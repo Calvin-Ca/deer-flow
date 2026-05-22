@@ -354,7 +354,7 @@ def _load_and_cache_app_config(config_path: str | None = None) -> AppConfig:
     _app_config_is_custom = False
     return _app_config
 
-
+# ./config.yaml 读取
 def get_app_config() -> AppConfig:
     """Get the DeerFlow config instance.
 

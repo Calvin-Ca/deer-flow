@@ -48,7 +48,7 @@ logger = logging.getLogger(__name__)
 
 
 def _get_runtime_config(config: RunnableConfig) -> dict:
-    """Merge legacy configurable options with LangGraph runtime context."""
+    """Merge legacy configurable options with LangGraph runtime context.""" 
     cfg = dict(config.get("configurable", {}) or {})
     context = config.get("context", {}) or {}
     if isinstance(context, dict):
@@ -372,13 +372,14 @@ def make_lead_agent(config: RunnableConfig):
     return _make_lead_agent(config, app_config=runtime_app_config or get_app_config())
 
 
-def _make_lead_agent(config: RunnableConfig, *, app_config: AppConfig):
+def _make_lead_agent(config: RunnableConfig, *, app_config: AppConfig): 
+    # config：运行时配置（本次请求参数），app_config：系统能力蓝图（静态配置），agent_config：某个 agent 的个性配置
     # Lazy import to avoid circular dependency
     from deerflow.tools import get_available_tools
     from deerflow.tools.builtins import setup_agent, update_agent
 
     cfg = _get_runtime_config(config)
-    resolved_app_config = app_config
+    resolved_app_config = app_config # 完整的 Agent 运行系统蓝图
 
     thinking_enabled = cfg.get("thinking_enabled", True)
     reasoning_effort = cfg.get("reasoning_effort", None)

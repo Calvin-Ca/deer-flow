@@ -206,6 +206,7 @@ def build_run_config(
     the LangGraph Platform-compatible HTTP API and the IM channel path behave
     identically.
     """
+    # LangGraph 架构升级，configurable演化为context
     config: dict[str, Any] = {"recursion_limit": 100}
     if request_config:
         # LangGraph >= 0.6.0 introduced ``context`` as the preferred way to
@@ -282,7 +283,7 @@ async def start_run(
     bridge = get_stream_bridge(request)
     run_mgr = get_run_manager(request)
     run_ctx = get_run_context(request)
-
+    # 客户端断开连接时的行为策略：cancel 表示中止 agent，continue_ 表示 agent 继续跑完（结果写入 checkpoint，下次可恢复）
     disconnect = DisconnectMode.cancel if body.on_disconnect == "cancel" else DisconnectMode.continue_
 
     body_context = getattr(body, "context", None) or {}
@@ -302,7 +303,7 @@ async def start_run(
                 detail=f"Model {model_name!r} is not in the configured model allowlist",
             )
 
-    try:
+    try:    # create_or_reject这里处理了并发冲突——同一个 thread 如果已有 run 在跑，根据 multitask_strategy 决定是排队、拒绝还是打断前一个
         record = await run_mgr.create_or_reject(
             thread_id,
             body.assistant_id,
@@ -332,7 +333,7 @@ async def start_run(
             await run_ctx.thread_store.update_status(thread_id, "running")
     except Exception:
         logger.warning("Failed to upsert thread_meta for %s (non-fatal)", sanitize_log_param(thread_id))
-
+    # 构建 agent 执行参数
     agent_factory = resolve_agent_factory(body.assistant_id)
     graph_input = normalize_input(body.input)
     config = build_run_config(thread_id, body.config, body.metadata, assistant_id=body.assistant_id)
@@ -341,8 +342,8 @@ async def start_run(
     # The ``context`` field is a custom extension for the langgraph-compat layer
     # that carries agent configuration (model_name, thinking_enabled, etc.).
     # Only agent-relevant keys are forwarded; unknown keys (e.g. thread_id) are ignored.
-    merge_run_context_overrides(config, getattr(body, "context", None))
-    inject_authenticated_user_context(config, request)
+    merge_run_context_overrides(config, getattr(body, "context", None)) # 把 context 中允许的字段，安全地“补充”到 config 的两个命名空间里，并且不覆盖已有配置，用于兼容新旧执行环境
+    inject_authenticated_user_context(config, request) # 注入当前用户信息
 
     stream_modes = normalize_stream_modes(body.stream_mode)
 

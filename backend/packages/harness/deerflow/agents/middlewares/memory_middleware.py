@@ -24,7 +24,7 @@ class MemoryMiddlewareState(AgentState):
 
     pass
 
-
+# 对话记忆中间件，在每次 Agent 执行完毕后，将对话内容异步写入记忆系统
 class MemoryMiddleware(AgentMiddleware[MemoryMiddlewareState]):
     """Middleware that queues conversation for memory update after agent execution.
 

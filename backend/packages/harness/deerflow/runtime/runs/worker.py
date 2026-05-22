@@ -136,10 +136,15 @@ async def run_agent(
     interrupt_after: list[str] | Literal["*"] | None = None,
 ) -> None:
     """Execute an agent in the background, publishing events to *bridge*."""
-
+    # run_agent()
+    # ├── 初始化阶段：快照、状态标记、元数据发布
+    # ├── 构建阶段：agent 工厂、checkpointer、中断节点
+    # ├── 执行阶段：astream 流式输出
+    # ├── 状态收尾：成功 / 中断 / 回滚
+    # └── finally：日志刷新、标题同步、SSE 终止
     # Unpack infrastructure dependencies from RunContext.
-    checkpointer = ctx.checkpointer
-    store = ctx.store
+    checkpointer = ctx.checkpointer # checkpoint 持久化（支持回滚）
+    store = ctx.store   # KV / memory
     event_store = ctx.event_store
     run_events_config = ctx.run_events_config
     thread_store = ctx.thread_store
@@ -303,7 +308,7 @@ async def run_agent(
         if len(lg_modes) == 1 and not stream_subgraphs:
             # Single mode, no subgraphs: astream yields raw chunks
             single_mode = lg_modes[0]
-            async for chunk in agent.astream(graph_input, config=runnable_config, stream_mode=single_mode):
+            async for chunk in agent.astream(graph_input, config=runnable_config, stream_mode=single_mode): # 执行图
                 if record.abort_event.is_set():
                     logger.info("Run %s abort requested — stopping", run_id)
                     break

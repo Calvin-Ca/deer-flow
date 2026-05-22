@@ -1,0 +1,62 @@
+# building-code-rag-poc
+
+建筑规范 RAG 项目的技术 POC，验证 PDF 解析流水线可行性。
+
+> 上下文与设计原则见仓库根目录 `CLAUDE.md`。本目录是 POC 阶段的独立沙箱，**不污染 deer-flow 既有结构**；跑通后再决定是否包装为 `skills/building-code-rag/`。
+
+---
+
+## 目录结构
+
+```
+building-code-rag-poc/
+├── README.md
+├── pyproject.toml              # uv 管理依赖（沿用 deer-flow 风格）
+├── .gitignore                  # 忽略 data/ 下的 PDF 与解析产物
+├── data/
+│   ├── raw/                    # 放原始 PDF（手动放入，不入 git）
+│   └── parsed/                 # MinerU 解析输出（不入 git）
+├── scripts/
+│   ├── setup_server.sh         # 服务器一次性环境准备
+│   └── 01_parse_pdf.py         # 阶段 0 第一步：MinerU 解析
+└── notebooks/                  # 调试与 review 用的 ipynb
+```
+
+---
+
+## 阶段 0：PDF 解析 POC（当前阶段）
+
+**目标**：拿 GB 50016 的 1-2 章过完整解析流水线，人工 review 抽取质量，**目标 >95% 准确率**。不达标不进入后续阶段。
+
+### 评估维度（必看）
+
+| 维度 | 怎么算合格 |
+|---|---|
+| 条款边界 | "3.4.1"、"3.4.2" 被正确切分为独立条目，层级关系正确 |
+| 表格 | 表格被结构化（行列关系保留），不是扁平化文本 |
+| 公式 | 公式抽出为 LaTeX 或可识别格式，不是乱码 |
+| 引用 | "应符合 X.X.X 的规定" 这类引用能被识别 |
+| 强制性标识 | "必须 / 严禁 / 不应 / 不得" 被标注，"宜 / 可" 区分 |
+| 图示 | 图示被切出（哪怕只是位置框），可在后续步骤中由 VLM 描述 |
+
+---
+
+## 使用流程
+
+### 1. 服务器一次性环境准备
+```bash
+bash scripts/setup_server.sh
+```
+
+### 2. 放 PDF
+把规范 PDF 放到 `data/raw/`（如 `data/raw/GB50016-2014-2018.pdf`）
+
+### 3. 跑解析
+```bash
+uv run python scripts/01_parse_pdf.py --pdf data/raw/GB50016-2014-2018.pdf
+```
+
+输出落在 `data/parsed/<pdf-basename>/`。
+
+### 4. 人工 review
+打开 `data/parsed/<pdf-basename>/auto/<basename>.md` 对照原 PDF 检查抽取质量，按上面"评估维度"评分。

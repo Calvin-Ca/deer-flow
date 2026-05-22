@@ -1,0 +1,24 @@
+# ===== PDF 原始数据：不入 git（可能含版权内容、文件大） =====
+data/raw/*
+!data/raw/.gitkeep
+
+# ===== 解析产物：不入 git（可重新生成、文件大） =====
+data/parsed/*
+!data/parsed/.gitkeep
+
+# ===== 调试 notebook 输出 =====
+notebooks/.ipynb_checkpoints/
+notebooks/*.ipynb_checkpoints
+
+# ===== Python 缓存 =====
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ===== 环境变量 =====
+.env
+.env.local

@@ -1,17 +1,21 @@
-"""阶段 0 第二步：从 MinerU 的 _content_list_v2.json 构建条款树。
+"""阶段 0 第二步：从 MinerU 的 content_list.json 构建条款树。
 
-输入：data/parsed/<standard>/<mode>/<standard>_content_list_v2.json
+支持两种 MinerU 输出格式：
+  v1 (content_list.json)：扁平列表，每条有 text / page_idx / text_level 字段
+  v2 (content_list_v2.json)：外层按页嵌套，文本藏在 paragraph_content / title_content 中
+
+实践中优先用 v1——顺序更可靠，文本字段更直接。
+
+输入：data/parsed/<standard>/<mode>/<standard>_content_list.json
 输出：data/structured/<standard>_clauses.json
 
-条款树结构：章 → 节 → 条 → 款，每个叶子节点带完整元数据。
-每条款输出格式见 CLAUDE.md §4.1。
+每条款格式见 CLAUDE.md §4.1。
 """
 
 from __future__ import annotations
 
 import json
 import re
-import sys
 from pathlib import Path
 from typing import Any
 
@@ -28,22 +32,17 @@ DEFAULT_OUTPUT = ROOT / "data" / "structured"
 # 正则模式
 # ---------------------------------------------------------------------------
 
-# 条款编号：1 / 1.1 / 1.1.1 / 1.1.1.1（行首，后跟空白或中文）
-CLAUSE_NUM_RE = re.compile(
-    r"^(\d+(?:\.\d+){0,3})\s+[一-鿿\w]"
-)
+# 条款编号：1 / 1.1 / 1.1.1 / 1.1.1.1（行首，后跟空白或中文字符）
+CLAUSE_NUM_RE = re.compile(r"^(\d+(?:\.\d+){0,3})\s*[　 一-鿿]")
 
-# 附录编号：附录A / 附录 B
+# 附录：附录A / 附录 B
 APPENDIX_RE = re.compile(r"^附录\s*([A-Z])\b")
 
-# 强制性关键词（出现即标记 is_mandatory=True）
-MANDATORY_RE = re.compile(r"必须|严禁|不应|不得|禁止")
+# 强制性：必须/严禁/不应/不得 是硬强条；"应"在 GB 规范中是 shall（强制）
+# 负向前瞻排除常见非强制用法：不应、应急、应对、应用、应付、应变、应运、应答
+MANDATORY_RE = re.compile(r"必须|严禁|不应|不得|禁止|(?<![不无非])应(?!急|对|用|付|变|运|答|届)")
 
-# 推荐性关键词（用于区分强条中的"应"）
-# 注："应"单独判断强制，但"宜/可"明确非强制
-RECOMMENDED_RE = re.compile(r"[宜]|^可[以]?")
-
-# 交叉引用：匹配"符合 X.X.X 的规定/要求"等
+# 交叉引用：本规范内条文号引用
 REFERENCE_RE = re.compile(
     r"(?:符合|按|按照|执行|见|参见|参照)\s*"
     r"(?:本[规标]范?\s*)?"
@@ -52,32 +51,93 @@ REFERENCE_RE = re.compile(
 )
 
 # ---------------------------------------------------------------------------
-# 文本提取工具
+# 格式检测与元素规范化
 # ---------------------------------------------------------------------------
 
-def extract_text(elem: dict) -> str:
-    """从任意元素中提取纯文本。"""
-    t = elem.get("type", "")
-    c = elem.get("content", {})
-    if t == "title":
-        parts = c.get("title_content", [])
-    elif t == "paragraph":
-        parts = c.get("paragraph_content", [])
-    elif t == "table":
-        # 表格单独处理，这里只返回 caption
-        caps = c.get("table_caption", [])
-        return " ".join(x.get("content", "") for x in caps if x.get("type") == "text").strip()
-    elif t == "image":
-        caps = c.get("image_caption", [])
-        return " ".join(x.get("content", "") for x in caps if x.get("type") == "text").strip()
+def detect_format(data: Any) -> str:
+    """自动检测 MinerU content_list 格式版本。"""
+    if not data:
+        return "v1"
+    first = data[0]
+    if isinstance(first, list):
+        return "v2"
+    return "v1"
+
+
+def normalize_elements(data: Any) -> list[dict]:
+    """
+    把 v1 / v2 格式统一成扁平的规范化元素列表：
+      { type, text, page, is_heading, raw }
+    """
+    fmt = detect_format(data)
+
+    if fmt == "v1":
+        return _normalize_v1(data)
     else:
-        return ""
-    return " ".join(x.get("content", "") for x in parts if x.get("type") == "text").strip()
+        return _normalize_v2(data)
 
 
-def extract_table_body(elem: dict) -> list[list[str]]:
-    """把 table 元素的 table_body 转成二维字符串列表。"""
-    c = elem.get("content", {})
+def _normalize_v1(items: list[dict]) -> list[dict]:
+    result = []
+    for item in items:
+        text = item.get("text", "").strip()
+        if not text:
+            continue
+        result.append({
+            "type": item.get("type", "text"),
+            "text": text,
+            "page": item.get("page_idx", 0) + 1,
+            "is_heading": "text_level" in item,
+            "raw": item,
+        })
+    return result
+
+
+def _normalize_v2(pages: list[list[dict]]) -> list[dict]:
+    result = []
+    for page_idx, page in enumerate(pages):
+        for item in page:
+            t = item.get("type", "")
+            c = item.get("content", {})
+
+            if t == "title":
+                parts = c.get("title_content", [])
+                text = " ".join(x.get("content", "") for x in parts if x.get("type") == "text").strip()
+                is_heading = True
+            elif t == "paragraph":
+                parts = c.get("paragraph_content", [])
+                text = " ".join(x.get("content", "") for x in parts if x.get("type") == "text").strip()
+                is_heading = False
+            elif t == "table":
+                caps = c.get("table_caption", [])
+                text = " ".join(x.get("content", "") for x in caps if x.get("type") == "text").strip()
+                is_heading = False
+            elif t == "image":
+                caps = c.get("image_caption", [])
+                text = " ".join(x.get("content", "") for x in caps if x.get("type") == "text").strip()
+                is_heading = False
+            else:
+                continue
+
+            if not text and t not in ("table",):
+                continue
+
+            result.append({
+                "type": t,
+                "text": text,
+                "page": page_idx + 1,
+                "is_heading": is_heading,
+                "raw": item,
+            })
+    return result
+
+
+# ---------------------------------------------------------------------------
+# 表格提取（仅 v2 有结构化 body）
+# ---------------------------------------------------------------------------
+
+def extract_table_body(raw_elem: dict) -> list[list[str]]:
+    c = raw_elem.get("content", {})
     rows = []
     for row in c.get("table_body", []):
         cells = []
@@ -92,11 +152,10 @@ def extract_table_body(elem: dict) -> list[list[str]]:
 
 
 # ---------------------------------------------------------------------------
-# 条款层级判断
+# 条款树构建
 # ---------------------------------------------------------------------------
 
 def clause_level(num_str: str) -> int:
-    """'1' → 1, '1.1' → 2, '1.1.1' → 3, '1.1.1.1' → 4"""
     return len(num_str.split("."))
 
 
@@ -105,29 +164,34 @@ def is_mandatory(text: str) -> bool:
 
 
 def extract_references(text: str) -> list[str]:
-    return list(dict.fromkeys(REFERENCE_RE.findall(text)))  # 去重保序
+    return list(dict.fromkeys(REFERENCE_RE.findall(text)))
 
 
-# ---------------------------------------------------------------------------
-# 核心解析
-# ---------------------------------------------------------------------------
-
-def parse_content_list(pages: list[list[dict]], standard_id: str) -> list[dict]:
+def _clause_match(text: str, is_heading: bool) -> re.Match | None:
     """
-    把 content_list_v2 的页面列表解析成扁平条款列表。
-    每条款是 CLAUDE.md §4.1 定义的 dict。
+    识别条款编号。规则：
+    - X.X / X.X.X / X.X.X.X（有小数点）：任何元素都可匹配
+    - 纯数字（如 "1 总则"）：仅在明确标记为标题（is_heading=True）时匹配，
+      避免把年份（2006年）、页码等误识别为章号
     """
+    m = CLAUSE_NUM_RE.match(text)
+    if m is None:
+        return None
+    num = m.group(1)
+    if "." not in num and not is_heading:
+        return None
+    return m
+
+
+def parse_elements(elements: list[dict], standard_id: str) -> list[dict]:
+    """把规范化元素列表解析成扁平条款列表。"""
     clauses: list[dict] = []
-    # 当前层级栈：{level: clause_dict}，用于把内容挂到正确的父节点
-    stack: dict[int, dict] = {}
+    stack: dict[int, dict] = {}  # level → clause_dict
 
     def current_clause() -> dict | None:
-        if not stack:
-            return None
-        return stack[max(stack)]
+        return stack[max(stack)] if stack else None
 
     def flush_clause(clause: dict) -> None:
-        """整理并追加到 clauses 列表。"""
         text = clause.get("content", "").strip()
         if not text and not clause.get("tables"):
             return
@@ -135,90 +199,96 @@ def parse_content_list(pages: list[list[dict]], standard_id: str) -> list[dict]:
         clause["references_to"] = extract_references(text)
         clauses.append(clause)
 
-    for page_idx, page in enumerate(pages):
-        for elem in page:
-            text = extract_text(elem)
-            if not text and elem.get("type") != "table":
+    for elem in elements:
+        text = elem["text"]
+        is_heading = elem.get("is_heading", False)
+
+        m = _clause_match(text, is_heading)
+        app_m = APPENDIX_RE.match(text)
+
+        if m:
+            num = m.group(1)
+            lvl = clause_level(num)
+
+            # 从完整文本中分离条款号和正文
+            # "3.2.1绿色建筑..." → title="3.2.1", body="绿色建筑..."
+            body = text[len(num):].strip()
+
+            for k in [k for k in stack if k >= lvl]:
+                flush_clause(stack.pop(k))
+
+            stack[lvl] = {
+                "standard_id": standard_id,
+                "clause_path": num,
+                "level": lvl,
+                "title": num,
+                "content": body,   # 条款号后的正文直接放入 content
+                "tables": [],
+                "images": [],
+                "page": elem["page"],
+                "is_mandatory": False,
+                "references_to": [],
+                "applicable_scope": {},
+            }
+
+        elif app_m:
+            for k in list(stack):
+                flush_clause(stack.pop(k))
+            letter = app_m.group(1)
+            stack[1] = {
+                "standard_id": standard_id,
+                "clause_path": f"附录{letter}",
+                "level": 1,
+                "title": text,
+                "content": "",
+                "tables": [],
+                "images": [],
+                "page": elem["page"],
+                "is_mandatory": False,
+                "references_to": [],
+                "applicable_scope": {},
+            }
+
+        else:
+            cur = current_clause()
+            if cur is None:
                 continue
 
-            # --- 判断是否是新条款标题 ---
-            m = CLAUSE_NUM_RE.match(text)
-            app_m = APPENDIX_RE.match(text)
-
-            if m:
-                num = m.group(1)
-                lvl = clause_level(num)
-
-                # 关闭比当前层级深或相同的栈节点
-                for k in [k for k in stack if k >= lvl]:
-                    flush_clause(stack.pop(k))
-
-                new_clause: dict[str, Any] = {
-                    "standard_id": standard_id,
-                    "clause_path": num,
-                    "level": lvl,
-                    "title": text,
-                    "content": "",
-                    "tables": [],
-                    "images": [],
-                    "page": page_idx + 1,
-                    # 以下字段在 flush 时填充
-                    "is_mandatory": False,
-                    "references_to": [],
-                    "applicable_scope": {},
-                }
-                stack[lvl] = new_clause
-
-            elif app_m:
-                # 附录单独作为顶层条款
-                for k in list(stack):
-                    flush_clause(stack.pop(k))
-                letter = app_m.group(1)
-                new_clause = {
-                    "standard_id": standard_id,
-                    "clause_path": f"附录{letter}",
-                    "level": 1,
-                    "title": text,
-                    "content": "",
-                    "tables": [],
-                    "images": [],
-                    "page": page_idx + 1,
-                    "is_mandatory": False,
-                    "references_to": [],
-                    "applicable_scope": {},
-                }
-                stack[1] = new_clause
-
+            raw = elem.get("raw", {})
+            if elem["type"] == "table":
+                cur["tables"].append({
+                    "caption": text,
+                    "body": extract_table_body(raw),
+                    "page": elem["page"],
+                })
+            elif elem["type"] == "image":
+                img_path = raw.get("content", {}).get("image_source", {}).get("path", "")
+                cur["images"].append({"path": img_path, "caption": text, "page": elem["page"]})
             else:
-                # 普通内容，挂到当前最深条款
-                cur = current_clause()
-                if cur is None:
-                    continue  # 封面/前言等，跳过
+                cur["content"] = (cur["content"] + "\n" + text).lstrip("\n")
 
-                if elem.get("type") == "table":
-                    table_data = {
-                        "caption": text,
-                        "body": extract_table_body(elem),
-                        "page": page_idx + 1,
-                    }
-                    cur["tables"].append(table_data)
-                elif elem.get("type") == "image":
-                    img_path = (
-                        elem.get("content", {})
-                        .get("image_source", {})
-                        .get("path", "")
-                    )
-                    cur["images"].append({"path": img_path, "caption": text, "page": page_idx + 1})
-                else:
-                    # 段落文本追加到 content
-                    if cur["content"]:
-                        cur["content"] += "\n" + text
-                    else:
-                        cur["content"] = text
-
-    # flush 剩余栈
     for clause in stack.values():
         flush_clause(clause)
+
+    # 按条款编号排序（MinerU 某些页内顺序可能颠倒）
+    def _sort_key(c: dict) -> tuple:
+        path = c["clause_path"]
+        if path.startswith("附录"):
+            return (99,) + (0,) * 4
+        try:
+            parts = [int(x) for x in path.split(".")]
+            return tuple(parts) + (0,) * (4 - len(parts))
+        except ValueError:
+            return (98,) + (0,) * 4
+
+    clauses.sort(key=_sort_key)
+
+    # 术语章（第2章，clause_path 以 "2." 开头）：定义文字含"应"不算强条
+    for c in clauses:
+        if c["clause_path"].startswith("2."):
+            c["is_mandatory"] = bool(
+                re.search(r"必须|严禁|不应|不得|禁止", c.get("content", ""))
+            )
 
     return clauses
 
@@ -232,17 +302,15 @@ def print_stats(clauses: list[dict]) -> None:
     mandatory = sum(1 for c in clauses if c["is_mandatory"])
     with_tables = sum(1 for c in clauses if c["tables"])
     with_refs = sum(1 for c in clauses if c["references_to"])
-
     by_level: dict[int, int] = {}
     for c in clauses:
-        lvl = c["level"]
-        by_level[lvl] = by_level.get(lvl, 0) + 1
+        by_level[c["level"]] = by_level.get(c["level"], 0) + 1
 
     t = Table(title="条款树统计")
     t.add_column("指标")
     t.add_column("数量", justify="right")
     t.add_row("总条款数", str(total))
-    t.add_row("强制性条款（必须/严禁/不应/不得）", str(mandatory))
+    t.add_row("强制性条款（应/必须/严禁/不应/不得）", str(mandatory))
     t.add_row("含表格的条款", str(with_tables))
     t.add_row("含交叉引用的条款", str(with_refs))
     for lvl in sorted(by_level):
@@ -256,49 +324,43 @@ def print_stats(clauses: list[dict]) -> None:
 
 @click.command()
 @click.option(
-    "--input",
-    "input_path",
+    "--input", "input_path",
     type=click.Path(exists=True, dir_okay=False, path_type=Path),
     required=True,
-    help="MinerU 输出的 _content_list_v2.json 路径。",
+    help="MinerU 输出的 _content_list.json 或 _content_list_v2.json 路径。",
 )
+@click.option("--standard-id", default="", help="规范标识，如 'GB 50016-2014(2018)'。")
 @click.option(
-    "--standard-id",
-    default="",
-    help="规范标识，如 'GB 50016-2014(2018)'。留空则从文件名推断。",
-)
-@click.option(
-    "--output-dir",
-    "output_dir",
+    "--output-dir", "output_dir",
     type=click.Path(file_okay=False, path_type=Path),
     default=DEFAULT_OUTPUT,
-    help="输出目录，默认 data/structured/。",
 )
-@click.option(
-    "--preview",
-    is_flag=True,
-    help="只打印前 20 条条款，不写文件（用于快速验证）。",
-)
-def main(
-    input_path: Path,
-    standard_id: str,
-    output_dir: Path,
-    preview: bool,
-) -> None:
-    """从 MinerU content_list_v2.json 构建结构化条款库。"""
+@click.option("--preview", is_flag=True, help="只打印前 20 条，不写文件。")
+def main(input_path: Path, standard_id: str, output_dir: Path, preview: bool) -> None:
+    """从 MinerU content_list.json 构建结构化条款库（支持 v1/v2 格式自动识别）。"""
 
     if not standard_id:
-        # 从文件名推断：去掉 _content_list_v2.json 后缀
-        standard_id = input_path.name.replace("_content_list_v2.json", "").replace("_", " ").strip()
+        standard_id = (
+            input_path.name
+            .replace("_content_list_v2.json", "")
+            .replace("_content_list.json", "")
+            .replace("_", " ")
+            .strip()
+        )
 
     console.print(f"[bold]规范：[/bold]{standard_id}")
     console.print(f"[bold]输入：[/bold]{input_path}")
 
     with open(input_path, encoding="utf-8") as f:
-        pages = json.load(f)
+        data = json.load(f)
 
-    console.print(f"共 {len(pages)} 页，开始解析…")
-    clauses = parse_content_list(pages, standard_id)
+    fmt = detect_format(data)
+    console.print(f"格式：{fmt}")
+
+    elements = normalize_elements(data)
+    console.print(f"共 {len(elements)} 个元素，开始解析…")
+
+    clauses = parse_elements(elements, standard_id)
     console.print(f"[green]✓ 提取到 {len(clauses)} 条条款[/green]")
 
     print_stats(clauses)
@@ -306,21 +368,19 @@ def main(
     if preview:
         console.print("\n[bold]--- 前 20 条预览 ---[/bold]")
         for c in clauses[:20]:
-            mandatory_tag = " [red][强条][/red]" if c["is_mandatory"] else ""
-            refs = f"  引用→{c['references_to']}" if c["references_to"] else ""
+            tag = " [red][强条][/red]" if c["is_mandatory"] else ""
+            refs = f"  → {c['references_to']}" if c["references_to"] else ""
             console.print(
-                f"  [cyan]{c['clause_path']}[/cyan] "
-                f"(p{c['page']}) {c['title'][:60]}"
-                f"{mandatory_tag}{refs}"
+                f"  [cyan]{c['clause_path']}[/cyan] (p{c['page']}) "
+                f"{c['title'][:60]}{tag}{refs}"
             )
         return
 
     output_dir.mkdir(parents=True, exist_ok=True)
-    safe_name = standard_id.replace(" ", "_").replace("(", "").replace(")", "")
-    out_path = output_dir / f"{safe_name}_clauses.json"
+    safe = standard_id.replace(" ", "_").replace("(", "").replace(")", "")
+    out_path = output_dir / f"{safe}_clauses.json"
     with open(out_path, "w", encoding="utf-8") as f:
         json.dump(clauses, f, ensure_ascii=False, indent=2)
-
     console.print(f"[green]✓ 已写入 {out_path}[/green]")
 
 

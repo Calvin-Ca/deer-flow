@@ -22,7 +22,9 @@ building-code-rag-poc/
 │   ├── setup_server.sh         # 服务器一次性环境准备
 │   ├── 01_parse_pdf.py         # 阶段 0 第一步：MinerU 解析
 │   ├── 02_extract_clauses.py   # 阶段 0 第二步：构建条款树
-│   └── 03_review_quality.py    # 阶段 0 第三步：质量审核
+│   ├── 03_review_quality.py    # 阶段 0 第三步：质量审核
+│   ├── 04_build_index.py       # 阶段 1 第一步：建 BM25 + 向量双索引
+│   └── 05_retrieve.py          # 阶段 1 第二步：混合检索 + 引用扩展 + Rerank
 └── notebooks/                  # 调试与 review 用的 ipynb
 ```
 
@@ -92,3 +94,53 @@ uv run python scripts/03_review_quality.py \
 
 ### 6. 人工 review
 对照原 PDF 抽查关键条款，按"评估维度"评分，确认达标后进入阶段 1。
+
+---
+
+## 阶段 1：MVP 条文检索
+
+### 7. 安装检索依赖
+```bash
+uv pip install -e ".[retrieval]"
+```
+
+### 8. Milvus 已在服务器部署（端口 19530），无需额外启动。
+
+### 9. 建立双索引（BM25 + 向量）
+```bash
+HF_ENDPOINT=https://hf-mirror.com uv run python scripts/04_build_index.py \
+  --input data/structured/GB_50016-20142018_clauses.json \
+  --standard-id "GB 50016-2014(2018)" \
+  --milvus-host localhost \
+  --milvus-port 19530
+```
+
+输出落在 `data/vector_store/GB_50016-20142018/`，Milvus collection 名为 `building_code_gb_50016-20142018`。
+
+只建 BM25（跳过向量索引）：
+```bash
+uv run python scripts/04_build_index.py \
+  --input data/structured/GB_50016-20142018_clauses.json \
+  --bm25-only
+```
+
+### 10. 检索验证
+```bash
+# 单条查询
+uv run python scripts/05_retrieve.py \
+  --store-dir data/vector_store/GB_50016-20142018 \
+  --query "24米住宅疏散楼梯净宽"
+
+# 跳过 Rerank（调试，速度更快）
+uv run python scripts/05_retrieve.py \
+  --store-dir data/vector_store/GB_50016-20142018 \
+  --query "防火分区最大建筑面积" \
+  --skip-rerank
+
+# 批量评测（需先核实 eval_set）
+uv run python scripts/05_retrieve.py \
+  --store-dir data/vector_store/GB_50016-20142018 \
+  --eval-set data/eval_set/gb50016_eval.json
+```
+
+核心指标：**强条召回率**（`avg_mandatory_recall`）——宁可多召回，不能漏强条。

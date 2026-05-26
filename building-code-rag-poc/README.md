@@ -15,10 +15,14 @@ building-code-rag-poc/
 ├── .gitignore                  # 忽略 data/ 下的 PDF 与解析产物
 ├── data/
 │   ├── raw/                    # 放原始 PDF（手动放入，不入 git）
-│   └── parsed/                 # MinerU 解析输出（不入 git）
+│   ├── parsed/                 # MinerU 解析输出（不入 git）
+│   ├── structured/             # 条款树 JSON（02 脚本输出，不入 git）
+│   └── quality_reports/        # 质量审核报告（03 脚本输出，不入 git）
 ├── scripts/
 │   ├── setup_server.sh         # 服务器一次性环境准备
-│   └── 01_parse_pdf.py         # 阶段 0 第一步：MinerU 解析
+│   ├── 01_parse_pdf.py         # 阶段 0 第一步：MinerU 解析
+│   ├── 02_extract_clauses.py   # 阶段 0 第二步：构建条款树
+│   └── 03_review_quality.py    # 阶段 0 第三步：质量审核
 └── notebooks/                  # 调试与 review 用的 ipynb
 ```
 
@@ -53,10 +57,38 @@ bash scripts/setup_server.sh
 
 ### 3. 跑解析
 ```bash
-uv run python scripts/01_parse_pdf.py --pdf data/raw/GB50016-2014-2018.pdf
+HF_ENDPOINT=https://hf-mirror.com uv run python scripts/01_parse_pdf.py \
+  --pdf data/raw/<文件名>.pdf
 ```
 
-输出落在 `data/parsed/<pdf-basename>/`。
+输出落在 `data/parsed/<pdf-basename>/auto/`，含 `.md` 和 `_content_list.json`。
 
-### 4. 人工 review
-打开 `data/parsed/<pdf-basename>/auto/<basename>.md` 对照原 PDF 检查抽取质量，按上面"评估维度"评分。
+### 4. 提取条款树
+```bash
+uv run python scripts/02_extract_clauses.py \
+  --input data/parsed/<pdf-basename>/auto/<pdf-basename>_content_list.json \
+  --standard-id "GB 50016-2014(2018)"
+```
+
+输出落在 `data/structured/<standard>_clauses.json`。
+
+### 5. 质量审核
+```bash
+uv run python scripts/03_review_quality.py \
+  --input data/structured/<standard>_clauses.json \
+  --standard-id "GB 50016-2014(2018)" \
+  --check-issues \
+  --export-report
+```
+
+报告输出至 `data/quality_reports/<standard>_report.md`。
+
+查看单条款：
+```bash
+uv run python scripts/03_review_quality.py \
+  --input data/structured/<standard>_clauses.json \
+  --show-clause 5.3.1
+```
+
+### 6. 人工 review
+对照原 PDF 抽查关键条款，按"评估维度"评分，确认达标后进入阶段 1。

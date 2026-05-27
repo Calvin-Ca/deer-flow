@@ -152,3 +152,36 @@ CUDA_VISIBLE_DEVICES=2 HF_ENDPOINT=https://hf-mirror.com \
 | 交叉引用 | "应符合 X.X.X 的规定" 被识别，`references_to` 字段有值 |
 | 强条召回率 | Recall@20 on mandatory clauses > 目标阈值 |
 | 引用扩展 | 命中条款的 `references_to` 被自动拉取 |
+
+---
+
+## 常用命令（快速参考）
+
+所有命令在 `building-code-rag-poc/` 目录下执行。
+
+```bash
+# 环境管理
+cd building-code-rag-poc && uv add <package>   # 安装新依赖（写入 pyproject.toml）
+cd building-code-rag-poc && uv sync             # 同步环境到 pyproject.toml/uv.lock
+
+# PDF 分块解析（大文件用，如 GB 50016 共 464 页用 80 页/块）
+CUDA_VISIBLE_DEVICES=2 HF_ENDPOINT=https://hf-mirror.com \
+  .venv/bin/python scripts/split_and_parse.py \
+  --pdf data/raw/<xxx>.pdf --chunk-size 80
+
+# 条款树提取
+.venv/bin/python scripts/02_extract_clauses.py \
+  --input "data/parsed/<basename>/auto/<basename>_content_list.json" \
+  --standard-id "<standard>" \
+  --output-dir data/structured/
+
+# 建双索引（BM25 + 向量）
+.venv/bin/python scripts/04_build_index.py \
+  --input data/structured/<standard>_clauses.json \
+  --embed-url http://localhost:8097 --embed-model-id /model
+
+# 检索验证
+.venv/bin/python scripts/05_retrieve.py \
+  --store-dir data/vector_store/<standard> \
+  --query "<查询>" --skip-rerank
+```

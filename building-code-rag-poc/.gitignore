@@ -27,8 +27,13 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 
-# ===== 自动生成的质量报告 =====
-data/quality_reports/
+# ===== 评测集：目录保留，文件不入 git =====
+data/eval_set/*
+!data/eval_set/.gitkeep
+
+# ===== 自动生成的质量报告：目录保留，文件不入 git =====
+data/quality_reports/*
+!data/quality_reports/.gitkeep
 
 # ===== 环境变量 =====
 .env

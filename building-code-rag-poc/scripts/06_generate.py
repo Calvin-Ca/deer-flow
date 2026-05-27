@@ -113,7 +113,7 @@ def build_user_message(query: str, clauses: list[dict]) -> str:
   "answer": "面向通用用户的自然语言回答。必须在正文中引用条款号。强制性条款（is_mandatory=true）明确标注为"强制要求"，推荐性条款（is_mandatory=false）标注为"推荐"。末尾附：本回答仅供参考，不替代专业审查。",
   "applicable_clauses": [
     {
-      "clause": "条款号，如 5.3.4",
+      "clause": "仅填条款编号，如 4.4.1，不加"条款"前缀",
       "standard": "规范编号",
       "text": "相关原文（保持完整语义）",
       "is_mandatory": true或false（从A类条款的 is_mandatory 标注中原样复制）,
@@ -122,7 +122,7 @@ def build_user_message(query: str, clauses: list[dict]) -> str:
   ],
   "referenced_clauses": [
     {
-      "clause": "条款号",
+      "clause": "仅填条款编号，如 4.4.1，不加"条款"前缀",
       "standard": "规范编号",
       "text": "原文关键句",
       "is_mandatory": true或false（从B类条款的 is_mandatory 标注中原样复制）

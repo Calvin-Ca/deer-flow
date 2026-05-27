@@ -127,17 +127,17 @@ def detect_mineru_cli() -> str:
     sys.exit(1)
 
 
-def parse_chunk(chunk_path: Path, chunk_out_dir: Path, device: str, cli: str) -> bool:
+def parse_chunk(chunk_path: Path, chunk_out_dir: Path, device: str, cli: str, backend: str = "pipeline") -> bool:
     """解析单块 PDF，返回是否成功。输出落在 chunk_out_dir/<chunk_stem>/auto/。"""
     if cli == "mineru":
-        cmd = [cli, "-p", str(chunk_path), "-o", str(chunk_out_dir), "--device", device]
+        cmd = [cli, "-p", str(chunk_path), "-o", str(chunk_out_dir), "--device", device, "--backend", backend]
     else:
         cmd = [cli, "-p", str(chunk_path), "-o", str(chunk_out_dir), "-m", "auto"]
 
-    result = subprocess.run(cmd, check=False, capture_output=True, text=True)
+    # 直接透传 stdout/stderr，方便实时观察 MinerU 进度
+    result = subprocess.run(cmd, check=False)
     if result.returncode != 0:
         console.print(f"[red]  ✗ {chunk_path.name} 失败（退出码 {result.returncode}）[/red]")
-        console.print(f"[dim]{result.stderr[-2000:]}[/dim]")
         return False
     return True
 
@@ -260,6 +260,10 @@ def merge_images(
     help="只处理第 N 块（0 起）；不传则处理全部。",
 )
 @click.option(
+    "--backend", default="pipeline", show_default=True,
+    help="mineru 后端。pipeline=纯 OCR+版面检测（推荐，无 VLM 依赖）；hybrid-auto-engine=含 VLM 图示理解。",
+)
+@click.option(
     "--skip-merge", is_flag=True, default=False,
     help="跳过合并步骤（只解析各块）。",
 )
@@ -268,6 +272,7 @@ def main(
     output_dir: Path,
     chunk_size: int,
     device: str,
+    backend: str,
     only_chunk: int | None,
     skip_merge: bool,
 ) -> None:
@@ -282,6 +287,7 @@ def main(
 
     console.rule(f"[bold]分块解析：{pdf_path.name}[/bold]")
     console.print(f"  CLI         : {cli}")
+    console.print(f"  后端        : {backend}")
     console.print(f"  设备        : {device}")
     console.print(f"  块大小      : {chunk_size} 页")
     console.print(f"  临时目录    : {chunk_pdf_dir.parent}")
@@ -307,7 +313,7 @@ def main(
             continue
 
         console.print(f"  → 解析中: {label}")
-        ok = parse_chunk(chunk_path, chunk_out_dir, device, cli)
+        ok = parse_chunk(chunk_path, chunk_out_dir, device, cli, backend)
         if ok:
             console.print(f"  [green]✓[/green] 完成: {chunk_path.name}")
         else:

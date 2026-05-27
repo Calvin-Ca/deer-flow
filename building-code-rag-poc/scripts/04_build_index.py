@@ -114,35 +114,37 @@ def build_vector_index(
     embed_model_id: str,
     batch_size: int,
 ) -> None:
-    from pymilvus import (
-        connections, utility, Collection, CollectionSchema,
-        FieldSchema, DataType,
-    )
+    from pymilvus import MilvusClient, DataType
 
-    # 连接 Milvus
-    connections.connect(host=milvus_host, port=str(milvus_port))
+    client = MilvusClient(uri=f"http://{milvus_host}:{milvus_port}")
     console.print(f"[green]已连接 Milvus {milvus_host}:{milvus_port}[/green]")
 
     # 建或重建 collection
-    if utility.has_collection(collection_name):
+    if client.has_collection(collection_name):
         console.print(f"[yellow]集合 {collection_name} 已存在，将重建[/yellow]")
-        utility.drop_collection(collection_name)
+        client.drop_collection(collection_name)
 
-    fields = [
-        FieldSchema(name="id",            dtype=DataType.INT64,   is_primary=True, auto_id=True),
-        FieldSchema(name="clause_path",   dtype=DataType.VARCHAR, max_length=64),
-        FieldSchema(name="standard_id",   dtype=DataType.VARCHAR, max_length=64),
-        FieldSchema(name="content",       dtype=DataType.VARCHAR, max_length=65_535),
-        FieldSchema(name="is_mandatory",  dtype=DataType.BOOL),
-        FieldSchema(name="level",         dtype=DataType.INT64),
-        FieldSchema(name="page",          dtype=DataType.INT64),
-        FieldSchema(name="references_to", dtype=DataType.VARCHAR, max_length=2_048),
-        FieldSchema(name="has_tables",    dtype=DataType.BOOL),
-        FieldSchema(name="has_images",    dtype=DataType.BOOL),
-        FieldSchema(name="embedding",     dtype=DataType.FLOAT_VECTOR, dim=EMBED_DIM),
-    ]
-    schema = CollectionSchema(fields=fields, description=f"建筑规范条款库 {collection_name}")
-    collection = Collection(name=collection_name, schema=schema)
+    schema = client.create_schema(auto_id=True, enable_dynamic_field=False)
+    schema.add_field("id",            DataType.INT64,         is_primary=True)
+    schema.add_field("clause_path",   DataType.VARCHAR,       max_length=64)
+    schema.add_field("standard_id",   DataType.VARCHAR,       max_length=64)
+    schema.add_field("content",       DataType.VARCHAR,       max_length=65_535)
+    schema.add_field("is_mandatory",  DataType.BOOL)
+    schema.add_field("level",         DataType.INT64)
+    schema.add_field("page",          DataType.INT64)
+    schema.add_field("references_to", DataType.VARCHAR,       max_length=2_048)
+    schema.add_field("has_tables",    DataType.BOOL)
+    schema.add_field("has_images",    DataType.BOOL)
+    schema.add_field("embedding",     DataType.FLOAT_VECTOR,  dim=EMBED_DIM)
+
+    index_params = client.prepare_index_params()
+    index_params.add_index("embedding",    metric_type="COSINE", index_type="HNSW",
+                           params={"M": 16, "efConstruction": 200})
+    index_params.add_index("is_mandatory", index_type="INVERTED")
+    index_params.add_index("clause_path",  index_type="INVERTED")
+
+    client.create_collection(collection_name=collection_name,
+                             schema=schema, index_params=index_params)
     console.print(f"集合 {collection_name} 已创建")
 
     # 分批嵌入并插入
@@ -154,30 +156,13 @@ def build_vector_index(
     for i in tqdm(range(0, len(clauses), batch_size), total=total_batches, desc="嵌入并插入"):
         batch_texts = texts[i: i + batch_size]
         batch_rows = rows[i: i + batch_size]
-
         embeddings = embed_texts(batch_texts, embed_url, embed_model_id, len(batch_texts))
+        for j, row in enumerate(batch_rows):
+            row["embedding"] = embeddings[j]
+        client.insert(collection_name=collection_name, data=batch_rows)
 
-        data = {k: [r[k] for r in batch_rows] for k in batch_rows[0]}
-        data["embedding"] = embeddings
-        collection.insert(list(data.values()))
-
-    collection.flush()
-
-    # 建 HNSW 向量索引
-    collection.create_index(
-        field_name="embedding",
-        index_params={
-            "metric_type": "COSINE",
-            "index_type":  "HNSW",
-            "params":      {"M": 16, "efConstruction": 200},
-        },
-    )
-    # 标量索引（用于过滤强条）
-    collection.create_index(field_name="is_mandatory")
-    collection.create_index(field_name="clause_path")
-
-    collection.load()
-    console.print(f"[green]✓ 向量索引完成：{collection.num_entities} 个向量[/green]")
+    stats = client.get_collection_stats(collection_name)
+    console.print(f"[green]✓ 向量索引完成：{stats['row_count']} 个向量[/green]")
 
 
 # ---------------------------------------------------------------------------
@@ -242,7 +227,7 @@ def main(
             .strip()
         )
 
-    safe_id = standard_id.replace(" ", "_").replace("(", "").replace(")", "")
+    safe_id = standard_id.replace(" ", "_").replace("(", "").replace(")", "").replace("-", "_")
     if store_dir is None:
         store_dir = DEFAULT_STORE / safe_id
     store_dir.mkdir(parents=True, exist_ok=True)

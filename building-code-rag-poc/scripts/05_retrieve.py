@@ -72,11 +72,9 @@ def embed_texts(texts: list[str], embed_url: str, model_id: str) -> list[list[fl
 
 
 def connect_milvus(milvus_host: str, milvus_port: int, collection_name: str):
-    from pymilvus import connections, Collection
-    connections.connect(host=milvus_host, port=str(milvus_port))
-    collection = Collection(name=collection_name)
-    collection.load()
-    return collection
+    from pymilvus import MilvusClient
+    client = MilvusClient(uri=f"http://{milvus_host}:{milvus_port}")
+    return client, collection_name
 
 
 # ---------------------------------------------------------------------------
@@ -106,7 +104,8 @@ def bm25_search(
 
 def vector_search(
     query: str,
-    collection,
+    client,
+    collection_name: str,
     embed_url: str,
     embed_model_id: str,
     top_k: int,
@@ -114,25 +113,25 @@ def vector_search(
 ) -> list[dict]:
     query_vec = embed_texts([query], embed_url, embed_model_id)[0]
 
-    expr = "is_mandatory == true" if filter_mandatory else ""
+    filter_expr = "is_mandatory == true" if filter_mandatory else ""
     search_params = {"metric_type": "COSINE", "params": {"ef": 64}}
 
-    hits = collection.search(
+    hits = client.search(
+        collection_name=collection_name,
         data=[query_vec],
         anns_field="embedding",
-        param=search_params,
+        search_params=search_params,
         limit=top_k,
-        expr=expr or None,
+        filter=filter_expr or None,
         output_fields=MILVUS_OUTPUT_FIELDS,
     )
 
     results = []
     for hit in hits[0]:
-        item = {f: hit.entity.get(f) for f in MILVUS_OUTPUT_FIELDS}
-        # references_to 在 Milvus 里是 JSON 字符串，还原为 list
+        item = {f: hit.get(f) for f in MILVUS_OUTPUT_FIELDS}
         refs_raw = item.get("references_to", "[]")
         item["references_to"] = json.loads(refs_raw) if isinstance(refs_raw, str) else refs_raw
-        item["_vector_score"] = hit.score
+        item["_vector_score"] = hit.get("distance")
         item["_source"] = "vector"
         results.append(item)
     return results
@@ -238,10 +237,10 @@ def retrieve(
 ) -> list[dict]:
     bm25, clause_paths = load_bm25(store_dir)
     metadata = load_metadata(store_dir)
-    collection = connect_milvus(milvus_host, milvus_port, collection_name)
+    client, col_name = connect_milvus(milvus_host, milvus_port, collection_name)
 
     bm25_results = bm25_search(query, bm25, clause_paths, metadata, bm25_top_k)
-    vector_results = vector_search(query, collection, embed_url, embed_model_id, vector_top_k)
+    vector_results = vector_search(query, client, col_name, embed_url, embed_model_id, vector_top_k)
 
     merged = merge_results(bm25_results, vector_results)
     expanded = expand_references(merged, metadata)
@@ -397,7 +396,7 @@ def main(
     """混合检索 + 引用扩展 + Rerank（Milvus + vLLM）。"""
 
     if not collection:
-        collection = f"{COLLECTION_PREFIX}_{store_dir.name}".lower()
+        collection = f"{COLLECTION_PREFIX}_{store_dir.name}".lower().replace("-", "_")
 
     if eval_path:
         if output_path is None:

@@ -101,6 +101,8 @@ def embed_texts(texts: list[str], embed_url: str, model_id: str, batch_size: int
             json={"model": model_id, "input": batch},
             timeout=120,
         )
+        if not resp.ok:
+            print(f"[ERROR] batch {i}: {resp.status_code} {resp.text[:500]}")
         resp.raise_for_status()
         data = sorted(resp.json()["data"], key=lambda x: x["index"])
         all_embeddings.extend(item["embedding"] for item in data)

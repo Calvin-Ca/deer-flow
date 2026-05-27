@@ -6,13 +6,12 @@
   data/vector_store/<standard>/metadata.json   条款元数据（与向量一一对应）
   Milvus collection: building_code_<standard>  向量索引（含全部元数据）
 
-安装依赖（服务器上）：
-  uv pip install -e ".[retrieval]"
+依赖服务（服务器已部署）：
+  Milvus:          localhost:19530
+  vLLM BGE-large:  localhost:8097  (model id: /model, dim: 1024)
 
-Milvus 服务已在服务器上运行（端口 19530）。
-
-嵌入模型：BAAI/bge-large-zh-v1.5（中文规范效果最佳）
-Rerank 模型：BAAI/bge-reranker-large（阶段 1 检索时使用）
+安装依赖：
+  uv pip install --python .venv/bin/python "pymilvus>=2.4.0" "rank-bm25>=0.2.2" requests
 """
 
 from __future__ import annotations
@@ -88,26 +87,37 @@ def build_bm25(clauses: list[dict], store_dir: Path) -> None:
 # 向量索引（Milvus）
 # ---------------------------------------------------------------------------
 
+def embed_texts(texts: list[str], embed_url: str, model_id: str, batch_size: int) -> list[list[float]]:
+    """调 vLLM embedding API，分批返回向量列表。"""
+    import requests
+
+    all_embeddings: list[list[float]] = []
+    for i in range(0, len(texts), batch_size):
+        batch = texts[i: i + batch_size]
+        resp = requests.post(
+            f"{embed_url}/v1/embeddings",
+            json={"model": model_id, "input": batch},
+            timeout=120,
+        )
+        resp.raise_for_status()
+        data = sorted(resp.json()["data"], key=lambda x: x["index"])
+        all_embeddings.extend(item["embedding"] for item in data)
+    return all_embeddings
+
+
 def build_vector_index(
     clauses: list[dict],
     collection_name: str,
     milvus_host: str,
     milvus_port: int,
+    embed_url: str,
+    embed_model_id: str,
     batch_size: int,
-    hf_endpoint: str,
 ) -> None:
-    import os
-    if hf_endpoint:
-        os.environ["HF_ENDPOINT"] = hf_endpoint
-
-    from sentence_transformers import SentenceTransformer
     from pymilvus import (
         connections, utility, Collection, CollectionSchema,
         FieldSchema, DataType,
     )
-
-    console.print(f"加载嵌入模型 {EMBED_MODEL}…")
-    model = SentenceTransformer(EMBED_MODEL)
 
     # 连接 Milvus
     connections.connect(host=milvus_host, port=str(milvus_port))
@@ -126,7 +136,7 @@ def build_vector_index(
         FieldSchema(name="is_mandatory",  dtype=DataType.BOOL),
         FieldSchema(name="level",         dtype=DataType.INT64),
         FieldSchema(name="page",          dtype=DataType.INT64),
-        FieldSchema(name="references_to", dtype=DataType.VARCHAR, max_length=2_048),  # JSON 字符串
+        FieldSchema(name="references_to", dtype=DataType.VARCHAR, max_length=2_048),
         FieldSchema(name="has_tables",    dtype=DataType.BOOL),
         FieldSchema(name="has_images",    dtype=DataType.BOOL),
         FieldSchema(name="embedding",     dtype=DataType.FLOAT_VECTOR, dim=EMBED_DIM),
@@ -139,16 +149,13 @@ def build_vector_index(
     texts = [clause_to_text(c) for c in clauses]
     rows = [clause_to_row(c) for c in clauses]
 
+    console.print(f"调用嵌入服务 {embed_url}，model={embed_model_id}…")
     total_batches = (len(clauses) + batch_size - 1) // batch_size
     for i in tqdm(range(0, len(clauses), batch_size), total=total_batches, desc="嵌入并插入"):
         batch_texts = texts[i: i + batch_size]
         batch_rows = rows[i: i + batch_size]
 
-        embeddings = model.encode(
-            batch_texts,
-            normalize_embeddings=True,
-            show_progress_bar=False,
-        ).tolist()
+        embeddings = embed_texts(batch_texts, embed_url, embed_model_id, len(batch_texts))
 
         data = {k: [r[k] for r in batch_rows] for k in batch_rows[0]}
         data["embedding"] = embeddings
@@ -208,23 +215,24 @@ def save_metadata(clauses: list[dict], store_dir: Path) -> None:
 )
 @click.option("--milvus-host", default="localhost", show_default=True)
 @click.option("--milvus-port", default=19530, show_default=True)
+@click.option("--embed-url", default="http://localhost:8097", show_default=True,
+              help="vLLM embedding 服务地址。")
+@click.option("--embed-model-id", default="/model", show_default=True,
+              help="vLLM 中的模型 ID（见 /v1/models）。")
 @click.option("--batch-size", default=64, show_default=True, help="嵌入批大小。")
-@click.option(
-    "--hf-endpoint", default="https://hf-mirror.com", show_default=True,
-    help="HuggingFace 镜像地址。",
-)
-@click.option("--bm25-only", is_flag=True, help="只建 BM25，跳过向量索引（不需要 GPU）。")
+@click.option("--bm25-only", is_flag=True, help="只建 BM25，跳过向量索引。")
 def main(
     input_path: Path,
     standard_id: str,
     store_dir: Path | None,
     milvus_host: str,
     milvus_port: int,
+    embed_url: str,
+    embed_model_id: str,
     batch_size: int,
-    hf_endpoint: str,
     bm25_only: bool,
 ) -> None:
-    """从条款树 JSON 建立 BM25 + 向量双索引（Milvus）。"""
+    """从条款树 JSON 建立 BM25 + 向量双索引（Milvus + vLLM）。"""
 
     if not standard_id:
         standard_id = (
@@ -253,7 +261,7 @@ def main(
     save_metadata(clauses, store_dir)
 
     if not bm25_only:
-        build_vector_index(clauses, collection_name, milvus_host, milvus_port, batch_size, hf_endpoint)
+        build_vector_index(clauses, collection_name, milvus_host, milvus_port, embed_url, embed_model_id, batch_size)
     else:
         console.print("[dim]--bm25-only：跳过向量索引[/dim]")
 

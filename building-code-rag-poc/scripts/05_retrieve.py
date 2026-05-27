@@ -36,7 +36,6 @@ console = Console()
 
 ROOT = Path(__file__).resolve().parent.parent
 RERANK_MODEL = "BAAI/bge-reranker-large"
-EMBED_MODEL = "BAAI/bge-large-zh-v1.5"
 COLLECTION_PREFIX = "building_code"
 
 MILVUS_OUTPUT_FIELDS = [
@@ -58,6 +57,18 @@ def load_bm25(store_dir: Path):
 def load_metadata(store_dir: Path) -> list[dict]:
     with open(store_dir / "metadata.json", encoding="utf-8") as f:
         return json.load(f)
+
+
+def embed_texts(texts: list[str], embed_url: str, model_id: str) -> list[list[float]]:
+    import requests
+    resp = requests.post(
+        f"{embed_url}/v1/embeddings",
+        json={"model": model_id, "input": texts},
+        timeout=120,
+    )
+    resp.raise_for_status()
+    data = sorted(resp.json()["data"], key=lambda x: x["index"])
+    return [item["embedding"] for item in data]
 
 
 def connect_milvus(milvus_host: str, milvus_port: int, collection_name: str):
@@ -96,11 +107,12 @@ def bm25_search(
 def vector_search(
     query: str,
     collection,
-    model,
+    embed_url: str,
+    embed_model_id: str,
     top_k: int,
     filter_mandatory: bool = False,
 ) -> list[dict]:
-    query_vec = model.encode([query], normalize_embeddings=True)[0].tolist()
+    query_vec = embed_texts([query], embed_url, embed_model_id)[0]
 
     expr = "is_mandatory == true" if filter_mandatory else ""
     search_params = {"metric_type": "COSINE", "params": {"ef": 64}}
@@ -189,24 +201,21 @@ def expand_references(results: list[dict], metadata: list[dict], max_depth: int 
 # Rerank
 # ---------------------------------------------------------------------------
 
-def rerank(query: str, results: list[dict], top_k: int, hf_endpoint: str) -> list[dict]:
-    import os
-    if hf_endpoint:
-        os.environ.setdefault("HF_ENDPOINT", hf_endpoint)
+def rerank(query: str, results: list[dict], top_k: int) -> list[dict]:
+    try:
+        from FlagEmbedding import FlagReranker
+        reranker = FlagReranker(RERANK_MODEL, use_fp16=True)
+        pairs = [[query, r.get("content", "")] for r in results]
+        scores = reranker.compute_score(pairs, normalize=True)
+        for item, score in zip(results, scores):
+            item["_rerank_score"] = float(score)
+        results_sorted = sorted(results, key=lambda x: x.get("_rerank_score", 0), reverse=True)
+    except Exception as e:
+        console.print(f"[yellow]Rerank 不可用（{e}），使用 RRF 排序[/yellow]")
+        results_sorted = results
 
-    from FlagEmbedding import FlagReranker
-    reranker = FlagReranker(RERANK_MODEL, use_fp16=True)
-
-    pairs = [[query, r.get("content", "")] for r in results]
-    scores = reranker.compute_score(pairs, normalize=True)
-
-    for item, score in zip(results, scores):
-        item["_rerank_score"] = float(score)
-
-    results_sorted = sorted(results, key=lambda x: x.get("_rerank_score", 0), reverse=True)
     mandatory = [r for r in results_sorted if r.get("is_mandatory")]
     non_mandatory = [r for r in results_sorted if not r.get("is_mandatory")]
-    # 强条全部保留，非强条截断到 top_k
     return mandatory + non_mandatory[: max(0, top_k - len(mandatory))]
 
 
@@ -220,21 +229,19 @@ def retrieve(
     milvus_host: str,
     milvus_port: int,
     collection_name: str,
+    embed_url: str,
+    embed_model_id: str,
     top_k: int,
     bm25_top_k: int,
     vector_top_k: int,
-    hf_endpoint: str,
     skip_rerank: bool,
 ) -> list[dict]:
     bm25, clause_paths = load_bm25(store_dir)
     metadata = load_metadata(store_dir)
-
-    from sentence_transformers import SentenceTransformer
-    embed_model = SentenceTransformer(EMBED_MODEL)
     collection = connect_milvus(milvus_host, milvus_port, collection_name)
 
     bm25_results = bm25_search(query, bm25, clause_paths, metadata, bm25_top_k)
-    vector_results = vector_search(query, collection, embed_model, vector_top_k)
+    vector_results = vector_search(query, collection, embed_url, embed_model_id, vector_top_k)
 
     merged = merge_results(bm25_results, vector_results)
     expanded = expand_references(merged, metadata)
@@ -244,7 +251,7 @@ def retrieve(
         non_mandatory = [r for r in expanded if not r.get("is_mandatory")]
         return mandatory + non_mandatory[: max(0, top_k - len(mandatory))]
 
-    return rerank(query, expanded, top_k, hf_endpoint)
+    return rerank(query, expanded, top_k)
 
 
 # ---------------------------------------------------------------------------
@@ -257,8 +264,9 @@ def run_eval(
     milvus_host: str,
     milvus_port: int,
     collection_name: str,
+    embed_url: str,
+    embed_model_id: str,
     top_k: int,
-    hf_endpoint: str,
     skip_rerank: bool,
     output_path: Path,
 ) -> None:
@@ -276,7 +284,7 @@ def run_eval(
 
         hits = retrieve(
             query, store_dir, milvus_host, milvus_port, collection_name,
-            top_k, top_k * 2, top_k * 2, hf_endpoint, skip_rerank,
+            embed_url, embed_model_id, top_k, top_k * 2, top_k * 2, skip_rerank,
         )
         hit_paths = {h["clause_path"] for h in hits}
         recalled = expected & hit_paths
@@ -369,7 +377,9 @@ def print_results(query: str, results: list[dict]) -> None:
 @click.option("--milvus-host", default="localhost", show_default=True)
 @click.option("--milvus-port", default=19530, show_default=True)
 @click.option("--collection", default="", help="Milvus collection 名（默认从 store-dir 推断）。")
-@click.option("--hf-endpoint", default="https://hf-mirror.com", show_default=True)
+@click.option("--embed-url", default="http://localhost:8097", show_default=True,
+              help="vLLM embedding 服务地址。")
+@click.option("--embed-model-id", default="/model", show_default=True)
 @click.option("--skip-rerank", is_flag=True, help="跳过 Rerank（调试用）。")
 def main(
     store_dir: Path,
@@ -380,10 +390,11 @@ def main(
     milvus_host: str,
     milvus_port: int,
     collection: str,
-    hf_endpoint: str,
+    embed_url: str,
+    embed_model_id: str,
     skip_rerank: bool,
 ) -> None:
-    """混合检索 + 引用扩展 + Rerank（Milvus）。"""
+    """混合检索 + 引用扩展 + Rerank（Milvus + vLLM）。"""
 
     if not collection:
         collection = f"{COLLECTION_PREFIX}_{store_dir.name}".lower()
@@ -392,11 +403,11 @@ def main(
         if output_path is None:
             output_path = ROOT / "data" / "eval_results" / f"{store_dir.name}_retrieval.json"
         run_eval(eval_path, store_dir, milvus_host, milvus_port, collection,
-                 top_k, hf_endpoint, skip_rerank, output_path)
+                 embed_url, embed_model_id, top_k, skip_rerank, output_path)
     elif query:
         results = retrieve(
             query, store_dir, milvus_host, milvus_port, collection,
-            top_k, top_k * 2, top_k * 2, hf_endpoint, skip_rerank,
+            embed_url, embed_model_id, top_k, top_k * 2, top_k * 2, skip_rerank,
         )
         print_results(query, results)
     else:

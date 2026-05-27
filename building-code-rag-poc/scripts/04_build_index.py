@@ -107,7 +107,7 @@ def build_vector_index(
     )
 
     console.print(f"加载嵌入模型 {EMBED_MODEL}…")
-    model = SentenceTransformer(EMBED_MODEL, model_kwargs={"use_safetensors": True})
+    model = SentenceTransformer(EMBED_MODEL)
 
     # 连接 Milvus
     connections.connect(host=milvus_host, port=str(milvus_port))

@@ -61,40 +61,62 @@ SYSTEM_PROMPT = """\
 
 
 def build_user_message(query: str, clauses: list[dict]) -> str:
-    mandatory = [c for c in clauses if c.get("is_mandatory")]
-    non_mandatory = [c for c in clauses if not c.get("is_mandatory")]
+    # 按来源分组：检索召回 vs 引用图扩展
+    retrieved = [c for c in clauses if c.get("_source") != "ref_expand"]
+    ref_expanded = [c for c in clauses if c.get("_source") == "ref_expand"]
+    n_mandatory = sum(1 for c in clauses if c.get("is_mandatory"))
 
-    lines = []
+    def clause_block(c: dict) -> list[str]:
+        # is_mandatory 显式写入，要求模型原样复制，不自行判断
+        mandatory_flag = "true【强制性，必须/严禁/不应/不得】" if c.get("is_mandatory") else "false【推荐性，宜/可】"
+        return [
+            f"--- 条款 {c['clause_path']} | is_mandatory={mandatory_flag} ---",
+            f"规范：{c.get('standard_id', '未知')}",
+            f"正文：{c.get('content', '').strip()}",
+            "",
+        ]
+
+    lines: list[str] = []
     lines.append(f"用户问题：{query}")
     lines.append("")
     lines.append(
-        f"以下是从规范库检索到的相关条款（共 {len(clauses)} 条，"
-        f"其中 {len(mandatory)} 条为强制性）："
+        f"从规范库检索到 {len(clauses)} 条相关条款（强制性 {n_mandatory} 条）。"
+        f"每条的 is_mandatory 值已明确标注，请在输出 JSON 中原样复制，不要自行判断。"
     )
     lines.append("")
 
-    for clause in clauses:
-        tag = "【强制性】" if clause.get("is_mandatory") else "【推荐性】"
-        source_tag = ""
-        if clause.get("_source") == "ref_expand":
-            source_tag = "（引用扩展）"
-        lines.append(f"--- 条款 {clause['clause_path']} {tag}{source_tag} ---")
-        lines.append(f"规范：{clause.get('standard_id', '未知')}")
-        lines.append(f"正文：{clause.get('content', '').strip()}")
+    if retrieved:
+        lines.append(
+            f"【A. 检索召回条款 {len(retrieved)} 条】"
+            f"——这些条款直接或语义相关地回答了用户问题，应填入 applicable_clauses。"
+        )
         lines.append("")
+        for c in retrieved:
+            lines.extend(clause_block(c))
+
+    if ref_expanded:
+        lines.append(
+            f"【B. 引用扩展条款 {len(ref_expanded)} 条】"
+            f"——这些条款是被 A 类条款所引用而自动拉取的关联条款，应填入 referenced_clauses。"
+        )
+        lines.append("")
+        for c in ref_expanded:
+            lines.extend(clause_block(c))
 
     lines.append("---")
-    lines.append("请严格基于以上条款回答问题，按如下 JSON schema 输出：")
+    lines.append(
+        "请严格基于以上条款回答问题，输出合法 JSON，不输出任何 JSON 以外的文字："
+    )
     lines.append("")
     lines.append("""\
 {
-  "answer": "面向通用用户的自然语言回答（必须在正文中引用条款号）。末尾附免责声明：本回答仅供参考，不替代专业审查。",
+  "answer": "面向通用用户的自然语言回答。必须在正文中引用条款号。强制性条款（is_mandatory=true）明确标注为"强制要求"，推荐性条款（is_mandatory=false）标注为"推荐"。末尾附：本回答仅供参考，不替代专业审查。",
   "applicable_clauses": [
     {
       "clause": "条款号，如 5.3.4",
-      "standard": "规范编号，如 GB 50016-2014(2018)",
-      "text": "相关原文（可截取关键句，保持完整语义）",
-      "is_mandatory": true,
+      "standard": "规范编号",
+      "text": "相关原文（保持完整语义）",
+      "is_mandatory": true或false（从A类条款的 is_mandatory 标注中原样复制）,
       "relevance": "direct（直接回答问题）或 contextual（背景参考）"
     }
   ],
@@ -103,7 +125,7 @@ def build_user_message(query: str, clauses: list[dict]) -> str:
       "clause": "条款号",
       "standard": "规范编号",
       "text": "原文关键句",
-      "is_mandatory": true
+      "is_mandatory": true或false（从B类条款的 is_mandatory 标注中原样复制）
     }
   ],
   "uncertain_aspects": ["需要专业人员核实的方面，若无则空数组"],

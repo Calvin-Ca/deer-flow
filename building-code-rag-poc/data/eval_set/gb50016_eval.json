@@ -1,0 +1,407 @@
+[
+  {
+    "id": "E001",
+    "query": "24米高的住宅楼疏散楼梯的最小净宽度是多少？",
+    "expected_clauses": ["5.5.30"],
+    "related_clauses": ["5.5.31", "5.5.18"],
+    "must_be_mandatory": true,
+    "user_type": "通用咨询",
+    "notes": "5.5.30明确规定住宅建筑疏散楼梯最小净宽"
+  },
+  {
+    "id": "E002",
+    "query": "防火墙的耐火极限是多少小时？",
+    "expected_clauses": ["6.1.1"],
+    "related_clauses": ["6.1.2", "6.1.3"],
+    "must_be_mandatory": true,
+    "user_type": "通用咨询",
+    "notes": "6.1.1规定防火墙耐火极限不低于3.00h"
+  },
+  {
+    "id": "E003",
+    "query": "高层民用建筑防火分区最大允许建筑面积是多少？",
+    "expected_clauses": ["5.3.1"],
+    "related_clauses": ["5.3.2", "5.3.3"],
+    "must_be_mandatory": true,
+    "user_type": "通用咨询",
+    "notes": "5.3.1有表格，区分一类和二类高层"
+  },
+  {
+    "id": "E004",
+    "query": "哪些建筑必须设置自动喷水灭火系统？",
+    "expected_clauses": ["8.3.1", "8.3.2", "8.3.3", "8.3.4"],
+    "related_clauses": ["8.3.5"],
+    "must_be_mandatory": true,
+    "user_type": "通用咨询",
+    "notes": "8.3.x系列条款，强条，需全部召回"
+  },
+  {
+    "id": "E005",
+    "query": "建筑高度大于100米的超高层建筑有什么特殊疏散要求？",
+    "expected_clauses": ["5.5.23", "5.5.31"],
+    "related_clauses": ["5.5.24", "5.5.25"],
+    "must_be_mandatory": true,
+    "user_type": "通用咨询",
+    "notes": "超高层（>100m）需设置避难层"
+  },
+  {
+    "id": "E006",
+    "query": "商业营业厅一个防火分区最大多少平方米？",
+    "expected_clauses": ["5.3.4"],
+    "related_clauses": ["5.3.1", "5.3.3"],
+    "must_be_mandatory": true,
+    "user_type": "通用咨询",
+    "notes": "5.3.4专门针对商店营业厅"
+  },
+  {
+    "id": "E007",
+    "query": "消防车道的净宽和净高要求是多少？",
+    "expected_clauses": ["7.1.8"],
+    "related_clauses": ["7.1.1", "7.1.2", "7.1.9"],
+    "must_be_mandatory": true,
+    "user_type": "通用咨询",
+    "notes": "7.1.8规定消防车道宽度不小于4m，净高不小于4m"
+  },
+  {
+    "id": "E008",
+    "query": "地下室防火分区面积限值是多少？",
+    "expected_clauses": ["5.3.1"],
+    "related_clauses": ["5.3.5"],
+    "must_be_mandatory": true,
+    "user_type": "通用咨询",
+    "notes": "5.3.1表5.3.1注明地下室500m²"
+  },
+  {
+    "id": "E009",
+    "query": "住宅建筑在什么条件下需要设置防烟楼梯间？",
+    "expected_clauses": ["5.5.12", "5.5.27"],
+    "related_clauses": ["5.5.13", "5.5.28"],
+    "must_be_mandatory": true,
+    "user_type": "通用咨询",
+    "notes": "建筑高度>33m的住宅须设防烟楼梯间"
+  },
+  {
+    "id": "E010",
+    "query": "歌舞娱乐放映游艺场所有哪些特殊防火要求？",
+    "expected_clauses": ["5.4.9"],
+    "related_clauses": ["5.4.10"],
+    "must_be_mandatory": true,
+    "user_type": "通用咨询",
+    "notes": "5.4.9是歌舞娱乐场所专条，含多款要求"
+  },
+  {
+    "id": "E011",
+    "query": "一、二级耐火等级建筑之间的防火间距是多少？",
+    "expected_clauses": ["5.2.2"],
+    "related_clauses": ["5.2.3", "5.2.4"],
+    "must_be_mandatory": true,
+    "user_type": "通用咨询",
+    "notes": "表5.2.2，一二级之间6m"
+  },
+  {
+    "id": "E012",
+    "query": "安全出口的疏散门净宽不应小于多少？",
+    "expected_clauses": ["5.5.18", "5.5.19"],
+    "related_clauses": ["5.5.20"],
+    "must_be_mandatory": true,
+    "user_type": "通用咨询",
+    "notes": "5.5.18规定疏散门净宽"
+  },
+  {
+    "id": "E013",
+    "query": "建筑的耐火等级分为哪几级？",
+    "expected_clauses": ["5.1.1", "3.2.1"],
+    "related_clauses": ["3.2.2"],
+    "must_be_mandatory": false,
+    "user_type": "通用咨询",
+    "notes": "耐火等级分四级，属于基础概念"
+  },
+  {
+    "id": "E014",
+    "query": "设置消防水泵房有什么防火要求？",
+    "expected_clauses": ["8.1.6"],
+    "related_clauses": ["8.1.7"],
+    "must_be_mandatory": true,
+    "user_type": "通用咨询",
+    "notes": "8.1.6规定消防水泵房隔墙耐火极限"
+  },
+  {
+    "id": "E015",
+    "query": "厂房内疏散楼梯最小净宽度要求？",
+    "expected_clauses": ["3.7.6"],
+    "related_clauses": ["3.7.5"],
+    "must_be_mandatory": true,
+    "user_type": "通用咨询",
+    "notes": "厂房疏散楼梯与民用建筑不同"
+  },
+  {
+    "id": "E016",
+    "query": "防火卷帘的耐火极限有什么要求？",
+    "expected_clauses": ["6.5.3"],
+    "related_clauses": ["6.5.1", "6.5.2"],
+    "must_be_mandatory": true,
+    "user_type": "通用咨询",
+    "notes": "6.5.3规定用于防火分隔的防火卷帘耐火极限"
+  },
+  {
+    "id": "E017",
+    "query": "剧场观众厅的疏散通道最小宽度？",
+    "expected_clauses": ["5.5.20"],
+    "related_clauses": ["5.5.18", "5.5.19"],
+    "must_be_mandatory": true,
+    "user_type": "通用咨询",
+    "notes": "人员密集场所特殊要求"
+  },
+  {
+    "id": "E018",
+    "query": "高层建筑消防应急照明和疏散指示标志的备用电源持续供电时间？",
+    "expected_clauses": ["10.3.3"],
+    "related_clauses": ["10.3.1", "10.3.2"],
+    "must_be_mandatory": true,
+    "user_type": "通用咨询",
+    "notes": "10.3.3规定备用电源持续工作时间"
+  },
+  {
+    "id": "E019",
+    "query": "汽车库防火分区最大建筑面积？",
+    "expected_clauses": ["5.3.1"],
+    "related_clauses": [],
+    "must_be_mandatory": true,
+    "user_type": "通用咨询",
+    "notes": "汽车库参照GB 50067，本规范可能仅有补充规定；测试是否正确说明适用范围"
+  },
+  {
+    "id": "E020",
+    "query": "室内消火栓设置间距不应大于多少米？",
+    "expected_clauses": ["8.2.1", "8.2.2"],
+    "related_clauses": ["8.2.3"],
+    "must_be_mandatory": true,
+    "user_type": "通用咨询",
+    "notes": "8.2系列条款"
+  },
+  {
+    "id": "E021",
+    "query": "建筑内电缆井、管道井的检查门防火要求？",
+    "expected_clauses": ["6.2.9"],
+    "related_clauses": ["6.2.10"],
+    "must_be_mandatory": true,
+    "user_type": "通用咨询",
+    "notes": "竖向管道井的防火分隔"
+  },
+  {
+    "id": "E022",
+    "query": "储油间与锅炉房如何进行防火分隔？",
+    "expected_clauses": ["5.4.12", "5.4.13"],
+    "related_clauses": ["5.4.14"],
+    "must_be_mandatory": true,
+    "user_type": "通用咨询",
+    "notes": "特殊房间的防火要求"
+  },
+  {
+    "id": "E023",
+    "query": "二类高层住宅和一类高层住宅分别是如何定义的？",
+    "expected_clauses": ["5.1.1"],
+    "related_clauses": [],
+    "must_be_mandatory": false,
+    "user_type": "通用咨询",
+    "notes": "建筑分类，附表格，是否能正确提取分类标准"
+  },
+  {
+    "id": "E024",
+    "query": "防烟楼梯间前室的面积有什么要求？",
+    "expected_clauses": ["6.4.3"],
+    "related_clauses": ["6.4.1", "6.4.2"],
+    "must_be_mandatory": true,
+    "user_type": "通用咨询",
+    "notes": "前室面积：公共≥6m²，合用≥10m²"
+  },
+  {
+    "id": "E025",
+    "query": "建筑外墙的保温材料有哪些防火要求？",
+    "expected_clauses": ["6.7.2", "6.7.3", "6.7.4", "6.7.5"],
+    "related_clauses": ["6.7.6", "6.7.7"],
+    "must_be_mandatory": true,
+    "user_type": "通用咨询",
+    "notes": "6.7系列，外保温防火是近年关注重点"
+  },
+  {
+    "id": "E026",
+    "query": "避难层（间）应该每隔多少米设置一个？",
+    "expected_clauses": ["5.5.23"],
+    "related_clauses": ["5.5.24", "5.5.25"],
+    "must_be_mandatory": true,
+    "user_type": "通用咨询",
+    "notes": "从首层到第一个避难层不超过50m"
+  },
+  {
+    "id": "E027",
+    "query": "丙类仓库的防火间距要求",
+    "expected_clauses": ["3.4.1", "4.2.1"],
+    "related_clauses": ["3.4.2"],
+    "must_be_mandatory": true,
+    "user_type": "通用咨询",
+    "notes": "仓库防火间距与厂房不同"
+  },
+  {
+    "id": "E028",
+    "query": "消防控制室的设置位置有什么要求？",
+    "expected_clauses": ["8.1.7"],
+    "related_clauses": ["8.1.6"],
+    "must_be_mandatory": true,
+    "user_type": "通用咨询",
+    "notes": "消防控制室不得设于地下三层及以下"
+  },
+  {
+    "id": "E029",
+    "query": "火灾自动报警系统什么情况下必须设置？",
+    "expected_clauses": ["8.4.1"],
+    "related_clauses": ["8.4.2", "8.4.3"],
+    "must_be_mandatory": true,
+    "user_type": "通用咨询",
+    "notes": "8.4.1给出设置范围的正面清单"
+  },
+  {
+    "id": "E030",
+    "query": "疏散指示标志的安装高度和间距要求",
+    "expected_clauses": ["10.3.5"],
+    "related_clauses": ["10.3.4"],
+    "must_be_mandatory": true,
+    "user_type": "通用咨询",
+    "notes": "距地面0.5m以下，间距不超过20m"
+  },
+  {
+    "id": "E031",
+    "query": "楼梯间在首层对外出口不能直通时，如何处理？",
+    "expected_clauses": ["5.5.17"],
+    "related_clauses": ["6.4.5"],
+    "must_be_mandatory": true,
+    "user_type": "通用咨询",
+    "notes": "首层扩大封闭楼梯间做法"
+  },
+  {
+    "id": "E032",
+    "query": "建筑高度超过32米的高层建筑疏散楼梯的形式？",
+    "expected_clauses": ["5.5.12", "5.5.13"],
+    "related_clauses": ["6.4.1", "6.4.2"],
+    "must_be_mandatory": true,
+    "user_type": "通用咨询",
+    "notes": "超过32m须设封闭或防烟楼梯间"
+  },
+  {
+    "id": "E033",
+    "query": "防排烟系统的设置范围",
+    "expected_clauses": ["8.5.1", "8.5.2", "8.5.3"],
+    "related_clauses": ["8.5.4"],
+    "must_be_mandatory": true,
+    "user_type": "通用咨询",
+    "notes": "8.5系列，防烟和排烟分别规定"
+  },
+  {
+    "id": "E034",
+    "query": "建筑高度怎么计算？坡屋面的建筑高度如何确定？",
+    "expected_clauses": ["附录A"],
+    "related_clauses": [],
+    "must_be_mandatory": false,
+    "user_type": "通用咨询",
+    "notes": "附录A，测试附录条款是否被正确提取"
+  },
+  {
+    "id": "E035",
+    "query": "医院病房楼的安全疏散要求有哪些特殊规定？",
+    "expected_clauses": ["5.5.14", "5.5.15"],
+    "related_clauses": ["5.5.16"],
+    "must_be_mandatory": true,
+    "user_type": "通用咨询",
+    "notes": "医疗建筑有特殊疏散要求"
+  },
+  {
+    "id": "E036",
+    "query": "变配电室与其他房间的防火分隔要求",
+    "expected_clauses": ["5.4.12"],
+    "related_clauses": [],
+    "must_be_mandatory": true,
+    "user_type": "通用咨询",
+    "notes": "变配电室耐火极限及防水要求"
+  },
+  {
+    "id": "E037",
+    "query": "什么是强制性条文？建筑防火规范中哪些是强制性条文？",
+    "expected_clauses": [],
+    "related_clauses": [],
+    "must_be_mandatory": false,
+    "user_type": "通用咨询",
+    "notes": "概念性问题，测试系统是否能识别出范围限制"
+  },
+  {
+    "id": "E038",
+    "query": "宿舍建筑的防火设计应遵循哪些规范？",
+    "expected_clauses": [],
+    "related_clauses": [],
+    "must_be_mandatory": false,
+    "user_type": "通用咨询",
+    "notes": "超范围测试：宿舍建筑参照JGJ 36，系统需告知适用范围限制"
+  },
+  {
+    "id": "E039",
+    "query": "老年人照料设施的疏散楼梯净宽不应小于多少？",
+    "expected_clauses": ["5.5.13", "5.5.32"],
+    "related_clauses": [],
+    "must_be_mandatory": true,
+    "user_type": "通用咨询",
+    "notes": "5.5.32是2018版新增的老年人设施专条"
+  },
+  {
+    "id": "E040",
+    "query": "地下建筑（地下室、半地下室）的安全出口数量和位置要求",
+    "expected_clauses": ["5.5.5"],
+    "related_clauses": ["5.5.6", "5.5.7"],
+    "must_be_mandatory": true,
+    "user_type": "通用咨询",
+    "notes": "地下室安全出口通向室外的要求"
+  },
+  {
+    "id": "E041",
+    "query": "灭火器的配置规定在哪个规范中？",
+    "expected_clauses": [],
+    "related_clauses": [],
+    "must_be_mandatory": false,
+    "user_type": "通用咨询",
+    "notes": "超范围测试：灭火器配置在GB 50140中，系统应明确说明"
+  },
+  {
+    "id": "E042",
+    "query": "建筑内部装修材料的燃烧性能要求",
+    "expected_clauses": [],
+    "related_clauses": [],
+    "must_be_mandatory": false,
+    "user_type": "通用咨询",
+    "notes": "超范围测试：装修防火在GB 50222中，系统应明确说明"
+  },
+  {
+    "id": "E043",
+    "query": "防火门的分级及耐火性能要求",
+    "expected_clauses": ["6.5.1", "6.5.2"],
+    "related_clauses": [],
+    "must_be_mandatory": true,
+    "user_type": "通用咨询",
+    "notes": "甲乙丙级防火门，不同位置有不同要求"
+  },
+  {
+    "id": "E044",
+    "query": "建筑间的防火间距不足时有哪些补救措施？",
+    "expected_clauses": ["5.2.6"],
+    "related_clauses": ["5.2.2"],
+    "must_be_mandatory": true,
+    "user_type": "通用咨询",
+    "notes": "测试是否能找到间距减少条件"
+  },
+  {
+    "id": "E045",
+    "query": "屋顶直升机停机坪的设置要求",
+    "expected_clauses": ["5.5.23"],
+    "related_clauses": [],
+    "must_be_mandatory": true,
+    "user_type": "通用咨询",
+    "notes": "建筑高度>250m的建筑需设停机坪"
+  }
+]

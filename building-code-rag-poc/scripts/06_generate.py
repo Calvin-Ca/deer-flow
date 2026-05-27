@@ -272,7 +272,7 @@ def run_retrieval(
     "--llm-url", default="http://localhost:8099", show_default=True,
     help="Qwen3 vLLM 服务地址。",
 )
-@click.option("--llm-model-id", default="/model", show_default=True)
+@click.option("--llm-model-id", default="qwen3-8b", show_default=True)
 @click.option("--temperature", default=0.1, show_default=True)
 @click.option("--max-tokens", default=4096, show_default=True)
 @click.option(

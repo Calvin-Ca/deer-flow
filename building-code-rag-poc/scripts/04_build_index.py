@@ -165,6 +165,7 @@ def build_vector_index(
             row["embedding"] = embeddings[j]
         client.insert(collection_name=collection_name, data=batch_rows)
 
+    client.flush(collection_name)
     stats = client.get_collection_stats(collection_name)
     console.print(f"[green]✓ 向量索引完成：{stats['row_count']} 个向量[/green]")
 

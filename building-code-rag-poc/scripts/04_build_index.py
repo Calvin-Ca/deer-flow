@@ -94,6 +94,8 @@ def embed_texts(texts: list[str], embed_url: str, model_id: str, batch_size: int
     all_embeddings: list[list[float]] = []
     for i in range(0, len(texts), batch_size):
         batch = texts[i: i + batch_size]
+        # 空字符串替换为占位符，vLLM 不接受空输入
+        batch = [t if t.strip() else "无内容" for t in batch]
         resp = requests.post(
             f"{embed_url}/v1/embeddings",
             json={"model": model_id, "input": batch},

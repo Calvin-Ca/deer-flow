@@ -2,12 +2,12 @@
 name = "building-code-rag-poc"
 version = "0.0.1"
 description = "建筑规范 RAG 项目的技术 POC（PDF 解析、检索、合规判定）"
-requires-python = ">=3.12,<3.13"  # torchvision 0.21.x 尚无 cp313 wheel
+requires-python = ">=3.12,<3.13"  # torchvision 0.20.x 尚无 cp313 wheel
 
 dependencies = [
     # ===== 阶段 0：PDF 解析 =====
-    "torch==2.6.0",          # cu121 wheel 由 [tool.uv.sources] 指定；mineru>=3.x 要求 >=2.6.0
-    "torchvision==0.21.0",
+    "torch==2.5.1",          # cu121 wheel 由 [tool.uv.sources] 指定；见 [tool.uv] override-dependencies
+    "torchvision==0.20.1",
     "numpy>=1.26",
     "mineru[pipeline]",      # 版面分析 + OCR（包含 six 等传递依赖）
     "six>=1.16",             # mineru OCR 组件显式依赖
@@ -34,6 +34,14 @@ dev = [
     "jupyter>=1.0",
     "ipykernel>=6.29",
     "ruff>=0.6",
+]
+
+[tool.uv]
+# torch 2.6.0 无 cu121 wheel（2.6.x 起官方转向 cu124，服务器驱动 535.x 不支持）
+# mineru 3.2.0 元数据声明 torch>=2.6.0，但实测 2.5.1+cu121 可正常运行
+override-dependencies = [
+    "torch==2.5.1",
+    "torchvision==0.20.1",
 ]
 
 [tool.uv.sources]

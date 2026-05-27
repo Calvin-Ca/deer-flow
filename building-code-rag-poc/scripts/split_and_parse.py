@@ -108,9 +108,8 @@ def split_pdf(pdf_path: Path, chunk_dir: Path, chunk_size: int) -> list[tuple[Pa
         pass
     console.print(
         "[red]✗ 找不到 pymupdf 或 pypdf。[/red]\n"
-        "  请安装其中一个：\n"
-        "    uv pip install --python .venv/bin/python pymupdf\n"
-        "    uv pip install --python .venv/bin/python pypdf"
+        "  请在 building-code-rag-poc/ 目录下执行：\n"
+        "    uv sync"
     )
     sys.exit(1)
 

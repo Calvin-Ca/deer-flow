@@ -11,6 +11,14 @@ dependencies = [
     "numpy>=1.26",
     "mineru[pipeline]",      # 版面分析 + OCR（包含 six 等传递依赖）
     "six>=1.16",             # mineru OCR 组件显式依赖
+    "pymupdf>=1.24",         # PDF 分割主路径（import fitz）
+    "pypdf>=4.0",            # PDF 分割 fallback
+
+    # ===== 阶段 1：检索 =====
+    "pymilvus>=2.4.0",
+    "rank-bm25>=0.2.2",
+    "requests>=2.32",        # 调 vLLM embedding / generate API
+    "FlagEmbedding>=1.3",    # bge-reranker（需 torch>=2.6 时可选）
 
     # 辅助
     "click>=8.1",            # CLI 参数解析
@@ -20,17 +28,6 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# 阶段 1+ 才装的：检索、嵌入、向量库
-retrieval = [
-    "pymilvus>=2.4.0",
-    "rank-bm25>=0.2.2",
-    "requests>=2.32",        # 调 vLLM embedding API
-    "FlagEmbedding>=1.3",    # bge-reranker（可选，需 torch>=2.6）
-]
-
-# 生成层（06_generate.py）：调用本地 vLLM Qwen3，依赖已包含在 retrieval 中（requests）
-# 无需额外安装；本 extras 仅作占位记录
-generate = []
 
 # 调试用
 dev = [
@@ -42,6 +39,11 @@ dev = [
 [tool.uv.sources]
 torch = { index = "pytorch-cu121" }
 torchvision = { index = "pytorch-cu121" }
+
+[[tool.uv.index]]
+name = "tsinghua"
+url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+default = true
 
 [[tool.uv.index]]
 name = "pytorch-cu121"

@@ -230,7 +230,7 @@ def retrieve(
     metadata = load_metadata(store_dir)
 
     from sentence_transformers import SentenceTransformer
-    embed_model = SentenceTransformer(EMBED_MODEL)
+    embed_model = SentenceTransformer(EMBED_MODEL, model_kwargs={"use_safetensors": True})
     collection = connect_milvus(milvus_host, milvus_port, collection_name)
 
     bm25_results = bm25_search(query, bm25, clause_paths, metadata, bm25_top_k)

@@ -30,7 +30,11 @@ building-code-rag-poc/
     ├── 03_review_quality.py        # 条款树质量审核与报告
     ├── 04_build_index.py           # 建 BM25 + Milvus 向量双索引
     ├── 05_retrieve.py              # 混合检索 + 引用扩展 + Rerank
-    └── 06_generate.py              # 结构化生成（Qwen3-8B，强制引用条文号）
+    ├── 06_generate.py              # 结构化生成（Qwen3-8B，强制引用条文号）
+    ├── 07_eval.py                  # 检索质量评测（强条召回率）
+    ├── 08_extract_params.py        # 【阶段2】从自由文本提取结构化建筑参数
+    ├── 09_gen_queries.py           # 【阶段2】按合规维度生成检索查询矩阵
+    └── 10_compliance_check.py      # 【阶段2】端到端合规检查编排
 ```
 
 ---
@@ -131,6 +135,111 @@ CUDA_VISIBLE_DEVICES=2 HF_ENDPOINT=https://hf-mirror.com \
 ```
 
 输出结构化 JSON，含 `applicable_clauses`（带条文号）、`uncertain_aspects`、`out_of_scope_warnings`。
+
+---
+
+## Skills（deer-flow 集成）
+
+POC 脚本跑通后，检索与合规判定功能被封装为 deer-flow skills，可供任意 agent 通过 bash 工具调用。
+
+所有 skill 调用均在服务器上执行，使用项目 venv：
+
+```bash
+# 服务器项目根目录
+cd /mnt/nvme/calvin/code/deer-flow
+```
+
+---
+
+### Phase 1 — 条文检索（`building-code-rag`）✓ 已完成
+
+**输入**：一个自然语言问题
+**输出**：相关条款列表 + Qwen3-8B 结构化回答
+
+```bash
+# 基本查询（输出 JSON 到 stdout）
+building-code-rag-poc/.venv/bin/python \
+  skills/public/building-code-rag/retrieve.py \
+  --query "防火墙的耐火极限要求是多少？"
+
+# 保存结果到文件
+building-code-rag-poc/.venv/bin/python \
+  skills/public/building-code-rag/retrieve.py \
+  --query "24米高住宅疏散楼梯最小净宽" \
+  --output /tmp/rag_result.json
+```
+
+| 参数 | 默认值 | 说明 |
+|---|---|---|
+| `--query` / `-q` | 必填 | 自然语言查询 |
+| `--standard` | `gb50016` | 规范代号 |
+| `--top-k` | `20` | 返回条款数（强条不截断） |
+| `--skip-rerank` | 关 | 跳过 Rerank，使用 RRF 排序（调试用） |
+| `--output` | stdout | 结果 JSON 写入路径（可选） |
+
+**输出结构**：
+
+```json
+{
+  "query": "用户查询",
+  "standard": "GB_50016-20142018",
+  "retrieved_clauses_count": 20,
+  "mandatory_clauses_count": 8,
+  "response": {
+    "answer": "自然语言回答（含免责声明）",
+    "applicable_clauses": [
+      {"clause": "6.1.1", "text": "...", "is_mandatory": true, "relevance": "direct"}
+    ],
+    "referenced_clauses": [...],
+    "uncertain_aspects": [],
+    "out_of_scope_warnings": []
+  }
+}
+```
+
+---
+
+### Phase 2 — 项目合规检查（`compliance-check`）✓ 已完成
+
+**输入**：项目参数自由文本描述
+**输出**：项目所有适用强条的完整清单 + 逐条合规判定
+
+```bash
+# 基本用法（计划接口）
+building-code-rag-poc/.venv/bin/python \
+  skills/public/compliance-check/check.py \
+  --project "地上11层住宅楼，总高32米，每层850m²，地下一层车库，位于城市建成区"
+
+# 结果写入文件
+building-code-rag-poc/.venv/bin/python \
+  skills/public/compliance-check/check.py \
+  --project "..." \
+  --output /tmp/compliance_result.json
+```
+
+**与 Phase 1 的区别**：
+
+| | building-code-rag | compliance-check |
+|---|---|---|
+| 用户输入 | 一个具体问题 | 项目参数描述 |
+| 查询来源 | 用户自己提问 | 系统按维度自动展开 8-12 个查询 |
+| 覆盖范围 | 问什么答什么 | 主动穷举所有适用合规维度 |
+| 输出 | 相关条款 + 回答 | 全量强条清单 + 逐条判定 |
+
+**内部编排流程**：
+
+```
+自由文本描述
+  ↓ ① 参数提取（LLM）→ 建筑类型/高度/面积/用途等
+  ↓ ② 查询生成   → 防火间距/防火分区/疏散/消防车道/消防设施...
+  ↓ ③ 并行检索   → 多次调用 building-code-rag 检索模块
+  ↓ ④ 合并去重   → 按 clause_path 去重
+  ↓ ⑤ 合规判定   → 逐条：符合 / 需核实 / 需补充信息 / 不适用
+  ↓ ⑥ 反思校验   → 检查是否有维度遗漏
+输出：结构化合规报告
+```
+
+内部编排脚本：`scripts/08_extract_params.py`（参数提取）、`09_gen_queries.py`（查询矩阵）、`10_compliance_check.py`（端到端编排）。
 
 ---
 

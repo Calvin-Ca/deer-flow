@@ -10,10 +10,13 @@ token_usage:
 models:
 - name: qwen3-8b
   display_name: Qwen3-8B (本地)
-  use: langchain_openai:ChatOpenAI
+  use: deerflow.models.vllm_provider:VllmChatModel
   model: qwen3-8b
   api_key: none
   base_url: http://localhost:8099/v1
+  extra_body:
+    chat_template_kwargs:
+      enable_thinking: false
 tool_groups:
 - name: web
 - name: file:read

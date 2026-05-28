@@ -8,11 +8,12 @@ log_level: info
 token_usage:
   enabled: true
 models:
-- name: gpt-4o
-  display_name: OpenAI / gpt-4o
+- name: qwen3-8b
+  display_name: Qwen3-8B (本地)
   use: langchain_openai:ChatOpenAI
-  model: gpt-4o
-  api_key: $OPENAI_API_KEY
+  model: qwen3-8b
+  api_key: none
+  base_url: http://localhost:8099/v1
 tool_groups:
 - name: web
 - name: file:read

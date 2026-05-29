@@ -334,9 +334,9 @@ async def start_run(
     except Exception:
         logger.warning("Failed to upsert thread_meta for %s (non-fatal)", sanitize_log_param(thread_id))
     # 构建 agent 执行参数
-    agent_factory = resolve_agent_factory(body.assistant_id)
-    graph_input = normalize_input(body.input)
-    config = build_run_config(thread_id, body.config, body.metadata, assistant_id=body.assistant_id)
+    agent_factory = resolve_agent_factory(body.assistant_id) # 所有 assistant_id 最终都走 make_lead_agent，无路由分发，注意这里只是返回make_lead_agent函数引用，并没有传参调用
+    graph_input = normalize_input(body.input) # 消息格式标准化为lg输入对象
+    config = build_run_config(thread_id, body.config, body.metadata, assistant_id=body.assistant_id) 
 
     # Merge DeerFlow-specific context overrides into both ``configurable`` and ``context``.
     # The ``context`` field is a custom extension for the langgraph-compat layer
@@ -385,11 +385,11 @@ async def sse_consumer(
     """
     last_event_id = request.headers.get("Last-Event-ID")
     try:
-        async for entry in bridge.subscribe(record.run_id, last_event_id=last_event_id):
+        async for entry in bridge.subscribe(record.run_id, last_event_id=last_event_id): # 持续订阅后台bridge.publish产生的数据
             if await request.is_disconnected():
                 break
 
-            if entry is HEARTBEAT_SENTINEL:
+            if entry is HEARTBEAT_SENTINEL:     # 定期发送心跳，防止nginx以为没数据断开连接
                 yield ": heartbeat\n\n"
                 continue
 

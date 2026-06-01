@@ -15,28 +15,22 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 
 import click
 from rich.console import Console
 from rich.table import Table
 
+# 让 `python scripts/07_eval.py` 也能 import retrieval（POC 根加入 sys.path）
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from retrieval.config import collection_name as build_collection_name  # noqa: E402
+from retrieval.engine import search  # noqa: E402
+
 ROOT = Path(__file__).resolve().parent.parent
 
 console = Console()
-
-COLLECTION_PREFIX = "building_code"
-
-
-def _load_retrieve():
-    import importlib.util
-    spec = importlib.util.spec_from_file_location(
-        "retrieve_05",
-        Path(__file__).parent / "05_retrieve.py",
-    )
-    mod = importlib.util.module_from_spec(spec)  # type: ignore[arg-type]
-    spec.loader.exec_module(mod)  # type: ignore[union-attr]
-    return mod.retrieve
 
 
 def run_eval(
@@ -51,8 +45,6 @@ def run_eval(
     skip_rerank: bool,
     output_path: Path,
 ) -> None:
-    retrieve_fn = _load_retrieve()
-
     with open(eval_path, encoding="utf-8") as f:
         eval_set = json.load(f)
 
@@ -83,7 +75,7 @@ def run_eval(
             })
             continue
 
-        hits = retrieve_fn(
+        hits = search(
             query, store_dir, milvus_host, milvus_port, collection_name,
             embed_url, embed_model_id, top_k, top_k * 2, top_k * 2, skip_rerank,
         )
@@ -253,7 +245,7 @@ def main(
     if eval_path is None:
         eval_path = ROOT / "data" / "eval_set" / "gb50016_eval.json"
 
-    collection_name = f"{COLLECTION_PREFIX}_{store_dir.name}".lower().replace("-", "_")
+    collection_name = build_collection_name(store_dir.name)
 
     if output_path is None:
         output_path = ROOT / "data" / "eval_results" / f"{store_dir.name}_eval.json"

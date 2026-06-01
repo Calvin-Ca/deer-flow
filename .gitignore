@@ -28,7 +28,7 @@ venv/
 
 # Configuration files
 mcp_config.json
-extensions_config.json
+# extensions_config.json — 取消忽略，纳入 git 同步到服务器（skill enabled 状态需随代码走）
 
 # IDE
 .idea/

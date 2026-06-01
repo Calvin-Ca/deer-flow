@@ -1,48 +1,37 @@
-"""阶段 2 核心：项目级合规检查——端到端编排。
+"""合规编排 —— 项目级合规检查端到端流水线（被合规服务 /compliance 使用）。
 
-流程：
-  自由文本描述
-    → 08 参数提取（Qwen3 /no_think）
-    → 09 查询矩阵生成（规则）
-    → 并行检索（05 retrieve × N 个维度）
-    → 按维度并行判定（每维度独立调用 Qwen3，避免单次 prompt 过长）
-    → 反思校验（Qwen3，检查维度遗漏）
-    → 结构化合规报告
+从 ``scripts/10_compliance_check.py`` 收敛而来，编排逻辑逐字不变，仅有两处机械改动：
+  1. 检索从 importlib 加载 05 改为直接 ``retrieval.engine.search``；
+  2. 原 rich ``console.print`` 进度改为标准 logging（server-side 无需 rich）。
 
-使用方式：
-  .venv/bin/python scripts/10_compliance_check.py \\
-    --project "地上11层住宅楼，总高32米，每层850平方米，地下一层车库" \\
-    --store-dir data/vector_store/GB_50016_20142018
+流程：自由文本 → 参数提取(params) → 查询矩阵(queries) → 并行检索(retrieval.search)
+      → 按维度串行去重判定(Qwen3) → 反思校验(Qwen3) → 结构化报告。
 
-  .venv/bin/python scripts/10_compliance_check.py \\
-    --project "..." \\
-    --store-dir data/vector_store/GB_50016_20142018 \\
-    --output /tmp/compliance_report.json
+漏强条=事故：这条确定性流水线必须 server 端可控，不下放自由 agent 推理。
 """
 from __future__ import annotations
 
-import importlib.util
 import json
+import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any
 
-import click
 import requests
-from rich.console import Console
-from rich.panel import Panel
-from rich.table import Table
 
-console = Console()
+from retrieval.config import DEFAULTS, collection_name
+from retrieval.engine import search
+from service.params import extract_params
+from service.queries import gen_queries
 
-ROOT = Path(__file__).resolve().parent.parent
+logger = logging.getLogger("ce-code.compliance")
 
-LLM_URL = "http://localhost:8099"
-LLM_MODEL_ID = "qwen3-8b"
-EMBED_URL = "http://localhost:8097"
-EMBED_MODEL_ID = "/model"
-MILVUS_HOST = "localhost"
-MILVUS_PORT = 19530
+LLM_URL = DEFAULTS["llm_url"]
+LLM_MODEL_ID = DEFAULTS["llm_model_id"]
+EMBED_URL = DEFAULTS["embed_url"]
+EMBED_MODEL_ID = DEFAULTS["embed_model_id"]
+MILVUS_HOST = DEFAULTS["milvus_host"]
+MILVUS_PORT = DEFAULTS["milvus_port"]
 TOP_K = 15          # 每个维度检索条款数
 MAX_WORKERS = 4     # 并行线程数（检索 + 判定共用）
 
@@ -50,22 +39,14 @@ DISCLAIMER = "以上结果仅供参考，不替代具有执业资格的注册工
 
 
 # ---------------------------------------------------------------------------
-# 模块懒加载
+# 检索函数（绑定 store_dir 的闭包）
 # ---------------------------------------------------------------------------
 
-def _load_module(name: str, path: Path):
-    spec = importlib.util.spec_from_file_location(name, path)
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod
-
-
 def _get_retrieve_fn(store_dir: Path):
-    mod = _load_module("poc_retrieve", ROOT / "scripts" / "05_retrieve.py")
-    collection = f"building_code_{store_dir.name}".lower().replace("-", "_")
+    collection = collection_name(store_dir.name)
 
     def _retrieve(query: str) -> list[dict]:
-        return mod.retrieve(
+        return search(
             query=query,
             store_dir=store_dir,
             milvus_host=MILVUS_HOST,
@@ -83,21 +64,15 @@ def _get_retrieve_fn(store_dir: Path):
 
 
 # ---------------------------------------------------------------------------
-# 步骤 1：参数提取
+# 步骤 1/2：参数提取 + 查询矩阵（直接复用 service.params / service.queries）
 # ---------------------------------------------------------------------------
 
 def step_extract_params(description: str, llm_url: str, model_id: str) -> dict[str, Any]:
-    mod = _load_module("poc_extract", ROOT / "scripts" / "08_extract_params.py")
-    return mod.extract_params(description, llm_url, model_id)
+    return extract_params(description, llm_url, model_id)
 
-
-# ---------------------------------------------------------------------------
-# 步骤 2：查询矩阵
-# ---------------------------------------------------------------------------
 
 def step_gen_queries(params: dict[str, Any]) -> list[dict[str, str]]:
-    mod = _load_module("poc_gen_queries", ROOT / "scripts" / "09_gen_queries.py")
-    return mod.gen_queries(params)
+    return gen_queries(params)
 
 
 # ---------------------------------------------------------------------------
@@ -298,42 +273,42 @@ def compliance_check(
     skip_reflection: bool = False,
 ) -> dict[str, Any]:
     # 1. 参数提取
-    console.print("[bold]① 提取项目参数...[/bold]")
+    logger.info("① 提取项目参数...")
     params = step_extract_params(description, llm_url, model_id)
-    console.print(f"  建筑类别：{params.get('building_category') or '待推断'}")
+    logger.info("  建筑类别：%s", params.get("building_category") or "待推断")
     if params.get("ambiguities"):
-        console.print(f"  [yellow]模糊参数：{params['ambiguities']}[/yellow]")
+        logger.info("  模糊参数：%s", params["ambiguities"])
 
     # 2. 查询矩阵
-    console.print("[bold]② 生成查询矩阵...[/bold]")
+    logger.info("② 生成查询矩阵...")
     queries = step_gen_queries(params)
     query_order = [q["dimension"] for q in queries]
-    console.print(f"  共 {len(queries)} 个维度：{query_order}")
+    logger.info("  共 %d 个维度：%s", len(queries), query_order)
 
     # 3. 并行检索（各维度独立）
-    console.print(f"[bold]③ 并行检索（{len(queries)} 个查询，{MAX_WORKERS} 线程）...[/bold]")
+    logger.info("③ 并行检索（%d 个查询，%d 线程）...", len(queries), MAX_WORKERS)
     retrieve_fn = _get_retrieve_fn(store_dir)
     clauses_by_dim = step_parallel_retrieve(queries, retrieve_fn)
     total_mandatory = sum(
         sum(1 for c in clauses if c.get("is_mandatory"))
         for clauses in clauses_by_dim.values()
     )
-    console.print(f"  各维度检索完成，强条总计（含重复）{total_mandatory} 条")
+    logger.info("  各维度检索完成，强条总计（含重复）%d 条", total_mandatory)
 
     # 4. 按维度并行判定
-    console.print(f"[bold]④ 按维度合规判定（{len(queries)} 个维度，串行去重）...[/bold]")
+    logger.info("④ 按维度合规判定（%d 个维度，串行去重）...", len(queries))
     judgment = step_judgment(params, clauses_by_dim, query_order, llm_url, model_id)
 
     # 5. 反思校验
     missed: list[str] = []
     if not skip_reflection:
-        console.print("[bold]⑤ 反思校验...[/bold]")
+        logger.info("⑤ 反思校验...")
         covered = [d["dimension"] for d in judgment.get("dimensions", [])]
         missed = step_reflection(params, covered, llm_url, model_id)
         if missed:
-            console.print(f"  [yellow]检测到可能遗漏的维度：{missed}[/yellow]")
+            logger.info("  检测到可能遗漏的维度：%s", missed)
         else:
-            console.print("  [green]维度覆盖完整，无遗漏[/green]")
+            logger.info("  维度覆盖完整，无遗漏")
 
     # 6. 组装报告
     dimensions = judgment.get("dimensions", [])
@@ -349,89 +324,3 @@ def compliance_check(
         "missed_dimensions_warning": missed,
         "disclaimer": DISCLAIMER,
     }
-
-
-# ---------------------------------------------------------------------------
-# 结果展示
-# ---------------------------------------------------------------------------
-
-def print_report(report: dict) -> None:
-    console.print(Panel(
-        f"[bold]{report.get('building_category', '未知类别')}[/bold]\n"
-        f"强条共 {report['mandatory_clauses_total']} 条",
-        title="合规检查报告",
-        border_style="green",
-    ))
-
-    for dim in report.get("dimensions", []):
-        t = Table(
-            title=f"[cyan]{dim['dimension']}[/cyan]",
-            show_header=True,
-            header_style="bold",
-            show_lines=True,
-        )
-        t.add_column("条款号", style="cyan", width=10)
-        t.add_column("合规状态", width=12)
-        t.add_column("说明", no_wrap=False, max_width=55)
-        for c in dim.get("clauses", []):
-            status = c.get("compliance_status", "")
-            color = {
-                "符合": "green", "不符合": "red",
-                "需核实": "yellow", "需补充信息": "yellow", "不适用": "dim",
-            }.get(status, "white")
-            note = c.get("note") or (c.get("text") or "")[:60]
-            t.add_row(c.get("clause", ""), f"[{color}]{status}[/{color}]", note)
-        console.print(t)
-
-    if report.get("uncertain_params"):
-        console.print(f"\n[yellow]⚠ 需补充参数：{report['uncertain_params']}[/yellow]")
-    if report.get("missed_dimensions_warning"):
-        console.print(f"[yellow]⚠ 可能遗漏的维度：{report['missed_dimensions_warning']}[/yellow]")
-    console.print(f"\n[dim]{report['disclaimer']}[/dim]")
-
-
-# ---------------------------------------------------------------------------
-# CLI
-# ---------------------------------------------------------------------------
-
-@click.command()
-@click.option("--project", "-p", required=True, help="项目自由文本描述。")
-@click.option(
-    "--store-dir", "store_dir",
-    type=click.Path(exists=True, file_okay=False, path_type=Path),
-    required=True,
-    help="向量索引目录（data/vector_store/<standard>/）。",
-)
-@click.option("--llm-url", default=LLM_URL, show_default=True)
-@click.option("--llm-model-id", default=LLM_MODEL_ID, show_default=True)
-@click.option("--skip-reflection", is_flag=True, help="跳过反思校验步骤（加速调试）。")
-@click.option("--output", "output_path", default=None, help="报告写入 JSON 文件。")
-def main(
-    project: str,
-    store_dir: Path,
-    llm_url: str,
-    llm_model_id: str,
-    skip_reflection: bool,
-    output_path: str | None,
-) -> None:
-    """项目级合规检查：参数提取 → 并行检索 → 按维度判定 → 反思校验。"""
-    try:
-        report = compliance_check(project, store_dir, llm_url, llm_model_id, skip_reflection)
-    except requests.RequestException as e:
-        console.print(f"[red]服务调用失败：{e}[/red]")
-        raise SystemExit(1)
-    except json.JSONDecodeError as e:
-        console.print(f"[red]LLM 返回了非法 JSON：{e}[/red]")
-        raise SystemExit(1)
-
-    print_report(report)
-
-    if output_path:
-        Path(output_path).write_text(
-            json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8"
-        )
-        console.print(f"[green]✓ 报告已写入 {output_path}[/green]")
-
-
-if __name__ == "__main__":
-    main()

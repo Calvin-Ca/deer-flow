@@ -1,5 +1,5 @@
 [project]
-name = "building-code-rag-poc"
+name = "ce-code"
 version = "0.0.1"
 description = "建筑规范 RAG 项目的技术 POC（PDF 解析、检索、合规判定）"
 requires-python = ">=3.12,<3.13"  # torchvision 0.20.x 尚无 cp313 wheel

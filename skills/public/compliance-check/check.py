@@ -2,14 +2,15 @@
 """项目级合规检查 —— deer-flow skill 客户端（纯标准库 HTTP）。
 
 设计：薄 HTTP 客户端，把项目描述转发给常驻合规服务
-（building-code-rag-poc/service/server.py 的 /compliance 端点）。沙箱内
+（ce-code/service/compliance_server.py 的 /compliance 端点）。沙箱内
 **零第三方依赖**——只用标准库 urllib，无需 venv、向量索引或 POC 脚本。
 
 用法（通过 deer-flow agent 的 bash 工具）：
     python3 check.py --project "地上11层住宅楼，总高32米，每层850平方米，地下一层车库"
     python3 check.py --project "..." --output /tmp/compliance_report.json
 
-服务地址默认 http://localhost:8100，可用环境变量 BUILDING_CODE_RAG_URL 覆盖。
+合规服务**独立部署在端口 8101**（与检索服务 :8100 分开）；可用环境变量
+BUILDING_CODE_COMPLIANCE_URL 覆盖。
 """
 from __future__ import annotations
 
@@ -20,7 +21,9 @@ import sys
 import urllib.error
 import urllib.request
 
-DEFAULT_SERVICE_URL = os.environ.get("BUILDING_CODE_RAG_URL", "http://localhost:8100")
+DEFAULT_SERVICE_URL = os.environ.get(
+    "BUILDING_CODE_COMPLIANCE_URL", "http://localhost:8101"
+)
 
 
 def _post(url: str, payload: dict, timeout: int) -> dict:
@@ -69,7 +72,7 @@ def main() -> None:
             "error": "无法连接合规服务",
             "detail": str(exc.reason),
             "service_url": args.service_url,
-            "hint": "确认服务器上检索服务已启动：cd building-code-rag-poc && .venv/bin/python service/server.py",
+            "hint": "确认服务器上合规服务已启动（端口 8101）：cd ce-code && .venv/bin/python service/compliance_server.py",
         })
 
     output = json.dumps(report, ensure_ascii=False, indent=2)

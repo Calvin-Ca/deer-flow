@@ -1,28 +1,18 @@
-"""阶段 2 第一步：从自由文本提取结构化建筑参数。
+"""合规编排 · 参数提取 —— 自由文本 → 结构化建筑参数（被 orchestration 使用）。
 
-使用 Qwen3-8B（/no_think 模式）解析用户描述，输出结构化 JSON。
-
-使用方式：
-  .venv/bin/python scripts/08_extract_params.py \\
-    --description "地上11层住宅楼，总高32米，每层850平方米，地下一层车库"
-
-  .venv/bin/python scripts/08_extract_params.py \\
-    --description "..." --output /tmp/params.json
+从 ``scripts/08_extract_params.py`` 收敛而来，prompt 与逻辑逐字不变。
 """
 from __future__ import annotations
 
 import json
-from pathlib import Path
 from typing import Any
 
-import click
 import requests
-from rich.console import Console
 
-console = Console()
+from retrieval.config import DEFAULTS
 
-LLM_URL = "http://localhost:8099"
-LLM_MODEL_ID = "qwen3-8b"
+LLM_URL = DEFAULTS["llm_url"]
+LLM_MODEL_ID = DEFAULTS["llm_model_id"]
 
 SYSTEM_PROMPT = """\
 你是一名建筑规范专家助手。请从用户的项目描述中提取结构化参数，输出合法 JSON，不输出任何 JSON 以外的文字。
@@ -71,32 +61,3 @@ def extract_params(
         raw = "\n".join(ln for ln in raw.splitlines() if not ln.startswith("```")).strip()
 
     return json.loads(raw)
-
-
-@click.command()
-@click.option("--description", "-d", required=True, help="项目自由文本描述。")
-@click.option("--llm-url", default=LLM_URL, show_default=True)
-@click.option("--llm-model-id", default=LLM_MODEL_ID, show_default=True)
-@click.option("--output", "output_path", default=None, help="结果写入 JSON 文件。")
-def main(description: str, llm_url: str, llm_model_id: str, output_path: str | None) -> None:
-    """从自由文本描述提取结构化建筑参数（Qwen3-8B）。"""
-    console.print("[dim]提取项目参数...[/dim]")
-    try:
-        params = extract_params(description, llm_url, llm_model_id)
-    except requests.RequestException as e:
-        console.print(f"[red]LLM 调用失败：{e}[/red]")
-        raise SystemExit(1)
-    except json.JSONDecodeError as e:
-        console.print(f"[red]返回了非法 JSON：{e}[/red]")
-        raise SystemExit(1)
-
-    output = json.dumps(params, ensure_ascii=False, indent=2)
-    if output_path:
-        Path(output_path).write_text(output, encoding="utf-8")
-        console.print(f"[green]✓ 参数已写入 {output_path}[/green]")
-    else:
-        console.print(output)
-
-
-if __name__ == "__main__":
-    main()

@@ -1,31 +1,12 @@
-"""阶段 2 第二步：根据结构化建筑参数，生成合规检索查询矩阵。
+"""合规编排 · 查询矩阵 —— 结构化参数 → 合规检索查询（被 orchestration 使用）。
 
-按 GB 50016 的合规维度展开：通用维度始终生成，特定维度按参数条件触发。
-
-使用方式：
-  .venv/bin/python scripts/09_gen_queries.py \\
-    --params-json /tmp/params.json
-
-  # 直接传 JSON 字符串
-  .venv/bin/python scripts/09_gen_queries.py \\
-    --params '{"building_type":"住宅","building_category":"二类高层住宅","height_m":32,...}'
+从 ``scripts/09_gen_queries.py`` 收敛而来，规则逐字不变：通用维度始终生成，
+特定维度按参数条件触发。
 """
 from __future__ import annotations
 
-import json
-from pathlib import Path
 from typing import Any
 
-import click
-from rich.console import Console
-from rich.table import Table
-
-console = Console()
-
-
-# ---------------------------------------------------------------------------
-# 查询矩阵生成
-# ---------------------------------------------------------------------------
 
 def gen_queries(params: dict[str, Any]) -> list[dict[str, str]]:
     """返回 [{"dimension": str, "query": str}, ...]，按合规维度展开。"""
@@ -167,50 +148,3 @@ def _is_highrise(params: dict[str, Any]) -> bool:
         threshold = 27 if "住宅" in btype else 24
         return height > threshold
     return False
-
-
-# ---------------------------------------------------------------------------
-# CLI
-# ---------------------------------------------------------------------------
-
-@click.command()
-@click.option(
-    "--params-json", "params_json_path",
-    type=click.Path(exists=True, dir_okay=False, path_type=Path),
-    default=None,
-    help="08 脚本输出的参数 JSON 文件。",
-)
-@click.option("--params", "params_str", default=None, help="直接传 JSON 字符串。")
-@click.option("--output", "output_path", default=None, help="查询矩阵写入 JSON 文件。")
-def main(
-    params_json_path: Path | None,
-    params_str: str | None,
-    output_path: str | None,
-) -> None:
-    """根据建筑参数生成 GB 50016 合规维度查询矩阵。"""
-    if params_json_path:
-        params = json.loads(params_json_path.read_text(encoding="utf-8"))
-    elif params_str:
-        params = json.loads(params_str)
-    else:
-        console.print("[red]请指定 --params-json 或 --params[/red]")
-        raise SystemExit(1)
-
-    queries = gen_queries(params)
-
-    t = Table(title=f"查询矩阵（共 {len(queries)} 个维度）", show_header=True, header_style="bold cyan")
-    t.add_column("维度", style="cyan", width=20)
-    t.add_column("检索查询", no_wrap=False)
-    for q in queries:
-        t.add_row(q["dimension"], q["query"])
-    console.print(t)
-
-    if output_path:
-        Path(output_path).write_text(
-            json.dumps(queries, ensure_ascii=False, indent=2), encoding="utf-8"
-        )
-        console.print(f"[green]✓ 查询矩阵已写入 {output_path}[/green]")
-
-
-if __name__ == "__main__":
-    main()

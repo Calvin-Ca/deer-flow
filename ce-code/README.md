@@ -1,15 +1,15 @@
-# building-code-rag-poc
+# ce-code
 
 建筑规范 RAG 项目的技术 POC，验证 PDF 解析 → 条款提取 → 混合检索 → 结构化生成的完整流水线。
 
-> 上下文与设计原则见仓库根目录 `CLAUDE.md`。本目录是 POC 阶段的独立沙箱，**不污染 deer-flow 既有结构**；跑通后再决定是否包装为 `skills/building-code-rag/`。
+> 上下文与设计原则见仓库根目录 `CLAUDE.md`。本目录是 POC 阶段的独立沙箱，**不污染 deer-flow 既有结构**；跑通后再决定是否包装为 `skills/code-qa/`。
 
 ---
 
 ## 目录结构
 
 ```
-building-code-rag-poc/
+ce-code/
 ├── README.md
 ├── pyproject.toml                  # uv 管理依赖
 ├── .gitignore                      # 忽略 data/ 下的大文件与解析产物
@@ -35,11 +35,22 @@ building-code-rag-poc/
     ├── 08_extract_params.py        # 【阶段2】从自由文本提取结构化建筑参数
     ├── 09_gen_queries.py           # 【阶段2】按合规维度生成检索查询矩阵
     └── 10_compliance_check.py      # 【阶段2】端到端合规检查编排
-└── service/
-    └── server.py                   # 常驻 HTTP 服务（FastAPI，端口 8100）：
-                                    #   /retrieve（包 05+06）、/compliance（包 10）
-                                    #   skill 侧用标准库 HTTP 调用，沙箱内零依赖
+├── bcrag/                          # 检索引擎库（纯检索，被服务/脚本共用）
+│   ├── config.py                  #   默认配置、规范别名、store/collection 解析
+│   └── retrieval.py               #   混合检索 search() + 引用扩展 + rerank + get_clause
+└── service/                        # 两个独立 HTTP 服务 + server-side 逻辑（均 import bcrag）
+    ├── server.py                  #   检索服务 :8100 —— /search /qa /retrieve /expand /clause /health
+    ├── generation.py              #   生成逻辑（被 /qa 使用）
+    ├── compliance_server.py       #   合规服务 :8101（独立进程）—— /compliance /health
+    ├── orchestration.py           #   合规编排（被合规服务使用）
+    ├── params.py                  #   参数提取（被合规编排使用）
+    └── queries.py                 #   查询矩阵（被合规编排使用）
 ```
+
+> **重构说明（v2）**：检索逻辑收敛进 `bcrag/` 包；生成与合规编排进 `service/` 层；
+> 原单一服务拆成**检索服务（:8100）+ 合规服务（:8101）两个独立进程**。脚本
+> `05/06/08/09/10` 退化为薄 CLI（`import bcrag` / `service.*`）。skill 仍是沙箱内零依赖的
+> urllib 客户端：`code-qa` → :8100 `/qa`，`compliance-check` → :8101 `/compliance`。
 
 ---
 
@@ -56,12 +67,12 @@ building-code-rag-poc/
 
 ## 使用流程
 
-所有脚本在 `building-code-rag-poc/` 目录下执行，使用项目 venv：`.venv/bin/python`。
+所有脚本在 `ce-code/` 目录下执行，使用项目 venv：`.venv/bin/python`。
 
 ### Step 1 — 服务器一次性环境准备
 
 ```bash
-bash scripts/setup_server.sh
+bash pipeline/setup_server.sh
 ```
 
 ### Step 2 — 放 PDF
@@ -74,7 +85,7 @@ bash scripts/setup_server.sh
 
 ```bash
 CUDA_VISIBLE_DEVICES=2 HF_ENDPOINT=https://hf-mirror.com \
-  .venv/bin/python scripts/split_and_parse.py \
+  .venv/bin/python pipeline/split_and_parse.py \
   --pdf data/raw/<文件名>.pdf --chunk-size 80
 ```
 
@@ -83,7 +94,7 @@ CUDA_VISIBLE_DEVICES=2 HF_ENDPOINT=https://hf-mirror.com \
 ### Step 4 — 提取条款树
 
 ```bash
-.venv/bin/python scripts/02_extract_clauses.py \
+.venv/bin/python pipeline/02_extract_clauses.py \
   --input "data/parsed/<basename>/auto/<basename>_content_list.json" \
   --standard-id "GB 50016-2014(2018)" \
   --output-dir data/structured/
@@ -94,7 +105,7 @@ CUDA_VISIBLE_DEVICES=2 HF_ENDPOINT=https://hf-mirror.com \
 ### Step 5 — 质量审核
 
 ```bash
-.venv/bin/python scripts/03_review_quality.py \
+.venv/bin/python pipeline/03_review_quality.py \
   --input data/structured/<standard>_clauses.json \
   --standard-id "GB 50016-2014(2018)" \
   --check-issues \
@@ -104,7 +115,7 @@ CUDA_VISIBLE_DEVICES=2 HF_ENDPOINT=https://hf-mirror.com \
 报告输出至 `data/quality_reports/`。查看单条款：
 
 ```bash
-.venv/bin/python scripts/03_review_quality.py \
+.venv/bin/python pipeline/03_review_quality.py \
   --input data/structured/<standard>_clauses.json \
   --show-clause 5.3.1
 ```
@@ -112,7 +123,7 @@ CUDA_VISIBLE_DEVICES=2 HF_ENDPOINT=https://hf-mirror.com \
 ### Step 6 — 建双索引（BM25 + 向量）
 
 ```bash
-.venv/bin/python scripts/04_build_index.py \
+.venv/bin/python pipeline/04_build_index.py \
   --input data/structured/GB_50016-20142018_clauses.json \
   --embed-url http://localhost:8097 --embed-model-id /model
 ```
@@ -151,29 +162,37 @@ POC 脚本跑通后，检索与合规判定功能封装为 deer-flow skills。
 （只用标准库 urllib），不依赖 venv / 向量索引数据 / POC 脚本——与 deer-flow 只把
 `skills/` 挂进沙箱的机制契合。
 
-**先在服务器上启动常驻服务**（一次性）：
+**先在服务器上启动两个常驻服务**（一次性；各占一个进程）：
 
 ```bash
-cd /mnt/nvme/calvin/code/deer-flow/building-code-rag-poc
-.venv/bin/python service/server.py            # 监听 0.0.0.0:8100
-# 或： .venv/bin/python -m uvicorn service.server:app --host 0.0.0.0 --port 8100
-curl http://localhost:8100/health             # 检查就绪状态 + 已建索引的规范
+cd /mnt/nvme/calvin/code/deer-flow/ce-code
+
+# 检索服务（code-qa skill 用）
+.venv/bin/python service/server.py             # 监听 0.0.0.0:8100
+curl http://localhost:8100/health
+
+# 合规服务（compliance-check skill 用，独立进程）
+.venv/bin/python service/compliance_server.py  # 监听 0.0.0.0:8101
+curl http://localhost:8101/health
 ```
+
+> 检索服务端点：`/search`（裸条款）、`/qa`（检索+生成）、`/retrieve`（/qa 别名）、
+> `/expand`、`/clause/{standard}/{path}`。合规服务端点：`/compliance`。
 
 ---
 
-### Phase 1 — 条文检索（`building-code-rag`）✓ 已完成
+### Phase 1 — 条文检索（`code-qa`）✓ 已完成
 
 **输入**：一个自然语言问题
 **输出**：相关条款列表 + Qwen3-8B 结构化回答
 
 ```bash
 # 基本查询（用系统 python3，无需 venv；服务跑在 8100）
-python3 skills/public/building-code-rag/retrieve.py \
+python3 skills/public/code-qa/qa.py \
   --query "防火墙的耐火极限要求是多少？"
 
 # 保存结果到文件
-python3 skills/public/building-code-rag/retrieve.py \
+python3 skills/public/code-qa/qa.py \
   --query "24米高住宅疏散楼梯最小净宽" \
   --output /tmp/rag_result.json
 ```
@@ -226,7 +245,7 @@ python3 skills/public/compliance-check/check.py \
 
 **与 Phase 1 的区别**：
 
-| | building-code-rag | compliance-check |
+| | code-qa | compliance-check |
 |---|---|---|
 | 用户输入 | 一个具体问题 | 项目参数描述 |
 | 查询来源 | 用户自己提问 | 系统按维度自动展开 8-12 个查询 |
@@ -239,7 +258,7 @@ python3 skills/public/compliance-check/check.py \
 自由文本描述
   ↓ ① 参数提取（LLM）→ 建筑类型/高度/面积/用途等
   ↓ ② 查询生成   → 防火间距/防火分区/疏散/消防车道/消防设施...
-  ↓ ③ 并行检索   → 多次调用 building-code-rag 检索模块
+  ↓ ③ 并行检索   → 多次调用 code-qa 检索模块
   ↓ ④ 合并去重   → 按 clause_path 去重
   ↓ ⑤ 合规判定   → 逐条：符合 / 需核实 / 需补充信息 / 不适用
   ↓ ⑥ 反思校验   → 检查是否有维度遗漏
@@ -273,26 +292,26 @@ python3 skills/public/compliance-check/check.py \
 
 ## 常用命令（快速参考）
 
-所有命令在 `building-code-rag-poc/` 目录下执行。
+所有命令在 `ce-code/` 目录下执行。
 
 ```bash
 # 环境管理
-cd building-code-rag-poc && uv add <package>   # 安装新依赖（写入 pyproject.toml）
-cd building-code-rag-poc && uv sync             # 同步环境到 pyproject.toml/uv.lock
+cd ce-code && uv add <package>   # 安装新依赖（写入 pyproject.toml）
+cd ce-code && uv sync             # 同步环境到 pyproject.toml/uv.lock
 
 # PDF 分块解析（大文件用，如 GB 50016 共 464 页用 80 页/块）
 CUDA_VISIBLE_DEVICES=2 HF_ENDPOINT=https://hf-mirror.com \
-  .venv/bin/python scripts/split_and_parse.py \
+  .venv/bin/python pipeline/split_and_parse.py \
   --pdf data/raw/<xxx>.pdf --chunk-size 80
 
 # 条款树提取
-.venv/bin/python scripts/02_extract_clauses.py \
+.venv/bin/python pipeline/02_extract_clauses.py \
   --input "data/parsed/<basename>/auto/<basename>_content_list.json" \
   --standard-id "<standard>" \
   --output-dir data/structured/
 
 # 建双索引（BM25 + 向量）
-.venv/bin/python scripts/04_build_index.py \
+.venv/bin/python pipeline/04_build_index.py \
   --input data/structured/<standard>_clauses.json \
   --embed-url http://localhost:8097 --embed-model-id /model
 
@@ -301,9 +320,10 @@ CUDA_VISIBLE_DEVICES=2 HF_ENDPOINT=https://hf-mirror.com \
   --store-dir data/vector_store/<standard> \
   --query "<查询>" --skip-rerank
 
-# 启动常驻 HTTP 服务（skill 走 HTTP 调用，端口 8100）
-.venv/bin/python service/server.py
-curl http://localhost:8100/health
+# 启动两个常驻 HTTP 服务（skill 走 HTTP 调用）
+.venv/bin/python service/server.py             # 检索服务 :8100
+.venv/bin/python service/compliance_server.py  # 合规服务 :8101（独立进程）
+curl http://localhost:8100/health && curl http://localhost:8101/health
 ```
 
 ---
@@ -352,7 +372,7 @@ Query → ① 向量(语义) + ① BM25(条文号/术语) + ④ 适用范围结�
 - **服务层双层 API**：原语端点（`/search` `/expand` `/filter` `/rerank` `/clause/{path}`）+ 任务端点（`/qa` `/compliance`）。
 - **检索与生成解耦**：`/retrieve` 拆成 `/search`（裸条款）+ `/qa`（=search+generate）；算量/审图要裸条款。
 - **引擎毕业成 package**：05/06/10 逻辑收敛成 `bcrag/` 包，服务与脚本都 import 它，不再 `importlib` 按文件名加载编号脚本。
-- **接入层映射**：`building-code-rag`→`/qa`、`compliance-check`→`/compliance`、〔算量〕→`/search`+`/clause`→自有 sandbox、〔审图〕→解析图纸→`/search`+`/filter`→比对。
+- **接入层映射**：`code-qa`→`/qa`、`compliance-check`→`/compliance`、〔算量〕→`/search`+`/clause`→自有 sandbox、〔审图〕→解析图纸→`/search`+`/filter`→比对。
 - **HTTP vs MCP**：现 skill→HTTP 本质是手写版 MCP；第二个 agent（算量）落地、原语集稳定后再考虑迁 MCP。
 
 **重构优先级**：先还 P0 = 暴露原语 + 检索/生成解耦（算量 agent 一落地就撞），随后并行打磨黑体强条标注、引用边分型、表格结构化、适用范围谓词抽取。

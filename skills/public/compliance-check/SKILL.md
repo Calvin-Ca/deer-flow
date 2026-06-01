@@ -12,13 +12,13 @@ description: 建筑规范项目级合规审查技能。引导用户完成多轮�
 1. **多轮参数收集**：识别描述中的模糊信息，主动追问补充
 2. **参数提取**：Qwen3-8B 从自由文本提取建筑类型、高度、面积、用途等结构化参数
 3. **维度展开**：按 GB 50016 合规维度自动展开 8-16 个检索查询
-4. **并行检索**：调用 building-code-rag 检索模块，合并去重
+4. **并行检索**：调用 code-qa 检索模块，合并去重
 5. **合规判定**：Qwen3-8B 逐条给出：符合 / 不符合 / 需核实 / 需补充信息 / 不适用
 6. **反思校验**：检查是否有合规维度遗漏
 
-## 与 building-code-rag 的关系
+## 与 code-qa 的关系
 
-| | building-code-rag | compliance-check |
+| | code-qa | compliance-check |
 |---|---|---|
 | 用户输入 | 一个具体问题 | 项目参数描述 |
 | 查询来源 | 用户提问 | 系统按维度自动展开 |
@@ -28,22 +28,22 @@ description: 建筑规范项目级合规审查技能。引导用户完成多轮�
 ## 架构（重要）
 
 本 skill 的 `check.py` 是一个**薄 HTTP 客户端**，把项目描述转发给服务器上常驻的
-**HTTP 服务**（`building-code-rag-poc/service/server.py` 的 `/compliance` 端点，
-默认 `http://localhost:8100`）。沙箱内**零第三方依赖**——只用标准库 urllib，无需
-venv、向量索引或 POC 脚本。
+**合规服务**（`ce-code/service/compliance_server.py` 的 `/compliance`
+端点，**独立部署在 `http://localhost:8101`**，与检索服务 :8100 分开）。沙箱内
+**零第三方依赖**——只用标准库 urllib，无需 venv、向量索引或 POC 脚本。
 
 ## 前置依赖（需在服务器上运行）
 
 | 服务 | 地址 | 用途 |
 |---|---|---|
-| **合规/检索服务** | localhost:8100 | 本 skill 直接调用的 HTTP 服务 |
+| **合规服务** | localhost:8101 | 本 skill 直接调用的 HTTP 服务（独立进程） |
 | Milvus | localhost:19530 | 向量库（被服务使用） |
 | vLLM BGE-large | localhost:8097 | 文本 embedding（被服务使用） |
 | vLLM Qwen3-8B | localhost:8099 | 参数提取 + 合规判定（被服务使用） |
 
-> 服务启动方式（服务器上，一次性常驻）：
+> 合规服务启动方式（服务器上，一次性常驻；与检索服务 :8100 各起一个进程）：
 > ```bash
-> cd building-code-rag-poc && .venv/bin/python service/server.py
+> cd ce-code && .venv/bin/python service/compliance_server.py
 > ```
 
 ---
@@ -126,7 +126,7 @@ python3 /mnt/skills/public/compliance-check/check.py \
 | `--project` / `-p` | 必填 | 项目自由文本描述 |
 | `--standard` | `gb50016` | 规范代号 |
 | `--skip-reflection` | 关 | 跳过反思校验（调试用） |
-| `--service-url` | `http://localhost:8100` | 合规服务地址（也可用环境变量 `BUILDING_CODE_RAG_URL`） |
+| `--service-url` | `http://localhost:8101` | 合规服务地址（也可用环境变量 `BUILDING_CODE_COMPLIANCE_URL`） |
 | `--output` | stdout | 报告 JSON 写入路径（可选） |
 
 ---
@@ -183,6 +183,6 @@ python3 /mnt/skills/public/compliance-check/check.py \
 
 | 错误信息 | 原因 | 处理（在服务器上） |
 |---|---|---|
-| `无法连接合规服务` | 8100 服务未启动 | `cd building-code-rag-poc && .venv/bin/python service/server.py` |
-| 返回 503 `向量索引未就绪` | 索引未建 | `uv run scripts/04_build_index.py --standard gb50016` |
+| `无法连接合规服务` | 8101 合规服务未启动 | `cd ce-code && .venv/bin/python service/compliance_server.py` |
+| 返回 503 `向量索引未就绪` | 索引未建 | `uv run pipeline/04_build_index.py --standard gb50016` |
 | 返回 500 `合规检查失败` | Milvus / vLLM 未启动 | `curl http://localhost:8097/health`、8099、Milvus 19530 检查 |

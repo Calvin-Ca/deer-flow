@@ -9,15 +9,15 @@
 
 使用方式：
   # 基本用法（80 页 / 块）
-  .venv/bin/python scripts/split_and_parse.py \\
+  .venv/bin/python pipeline/split_and_parse.py \\
     --pdf data/raw/GB50016-2014_2018.pdf
 
   # 调小块大小（内存不足时）
-  .venv/bin/python scripts/split_and_parse.py \\
+  .venv/bin/python pipeline/split_and_parse.py \\
     --pdf data/raw/GB50016-2014_2018.pdf --chunk-size 50
 
   # 只跑特定块（调试用，块编号从 0 开始）
-  .venv/bin/python scripts/split_and_parse.py \\
+  .venv/bin/python pipeline/split_and_parse.py \\
     --pdf data/raw/GB50016-2014_2018.pdf --only-chunk 3
 
 输出：data/parsed/<basename>/auto/（与 01_parse_pdf.py 输出格式完全一致，
@@ -108,7 +108,7 @@ def split_pdf(pdf_path: Path, chunk_dir: Path, chunk_size: int) -> list[tuple[Pa
         pass
     console.print(
         "[red]✗ 找不到 pymupdf 或 pypdf。[/red]\n"
-        "  请在 building-code-rag-poc/ 目录下执行：\n"
+        "  请在 ce-code/ 目录下执行：\n"
         "    uv sync"
     )
     sys.exit(1)
@@ -344,7 +344,7 @@ def main(
     console.print(f"  图片          : {img_count} 张 → {final_auto_dir / 'images'}")
     console.print(
         f"\n[bold]下一步[/bold]：\n"
-        f"  .venv/bin/python scripts/02_extract_clauses.py \\\n"
+        f"  .venv/bin/python pipeline/02_extract_clauses.py \\\n"
         f"    {json_path} \\\n"
         f"    --output data/structured/{basename}_clauses.json"
     )

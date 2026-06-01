@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
-"""建筑规范 RAG 检索 —— deer-flow skill 客户端（纯标准库 HTTP）。
+"""规范知识问答（code-qa）—— deer-flow skill 客户端（纯标准库 HTTP）。
 
 设计：本脚本只是一个**薄 HTTP 客户端**，把查询转发给常驻的检索服务
-（building-code-rag-poc/service/server.py）。沙箱内**零第三方依赖**——只用
+（ce-code/service/server.py）。沙箱内**零第三方依赖**——只用
 Python 标准库 urllib，无需 venv、无需向量索引数据、无需 POC 脚本。
 
 用法（通过 deer-flow agent 的 bash 工具）：
-    python3 retrieve.py --query "防火墙耐火极限要求"
-    python3 retrieve.py --query "..." --top-k 20 --output /tmp/result.json
+    python3 qa.py --query "防火墙耐火极限要求"
+    python3 qa.py --query "..." --top-k 20 --output /tmp/result.json
 
-服务地址默认 http://localhost:8100，可用环境变量 BUILDING_CODE_RAG_URL 覆盖。
+服务地址默认 http://localhost:8100，可用环境变量 CODE_QA_URL 覆盖。
 """
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ import sys
 import urllib.error
 import urllib.request
 
-DEFAULT_SERVICE_URL = os.environ.get("BUILDING_CODE_RAG_URL", "http://localhost:8100")
+DEFAULT_SERVICE_URL = os.environ.get("CODE_QA_URL", "http://localhost:8100")
 
 
 def _post(url: str, payload: dict, timeout: int) -> dict:
@@ -42,12 +42,18 @@ def main() -> None:
     parser.add_argument("--standard", default="gb50016", help="规范代号（默认 gb50016）")
     parser.add_argument("--top-k", type=int, default=20, help="最终返回条款数（强条不截断）")
     parser.add_argument("--skip-rerank", action="store_true", help="跳过 Rerank，用 RRF 排序")
+    parser.add_argument(
+        "--no-generate", action="store_true",
+        help="只检索、不生成回答：打 /search 拿裸条款（给算量/审图等场景复用）",
+    )
     parser.add_argument("--service-url", default=DEFAULT_SERVICE_URL, help="检索服务地址")
     parser.add_argument("--timeout", type=int, default=300, help="HTTP 超时（秒）")
     parser.add_argument("--output", default=None, help="结果写入 JSON 文件；不指定则输出到 stdout")
     args = parser.parse_args()
 
-    url = args.service_url.rstrip("/") + "/retrieve"
+    # 默认 /qa（检索 + 结构化生成）；--no-generate 走 /search（裸条款）
+    endpoint = "/search" if args.no_generate else "/qa"
+    url = args.service_url.rstrip("/") + endpoint
     payload = {
         "query": args.query,
         "standard": args.standard,
@@ -73,7 +79,7 @@ def main() -> None:
             "error": "无法连接检索服务",
             "detail": str(exc.reason),
             "service_url": args.service_url,
-            "hint": "确认服务器上检索服务已启动：cd building-code-rag-poc && .venv/bin/python service/server.py",
+            "hint": "确认服务器上检索服务已启动：cd ce-code && .venv/bin/python service/server.py",
         })
 
     output = json.dumps(result, ensure_ascii=False, indent=2)

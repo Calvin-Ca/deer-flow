@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # 服务器一次性环境准备脚本。
-# 在远程 Linux GPU 服务器上执行：bash scripts/setup_server.sh
+# 在远程 Linux GPU 服务器上执行：bash pipeline/setup_server.sh
 #
 # 前置：
 #   - 服务器已有 Python 3.12+（用 uv 自动管理也行）
@@ -9,7 +9,7 @@
 
 set -euo pipefail
 
-cd "$(dirname "$0")/.."  # 进入 building-code-rag-poc 根目录
+cd "$(dirname "$0")/.."  # 进入 ce-code 根目录
 
 # ---------- 1. 装 uv（如果还没装） ----------
 if ! command -v uv >/dev/null 2>&1; then
@@ -55,4 +55,4 @@ print(r.stdout if r.returncode == 0 else 'nvidia-smi 不可用（无 GPU 或未�
 echo
 echo "[setup] ✓ 完成。下一步："
 echo "  1. 把规范 PDF 放到 data/raw/"
-echo "  2. 跑：uv run python scripts/01_parse_pdf.py --pdf data/raw/<your.pdf>"
+echo "  2. 跑：uv run python pipeline/01_parse_pdf.py --pdf data/raw/<your.pdf>"

@@ -1,9 +1,9 @@
 ---
-name: building-code-rag
-description: 建筑规范条文检索技能。接收自然语言查询，返回结构化条款结果（含原文、条文号、强制性标识）。当前支持《建筑设计防火规范》GB 50016-2014(2018)。适用于条文查询、合规判定辅助等场景。强条必须 100% 召回，is_mandatory=true 的条款不得遗漏。
+name: code-qa
+description: 规范知识问答技能。接收自然语言查询，返回结构化条款结果（含原文、条文号、强制性标识）。当前支持《建筑设计防火规范》GB 50016-2014(2018)。适用于条文查询、合规判定辅助等场景。强条必须 100% 召回，is_mandatory=true 的条款不得遗漏。
 ---
 
-# 建筑规范 RAG 检索技能
+# 规范知识问答（code-qa）
 
 ## 能力
 
@@ -22,8 +22,8 @@ description: 建筑规范条文检索技能。接收自然语言查询，返回�
 ## 架构（重要）
 
 本 skill 是一个**薄 HTTP 客户端**。真正的检索/生成逻辑跑在服务器上一个
-**常驻 HTTP 服务**（`building-code-rag-poc/service/server.py`，默认
-`http://localhost:8100`）里。`retrieve.py` 只用 Python 标准库 urllib 把查询
+**常驻 HTTP 服务**（`ce-code/service/server.py`，默认
+`http://localhost:8100`）里。`qa.py` 只用 Python 标准库 urllib 把查询
 转发过去——**沙箱内零第三方依赖，无需 venv、无需向量索引数据、无需 POC 脚本**。
 
 ## 前置依赖（需在服务器上运行）
@@ -37,21 +37,21 @@ description: 建筑规范条文检索技能。接收自然语言查询，返回�
 
 > 检索服务启动方式（服务器上，一次性常驻）：
 > ```bash
-> cd building-code-rag-poc
+> cd ce-code
 > .venv/bin/python service/server.py        # 监听 0.0.0.0:8100
 > ```
 
 ## 调用方式
 
-**通过 bash 工具调用 `retrieve.py`**（用系统 `python3` 即可，无需特定 venv）：
+**通过 bash 工具调用 `qa.py`**（用系统 `python3` 即可，无需特定 venv）：
 
 ```bash
 # 基本查询（输出 JSON 到 stdout）
-python3 /mnt/skills/public/building-code-rag/retrieve.py \
+python3 /mnt/skills/public/code-qa/qa.py \
   --query "防火墙的耐火极限要求是多少？"
 
 # 保存结果到文件后读取
-python3 /mnt/skills/public/building-code-rag/retrieve.py \
+python3 /mnt/skills/public/code-qa/qa.py \
   --query "24米高住宅疏散楼梯最小净宽" \
   --output /tmp/rag_result.json \
 && cat /tmp/rag_result.json
@@ -65,7 +65,8 @@ python3 /mnt/skills/public/building-code-rag/retrieve.py \
 | `--standard` | `gb50016` | 规范代号（见上表） |
 | `--top-k` | `20` | 最终返回条款数（强条不截断） |
 | `--skip-rerank` | 关 | 跳过 Rerank，用 RRF 排序（调试用） |
-| `--service-url` | `http://localhost:8100` | 检索服务地址（也可用环境变量 `BUILDING_CODE_RAG_URL`） |
+| `--no-generate` | 关 | 只检索不生成：打 `/search` 返回裸条款（无 `response` 字段，多 `clauses` 字段）；供算量/审图等场景复用 |
+| `--service-url` | `http://localhost:8100` | 检索服务地址（也可用环境变量 `CODE_QA_URL`） |
 | `--output` | stdout | 结果 JSON 写入路径（可选） |
 
 ## 输出格式
@@ -123,7 +124,7 @@ python3 /mnt/skills/public/building-code-rag/retrieve.py \
 
 | 错误信息 | 原因 | 处理（在服务器上） |
 |---|---|---|
-| `无法连接检索服务` | 8100 服务未启动 | `cd building-code-rag-poc && .venv/bin/python service/server.py` |
-| 返回 503 `向量索引未就绪` | GB 50016 索引未建 | `uv run scripts/04_build_index.py --standard gb50016` |
+| `无法连接检索服务` | 8100 服务未启动 | `cd ce-code && .venv/bin/python service/server.py` |
+| 返回 503 `向量索引未就绪` | GB 50016 索引未建 | `uv run pipeline/04_build_index.py --standard gb50016` |
 | 返回 500 `检索失败` | Milvus 或 embedding 服务未启动 | `curl http://localhost:8097/health`、Milvus 19530 检查 |
 | 返回 500 `生成失败` | Qwen3 服务未启动 | `curl http://localhost:8099/health` 检查服务 |

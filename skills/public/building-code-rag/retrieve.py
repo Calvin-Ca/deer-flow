@@ -1,149 +1,92 @@
 #!/usr/bin/env python3
-"""建筑规范 RAG 检索入口——deer-flow skill 调用包装。
+"""建筑规范 RAG 检索 —— deer-flow skill 客户端（纯标准库 HTTP）。
+
+设计：本脚本只是一个**薄 HTTP 客户端**，把查询转发给常驻的检索服务
+（building-code-rag-poc/service/server.py）。沙箱内**零第三方依赖**——只用
+Python 标准库 urllib，无需 venv、无需向量索引数据、无需 POC 脚本。
 
 用法（通过 deer-flow agent 的 bash 工具）：
-    python retrieve.py --query "防火墙耐火极限要求"
-    python retrieve.py --query "..." --standard gb50016 --top-k 20 --output /tmp/result.json
+    python3 retrieve.py --query "防火墙耐火极限要求"
+    python3 retrieve.py --query "..." --top-k 20 --output /tmp/result.json
+
+服务地址默认 http://localhost:8100，可用环境变量 BUILDING_CODE_RAG_URL 覆盖。
 """
 from __future__ import annotations
 
-import importlib.util
+import argparse
 import json
+import os
 import sys
-from pathlib import Path
+import urllib.error
+import urllib.request
 
-import click
-
-# ── 路径解析 ──────────────────────────────────────────────────────────────────
-# 本文件位于 skills/public/building-code-rag/，向上三级到 deer-flow 项目根
-_SKILL_DIR = Path(__file__).resolve().parent
-_PROJECT_ROOT = _SKILL_DIR.parent.parent.parent
-_POC_SCRIPTS = _PROJECT_ROOT / "building-code-rag-poc" / "scripts"
-_POC_ROOT = _PROJECT_ROOT / "building-code-rag-poc"
-
-# ── 默认配置（服务器环境）────────────────────────────────────────────────────
-_VECTOR_STORE = _POC_ROOT / "data" / "vector_store"
-
-_DEFAULTS = {
-    "milvus_host": "localhost",
-    "milvus_port": 19530,
-    "embed_url": "http://localhost:8097",
-    "embed_model_id": "/model",
-    "llm_url": "http://localhost:8099",
-    "llm_model_id": "qwen3-8b",
-    "top_k": 20,
-}
-
-_STANDARD_ALIASES: dict[str, str] = {
-    "gb50016": "GB_50016-20142018",
-    "gb50016-2014": "GB_50016-20142018",
-    "gb50016-20142018": "GB_50016-20142018",
-    "GB_50016-20142018": "GB_50016-20142018",
-}
+DEFAULT_SERVICE_URL = os.environ.get("BUILDING_CODE_RAG_URL", "http://localhost:8100")
 
 
-def _load_module(name: str, path: Path):
-    spec = importlib.util.spec_from_file_location(name, path)
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod
+def _post(url: str, payload: dict, timeout: int) -> dict:
+    data = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        return json.loads(resp.read().decode("utf-8"))
 
 
-def _exit_json(obj: dict) -> None:
-    click.echo(json.dumps(obj, ensure_ascii=False, indent=2))
+def _fail(obj: dict) -> None:
+    """以 JSON 形式输出错误并以非零码退出（便于 agent 识别失败）。"""
+    print(json.dumps(obj, ensure_ascii=False, indent=2))
     raise SystemExit(1)
 
 
-# ── CLI ───────────────────────────────────────────────────────────────────────
+def main() -> None:
+    parser = argparse.ArgumentParser(description="建筑规范条文检索（HTTP 客户端）")
+    parser.add_argument("--query", "-q", required=True, help="自然语言查询")
+    parser.add_argument("--standard", default="gb50016", help="规范代号（默认 gb50016）")
+    parser.add_argument("--top-k", type=int, default=20, help="最终返回条款数（强条不截断）")
+    parser.add_argument("--skip-rerank", action="store_true", help="跳过 Rerank，用 RRF 排序")
+    parser.add_argument("--service-url", default=DEFAULT_SERVICE_URL, help="检索服务地址")
+    parser.add_argument("--timeout", type=int, default=300, help="HTTP 超时（秒）")
+    parser.add_argument("--output", default=None, help="结果写入 JSON 文件；不指定则输出到 stdout")
+    args = parser.parse_args()
 
-@click.command()
-@click.option("--query", "-q", required=True, help="自然语言查询。")
-@click.option("--standard", default="gb50016", show_default=True, help="规范代号（目前支持 gb50016）。")
-@click.option("--top-k", default=_DEFAULTS["top_k"], show_default=True, help="最终返回条款数（强条不截断）。")
-@click.option("--skip-rerank", is_flag=True, help="跳过 Rerank，使用 RRF 排序（调试用）。")
-@click.option("--output", "output_path", default=None, help="结果写入 JSON 文件；不指定则输出到 stdout。")
-def main(
-    query: str,
-    standard: str,
-    top_k: int,
-    skip_rerank: bool,
-    output_path: str | None,
-) -> None:
-    """建筑规范条文混合检索 + Qwen3 结构化生成。"""
-
-    # 1. 解析规范 → store_dir
-    store_name = _STANDARD_ALIASES.get(standard) or _STANDARD_ALIASES.get(standard.lower())
-    if not store_name:
-        _exit_json({"error": f"未知规范代号: {standard!r}，支持: {list(_STANDARD_ALIASES)}"})
-
-    store_dir = _VECTOR_STORE / store_name
-    if not store_dir.exists():
-        _exit_json({
-            "error": f"向量索引目录不存在: {store_dir}",
-            "hint": f"请先在服务器上运行: uv run scripts/04_build_index.py --standard {standard}",
-        })
-
-    # 2. 动态加载 POC 模块（文件名以数字开头，不能直接 import）
-    if not _POC_SCRIPTS.exists():
-        _exit_json({"error": f"POC 脚本目录不存在: {_POC_SCRIPTS}"})
-
-    try:
-        retrieve_mod = _load_module("poc_retrieve", _POC_SCRIPTS / "05_retrieve.py")
-        generate_mod = _load_module("poc_generate", _POC_SCRIPTS / "06_generate.py")
-    except Exception as exc:
-        _exit_json({"error": f"POC 模块加载失败: {exc}"})
-
-    # 3. 检索
-    collection = f"building_code_{store_name}".lower().replace("-", "_")
-    try:
-        clauses = retrieve_mod.retrieve(
-            query=query,
-            store_dir=store_dir,
-            milvus_host=_DEFAULTS["milvus_host"],
-            milvus_port=_DEFAULTS["milvus_port"],
-            collection_name=collection,
-            embed_url=_DEFAULTS["embed_url"],
-            embed_model_id=_DEFAULTS["embed_model_id"],
-            top_k=top_k,
-            bm25_top_k=top_k * 2,
-            vector_top_k=top_k * 2,
-            skip_rerank=skip_rerank,
-        )
-    except Exception as exc:
-        _exit_json({"error": f"检索失败: {exc}"})
-
-    # 4. 生成
-    try:
-        user_msg = generate_mod.build_user_message(query, clauses)
-        response = generate_mod.call_qwen3(
-            generate_mod.SYSTEM_PROMPT,
-            user_msg,
-            _DEFAULTS["llm_url"],
-            _DEFAULTS["llm_model_id"],
-        )
-    except Exception as exc:
-        _exit_json({
-            "error": f"生成失败: {exc}",
-            "retrieved_clauses_count": len(clauses),
-        })
-
-    # 5. 输出
-    result = {
-        "query": query,
-        "standard": store_name,
-        "retrieved_clauses_count": len(clauses),
-        "mandatory_clauses_count": sum(1 for c in clauses if c.get("is_mandatory")),
-        "response": response,
+    url = args.service_url.rstrip("/") + "/retrieve"
+    payload = {
+        "query": args.query,
+        "standard": args.standard,
+        "top_k": args.top_k,
+        "skip_rerank": args.skip_rerank,
     }
 
+    try:
+        result = _post(url, payload, args.timeout)
+    except urllib.error.HTTPError as exc:
+        # 服务端用 HTTP 状态码 + detail 表达错误（如索引未就绪/检索失败）
+        try:
+            detail = json.loads(exc.read().decode("utf-8")).get("detail", str(exc))
+        except Exception:
+            detail = str(exc)
+        _fail({
+            "error": f"检索服务返回 {exc.code}",
+            "detail": detail,
+            "service_url": args.service_url,
+        })
+    except urllib.error.URLError as exc:
+        _fail({
+            "error": "无法连接检索服务",
+            "detail": str(exc.reason),
+            "service_url": args.service_url,
+            "hint": "确认服务器上检索服务已启动：cd building-code-rag-poc && .venv/bin/python service/server.py",
+        })
+
     output = json.dumps(result, ensure_ascii=False, indent=2)
-    if output_path:
-        out = Path(output_path)
-        out.parent.mkdir(parents=True, exist_ok=True)
-        out.write_text(output, encoding="utf-8")
-        click.echo(f"✓ 结果已写入 {out}", err=True)
+    if args.output:
+        with open(args.output, "w", encoding="utf-8") as f:
+            f.write(output)
+        print(f"✓ 结果已写入 {args.output}", file=sys.stderr)
+        # 同时把 meta 摘要打到 stderr，便于在前端步骤里一眼看到过程
+        meta = result.get("meta", {})
+        if meta:
+            print(f"  meta: {json.dumps(meta, ensure_ascii=False)}", file=sys.stderr)
     else:
-        click.echo(output)
+        print(output)
 
 
 if __name__ == "__main__":

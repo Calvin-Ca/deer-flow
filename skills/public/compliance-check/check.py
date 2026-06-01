@@ -1,87 +1,87 @@
 #!/usr/bin/env python3
-"""项目级合规检查 skill——deer-flow 调用包装。
+"""项目级合规检查 —— deer-flow skill 客户端（纯标准库 HTTP）。
+
+设计：薄 HTTP 客户端，把项目描述转发给常驻合规服务
+（building-code-rag-poc/service/server.py 的 /compliance 端点）。沙箱内
+**零第三方依赖**——只用标准库 urllib，无需 venv、向量索引或 POC 脚本。
 
 用法（通过 deer-flow agent 的 bash 工具）：
-    python check.py --project "地上11层住宅楼，总高32米，每层850平方米，地下一层车库"
-    python check.py --project "..." --output /tmp/compliance_report.json
+    python3 check.py --project "地上11层住宅楼，总高32米，每层850平方米，地下一层车库"
+    python3 check.py --project "..." --output /tmp/compliance_report.json
+
+服务地址默认 http://localhost:8100，可用环境变量 BUILDING_CODE_RAG_URL 覆盖。
 """
 from __future__ import annotations
 
-import importlib.util
+import argparse
 import json
+import os
 import sys
-from pathlib import Path
+import urllib.error
+import urllib.request
 
-import click
-
-_SKILL_DIR = Path(__file__).resolve().parent
-_PROJECT_ROOT = _SKILL_DIR.parent.parent.parent
-_POC_SCRIPTS = _PROJECT_ROOT / "building-code-rag-poc" / "scripts"
-_POC_ROOT = _PROJECT_ROOT / "building-code-rag-poc"
-
-_VECTOR_STORE = _POC_ROOT / "data" / "vector_store"
-
-_DEFAULTS = {
-    "standard": "GB_50016-20142018",
-    "llm_url": "http://localhost:8099",
-    "llm_model_id": "qwen3-8b",
-}
+DEFAULT_SERVICE_URL = os.environ.get("BUILDING_CODE_RAG_URL", "http://localhost:8100")
 
 
-def _load_module(name: str, path: Path):
-    spec = importlib.util.spec_from_file_location(name, path)
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod
+def _post(url: str, payload: dict, timeout: int) -> dict:
+    data = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        return json.loads(resp.read().decode("utf-8"))
 
 
-def _exit_json(obj: dict) -> None:
-    click.echo(json.dumps(obj, ensure_ascii=False, indent=2))
+def _fail(obj: dict) -> None:
+    print(json.dumps(obj, ensure_ascii=False, indent=2))
     raise SystemExit(1)
 
 
-@click.command()
-@click.option("--project", "-p", required=True, help="项目自由文本描述。")
-@click.option("--standard", default=_DEFAULTS["standard"], show_default=True, help="规范代号（目前支持 GB_50016-20142018）。")
-@click.option("--skip-reflection", is_flag=True, help="跳过反思校验（加速调试）。")
-@click.option("--output", "output_path", default=None, help="报告写入 JSON 文件；不指定则输出到 stdout。")
-def main(project: str, standard: str, skip_reflection: bool, output_path: str | None) -> None:
-    """项目合规检查：自由文本描述 → 全量强条清单 + 逐条合规判定。"""
+def main() -> None:
+    parser = argparse.ArgumentParser(description="项目级合规检查（HTTP 客户端）")
+    parser.add_argument("--project", "-p", required=True, help="项目自由文本描述")
+    parser.add_argument("--standard", default="gb50016", help="规范代号（默认 gb50016）")
+    parser.add_argument("--skip-reflection", action="store_true", help="跳过反思校验（加速调试）")
+    parser.add_argument("--service-url", default=DEFAULT_SERVICE_URL, help="合规服务地址")
+    parser.add_argument("--timeout", type=int, default=600, help="HTTP 超时（秒，合规检查较慢）")
+    parser.add_argument("--output", default=None, help="报告写入 JSON 文件；不指定则输出到 stdout")
+    args = parser.parse_args()
 
-    store_dir = _VECTOR_STORE / standard
-    if not store_dir.exists():
-        _exit_json({
-            "error": f"向量索引目录不存在: {store_dir}",
-            "hint": f"请先在服务器上运行: uv run scripts/04_build_index.py",
+    url = args.service_url.rstrip("/") + "/compliance"
+    payload = {
+        "project": args.project,
+        "standard": args.standard,
+        "skip_reflection": args.skip_reflection,
+    }
+
+    try:
+        report = _post(url, payload, args.timeout)
+    except urllib.error.HTTPError as exc:
+        try:
+            detail = json.loads(exc.read().decode("utf-8")).get("detail", str(exc))
+        except Exception:
+            detail = str(exc)
+        _fail({
+            "error": f"合规服务返回 {exc.code}",
+            "detail": detail,
+            "service_url": args.service_url,
+        })
+    except urllib.error.URLError as exc:
+        _fail({
+            "error": "无法连接合规服务",
+            "detail": str(exc.reason),
+            "service_url": args.service_url,
+            "hint": "确认服务器上检索服务已启动：cd building-code-rag-poc && .venv/bin/python service/server.py",
         })
 
-    if not _POC_SCRIPTS.exists():
-        _exit_json({"error": f"POC 脚本目录不存在: {_POC_SCRIPTS}"})
-
-    try:
-        check_mod = _load_module("poc_compliance", _POC_SCRIPTS / "10_compliance_check.py")
-    except Exception as exc:
-        _exit_json({"error": f"模块加载失败: {exc}"})
-
-    try:
-        report = check_mod.compliance_check(
-            description=project,
-            store_dir=store_dir,
-            llm_url=_DEFAULTS["llm_url"],
-            model_id=_DEFAULTS["llm_model_id"],
-            skip_reflection=skip_reflection,
-        )
-    except Exception as exc:
-        _exit_json({"error": f"合规检查失败: {exc}"})
-
     output = json.dumps(report, ensure_ascii=False, indent=2)
-    if output_path:
-        out = Path(output_path)
-        out.parent.mkdir(parents=True, exist_ok=True)
-        out.write_text(output, encoding="utf-8")
-        click.echo(f"✓ 报告已写入 {out}", err=True)
+    if args.output:
+        with open(args.output, "w", encoding="utf-8") as f:
+            f.write(output)
+        print(f"✓ 报告已写入 {args.output}", file=sys.stderr)
+        meta = report.get("meta", {})
+        if meta:
+            print(f"  meta: {json.dumps(meta, ensure_ascii=False)}", file=sys.stderr)
     else:
-        click.echo(output)
+        print(output)
 
 
 if __name__ == "__main__":

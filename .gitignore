@@ -1,5 +1,8 @@
 # DeerFlow docker image cache
 docker/.cache/
+
+# tiktoken BPE 词表缓存（tiktoken 首次运行时下载到 cwd）
+data-gym-cache/
 # oh-my-claudecode state
 .omc/
 # OS generated files

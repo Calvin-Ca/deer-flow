@@ -234,7 +234,14 @@ def retrieve(
     bm25_top_k: int,
     vector_top_k: int,
     skip_rerank: bool,
+    stats: dict | None = None,
 ) -> list[dict]:
+    """混合检索主入口。
+
+    若传入 ``stats`` 字典，会回填各阶段命中数（bm25_hits / vector_hits /
+    merged / expanded / final / mandatory），供 HTTP 服务层做可观测性输出；
+    检索逻辑本身不受影响。
+    """
     bm25, clause_paths = load_bm25(store_dir)
     metadata = load_metadata(store_dir)
     client, col_name = connect_milvus(milvus_host, milvus_port, collection_name)
@@ -248,9 +255,21 @@ def retrieve(
     if skip_rerank:
         mandatory = [r for r in expanded if r.get("is_mandatory")]
         non_mandatory = [r for r in expanded if not r.get("is_mandatory")]
-        return mandatory + non_mandatory[: max(0, top_k - len(mandatory))]
+        final = mandatory + non_mandatory[: max(0, top_k - len(mandatory))]
+    else:
+        final = rerank(query, expanded, top_k)
 
-    return rerank(query, expanded, top_k)
+    if stats is not None:
+        stats.update(
+            bm25_hits=len(bm25_results),
+            vector_hits=len(vector_results),
+            merged=len(merged),
+            expanded=len(expanded),
+            final=len(final),
+            mandatory=sum(1 for r in final if r.get("is_mandatory")),
+        )
+
+    return final
 
 
 # ---------------------------------------------------------------------------

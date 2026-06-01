@@ -39,6 +39,9 @@ data/eval_results/*
 data/quality_reports/*
 !data/quality_reports/.gitkeep
 
+# ===== PyTorch 临时目录（torch RPC/distributed 模块编译产物，落在 cwd） =====
+tmp*/
+
 # ===== 环境变量 =====
 .env
 .env.local

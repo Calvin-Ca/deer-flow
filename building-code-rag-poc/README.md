@@ -35,6 +35,10 @@ building-code-rag-poc/
     ├── 08_extract_params.py        # 【阶段2】从自由文本提取结构化建筑参数
     ├── 09_gen_queries.py           # 【阶段2】按合规维度生成检索查询矩阵
     └── 10_compliance_check.py      # 【阶段2】端到端合规检查编排
+└── service/
+    └── server.py                   # 常驻 HTTP 服务（FastAPI，端口 8100）：
+                                    #   /retrieve（包 05+06）、/compliance（包 10）
+                                    #   skill 侧用标准库 HTTP 调用，沙箱内零依赖
 ```
 
 ---
@@ -140,13 +144,20 @@ CUDA_VISIBLE_DEVICES=2 HF_ENDPOINT=https://hf-mirror.com \
 
 ## Skills（deer-flow 集成）
 
-POC 脚本跑通后，检索与合规判定功能被封装为 deer-flow skills，可供任意 agent 通过 bash 工具调用。
+POC 脚本跑通后，检索与合规判定功能封装为 deer-flow skills。
 
-所有 skill 调用均在服务器上执行，使用项目 venv：
+**架构（重要）**：skill 不再直接加载 POC 脚本，而是通过 HTTP 调用一个**常驻服务**
+（`service/server.py`，端口 8100）。这样 skill 在 deer-flow 沙箱内**零第三方依赖**
+（只用标准库 urllib），不依赖 venv / 向量索引数据 / POC 脚本——与 deer-flow 只把
+`skills/` 挂进沙箱的机制契合。
+
+**先在服务器上启动常驻服务**（一次性）：
 
 ```bash
-# 服务器项目根目录
-cd /mnt/nvme/calvin/code/deer-flow
+cd /mnt/nvme/calvin/code/deer-flow/building-code-rag-poc
+.venv/bin/python service/server.py            # 监听 0.0.0.0:8100
+# 或： .venv/bin/python -m uvicorn service.server:app --host 0.0.0.0 --port 8100
+curl http://localhost:8100/health             # 检查就绪状态 + 已建索引的规范
 ```
 
 ---
@@ -157,14 +168,12 @@ cd /mnt/nvme/calvin/code/deer-flow
 **输出**：相关条款列表 + Qwen3-8B 结构化回答
 
 ```bash
-# 基本查询（输出 JSON 到 stdout）
-building-code-rag-poc/.venv/bin/python \
-  skills/public/building-code-rag/retrieve.py \
+# 基本查询（用系统 python3，无需 venv；服务跑在 8100）
+python3 skills/public/building-code-rag/retrieve.py \
   --query "防火墙的耐火极限要求是多少？"
 
 # 保存结果到文件
-building-code-rag-poc/.venv/bin/python \
-  skills/public/building-code-rag/retrieve.py \
+python3 skills/public/building-code-rag/retrieve.py \
   --query "24米高住宅疏散楼梯最小净宽" \
   --output /tmp/rag_result.json
 ```
@@ -205,14 +214,12 @@ building-code-rag-poc/.venv/bin/python \
 **输出**：项目所有适用强条的完整清单 + 逐条合规判定
 
 ```bash
-# 基本用法（计划接口）
-building-code-rag-poc/.venv/bin/python \
-  skills/public/compliance-check/check.py \
+# 基本用法（用系统 python3；服务跑在 8100）
+python3 skills/public/compliance-check/check.py \
   --project "地上11层住宅楼，总高32米，每层850m²，地下一层车库，位于城市建成区"
 
 # 结果写入文件
-building-code-rag-poc/.venv/bin/python \
-  skills/public/compliance-check/check.py \
+python3 skills/public/compliance-check/check.py \
   --project "..." \
   --output /tmp/compliance_result.json
 ```
@@ -293,4 +300,8 @@ CUDA_VISIBLE_DEVICES=2 HF_ENDPOINT=https://hf-mirror.com \
 .venv/bin/python scripts/05_retrieve.py \
   --store-dir data/vector_store/<standard> \
   --query "<查询>" --skip-rerank
+
+# 启动常驻 HTTP 服务（skill 走 HTTP 调用，端口 8100）
+.venv/bin/python service/server.py
+curl http://localhost:8100/health
 ```

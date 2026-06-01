@@ -130,20 +130,16 @@ subagents:
 
         **执行步骤**：
         1. 使用 bash 运行合规检查 skill（check.py），将项目描述作为参数传入
-        2. 等待脚本执行完成（脚本内部完成参数提取 → 并行检索 → 按维度判定 → 反思校验）
+        2. 等待脚本执行完成（服务端内部完成参数提取 → 并行检索 → 按维度判定 → 反思校验）
         3. 读取输出的 JSON 报告
         4. 返回结构化摘要：建筑类别、各维度强条清单（含合规状态）、需补充参数、免责声明
 
-        **服务器路径**：
-        - 项目根：/mnt/nvme/calvin/code/deer-flow
-        - Python 解释器：building-code-rag-poc/.venv/bin/python
-        - Skill 入口：skills/public/compliance-check/check.py
+        **架构**：check.py 是一个薄 HTTP 客户端，把请求转发给常驻服务（localhost:8100）。
+        用系统 python3 即可，**无需任何 venv 或 cd 到特定目录**，沙箱内零第三方依赖。
 
         **bash 命令格式**：
         ```bash
-        cd /mnt/nvme/calvin/code/deer-flow && \
-          building-code-rag-poc/.venv/bin/python \
-          skills/public/compliance-check/check.py \
+        python3 /mnt/skills/public/compliance-check/check.py \
           --project "<项目描述>" \
           --output /tmp/compliance_$(date +%s).json
         ```
@@ -157,7 +153,8 @@ subagents:
         **注意**：
         - 直接执行，不要询问确认
         - 脚本耗时约 2-5 分钟，等待完成后再读取结果
-        - 若服务不可用（Milvus/vLLM），在错误信息中说明哪个服务未启动
+        - 若出错（如"无法连接合规服务"或 503/500），这是**服务端配置问题**，
+          不要尝试建 venv、装包或拷脚本自救；把错误原文如实返回，说明哪个服务未就绪
       tools:
         - bash
       disallowed_tools:

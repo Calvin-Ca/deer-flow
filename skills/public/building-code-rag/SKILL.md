@@ -19,28 +19,39 @@ description: 建筑规范条文检索技能。接收自然语言查询，返回�
 |---|---|
 | `gb50016` | 《建筑设计防火规范》GB 50016-2014(2018) |
 
+## 架构（重要）
+
+本 skill 是一个**薄 HTTP 客户端**。真正的检索/生成逻辑跑在服务器上一个
+**常驻 HTTP 服务**（`building-code-rag-poc/service/server.py`，默认
+`http://localhost:8100`）里。`retrieve.py` 只用 Python 标准库 urllib 把查询
+转发过去——**沙箱内零第三方依赖，无需 venv、无需向量索引数据、无需 POC 脚本**。
+
 ## 前置依赖（需在服务器上运行）
 
 | 服务 | 地址 | 用途 |
 |---|---|---|
-| Milvus | localhost:19530 | 向量库 |
-| vLLM BGE-large | localhost:8097 | 文本 embedding |
-| vLLM Qwen3-8B | localhost:8099 | 结构化生成 |
+| **检索服务** | localhost:8100 | 本 skill 直接调用的 HTTP 服务 |
+| Milvus | localhost:19530 | 向量库（被检索服务使用） |
+| vLLM BGE-large | localhost:8097 | 文本 embedding（被检索服务使用） |
+| vLLM Qwen3-8B | localhost:8099 | 结构化生成（被检索服务使用） |
+
+> 检索服务启动方式（服务器上，一次性常驻）：
+> ```bash
+> cd building-code-rag-poc
+> .venv/bin/python service/server.py        # 监听 0.0.0.0:8100
+> ```
 
 ## 调用方式
 
-**通过 bash 工具调用 `retrieve.py`**：
+**通过 bash 工具调用 `retrieve.py`**（用系统 `python3` 即可，无需特定 venv）：
 
 ```bash
 # 基本查询（输出 JSON 到 stdout）
-cd /mnt/nvme/calvin/code/deer-flow
-building-code-rag-poc/.venv/bin/python \
-  skills/public/building-code-rag/retrieve.py \
+python3 /mnt/skills/public/building-code-rag/retrieve.py \
   --query "防火墙的耐火极限要求是多少？"
 
 # 保存结果到文件后读取
-building-code-rag-poc/.venv/bin/python \
-  skills/public/building-code-rag/retrieve.py \
+python3 /mnt/skills/public/building-code-rag/retrieve.py \
   --query "24米高住宅疏散楼梯最小净宽" \
   --output /tmp/rag_result.json \
 && cat /tmp/rag_result.json
@@ -54,6 +65,7 @@ building-code-rag-poc/.venv/bin/python \
 | `--standard` | `gb50016` | 规范代号（见上表） |
 | `--top-k` | `20` | 最终返回条款数（强条不截断） |
 | `--skip-rerank` | 关 | 跳过 Rerank，用 RRF 排序（调试用） |
+| `--service-url` | `http://localhost:8100` | 检索服务地址（也可用环境变量 `BUILDING_CODE_RAG_URL`） |
 | `--output` | stdout | 结果 JSON 写入路径（可选） |
 
 ## 输出格式
@@ -85,9 +97,17 @@ building-code-rag-poc/.venv/bin/python \
     ],
     "uncertain_aspects": ["需人工核实的方面，若无则空数组"],
     "out_of_scope_warnings": ["超出规范适用范围的提示，若无则空数组"]
+  },
+  "meta": {
+    "request_id": "a1b2c3d4",
+    "bm25_hits": 40, "vector_hits": 40, "merged": 55, "expanded": 62,
+    "final": 20, "mandatory": 8,
+    "retrieve_ms": 850, "generate_ms": 3200, "elapsed_ms": 4050
   }
 }
 ```
+
+> `meta` 是过程可观测性摘要（各阶段命中数 + 耗时）；保存到文件时也会在 stderr 打一行摘要。
 
 ## 使用原则
 
@@ -98,9 +118,12 @@ building-code-rag-poc/.venv/bin/python \
 
 ## 常见错误排查
 
-| 错误信息 | 原因 | 处理 |
+> 这些都是**服务端配置问题**，agent 在沙箱内无法补救（不要尝试建 venv、装包或拷脚本）。
+> 应把错误原文转达用户，由用户在服务器侧处理。
+
+| 错误信息 | 原因 | 处理（在服务器上） |
 |---|---|---|
-| `向量索引目录不存在` | GB 50016 索引未建 | 服务器上运行 `uv run scripts/04_build_index.py --standard gb50016` |
-| `检索失败` | Milvus 或 embedding 服务未启动 | `curl http://localhost:8097/health` 检查服务 |
-| `生成失败` | Qwen3 服务未启动 | `curl http://localhost:8099/health` 检查服务 |
-| `POC 模块加载失败` | 代码目录结构异常 | 确认 `building-code-rag-poc/scripts/` 目录存在 |
+| `无法连接检索服务` | 8100 服务未启动 | `cd building-code-rag-poc && .venv/bin/python service/server.py` |
+| 返回 503 `向量索引未就绪` | GB 50016 索引未建 | `uv run scripts/04_build_index.py --standard gb50016` |
+| 返回 500 `检索失败` | Milvus 或 embedding 服务未启动 | `curl http://localhost:8097/health`、Milvus 19530 检查 |
+| 返回 500 `生成失败` | Qwen3 服务未启动 | `curl http://localhost:8099/health` 检查服务 |

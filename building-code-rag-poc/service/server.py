@@ -25,6 +25,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import logging
 import time
 import uuid
@@ -181,6 +182,28 @@ def retrieve(req: RetrieveRequest) -> dict:
         stats.get("expanded"), stats.get("final"), stats.get("mandatory"),
         (t_retrieved - t0) * 1000,
     )
+
+    # 逐条输出：汇总行 + 列表头 + 每条条款
+    n_mandatory = sum(1 for c in clauses if c.get("is_mandatory"))
+    logger.info("[%s] ── 命中 %d 条（强条 %d）", rid, len(clauses), n_mandatory)
+    # 列表头：字符位与数据行对齐（以 ★强条 为基准：indent=3, tag=3, sep=2）
+    logger.info("[%s]   标识   条款号         页码      来源        引用关系", rid)
+    for c in clauses:
+        refs_raw = c.get("references_to", [])
+        refs: list[str] = (
+            json.loads(refs_raw) if isinstance(refs_raw, str) else refs_raw
+        )
+        mandatory_tag = "★强条" if c.get("is_mandatory") else "  推荐"
+        ref_str = ""
+        if refs:
+            preview = refs[:4]
+            tail = f"+{len(refs)-4}" if len(refs) > 4 else ""
+            ref_str = f"  引用→[{', '.join(preview)}{tail}]"
+        logger.info(
+            "[%s]   %s  %-10s  p.%-4d  %-10s%s",
+            rid, mandatory_tag, c.get("clause_path", "?"),
+            c.get("page", 0), c.get("_source", ""), ref_str,
+        )
 
     # 2. 生成（Qwen3 结构化回答）
     try:

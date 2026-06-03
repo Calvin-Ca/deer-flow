@@ -174,7 +174,7 @@ class DanglingToolCallMiddleware(AgentMiddleware[AgentState]):
         return handler(request)
 
     @override
-    async def awrap_model_call(
+    async def awrap_model_call(     # 
         self,
         request: ModelRequest,
         handler: Callable[[ModelRequest], Awaitable[ModelResponse]],

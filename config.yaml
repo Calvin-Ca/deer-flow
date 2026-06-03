@@ -8,15 +8,31 @@ log_level: info
 token_usage:
   enabled: true
 models:
-- name: qwen3-8b
-  display_name: Qwen3-8B (本地)
-  use: deerflow.models.vllm_provider:VllmChatModel
-  model: qwen3-8b
-  api_key: none
-  base_url: http://localhost:8099/v1
-  extra_body:
-    chat_template_kwargs:
-      enable_thinking: false
+# ── 阿里云百炼 / 通义千问（OpenAI 兼容；当前 agent 默认模型，列表第一项即默认）──────────
+#    api_key 是占位符，可安全推送。服务器上 `git pull` 后替换成真实密钥即可；
+#    ⚠️ 服务器填好真 key 后，那份 config.yaml 也别再 commit（否则下次 push 会把 key 带回 GitHub）。
+- name: gateway-llm
+  display_name: 通义千问（阿里云百炼）
+  use: langchain_openai:ChatOpenAI
+  model: qwen-plus                  # ← 可改：qwen-max(更强) / qwen-turbo(更快更便宜) / qwen3-235b-a22b 等
+  api_key: REPLACE_WITH_DASHSCOPE_KEY_ON_SERVER   # ← 服务器上换成真实 sk-... 密钥
+  base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
+# ── 服务器 vLLM Qwen3-8B（临时注释；要切回：取消下面注释 + 注释掉上面网关那段）────────
+# - name: qwen3-8b
+#   display_name: Qwen3-8B (本地)
+#   use: deerflow.models.vllm_provider:VllmChatModel
+#   model: qwen3-8b
+#   api_key: none
+#   base_url: http://localhost:8099/v1
+#   supports_thinking: true
+#   when_thinking_enabled:
+#     extra_body:
+#       chat_template_kwargs:
+#         enable_thinking: true
+#   when_thinking_disabled:
+#     extra_body:
+#       chat_template_kwargs:
+#         enable_thinking: false
 tool_groups:
 - name: web
 - name: file:read
@@ -173,6 +189,6 @@ database:
   backend: sqlite
   sqlite_dir: .deer-flow/data
 run_events:
-  backend: memory
+  backend: jsonl
   max_trace_content: 10240
   track_token_usage: true

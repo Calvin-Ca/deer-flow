@@ -58,7 +58,7 @@ class ToolErrorHandlingMiddleware(AgentMiddleware[AgentState]):
         handler: Callable[[ToolCallRequest], Awaitable[ToolMessage | Command]],
     ) -> ToolMessage | Command:
         try:
-            return await handler(request)
+            return await handler(request)  # request.tool_call:LLM 要求执行的工具:request.tool:实际找到的工具对象
         except GraphBubbleUp:
             # Preserve LangGraph control-flow signals (interrupt/pause/resume).
             raise

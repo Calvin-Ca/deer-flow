@@ -1,0 +1,16 @@
+[project]
+name = "ce-services"
+version = "0.1.0"
+description = "建筑规范 RAG 任务层 —— qa / compliance 等任务服务（纯 HTTP 客户端，HTTP 调 ce-code 知识服务 :8100）"
+requires-python = ">=3.12"
+# 任务层是知识服务的纯 HTTP 客户端：不 import retrieval、不连 Milvus/向量库，
+# 只依赖 fastapi/uvicorn（起服务）+ requests（调知识服务 :8100 与 vLLM）。
+dependencies = [
+    "fastapi>=0.110",
+    "uvicorn>=0.29",
+    "requests>=2.32",
+    "pydantic>=2.7",
+]
+
+[tool.uv]
+package = false

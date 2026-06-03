@@ -21,24 +21,26 @@ description: 规范知识问答技能。接收自然语言查询，返回结构�
 
 ## 架构（重要）
 
-本 skill 是一个**薄 HTTP 客户端**。真正的检索/生成逻辑跑在服务器上一个
-**常驻 HTTP 服务**（`ce-code/service/server.py`，默认
-`http://localhost:8100`）里。`qa.py` 只用 Python 标准库 urllib 把查询
-转发过去——**沙箱内零第三方依赖，无需 venv、无需向量索引数据、无需 POC 脚本**。
+本 skill 是一个**薄 HTTP 客户端**。真正的逻辑跑在服务器上的常驻服务里，分两层：
+- **qa 任务服务**（`ce-services/qa/server.py`，默认 `http://localhost:8102`）——检索 + 结构化生成，本 skill 默认打它。
+- **知识服务**（`ce-code/service/server.py`，默认 `http://localhost:8100`）——只提供裸检索原语；qa 服务 HTTP 调它，`--no-generate` 时本 skill 也直接打它的 `/search`。
+
+`qa.py` 只用 Python 标准库 urllib 转发查询——**沙箱内零第三方依赖，无需 venv、无需向量索引数据、无需 POC 脚本**。
 
 ## 前置依赖（需在服务器上运行）
 
 | 服务 | 地址 | 用途 |
 |---|---|---|
-| **检索服务** | localhost:8100 | 本 skill 直接调用的 HTTP 服务 |
-| Milvus | localhost:19530 | 向量库（被检索服务使用） |
-| vLLM BGE-large | localhost:8097 | 文本 embedding（被检索服务使用） |
-| vLLM Qwen3-8B | localhost:8099 | 结构化生成（被检索服务使用） |
+| **qa 任务服务** | localhost:8102 | 本 skill 默认调用的 HTTP 服务（检索+生成） |
+| **知识服务** | localhost:8100 | 裸检索原语（被 qa 服务调用；`--no-generate` 直接打） |
+| Milvus | localhost:19530 | 向量库（被知识服务使用） |
+| vLLM BGE-large | localhost:8097 | 文本 embedding（被知识服务使用） |
+| vLLM Qwen3-8B | localhost:8099 | 结构化生成（被 qa 服务使用） |
 
-> 检索服务启动方式（服务器上，一次性常驻）：
+> 服务启动方式（服务器上，常驻；需先起知识服务再起 qa 服务）：
 > ```bash
-> cd ce-code
-> .venv/bin/python service/server.py        # 监听 0.0.0.0:8100
+> cd ce-code && .venv/bin/python service/server.py     # 知识服务 :8100
+> cd ce-services && uv run python qa/server.py            # qa 任务服务 :8102
 > ```
 
 ## 调用方式
@@ -65,8 +67,9 @@ python3 /mnt/skills/public/code-qa/qa.py \
 | `--standard` | `gb50016` | 规范代号（见上表） |
 | `--top-k` | `20` | 最终返回条款数（强条不截断） |
 | `--skip-rerank` | 关 | 跳过 Rerank，用 RRF 排序（调试用） |
-| `--no-generate` | 关 | 只检索不生成：打 `/search` 返回裸条款（无 `response` 字段，多 `clauses` 字段）；供算量/审图等场景复用 |
-| `--service-url` | `http://localhost:8100` | 检索服务地址（也可用环境变量 `CODE_QA_URL`） |
+| `--no-generate` | 关 | 只检索不生成：打知识服务 `/search` 返回裸条款（无 `response` 字段，多 `clauses` 字段）；供算量/审图等场景复用 |
+| `--service-url` | `http://localhost:8102` | qa 任务服务地址（也可用环境变量 `CODE_QA_URL`） |
+| `--knowledge-url` | `http://localhost:8100` | 知识服务地址，`--no-generate` 时用（环境变量 `CODE_QA_KNOWLEDGE_URL`） |
 | `--output` | stdout | 结果 JSON 写入路径（可选） |
 
 ## 输出格式
@@ -124,7 +127,8 @@ python3 /mnt/skills/public/code-qa/qa.py \
 
 | 错误信息 | 原因 | 处理（在服务器上） |
 |---|---|---|
-| `无法连接检索服务` | 8100 服务未启动 | `cd ce-code && .venv/bin/python service/server.py` |
+| `无法连接服务`（默认路径） | 8102 qa 服务未启动 | `cd ce-services && uv run python qa/server.py` |
+| `无法连接服务`（--no-generate） | 8100 知识服务未启动 | `cd ce-code && .venv/bin/python service/server.py` |
 | 返回 503 `向量索引未就绪` | GB 50016 索引未建 | `uv run pipeline/04_build_index.py --standard gb50016` |
 | 返回 500 `检索失败` | Milvus 或 embedding 服务未启动 | `curl http://localhost:8097/health`、Milvus 19530 检查 |
 | 返回 500 `生成失败` | Qwen3 服务未启动 | `curl http://localhost:8099/health` 检查服务 |

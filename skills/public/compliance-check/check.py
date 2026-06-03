@@ -2,7 +2,7 @@
 """项目级合规检查 —— deer-flow skill 客户端（纯标准库 HTTP）。
 
 设计：薄 HTTP 客户端，把项目描述转发给常驻合规服务
-（ce-code/service/compliance_server.py 的 /compliance 端点）。沙箱内
+（ce-services/compliance/server.py 的 /compliance 端点）。沙箱内
 **零第三方依赖**——只用标准库 urllib，无需 venv、向量索引或 POC 脚本。
 
 用法（通过 deer-flow agent 的 bash 工具）：
@@ -72,7 +72,7 @@ def main() -> None:
             "error": "无法连接合规服务",
             "detail": str(exc.reason),
             "service_url": args.service_url,
-            "hint": "确认服务器上合规服务已启动（端口 8101）：cd ce-code && .venv/bin/python service/compliance_server.py",
+            "hint": "确认服务器上合规服务已启动（端口 8101）：cd ce-services && uv run python compliance/server.py",
         })
 
     output = json.dumps(report, ensure_ascii=False, indent=2)

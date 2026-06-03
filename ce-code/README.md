@@ -21,36 +21,32 @@ ce-code/
 │   ├── eval_set/                   # 评测集（入 git）
 │   │   └── gb50016_eval.json       # GB 50016 的 45 条评测用例
 │   └── quality_reports/            # 质量审核报告（03 脚本输出，不入 git）
-└── scripts/
-    ├── setup_server.sh             # 服务器一次性环境准备
-    ├── rename_raw_files.sh         # 原始 PDF 重命名工具
-    ├── split_and_parse.py          # 大 PDF 分块 MinerU 解析（推荐入口）
-    ├── 01_parse_pdf.py             # 单文件 MinerU 解析（小 PDF 用）
-    ├── 02_extract_clauses.py       # 构建条款树（章/节/条层级）
-    ├── 03_review_quality.py        # 条款树质量审核与报告
-    ├── 04_build_index.py           # 建 BM25 + Milvus 向量双索引
-    ├── 05_retrieve.py              # 混合检索 + 引用扩展 + Rerank
-    ├── 06_generate.py              # 结构化生成（Qwen3-8B，强制引用条文号）
-    ├── 07_eval.py                  # 检索质量评测（强条召回率）
-    ├── 08_extract_params.py        # 【阶段2】从自由文本提取结构化建筑参数
-    ├── 09_gen_queries.py           # 【阶段2】按合规维度生成检索查询矩阵
-    └── 10_compliance_check.py      # 【阶段2】端到端合规检查编排
-├── bcrag/                          # 检索引擎库（纯检索，被服务/脚本共用）
+├── pipeline/                      # 数据流水线（解析 → 条款树 → 建索引）
+│   ├── setup_server.sh            #   服务器一次性环境准备
+│   ├── rename_raw_files.sh        #   原始 PDF 重命名工具
+│   ├── split_and_parse.py         #   大 PDF 分块 MinerU 解析（推荐入口）
+│   ├── 01_parse_pdf.py            #   单文件 MinerU 解析（小 PDF 用）
+│   ├── 02_extract_clauses.py      #   构建条款树（章/节/条层级）
+│   ├── 03_review_quality.py       #   条款树质量审核与报告
+│   └── 04_build_index.py          #   建 BM25 + Milvus 向量双索引
+├── scripts/                       # 检索层 CLI（只依赖 retrieval）
+│   ├── 05_retrieve.py             #   混合检索 + 引用扩展 + Rerank
+│   └── 07_eval.py                 #   检索质量评测（强条召回率）
+├── retrieval/                      # 检索引擎库（纯检索，被知识服务/脚本共用）
 │   ├── config.py                  #   默认配置、规范别名、store/collection 解析
-│   └── retrieval.py               #   混合检索 search() + 引用扩展 + rerank + get_clause
-└── service/                        # 两个独立 HTTP 服务 + server-side 逻辑（均 import bcrag）
-    ├── server.py                  #   检索服务 :8100 —— /search /qa /retrieve /expand /clause /health
-    ├── generation.py              #   生成逻辑（被 /qa 使用）
-    ├── compliance_server.py       #   合规服务 :8101（独立进程）—— /compliance /health
-    ├── orchestration.py           #   合规编排（被合规服务使用）
-    ├── params.py                  #   参数提取（被合规编排使用）
-    └── queries.py                 #   查询矩阵（被合规编排使用）
+│   └── engine.py                  #   混合检索 search() + 引用扩展 + rerank + get_clause
+└── service/                        # 知识服务（HTTP 包装，import retrieval）
+    └── server.py                  #   知识服务 :8100 —— 仅原语 /search /expand /clause /health
 ```
 
-> **重构说明（v2）**：检索逻辑收敛进 `bcrag/` 包；生成与合规编排进 `service/` 层；
-> 原单一服务拆成**检索服务（:8100）+ 合规服务（:8101）两个独立进程**。脚本
-> `05/06/08/09/10` 退化为薄 CLI（`import bcrag` / `service.*`）。skill 仍是沙箱内零依赖的
-> urllib 客户端：`code-qa` → :8100 `/qa`，`compliance-check` → :8101 `/compliance`。
+> **任务层在 `../ce-services/`**（与 ce-code 平级的独立 uv 项目）：`qa`（:8102 `/qa`，
+> 检索+生成）、`compliance`（:8101 `/compliance`，合规编排）。它们是知识服务的
+> **纯 HTTP 客户端**——不 import retrieval，只打 :8100 `/search`。详见 `../ce-services/README.md`。
+
+> **重构说明（v3）**：知识层（ce-code）收敛为「数据 + 检索」——检索逻辑进 `retrieval/`
+> 包，知识服务 `service/server.py` 只暴露检索原语（`/search` `/expand` `/clause`）。
+> 生成（qa）与合规编排迁出到顶层 `ce-services/` 任务层，作为知识服务的 HTTP 客户端。
+> 退役的 POC CLI `06/08/09/10` 已删除（HTTP 服务 + skill 客户端取代其调试职能）。
 
 ---
 
@@ -141,12 +137,14 @@ CUDA_VISIBLE_DEVICES=2 HF_ENDPOINT=https://hf-mirror.com \
 
 核心指标：**强条召回率**——宁可多召回，不能漏强条。
 
-### Step 8 — 端到端生成
+### Step 8 — 端到端生成（问答）
+
+生成已迁出到任务层 qa 服务（:8102），直接打 HTTP：
 
 ```bash
-.venv/bin/python scripts/06_generate.py \
-  --store-dir data/vector_store/GB_50016_20142018 \
-  --query "24米高的住宅楼疏散楼梯最小净宽度是多少？"
+curl -s http://localhost:8102/qa \
+  -H 'Content-Type: application/json' \
+  -d '{"query":"24米高的住宅楼疏散楼梯最小净宽度是多少？","standard":"gb50016"}'
 ```
 
 输出结构化 JSON，含 `applicable_clauses`（带条文号）、`uncertain_aspects`、`out_of_scope_warnings`。
@@ -155,29 +153,33 @@ CUDA_VISIBLE_DEVICES=2 HF_ENDPOINT=https://hf-mirror.com \
 
 ## Skills（deer-flow 集成）
 
-POC 脚本跑通后，检索与合规判定功能封装为 deer-flow skills。
+检索与合规判定功能封装为 deer-flow skills。
 
-**架构（重要）**：skill 不再直接加载 POC 脚本，而是通过 HTTP 调用一个**常驻服务**
-（`service/server.py`，端口 8100）。这样 skill 在 deer-flow 沙箱内**零第三方依赖**
-（只用标准库 urllib），不依赖 venv / 向量索引数据 / POC 脚本——与 deer-flow 只把
-`skills/` 挂进沙箱的机制契合。
+**架构（重要）**：skill 不直接加载 POC 脚本，而是通过 HTTP 调用常驻服务。**三层服务**：
+知识服务（:8100，检索原语）+ qa 任务服务（:8102，检索+生成）+ 合规任务服务（:8101，
+合规编排）。任务层是知识服务的纯 HTTP 客户端。skill 在沙箱内**零第三方依赖**
+（只用标准库 urllib），与 deer-flow 只把 `skills/` 挂进沙箱的机制契合。
 
-**先在服务器上启动两个常驻服务**（一次性；各占一个进程）：
+**先在服务器上启动三个常驻服务**（一次性；各占一个进程；先起知识服务，任务层依赖它）：
 
 ```bash
+# ① 知识服务（检索原语，:8100）—— 必须先起
 cd /mnt/nvme/calvin/code/deer-flow/ce-code
-
-# 检索服务（code-qa skill 用）
 .venv/bin/python service/server.py             # 监听 0.0.0.0:8100
 curl http://localhost:8100/health
 
-# 合规服务（compliance-check skill 用，独立进程）
-.venv/bin/python service/compliance_server.py  # 监听 0.0.0.0:8101
+# ② qa 任务服务（code-qa skill 用，:8102）
+cd /mnt/nvme/calvin/code/deer-flow/ce-services
+uv run python qa/server.py                     # 监听 0.0.0.0:8102
+curl http://localhost:8102/health
+
+# ③ 合规任务服务（compliance-check skill 用，:8101）
+uv run python compliance/server.py             # 监听 0.0.0.0:8101
 curl http://localhost:8101/health
 ```
 
-> 检索服务端点：`/search`（裸条款）、`/qa`（检索+生成）、`/retrieve`（/qa 别名）、
-> `/expand`、`/clause/{standard}/{path}`。合规服务端点：`/compliance`。
+> 知识服务端点（原语）：`/search`（裸条款）、`/expand`、`/clause/{standard}/{path}`。
+> qa 服务端点：`/qa`（检索+生成）。合规服务端点：`/compliance`。
 
 ---
 
@@ -265,7 +267,7 @@ python3 skills/public/compliance-check/check.py \
 输出：结构化合规报告
 ```
 
-内部编排脚本：`scripts/08_extract_params.py`（参数提取）、`09_gen_queries.py`（查询矩阵）、`10_compliance_check.py`（端到端编排）。
+编排实现：`../ce-services/compliance/`（`params.py` 参数提取、`queries.py` 查询矩阵、`orchestration.py` 端到端编排、`server.py` :8101）。检索经知识服务 :8100 `/search`。
 
 ---
 
@@ -320,10 +322,11 @@ CUDA_VISIBLE_DEVICES=2 HF_ENDPOINT=https://hf-mirror.com \
   --store-dir data/vector_store/<standard> \
   --query "<查询>" --skip-rerank
 
-# 启动两个常驻 HTTP 服务（skill 走 HTTP 调用）
-.venv/bin/python service/server.py             # 检索服务 :8100
-.venv/bin/python service/compliance_server.py  # 合规服务 :8101（独立进程）
-curl http://localhost:8100/health && curl http://localhost:8101/health
+# 启动三个常驻 HTTP 服务（skill 走 HTTP 调用；先起知识服务）
+.venv/bin/python service/server.py                       # 知识服务 :8100（ce-code）
+(cd ../ce-services && uv run python qa/server.py)            # qa 服务 :8102
+(cd ../ce-services && uv run python compliance/server.py)    # 合规服务 :8101
+curl http://localhost:8100/health && curl http://localhost:8102/health && curl http://localhost:8101/health
 ```
 
 ---
@@ -365,14 +368,15 @@ Query → ① 向量(语义) + ① BM25(条文号/术语) + ④ 适用范围结�
 ※ ④ 适用范围过滤优先于排序：先按 standard/version/scope 圈定范围，再排序。
 ```
 
-### 服务 / skill 拓扑：一个知识服务，N 个 skill
+### 服务 / skill 拓扑：一个知识服务，N 个任务服务（**已落地**）
 
-知识层是独立常驻服务（非 skill），skill 只是每个 agent 的薄适配器。当前 `service/server.py` 只暴露两个**焊死的任务端点**（`/retrieve`=检索+生成、`/compliance`=整条流水线），检索原语被埋在 05/06/10 脚本里——这是最大扩展性债务：算量/审图 agent 落地时无法复用"裸检索 / 引用扩展 / 范围过滤"。目标：
+知识层是独立常驻服务（非 skill），任务服务与 skill 是它的薄客户端。结构重构已完成：
 
-- **服务层双层 API**：原语端点（`/search` `/expand` `/filter` `/rerank` `/clause/{path}`）+ 任务端点（`/qa` `/compliance`）。
-- **检索与生成解耦**：`/retrieve` 拆成 `/search`（裸条款）+ `/qa`（=search+generate）；算量/审图要裸条款。
-- **引擎毕业成 package**：05/06/10 逻辑收敛成 `bcrag/` 包，服务与脚本都 import 它，不再 `importlib` 按文件名加载编号脚本。
-- **接入层映射**：`code-qa`→`/qa`、`compliance-check`→`/compliance`、〔算量〕→`/search`+`/clause`→自有 sandbox、〔审图〕→解析图纸→`/search`+`/filter`→比对。
-- **HTTP vs MCP**：现 skill→HTTP 本质是手写版 MCP；第二个 agent（算量）落地、原语集稳定后再考虑迁 MCP。
+- **知识层只放数据 + 检索**：`retrieval/` 包 + 知识服务 `service/server.py`（:8100），只暴露原语 `/search` `/expand` `/clause`。retrieval + rerank 模型只在此加载一份。
+- **检索与生成/编排解耦**：生成（qa）与合规编排迁出到顶层 `../ce-services/` 任务层（独立 uv 项目），作为知识服务的**纯 HTTP 客户端**——`qa`（:8102 `/qa`=search+generate）、`compliance`（:8101 `/compliance`）。不 import retrieval。
+- **引擎已毕业成 package**：检索逻辑在 `retrieval/`，服务与脚本 import 它，不再 `importlib` 按文件名加载编号脚本；退役的 POC CLI `06/08/09/10` 已删除。
+- **接入层映射**：`code-qa`→qa 服务 `/qa`、`compliance-check`→合规服务 `/compliance`、〔算量〕→知识服务 `/search`+`/clause`→自有 sandbox、〔审图〕→解析图纸→`/search`+`/filter`→比对。
+- **待补原语**：`/filter`（适用范围过滤）、`/rerank` 待 Phase B 数据模型（谓词抽取）落地后补。
+- **HTTP vs MCP**：现 skill/任务层→HTTP 本质是手写版 MCP；第二个 agent（算量）落地、原语集稳定后再考虑迁 MCP。
 
-**重构优先级**：先还 P0 = 暴露原语 + 检索/生成解耦（算量 agent 一落地就撞），随后并行打磨黑体强条标注、引用边分型、表格结构化、适用范围谓词抽取。
+**下一步**：并行打磨黑体强条标注、引用边分型、表格结构化、适用范围谓词抽取（Phase B，决定三个 agent 能力天花板）。

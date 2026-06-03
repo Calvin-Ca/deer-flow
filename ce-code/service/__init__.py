@@ -1,9 +1,6 @@
-"""service —— 知识层 server-side 逻辑与 HTTP 服务。
+"""service —— 知识服务的 HTTP 包装（检索原语，:8100）。
 
-包含两个独立服务的 FastAPI app 及其编排/生成逻辑（均 import retrieval 做检索）：
-  server.py            检索服务 :8100（/search /expand /clause /qa /retrieve /health）
-  compliance_server.py 合规服务 :8101（/compliance /health）
-  generation.py        生成逻辑（被检索服务 /qa 使用）
-  orchestration.py     合规编排（被合规服务使用）
-  params.py / queries.py  参数提取 / 查询矩阵（被合规编排使用）
+只剩 ``server.py`` 一个文件：把 ``retrieval`` 包的检索原语（search/expand/get_clause）
+包成 HTTP 端点。生成（qa）与编排（compliance）已迁出到顶层 ``services/`` 任务层，
+作为本服务的纯 HTTP 客户端。
 """

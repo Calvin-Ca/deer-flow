@@ -28,22 +28,25 @@ description: 建筑规范项目级合规审查技能。引导用户完成多轮�
 ## 架构（重要）
 
 本 skill 的 `check.py` 是一个**薄 HTTP 客户端**，把项目描述转发给服务器上常驻的
-**合规服务**（`ce-code/service/compliance_server.py` 的 `/compliance`
-端点，**独立部署在 `http://localhost:8101`**，与检索服务 :8100 分开）。沙箱内
-**零第三方依赖**——只用标准库 urllib，无需 venv、向量索引或 POC 脚本。
+**合规服务**（`ce-services/compliance/server.py` 的 `/compliance` 端点，**独立部署在
+`http://localhost:8101`**）。合规服务本身是知识服务 :8100 的纯 HTTP 客户端：检索经
+知识服务 `/search`，参数提取 / 判定 / 反思直接调 Qwen3。沙箱内 **零第三方依赖**——
+只用标准库 urllib，无需 venv、向量索引或 POC 脚本。
 
 ## 前置依赖（需在服务器上运行）
 
 | 服务 | 地址 | 用途 |
 |---|---|---|
 | **合规服务** | localhost:8101 | 本 skill 直接调用的 HTTP 服务（独立进程） |
-| Milvus | localhost:19530 | 向量库（被服务使用） |
-| vLLM BGE-large | localhost:8097 | 文本 embedding（被服务使用） |
-| vLLM Qwen3-8B | localhost:8099 | 参数提取 + 合规判定（被服务使用） |
+| **知识服务** | localhost:8100 | 裸检索原语（被合规服务调用） |
+| Milvus | localhost:19530 | 向量库（被知识服务使用） |
+| vLLM BGE-large | localhost:8097 | 文本 embedding（被知识服务使用） |
+| vLLM Qwen3-8B | localhost:8099 | 参数提取 + 合规判定（被合规服务使用） |
 
-> 合规服务启动方式（服务器上，一次性常驻；与检索服务 :8100 各起一个进程）：
+> 服务启动方式（服务器上，常驻；需先起知识服务，合规服务依赖它）：
 > ```bash
-> cd ce-code && .venv/bin/python service/compliance_server.py
+> cd ce-code && .venv/bin/python service/server.py        # 知识服务 :8100
+> cd ce-services && uv run python compliance/server.py       # 合规服务 :8101
 > ```
 
 ---
@@ -183,6 +186,7 @@ python3 /mnt/skills/public/compliance-check/check.py \
 
 | 错误信息 | 原因 | 处理（在服务器上） |
 |---|---|---|
-| `无法连接合规服务` | 8101 合规服务未启动 | `cd ce-code && .venv/bin/python service/compliance_server.py` |
+| `无法连接合规服务` | 8101 合规服务未启动 | `cd ce-services && uv run python compliance/server.py` |
+| 503 `无法连接知识服务` | 8100 知识服务未启动 | `cd ce-code && .venv/bin/python service/server.py` |
 | 返回 503 `向量索引未就绪` | 索引未建 | `uv run pipeline/04_build_index.py --standard gb50016` |
 | 返回 500 `合规检查失败` | Milvus / vLLM 未启动 | `curl http://localhost:8097/health`、8099、Milvus 19530 检查 |

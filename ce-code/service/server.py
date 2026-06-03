@@ -1,20 +1,20 @@
 #!/usr/bin/env python3
-"""建筑规范 RAG —— 检索服务（常驻 HTTP，端口 8100）。
+"""建筑规范 RAG —— 知识服务（常驻 HTTP，端口 8100）。
 
-重构后职责单一：**对底层知识库提供检索 + 问答**，编排逻辑（合规）已拆到独立的
-合规服务（``compliance_server.py``，端口 8101）。检索逻辑来自 ``retrieval`` 包，生成
-逻辑来自 ``service.generation``——本文件只做 HTTP ↔ 函数调用的翻译 + 可观测性日志。
+职责单一：**只对底层知识库提供检索原语**（裸检索 / 引用扩展 / 单条款直取）。生成
+（问答）与编排（合规）已拆到顶层 ``services/`` 任务层（qa :8102 / compliance :8101），
+它们作为本服务的纯 HTTP 客户端，HTTP 调本服务的 /search。检索逻辑来自 ``retrieval``
+包——本文件只做 HTTP ↔ 函数调用的翻译 + 可观测性日志，是 retrieval + rerank 的唯一
+进程内 owner（索引、rerank 模型只在此加载一份）。
 
 为什么是 HTTP 服务：
   deer-flow 沙箱只把 ``skills/`` 挂进 agent 可见范围，``ce-code/``
-  （venv、向量索引数据、retrieval/service 代码）都不在其中。做成常驻服务后，skill 侧
-  只需标准库 urllib 打 HTTP，沙箱内**零依赖、零 venv、零数据目录**。
+  （venv、向量索引数据、retrieval 代码）都不在其中。做成常驻服务后，沙箱内的 skill
+  与服务器上的任务层都只需打 HTTP，沙箱侧**零依赖、零 venv、零数据目录**。
 
-端点：
+端点（原语）：
   GET  /health                       健康检查（含已就绪的 standard 列表）
-  POST /search                       裸检索（条款 + meta，无生成）—— 给算量/审图复用
-  POST /qa                           检索 + Qwen3 结构化生成（code-qa skill）
-  POST /retrieve                     /qa 的后向兼容别名
+  POST /search                       裸检索（条款 + meta，无生成）—— qa/compliance/算量/审图复用
   POST /expand                       对给定 clause_path 做引用图扩展
   GET  /clause/{standard}/{path}     单条款直取
 
@@ -48,7 +48,6 @@ from retrieval.config import (  # noqa: E402
     resolve_store_dir,
 )
 from retrieval.engine import expand_references, get_clause, load_metadata, search  # noqa: E402
-from service.generation import answer  # noqa: E402
 
 _VECTOR_STORE = _POC_ROOT / "data" / "vector_store"
 
@@ -96,7 +95,7 @@ class ExpandRequest(BaseModel):
 app = FastAPI(title="Building Code RAG · Retrieval Service", version="2.0.0")
 
 
-# ── 共享检索步骤（/search 与 /qa 复用，含逐条日志）────────────────────────────
+# ── 检索步骤（/search 用，含逐条日志可观测性）────────────────────────────────
 
 def _run_search(req: SearchRequest, rid: str) -> tuple[list[dict], dict, str, float]:
     store_dir, store_name = _resolve(req.standard)
@@ -189,47 +188,6 @@ def search_endpoint(req: SearchRequest) -> dict:
             "elapsed_ms": round(retrieve_ms),
         },
     }
-
-
-@app.post("/qa")
-def qa_endpoint(req: SearchRequest) -> dict:
-    """检索 + Qwen3 结构化生成（code-qa skill 的默认路径）。"""
-    rid = uuid.uuid4().hex[:8]
-    clauses, stats, store_name, retrieve_ms = _run_search(req, rid)
-
-    t1 = time.perf_counter()
-    try:
-        response = answer(req.query, clauses, DEFAULTS["llm_url"], DEFAULTS["llm_model_id"])
-    except Exception as exc:
-        logger.exception("[%s] 生成失败", rid)
-        raise HTTPException(
-            status_code=500,
-            detail=f"生成失败: {exc}（检索到 {len(clauses)} 条，可重试）",
-        ) from exc
-
-    generate_ms = (time.perf_counter() - t1) * 1000
-    logger.info("[%s] 生成完成 (%.0fms) 总耗时 %.0fms", rid, generate_ms, retrieve_ms + generate_ms)
-
-    return {
-        "query": req.query,
-        "standard": store_name,
-        "retrieved_clauses_count": len(clauses),
-        "mandatory_clauses_count": stats.get("mandatory", 0),
-        "response": response,
-        "meta": {
-            "request_id": rid,
-            **stats,
-            "retrieve_ms": round(retrieve_ms),
-            "generate_ms": round(generate_ms),
-            "elapsed_ms": round(retrieve_ms + generate_ms),
-        },
-    }
-
-
-@app.post("/retrieve")
-def retrieve_alias(req: SearchRequest) -> dict:
-    """后向兼容别名 → /qa（旧 skill 客户端打的是 /retrieve）。"""
-    return qa_endpoint(req)
 
 
 @app.post("/expand")

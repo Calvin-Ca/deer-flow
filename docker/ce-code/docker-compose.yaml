@@ -1,0 +1,36 @@
+# 知识服务（:8100）—— 单独启动，或被 docker/ce-services/docker-compose.yaml include
+#
+# 单独启动（从项目根执行）：
+#   cp docker/ce-code/.env.example docker/ce-code/.env
+#   docker compose -f docker/ce-code/docker-compose.yaml up -d
+
+services:
+  knowledge:
+    build:
+      context: ../..                      # 项目根（COPY ce-code/ 的基准）
+      dockerfile: docker/ce-code/Dockerfile
+    image: rag-knowledge:latest
+    container_name: rag-knowledge
+    network_mode: host                    # 直接复用宿主机网络，访问 Milvus/vLLM
+    restart: unless-stopped
+    environment:
+      - CUDA_VISIBLE_DEVICES=${CUDA_DEVICE:-2}
+      - NVIDIA_VISIBLE_DEVICES=${CUDA_DEVICE:-2}
+      - HF_ENDPOINT=https://hf-mirror.com
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ["${CUDA_DEVICE:-2}"]
+              capabilities: [gpu]
+    volumes:
+      - ${DATA_DIR}:/app/data:ro
+      - ${HF_CACHE:-~/.cache/huggingface}:/root/.cache/huggingface
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:8100/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s    # FlagEmbedding 首次加载模型较慢

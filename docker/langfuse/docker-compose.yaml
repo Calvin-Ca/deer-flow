@@ -1,0 +1,185 @@
+# Langfuse v3 自托管栈（与 deer-flow 解耦的独立 compose）
+#
+# 用途：LLM 可观测性 —— 查看每次模型调用的真实 system prompt / 消息历史 /
+#       工具调用（read_file、bash 等）/ token / 延迟 / 报错。
+#
+# 设计原则：
+#   - 只把 Web UI 暴露到宿主机 3030 端口（3000 被 deer-flow 前端占用）。
+#   - Postgres / ClickHouse / Redis / MinIO 全部只在内部网络可见，不映射宿主端口，
+#     避免与 vLLM(8097-8099)/Milvus(19530)/RAG 服务(8100/8101) 等冲突。
+#   - 所有密钥用 ${VAR:-默认值} 形式：不放 .env 也能 `docker compose up` 直接跑通；
+#     生产可在同目录 .env 覆盖（.env 已被 .gitignore 忽略）。
+#   - 用 LANGFUSE_INIT_* 无人值守初始化 org/project/user 和一对固定 API Key，
+#     deer-flow 侧 LANGFUSE_PUBLIC_KEY/SECRET_KEY 直接对上，无需点 UI。
+#
+# 启动（在服务器上）：
+#   cd docker/langfuse && docker compose up -d
+# 访问：http://<服务器IP>:3030   登录邮箱见 LANGFUSE_INIT_USER_EMAIL，密码见 .env / 下方默认值
+
+services:
+  langfuse-web:
+    image: langfuse/langfuse:3
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "${LANGFUSE_WEB_PORT:-3030}:3000"
+    environment:
+      # ── 核心存储 ──────────────────────────────────────────────
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-758812007d952668c4193f3fd8fb9717}@postgres:5432/postgres
+      SALT: ${SALT:-FkkV/FYoVaVcNW4YqzcL+0gwrvFKzGMpYc4qh5tj9GA=}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-417184d53bb04353fbb18183e3914cae0b60a8dec01e8f19f0c8465c5c41cce8}
+      TELEMETRY_ENABLED: ${TELEMETRY_ENABLED:-false}
+      LANGFUSE_ENABLE_EXPERIMENTAL_FEATURES: ${LANGFUSE_ENABLE_EXPERIMENTAL_FEATURES:-false}
+      # ── ClickHouse（trace 明细存储）────────────────────────────
+      CLICKHOUSE_MIGRATION_URL: clickhouse://clickhouse:9000
+      CLICKHOUSE_URL: http://clickhouse:8123
+      CLICKHOUSE_USER: clickhouse
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-f22cc8a47a250f8644230a7692eff5ab}
+      CLICKHOUSE_CLUSTER_ENABLED: "false"
+      # ── 对象存储（事件/媒体批量上传，用内置 MinIO）─────────────
+      LANGFUSE_S3_EVENT_UPLOAD_BUCKET: langfuse
+      LANGFUSE_S3_EVENT_UPLOAD_REGION: auto
+      LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minio}
+      LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-afe13a9ee11cbd3408ac2d4d64b3e201}
+      LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: http://minio:9000
+      LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: "true"
+      LANGFUSE_S3_EVENT_UPLOAD_PREFIX: events/
+      LANGFUSE_S3_MEDIA_UPLOAD_BUCKET: langfuse
+      LANGFUSE_S3_MEDIA_UPLOAD_REGION: auto
+      LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minio}
+      LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-afe13a9ee11cbd3408ac2d4d64b3e201}
+      LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT: http://minio:9000
+      LANGFUSE_S3_MEDIA_UPLOAD_FORCE_PATH_STYLE: "true"
+      LANGFUSE_S3_MEDIA_UPLOAD_PREFIX: media/
+      # ── Redis（队列）──────────────────────────────────────────
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_AUTH: ${REDIS_AUTH:-ba0c6aee03df61d8d660e4706e2ba4d7}
+      # ── NextAuth（登录）───────────────────────────────────────
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3030}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-vPx76qI4R7yqb2EuDR5to8nuocFURCgZEK49Q1a5Q+M=}
+      # ── 无人值守初始化：建好 org/project/user + 固定一对 API Key ──
+      LANGFUSE_INIT_ORG_ID: ${LANGFUSE_INIT_ORG_ID:-deerflow}
+      LANGFUSE_INIT_ORG_NAME: ${LANGFUSE_INIT_ORG_NAME:-DeerFlow}
+      LANGFUSE_INIT_PROJECT_ID: ${LANGFUSE_INIT_PROJECT_ID:-deerflow}
+      LANGFUSE_INIT_PROJECT_NAME: ${LANGFUSE_INIT_PROJECT_NAME:-deer-flow}
+      LANGFUSE_INIT_PROJECT_PUBLIC_KEY: ${LANGFUSE_INIT_PROJECT_PUBLIC_KEY:-pk-lf-f8233b5e-1a4b-4561-ad52-40ed09152898}
+      LANGFUSE_INIT_PROJECT_SECRET_KEY: ${LANGFUSE_INIT_PROJECT_SECRET_KEY:-sk-lf-9a357125-10bc-42da-a4a0-f520026bd5b7}
+      LANGFUSE_INIT_USER_EMAIL: ${LANGFUSE_INIT_USER_EMAIL:-admin@deerflow.local}
+      LANGFUSE_INIT_USER_NAME: ${LANGFUSE_INIT_USER_NAME:-Admin}
+      LANGFUSE_INIT_USER_PASSWORD: ${LANGFUSE_INIT_USER_PASSWORD:-24b2ae94b499d4dc38c36f65}
+
+  langfuse-worker:
+    image: langfuse/langfuse-worker:3
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-758812007d952668c4193f3fd8fb9717}@postgres:5432/postgres
+      SALT: ${SALT:-FkkV/FYoVaVcNW4YqzcL+0gwrvFKzGMpYc4qh5tj9GA=}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-417184d53bb04353fbb18183e3914cae0b60a8dec01e8f19f0c8465c5c41cce8}
+      TELEMETRY_ENABLED: ${TELEMETRY_ENABLED:-false}
+      CLICKHOUSE_MIGRATION_URL: clickhouse://clickhouse:9000
+      CLICKHOUSE_URL: http://clickhouse:8123
+      CLICKHOUSE_USER: clickhouse
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-f22cc8a47a250f8644230a7692eff5ab}
+      CLICKHOUSE_CLUSTER_ENABLED: "false"
+      LANGFUSE_S3_EVENT_UPLOAD_BUCKET: langfuse
+      LANGFUSE_S3_EVENT_UPLOAD_REGION: auto
+      LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minio}
+      LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-afe13a9ee11cbd3408ac2d4d64b3e201}
+      LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: http://minio:9000
+      LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: "true"
+      LANGFUSE_S3_EVENT_UPLOAD_PREFIX: events/
+      LANGFUSE_S3_MEDIA_UPLOAD_BUCKET: langfuse
+      LANGFUSE_S3_MEDIA_UPLOAD_REGION: auto
+      LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minio}
+      LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-afe13a9ee11cbd3408ac2d4d64b3e201}
+      LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT: http://minio:9000
+      LANGFUSE_S3_MEDIA_UPLOAD_FORCE_PATH_STYLE: "true"
+      LANGFUSE_S3_MEDIA_UPLOAD_PREFIX: media/
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_AUTH: ${REDIS_AUTH:-ba0c6aee03df61d8d660e4706e2ba4d7}
+
+  postgres:
+    image: postgres:16
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-758812007d952668c4193f3fd8fb9717}
+      POSTGRES_DB: postgres
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - langfuse_postgres:/var/lib/postgresql/data
+
+  clickhouse:
+    image: clickhouse/clickhouse-server
+    restart: always
+    user: "101:101"
+    environment:
+      CLICKHOUSE_DB: default
+      CLICKHOUSE_USER: clickhouse
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-f22cc8a47a250f8644230a7692eff5ab}
+    healthcheck:
+      test: wget --no-verbose --tries=1 --spider http://localhost:8123/ping || exit 1
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 1s
+    volumes:
+      - langfuse_clickhouse_data:/var/lib/clickhouse
+      - langfuse_clickhouse_logs:/var/log/clickhouse-server
+
+  minio:
+    image: minio/minio
+    restart: always
+    entrypoint: sh
+    # 启动后自动建好 langfuse bucket
+    command: -c 'mkdir -p /data/langfuse && minio server --address ":9000" --console-address ":9001" /data'
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minio}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-afe13a9ee11cbd3408ac2d4d64b3e201}
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - langfuse_minio:/data
+
+  redis:
+    image: redis:7
+    restart: always
+    command: >
+      --requirepass ${REDIS_AUTH:-ba0c6aee03df61d8d660e4706e2ba4d7}
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  langfuse_postgres:
+  langfuse_clickhouse_data:
+  langfuse_clickhouse_logs:
+  langfuse_minio:

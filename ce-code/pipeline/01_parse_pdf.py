@@ -27,7 +27,7 @@ from rich.console import Console
 
 console = Console()
 
-# 项目根目录（building-code-rag-poc/），脚本在 scripts/ 下
+# 项目根目录（ce-code/），脚本在 pipeline/ 下
 ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_OUTPUT = ROOT / "data" / "parsed"
 
@@ -39,7 +39,7 @@ def detect_mineru_cli() -> str:
             return candidate
     console.print(
         "[red]✗ 找不到 MinerU CLI（既没有 mineru 也没有 magic-pdf）。[/red]\n"
-        "  请先在服务器上跑 [bold]bash scripts/setup_server.sh[/bold]。"
+        "  请先在服务器上跑 [bold]bash pipeline/setup_server.sh[/bold]。"
     )
     sys.exit(1)
 

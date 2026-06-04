@@ -1,5 +1,8 @@
 # DeerFlow docker image cache
 docker/.cache/
+
+# tiktoken BPE 词表缓存（tiktoken 首次运行时下载到 cwd）
+data-gym-cache/
 # oh-my-claudecode state
 .omc/
 # OS generated files
@@ -25,7 +28,7 @@ venv/
 
 # Configuration files
 mcp_config.json
-extensions_config.json
+# extensions_config.json — 取消忽略，纳入 git 同步到服务器（skill enabled 状态需随代码走）
 
 # IDE
 .idea/

@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # 把 data/raw/ 下文件名中的空格替换为下划线。
-# 用法：bash scripts/rename_raw_files.sh [--dry-run]
+# 用法：bash pipeline/rename_raw_files.sh [--dry-run]
 #   --dry-run  只打印，不实际重命名
 
 set -euo pipefail
 
-cd "$(dirname "$0")/.."   # 进入 building-code-rag-poc 根目录
+cd "$(dirname "$0")/.."   # 进入 ce-code 根目录
 
 DRY_RUN=false
 [[ "${1:-}" == "--dry-run" ]] && DRY_RUN=true

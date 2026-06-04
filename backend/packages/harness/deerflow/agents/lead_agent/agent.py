@@ -360,7 +360,7 @@ def _load_enabled_skills_for_tool_policy(available_skills: set[str] | None, *, a
         logger.exception("Failed to load skills for allowed-tools policy")
         raise
 
-    if available_skills is None:
+    if available_skills is None: # None就不过滤skills,原样返回
         return skills
     return [skill for skill in skills if skill.name in available_skills]
 
@@ -373,11 +373,11 @@ def make_lead_agent(config: RunnableConfig):
 
 
 def _make_lead_agent(config: RunnableConfig, *, app_config: AppConfig): 
-    # config：运行时配置（本次请求参数），app_config：系统能力蓝图（静态配置），agent_config：某个 agent 的个性配置
     # Lazy import to avoid circular dependency
     from deerflow.tools import get_available_tools
     from deerflow.tools.builtins import setup_agent, update_agent
 
+    # config：运行时配置（本次请求参数），app_config：系统能力蓝图（静态配置）
     cfg = _get_runtime_config(config)
     resolved_app_config = app_config # 完整的 Agent 运行系统蓝图
 
@@ -390,8 +390,9 @@ def _make_lead_agent(config: RunnableConfig, *, app_config: AppConfig):
     is_bootstrap = cfg.get("is_bootstrap", False)
     agent_name = validate_agent_name(cfg.get("agent_name"))
 
+     # agent_config：某个 agent 的个性配置
     agent_config = load_agent_config(agent_name) if not is_bootstrap else None
-    available_skills = _available_skill_names(agent_config, is_bootstrap)
+    available_skills = _available_skill_names(agent_config, is_bootstrap) 
     # Custom agent model from agent config (if any), or None to let _resolve_model_name pick the default
     agent_model_name = agent_config.model if agent_config and agent_config.model else None
 
@@ -446,7 +447,7 @@ def _make_lead_agent(config: RunnableConfig, *, app_config: AppConfig):
         if not isinstance(existing, list):
             existing = list(existing)
         config["callbacks"] = [*existing, *tracing_callbacks]
-
+    # 如果 available_skills 是 None 则不过滤，否则skills_for_tool_policy = available_skills
     skills_for_tool_policy = _load_enabled_skills_for_tool_policy(available_skills, app_config=resolved_app_config)
 
     if is_bootstrap:    # 用户在前端自己新增skill才为true
@@ -468,7 +469,7 @@ def _make_lead_agent(config: RunnableConfig, *, app_config: AppConfig):
     # Custom agents can update their own SOUL.md / config via update_agent.
     # The default agent (no agent_name) does not see this tool.
     extra_tools = [update_agent] if agent_name else []
-    # Default lead agent (unchanged behavior)
+    # Default lead agent (unchanged behavior),按 gent_config.tool_groups中 agent 声明的工具组装配工具集
     tools = get_available_tools(model_name=model_name, groups=agent_config.tool_groups if agent_config else None, subagent_enabled=subagent_enabled, app_config=resolved_app_config)
     return create_agent(
         model=create_chat_model(name=model_name, thinking_enabled=thinking_enabled, reasoning_effort=reasoning_effort, app_config=resolved_app_config, attach_tracing=False),

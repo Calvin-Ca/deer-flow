@@ -12,26 +12,42 @@ description: 建筑规范项目级合规审查技能。引导用户完成多轮�
 1. **多轮参数收集**：识别描述中的模糊信息，主动追问补充
 2. **参数提取**：Qwen3-8B 从自由文本提取建筑类型、高度、面积、用途等结构化参数
 3. **维度展开**：按 GB 50016 合规维度自动展开 8-16 个检索查询
-4. **并行检索**：调用 building-code-rag 检索模块，合并去重
+4. **并行检索**：调用 code-qa 检索模块，合并去重
 5. **合规判定**：Qwen3-8B 逐条给出：符合 / 不符合 / 需核实 / 需补充信息 / 不适用
 6. **反思校验**：检查是否有合规维度遗漏
 
-## 与 building-code-rag 的关系
+## 与 code-qa 的关系
 
-| | building-code-rag | compliance-check |
+| | code-qa | compliance-check |
 |---|---|---|
 | 用户输入 | 一个具体问题 | 项目参数描述 |
 | 查询来源 | 用户提问 | 系统按维度自动展开 |
 | 覆盖范围 | 问什么答什么 | 主动穷举所有适用维度 |
 | 输出 | 相关条款 + 回答 | 全量强条清单 + 逐条判定 |
 
+## 架构（重要）
+
+本 skill 的 `check.py` 是一个**薄 HTTP 客户端**，把项目描述转发给服务器上常驻的
+**合规服务**（`ce-services/compliance/server.py` 的 `/compliance` 端点，**独立部署在
+`http://localhost:8101`**）。合规服务本身是知识服务 :8100 的纯 HTTP 客户端：检索经
+知识服务 `/search`，参数提取 / 判定 / 反思直接调 Qwen3。沙箱内 **零第三方依赖**——
+只用标准库 urllib，无需 venv、向量索引或 POC 脚本。
+
 ## 前置依赖（需在服务器上运行）
 
 | 服务 | 地址 | 用途 |
 |---|---|---|
-| Milvus | localhost:19530 | 向量库 |
-| vLLM BGE-large | localhost:8097 | 文本 embedding |
-| vLLM Qwen3-8B | localhost:8099 | 参数提取 + 合规判定 |
+| **合规服务** | localhost:8101 | 本 skill 直接调用的 HTTP 服务（独立进程） |
+| **知识服务** | localhost:8100 | 裸检索原语（被合规服务调用） |
+| Milvus | localhost:19530 | 向量库（被知识服务使用） |
+| vLLM BGE-large | localhost:8097 | 文本 embedding（被知识服务使用） |
+| vLLM Qwen3-8B | localhost:8099 | 参数提取 + 合规判定（被合规服务使用） |
+
+> 服务启动方式（服务器上，常驻；需先起知识服务，合规服务依赖它）：
+> ```bash
+> cd ce-code && uv run python service/server.py        # 知识服务 :8100
+> cd ce-services && uv run python compliance/server.py       # 合规服务 :8101
+> ```
 
 ---
 
@@ -95,17 +111,15 @@ task(
 
 ## 调用方式二：bash 直接调用
 
-```bash
-cd /mnt/nvme/calvin/code/deer-flow
+用系统 `python3` 即可，无需特定 venv：
 
+```bash
 # 基本调用
-building-code-rag-poc/.venv/bin/python \
-  skills/public/compliance-check/check.py \
+python3 /mnt/skills/public/compliance-check/check.py \
   --project "地上11层住宅楼，总高32米，每层850平方米，地下一层车库"
 
 # 保存报告
-building-code-rag-poc/.venv/bin/python \
-  skills/public/compliance-check/check.py \
+python3 /mnt/skills/public/compliance-check/check.py \
   --project "..." \
   --output /tmp/compliance_report.json
 ```
@@ -113,8 +127,9 @@ building-code-rag-poc/.venv/bin/python \
 | 参数 | 默认值 | 说明 |
 |---|---|---|
 | `--project` / `-p` | 必填 | 项目自由文本描述 |
-| `--standard` | `GB_50016-20142018` | 规范代号 |
+| `--standard` | `gb50016` | 规范代号 |
 | `--skip-reflection` | 关 | 跳过反思校验（调试用） |
+| `--service-url` | `http://localhost:8101` | 合规服务地址（也可用环境变量 `BUILDING_CODE_COMPLIANCE_URL`） |
 | `--output` | stdout | 报告 JSON 写入路径（可选） |
 
 ---
@@ -149,7 +164,12 @@ building-code-rag-poc/.venv/bin/python \
   "mandatory_clauses_total": 85,
   "uncertain_params": ["耐火等级未说明"],
   "missed_dimensions_warning": [],
-  "disclaimer": "以上结果仅供参考，不替代具有执业资格的注册工程师专业审查。"
+  "disclaimer": "以上结果仅供参考，不替代具有执业资格的注册工程师专业审查。",
+  "meta": {
+    "request_id": "a1b2c3d4",
+    "dimensions_count": 15,
+    "elapsed_ms": 142000
+  }
 }
 ```
 
@@ -161,7 +181,12 @@ building-code-rag-poc/.venv/bin/python \
 
 ## 常见错误排查
 
-| 错误信息 | 原因 | 处理 |
+> 这些都是**服务端配置问题**，agent 在沙箱内无法补救（不要建 venv、装包或拷脚本）。
+> 把错误原文转达用户，由用户在服务器侧处理。
+
+| 错误信息 | 原因 | 处理（在服务器上） |
 |---|---|---|
-| `向量索引目录不存在` | 索引未建 | 服务器运行 `uv run scripts/04_build_index.py` |
-| `服务调用失败` | Milvus / vLLM 未启动 | `curl http://localhost:8097/health` 检查 |
+| `无法连接合规服务` | 8101 合规服务未启动 | `cd ce-services && uv run python compliance/server.py` |
+| 503 `无法连接知识服务` | 8100 知识服务未启动 | `cd ce-code && uv run python service/server.py` |
+| 返回 503 `向量索引未就绪` | 索引未建 | `uv run pipeline/04_build_index.py --standard gb50016` |
+| 返回 500 `合规检查失败` | Milvus / vLLM 未启动 | `curl http://localhost:8097/health`、8099、Milvus 19530 检查 |

@@ -9,7 +9,7 @@
 输入：data/parsed/<standard>/<mode>/<standard>_content_list.json
 输出：data/structured/<standard>_clauses.json
 
-每条款格式见 CLAUDE.md §4.1。
+每条款格式见 ce-code/PRD.md §1。
 """
 
 from __future__ import annotations

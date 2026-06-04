@@ -42,15 +42,25 @@ ce-services/
     └── queries.py          # 结构化参数 → 合规检索查询矩阵
 ```
 
-## 启动（服务器上，常驻）
+## 启动（服务器，两种方式二选一）
 
-前置：知识服务 :8100 必须先起（任务层依赖它）。见 `../ce-code/README.md`。
+全栈需 **2 个进程**：知识服务 :8100 + 任务服务 :8101（先起知识服务，任务层依赖它）。
+
+### 方式 A — Docker 一键全栈（推荐）
+
+`docker/ce-services/docker-compose.yaml` 用 `include` 组合知识服务，`depends_on: service_healthy` 保证顺序。
 
 ```bash
-cd ce-services
-uv sync                        # 首次：装 fastapi/uvicorn/requests
+cp docker/ce-services/.env.example docker/ce-services/.env   # 首次：填 DATA_DIR
+docker compose -f docker/ce-services/docker-compose.yaml up -d
+# 仅知识服务：docker compose -f docker/ce-code/docker-compose.yaml up -d
+```
 
-uv run python main.py          # 任务服务 :8101（qa + compliance）
+### 方式 B — 直接运行（两进程）
+
+```bash
+cd ce-code     && uv run python service/server.py   # ① :8100 知识服务（必须先起）
+cd ce-services && uv sync && uv run python main.py   # ② :8101 任务服务（qa + compliance）
 # 或 uvicorn 形式：uv run uvicorn main:app --host 0.0.0.0 --port 8101
 ```
 
@@ -58,6 +68,7 @@ uv run python main.py          # 任务服务 :8101（qa + compliance）
 
 健康检查：
 ```bash
+curl http://localhost:8100/health   # {"status":"ok","service":"retrieval",...}
 curl http://localhost:8101/health   # {"status":"ok","service":"tasks","routes":["/qa","/compliance"],...}
 ```
 

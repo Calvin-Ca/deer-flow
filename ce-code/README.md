@@ -39,8 +39,8 @@ ce-code/
     └── server.py                  #   知识服务 :8100 —— 仅原语 /search /expand /clause /health
 ```
 
-> **任务层在 `../ce-services/`**（与 ce-code 平级的独立 uv 项目）：`qa`（:8102 `/qa`，
-> 检索+生成）、`compliance`（:8101 `/compliance`，合规编排）。它们是知识服务的
+> **任务层在 `../ce-services/`**（与 ce-code 平级的独立 uv 项目）：单进程 `main.py`（:8101），
+> `/qa`（检索+生成）+ `/compliance`（合规编排）共端口。它是知识服务的
 > **纯 HTTP 客户端**——不 import retrieval，只打 :8100 `/search`。详见 `../ce-services/README.md`。
 
 > **重构说明（v3）**：知识层（ce-code）收敛为「数据 + 检索」——检索逻辑进 `retrieval/`
@@ -139,10 +139,10 @@ uv run python scripts/05_retrieve.py \
 
 ### Step 8 — 端到端生成（问答）
 
-生成已迁出到任务层 qa 服务（:8102），直接打 HTTP：
+生成已迁出到任务服务（:8101 `/qa`），直接打 HTTP：
 
 ```bash
-curl -s http://localhost:8102/qa \
+curl -s http://localhost:8101/qa \
   -H 'Content-Type: application/json' \
   -d '{"query":"24米高的住宅楼疏散楼梯最小净宽度是多少？","standard":"gb50016"}'
 ```
@@ -155,12 +155,12 @@ curl -s http://localhost:8102/qa \
 
 检索与合规判定功能封装为 deer-flow skills。
 
-**架构（重要）**：skill 不直接加载 POC 脚本，而是通过 HTTP 调用常驻服务。**三层服务**：
-知识服务（:8100，检索原语）+ qa 任务服务（:8102，检索+生成）+ 合规任务服务（:8101，
-合规编排）。任务层是知识服务的纯 HTTP 客户端。skill 在沙箱内**零第三方依赖**
+**架构（重要）**：skill 不直接加载 POC 脚本，而是通过 HTTP 调用常驻服务。**两层服务**：
+知识服务（:8100，检索原语）+ 任务服务（:8101，`/qa` 检索+生成 / `/compliance` 合规编排，
+qa + compliance 共进程）。任务层是知识服务的纯 HTTP 客户端。skill 在沙箱内**零第三方依赖**
 （只用标准库 urllib），与 deer-flow 只把 `skills/` 挂进沙箱的机制契合。
 
-**先在服务器上启动三个常驻服务**（一次性；各占一个进程；先起知识服务，任务层依赖它）：
+**先在服务器上启动两个常驻服务**（一次性；各占一个进程；先起知识服务，任务层依赖它）：
 
 ```bash
 # ① 知识服务（检索原语，:8100）—— 必须先起
@@ -168,18 +168,14 @@ cd /mnt/nvme/calvin/code/deer-flow/ce-code
 uv run python service/server.py                # 监听 0.0.0.0:8100
 curl http://localhost:8100/health
 
-# ② qa 任务服务（code-qa skill 用，:8102）
+# ② 任务服务（code-qa + compliance-check skill 用，:8101）
 cd /mnt/nvme/calvin/code/deer-flow/ce-services
-uv run python qa/server.py                     # 监听 0.0.0.0:8102
-curl http://localhost:8102/health
-
-# ③ 合规任务服务（compliance-check skill 用，:8101）
-uv run python compliance/server.py             # 监听 0.0.0.0:8101
+uv run python main.py                          # 监听 0.0.0.0:8101
 curl http://localhost:8101/health
 ```
 
 > 知识服务端点（原语）：`/search`（裸条款）、`/expand`、`/clause/{standard}/{path}`。
-> qa 服务端点：`/qa`（检索+生成）。合规服务端点：`/compliance`。
+> 任务服务端点：`/qa`（检索+生成）、`/compliance`（合规编排）。
 
 ---
 
@@ -322,11 +318,10 @@ uv run python scripts/05_retrieve.py \
   --store-dir data/vector_store/<standard> \
   --query "<查询>" --skip-rerank
 
-# 启动三个常驻 HTTP 服务（skill 走 HTTP 调用；先起知识服务）
+# 启动两个常驻 HTTP 服务（skill 走 HTTP 调用；先起知识服务）
 uv run python service/server.py                          # 知识服务 :8100（ce-code）
-(cd ../ce-services && uv run python qa/server.py)            # qa 服务 :8102
-(cd ../ce-services && uv run python compliance/server.py)    # 合规服务 :8101
-curl http://localhost:8100/health && curl http://localhost:8102/health && curl http://localhost:8101/health
+(cd ../ce-services && uv run python main.py)             # 任务服务 :8101（qa + compliance）
+curl http://localhost:8100/health && curl http://localhost:8101/health
 ```
 
 ---
@@ -357,7 +352,7 @@ curl http://localhost:8100/health && curl http://localhost:8102/health && curl h
 - **【P1】chunk 携带祖先链**：叶子款/项向量化拼上祖先标题链 + 所属"条"全文；召回既给命中款也给完整条。
 - **【P2】条款级版本/效力**：`status`/`version`/`effective_date` 到条款粒度；废止条款不召回但保留。多规范从一开始就支持（GB 50116 待收录）。
 
-精化后的条款 schema 见仓库根 `CLAUDE.md` §4.1（本地）。
+精化后的条款 schema 见 `ce-code/PRD.md` §1。
 
 ### 检索面（四通道）
 
@@ -373,7 +368,7 @@ Query → ① 向量(语义) + ① BM25(条文号/术语) + ④ 适用范围结�
 知识层是独立常驻服务（非 skill），任务服务与 skill 是它的薄客户端。结构重构已完成：
 
 - **知识层只放数据 + 检索**：`retrieval/` 包 + 知识服务 `service/server.py`（:8100），只暴露原语 `/search` `/expand` `/clause`。retrieval + rerank 模型只在此加载一份。
-- **检索与生成/编排解耦**：生成（qa）与合规编排迁出到顶层 `../ce-services/` 任务层（独立 uv 项目），作为知识服务的**纯 HTTP 客户端**——`qa`（:8102 `/qa`=search+generate）、`compliance`（:8101 `/compliance`）。不 import retrieval。
+- **检索与生成/编排解耦**：生成（qa）与合规编排迁出到顶层 `../ce-services/` 任务层（独立 uv 项目），作为知识服务的**纯 HTTP 客户端**——单进程 `main.py`（:8101）`/qa`=search+generate、`/compliance`=合规编排。不 import retrieval。
 - **引擎已毕业成 package**：检索逻辑在 `retrieval/`，服务与脚本 import 它，不再 `importlib` 按文件名加载编号脚本；退役的 POC CLI `06/08/09/10` 已删除。
 - **接入层映射**：`code-qa`→qa 服务 `/qa`、`compliance-check`→合规服务 `/compliance`、〔算量〕→知识服务 `/search`+`/clause`→自有 sandbox、〔审图〕→解析图纸→`/search`+`/filter`→比对。
 - **待补原语**：`/filter`（适用范围过滤）、`/rerank` 待 Phase B 数据模型（谓词抽取）落地后补。

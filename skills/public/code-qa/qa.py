@@ -87,7 +87,7 @@ def main() -> None:
         })
     except urllib.error.URLError as exc:
         startup = (
-            "cd ce-code && .venv/bin/python service/server.py"
+            "cd ce-code && uv run python service/server.py"
             if args.no_generate
             else "cd ce-services && uv run python qa/server.py"
         )

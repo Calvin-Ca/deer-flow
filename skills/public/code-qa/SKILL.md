@@ -39,7 +39,7 @@ description: 规范知识问答技能。接收自然语言查询，返回结构�
 
 > 服务启动方式（服务器上，常驻；需先起知识服务再起 qa 服务）：
 > ```bash
-> cd ce-code && .venv/bin/python service/server.py     # 知识服务 :8100
+> cd ce-code && uv run python service/server.py     # 知识服务 :8100
 > cd ce-services && uv run python qa/server.py            # qa 任务服务 :8102
 > ```
 
@@ -128,7 +128,7 @@ python3 /mnt/skills/public/code-qa/qa.py \
 | 错误信息 | 原因 | 处理（在服务器上） |
 |---|---|---|
 | `无法连接服务`（默认路径） | 8102 qa 服务未启动 | `cd ce-services && uv run python qa/server.py` |
-| `无法连接服务`（--no-generate） | 8100 知识服务未启动 | `cd ce-code && .venv/bin/python service/server.py` |
+| `无法连接服务`（--no-generate） | 8100 知识服务未启动 | `cd ce-code && uv run python service/server.py` |
 | 返回 503 `向量索引未就绪` | GB 50016 索引未建 | `uv run pipeline/04_build_index.py --standard gb50016` |
 | 返回 500 `检索失败` | Milvus 或 embedding 服务未启动 | `curl http://localhost:8097/health`、Milvus 19530 检查 |
 | 返回 500 `生成失败` | Qwen3 服务未启动 | `curl http://localhost:8099/health` 检查服务 |

@@ -63,7 +63,7 @@ ce-code/
 
 ## 使用流程
 
-所有脚本在 `ce-code/` 目录下执行，使用项目 venv：`.venv/bin/python`。
+所有脚本在 `ce-code/` 目录下执行，使用项目 venv：`uv run python`。
 
 ### Step 1 — 服务器一次性环境准备
 
@@ -81,7 +81,7 @@ bash pipeline/setup_server.sh
 
 ```bash
 CUDA_VISIBLE_DEVICES=2 HF_ENDPOINT=https://hf-mirror.com \
-  .venv/bin/python pipeline/split_and_parse.py \
+  uv run python pipeline/split_and_parse.py \
   --pdf data/raw/<文件名>.pdf --chunk-size 80
 ```
 
@@ -90,7 +90,7 @@ CUDA_VISIBLE_DEVICES=2 HF_ENDPOINT=https://hf-mirror.com \
 ### Step 4 — 提取条款树
 
 ```bash
-.venv/bin/python pipeline/02_extract_clauses.py \
+uv run python pipeline/02_extract_clauses.py \
   --input "data/parsed/<basename>/auto/<basename>_content_list.json" \
   --standard-id "GB 50016-2014(2018)" \
   --output-dir data/structured/
@@ -101,7 +101,7 @@ CUDA_VISIBLE_DEVICES=2 HF_ENDPOINT=https://hf-mirror.com \
 ### Step 5 — 质量审核
 
 ```bash
-.venv/bin/python pipeline/03_review_quality.py \
+uv run python pipeline/03_review_quality.py \
   --input data/structured/<standard>_clauses.json \
   --standard-id "GB 50016-2014(2018)" \
   --check-issues \
@@ -111,7 +111,7 @@ CUDA_VISIBLE_DEVICES=2 HF_ENDPOINT=https://hf-mirror.com \
 报告输出至 `data/quality_reports/`。查看单条款：
 
 ```bash
-.venv/bin/python pipeline/03_review_quality.py \
+uv run python pipeline/03_review_quality.py \
   --input data/structured/<standard>_clauses.json \
   --show-clause 5.3.1
 ```
@@ -119,7 +119,7 @@ CUDA_VISIBLE_DEVICES=2 HF_ENDPOINT=https://hf-mirror.com \
 ### Step 6 — 建双索引（BM25 + 向量）
 
 ```bash
-.venv/bin/python pipeline/04_build_index.py \
+uv run python pipeline/04_build_index.py \
   --input data/structured/GB_50016-20142018_clauses.json \
   --embed-url http://localhost:8097 --embed-model-id /model
 ```
@@ -129,7 +129,7 @@ CUDA_VISIBLE_DEVICES=2 HF_ENDPOINT=https://hf-mirror.com \
 ### Step 7 — 检索验证
 
 ```bash
-.venv/bin/python scripts/05_retrieve.py \
+uv run python scripts/05_retrieve.py \
   --store-dir data/vector_store/GB_50016_20142018 \
   --query "24米高的住宅楼疏散楼梯最小净宽度" \
   --skip-rerank
@@ -165,7 +165,7 @@ curl -s http://localhost:8102/qa \
 ```bash
 # ① 知识服务（检索原语，:8100）—— 必须先起
 cd /mnt/nvme/calvin/code/deer-flow/ce-code
-.venv/bin/python service/server.py             # 监听 0.0.0.0:8100
+uv run python service/server.py                # 监听 0.0.0.0:8100
 curl http://localhost:8100/health
 
 # ② qa 任务服务（code-qa skill 用，:8102）
@@ -303,27 +303,27 @@ cd ce-code && uv sync             # 同步环境到 pyproject.toml/uv.lock
 
 # PDF 分块解析（大文件用，如 GB 50016 共 464 页用 80 页/块）
 CUDA_VISIBLE_DEVICES=2 HF_ENDPOINT=https://hf-mirror.com \
-  .venv/bin/python pipeline/split_and_parse.py \
+  uv run python pipeline/split_and_parse.py \
   --pdf data/raw/<xxx>.pdf --chunk-size 80
 
 # 条款树提取
-.venv/bin/python pipeline/02_extract_clauses.py \
+uv run python pipeline/02_extract_clauses.py \
   --input "data/parsed/<basename>/auto/<basename>_content_list.json" \
   --standard-id "<standard>" \
   --output-dir data/structured/
 
 # 建双索引（BM25 + 向量）
-.venv/bin/python pipeline/04_build_index.py \
+uv run python pipeline/04_build_index.py \
   --input data/structured/<standard>_clauses.json \
   --embed-url http://localhost:8097 --embed-model-id /model
 
 # 检索验证
-.venv/bin/python scripts/05_retrieve.py \
+uv run python scripts/05_retrieve.py \
   --store-dir data/vector_store/<standard> \
   --query "<查询>" --skip-rerank
 
 # 启动三个常驻 HTTP 服务（skill 走 HTTP 调用；先起知识服务）
-.venv/bin/python service/server.py                       # 知识服务 :8100（ce-code）
+uv run python service/server.py                          # 知识服务 :8100（ce-code）
 (cd ../ce-services && uv run python qa/server.py)            # qa 服务 :8102
 (cd ../ce-services && uv run python compliance/server.py)    # 合规服务 :8101
 curl http://localhost:8100/health && curl http://localhost:8102/health && curl http://localhost:8101/health

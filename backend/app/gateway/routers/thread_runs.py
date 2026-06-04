@@ -139,13 +139,13 @@ async def stream_run(thread_id: str, body: RunCreateRequest, request: Request) -
     bridge = get_stream_bridge(request) # 连接后端agent执行和前端SSE流的中转站
     run_mgr = get_run_manager(request)  # 负责 run 的生命周期管理，包括创建、状态更新（running / success / error / interrupted）、持久化到数据库
     record = await start_run(body, thread_id, request)  # 代表本次 run 的元数据，包含 run_id、thread_id、status、abort_event 等字段，贯穿整个 run 的生命周期，用户消息在input中
-
+    # 建立一个不会立即关闭的 HTTP SSE 流，把 sse_consumer 持续生成的事件实时推送给客户端
     return StreamingResponse(
-        sse_consumer(bridge, record, request, run_mgr),
+        sse_consumer(bridge, record, request, run_mgr),  # 负责生成sse所要推送的数据
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
+            "Connection": "keep-alive", # 持续推送后端chunks到前端显示
             "X-Accel-Buffering": "no",
             # LangGraph Platform includes run metadata in this header.
             # The SDK uses a greedy regex to extract the run id from this path,

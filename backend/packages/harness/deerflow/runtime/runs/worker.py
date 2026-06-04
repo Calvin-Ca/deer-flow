@@ -127,7 +127,7 @@ async def run_agent(
     record: RunRecord,
     *,
     ctx: RunContext,
-    agent_factory: Any,
+    agent_factory: Any, # 其实就是lead_agent
     graph_input: dict,
     config: dict,
     stream_modes: list[str] | None = None,
@@ -250,7 +250,7 @@ async def run_agent(
         # the agent name that this run will actually execute.
         config.setdefault("run_name", resolve_root_run_name(config, record.assistant_id))
         runnable_config = RunnableConfig(**config)
-        if ctx.app_config is not None and _agent_factory_supports_app_config(agent_factory):
+        if ctx.app_config is not None and _agent_factory_supports_app_config(agent_factory):    # 配置 lead_agent
             agent = agent_factory(config=runnable_config, app_config=ctx.app_config)
         else:
             agent = agent_factory(config=runnable_config)

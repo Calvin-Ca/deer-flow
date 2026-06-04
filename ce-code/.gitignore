@@ -1,6 +1,7 @@
-# ===== PDF 原始数据：不入 git（可能含版权内容、文件大） =====
+# ===== PDF 原始数据：不入 git（可能含版权内容、文件大）；清单入 git 作溯源 =====
 data/raw/*
 !data/raw/.gitkeep
+!data/raw/manifest.md
 
 # ===== 解析产物：不入 git（可重新生成、文件大） =====
 data/parsed/*

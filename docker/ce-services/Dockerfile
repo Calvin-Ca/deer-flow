@@ -1,10 +1,9 @@
-# 建筑规范 RAG —— 任务服务镜像（qa :8102 / compliance :8101）
+# 建筑规范 RAG —— 任务服务镜像（qa + compliance 共进程，:8101）
 #
 # 纯 HTTP 客户端，不依赖 torch/Milvus，镜像极轻量。
-# qa 和 compliance 共用同一镜像，通过 docker-compose CMD 区分。
 #
 # 构建（从项目根执行）：
-#   docker build -f docker/rag/Dockerfile.tasks -t rag-tasks .
+#   docker build -f docker/ce-services/Dockerfile -t rag-tasks .
 FROM python:3.12-slim
 
 RUN pip install --no-cache-dir \
@@ -15,10 +14,11 @@ RUN pip install --no-cache-dir \
 
 WORKDIR /app
 
-COPY ce-services/common/     common/
-COPY ce-services/qa/         qa/
-COPY ce-services/compliance/ compliance/
+COPY ce-services/main.py       main.py
+COPY ce-services/common/       common/
+COPY ce-services/qa/           qa/
+COPY ce-services/compliance/   compliance/
 
 ENV PYTHONUNBUFFERED=1
 
-# CMD 在 docker-compose 中按服务覆盖
+CMD ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8101"]

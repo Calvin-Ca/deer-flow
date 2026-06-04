@@ -37,16 +37,16 @@ description: 建筑规范项目级合规审查技能。引导用户完成多轮�
 
 | 服务 | 地址 | 用途 |
 |---|---|---|
-| **合规服务** | localhost:8101 | 本 skill 直接调用的 HTTP 服务（独立进程） |
+| **任务服务** | localhost:8101 | 本 skill 直接调用的 HTTP 服务（qa + compliance 共进程） |
 | **知识服务** | localhost:8100 | 裸检索原语（被合规服务调用） |
 | Milvus | localhost:19530 | 向量库（被知识服务使用） |
 | vLLM BGE-large | localhost:8097 | 文本 embedding（被知识服务使用） |
 | vLLM Qwen3-8B | localhost:8099 | 参数提取 + 合规判定（被合规服务使用） |
 
-> 服务启动方式（服务器上，常驻；需先起知识服务，合规服务依赖它）：
+> 服务启动方式（服务器上，常驻；需先起知识服务，任务服务依赖它）：
 > ```bash
-> cd ce-code && uv run python service/server.py        # 知识服务 :8100
-> cd ce-services && uv run python compliance/server.py       # 合规服务 :8101
+> cd ce-code     && uv run python service/server.py   # 知识服务 :8100
+> cd ce-services && uv run python main.py             # 任务服务 :8101（qa + compliance）
 > ```
 
 ---
@@ -186,7 +186,7 @@ python3 /mnt/skills/public/compliance-check/check.py \
 
 | 错误信息 | 原因 | 处理（在服务器上） |
 |---|---|---|
-| `无法连接合规服务` | 8101 合规服务未启动 | `cd ce-services && uv run python compliance/server.py` |
+| `无法连接合规服务` | 8101 任务服务未启动 | `cd ce-services && uv run python main.py` |
 | 503 `无法连接知识服务` | 8100 知识服务未启动 | `cd ce-code && uv run python service/server.py` |
 | 返回 503 `向量索引未就绪` | 索引未建 | `uv run pipeline/04_build_index.py --standard gb50016` |
 | 返回 500 `合规检查失败` | Milvus / vLLM 未启动 | `curl http://localhost:8097/health`、8099、Milvus 19530 检查 |

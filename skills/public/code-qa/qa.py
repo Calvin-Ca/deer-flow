@@ -5,7 +5,7 @@
 依赖**——只用 Python 标准库 urllib，无需 venv、无需向量索引数据、无需 POC 脚本。
 
 两条路径打不同服务（任务层 / 知识层已拆分）：
-  - 默认（问答）→ qa 任务服务 :8102 的 /qa（检索 + 结构化生成）
+  - 默认（问答）→ 任务服务 :8101 的 /qa（检索 + 结构化生成）
   - --no-generate（裸条款）→ 知识服务 :8100 的 /search（给算量/审图等场景复用）
 
 用法（通过 deer-flow agent 的 bash 工具）：
@@ -13,7 +13,7 @@
     python3 qa.py --query "..." --top-k 20 --output /tmp/result.json
     python3 qa.py --query "..." --no-generate   # 只检索裸条款，不生成
 
-地址默认 qa 服务 http://localhost:8102、知识服务 http://localhost:8100，
+地址默认任务服务 http://localhost:8101、知识服务 http://localhost:8100，
 可分别用环境变量 CODE_QA_URL / CODE_QA_KNOWLEDGE_URL 覆盖。
 """
 from __future__ import annotations
@@ -25,7 +25,7 @@ import sys
 import urllib.error
 import urllib.request
 
-DEFAULT_SERVICE_URL = os.environ.get("CODE_QA_URL", "http://localhost:8102")
+DEFAULT_SERVICE_URL = os.environ.get("CODE_QA_URL", "http://localhost:8101")
 DEFAULT_KNOWLEDGE_URL = os.environ.get("CODE_QA_KNOWLEDGE_URL", "http://localhost:8100")
 
 
@@ -52,7 +52,7 @@ def main() -> None:
         "--no-generate", action="store_true",
         help="只检索、不生成回答：打知识服务 /search 拿裸条款（给算量/审图等场景复用）",
     )
-    parser.add_argument("--service-url", default=DEFAULT_SERVICE_URL, help="qa 任务服务地址（:8102）")
+    parser.add_argument("--service-url", default=DEFAULT_SERVICE_URL, help="任务服务地址（:8101）")
     parser.add_argument("--knowledge-url", default=DEFAULT_KNOWLEDGE_URL, help="知识服务地址（:8100，--no-generate 用）")
     parser.add_argument("--timeout", type=int, default=300, help="HTTP 超时（秒）")
     parser.add_argument("--output", default=None, help="结果写入 JSON 文件；不指定则输出到 stdout")
@@ -89,7 +89,7 @@ def main() -> None:
         startup = (
             "cd ce-code && uv run python service/server.py"
             if args.no_generate
-            else "cd ce-services && uv run python qa/server.py"
+            else "cd ce-services && uv run python main.py"
         )
         _fail({
             "error": "无法连接服务",

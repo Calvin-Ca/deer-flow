@@ -80,3 +80,38 @@ MinerU 解析 + 条款树提取 + 质量审核，在 GB 50378-2006 和 GB 50016 
 - [ ] 评测集增加"适用性误判率"指标
 
 **多规范扩展**：GB 50116 待收录（当前 `火灾自动报警系统` 维度在 GB 50016 无对应强条）。
+
+---
+
+## Phase C：造价知识底座（CostAgent / 算量组价 agent）（⬜ 待办）
+
+> 对应 PRD §5、`cost_agent_prd.md` 八 / `cost_agent_tech.md` 三、六，以及 CostAgent M0 数据底座里程碑。新增**关系库 + 知识图谱**两层与造价检索原语；与 Phase B（防火轨数据模型）解耦，可并行。
+> 范围：**单地区房建**先行（与 CostAgent MVP 一致）；算量引擎/图纸解析/编排在任务层，不在此。
+
+### 数据资产（关系库优先）
+
+- [ ] 关系库 PostgreSQL 建表：`bill_spec` / `quota_item` / `quota_resource` / `resource` / `resource_price` / `hist_bill`，强制带 `version` + `region`，价格带 `effective_period`
+- [ ] GB 50500 + GB 50854 清单计量规范结构化入 `bill_spec`（复用 MinerU 解析 + 规则，含 calc_rule + feature_schema）
+- [ ] 单地区定额库导入 `quota_item` + `quota_resource` + `resource`（定额电子表清洗）
+- [ ] 价格库导入 `resource_price`（信息价/市场价，带 `effective_period` 时效）
+- [ ] 历史工程库 `hist_bill`（脱敏 + 质量标注，供审核轨对标）
+
+### 知识图谱
+
+- [ ] **P0**：用 PG 关联表模拟「构件→清单→定额→工料机」关系（`MAPS_TO` / `APPLIES` / `CONSUMES`），跑通组价取数
+- [ ] **P1**：迁 Neo4j，多跳遍历（清单→定额→工料机）
+
+### 向量库 + 检索原语
+
+- [ ] 造价 `bill_spec_kb` collection（BGE-M3 dense+sparse 混检），供清单匹配候选生成
+- [ ] 新增 `/bill/match`（构件→清单候选：混合召回 + KG 约束 + LLM 决策）
+- [ ] 新增 `/price/compose`（清单项+region→工料机含量+价格：KG + 价格库）
+- [ ] 新增 `/quota/{region}/{code}`（定额子目直取）
+
+### 造价评测集
+
+- [ ] 清单编码匹配：`match_gold.jsonl`（构件→编码标注），指标 Top-1 ≥ 85% / Top-3 ≥ 95%
+- [ ] 定额套用：对照已结算项目，定额套用准确率 ≥ 85%
+- [ ] 红线门禁：未达准确率红线的原语默认「只建议不定稿」（HITL 在任务层兜底）
+
+**模型/部署待评估项**：造价轨 embedding 用 BGE-M3 vs 复用规范轨 bge-large-zh-v1.5 是否统一为单服务（见 PRD §7）。

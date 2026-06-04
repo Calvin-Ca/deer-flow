@@ -19,6 +19,7 @@
 **项目约束**：
 - MVP 规范范围：**单一规范深做**，首选《建筑设计防火规范》GB 50016-2014(2018)——强条密集、引用复杂、公众高频查询
 - 数据源：**PDF**，且**解析质量是项目天花板**
+- **双轨知识资产**：知识层服务三个 agent（规范问答 / 算量组价 / 图纸审核，见 §4）。① **规范问答/审图轨**——防火规范条款库（GB 50016，多表征，见 §1–§4）；② **算量组价轨（CostAgent）**——造价知识底座（清单计量规范 GB 50500/GB 50854 + 定额 + 价格 + 历史 + 知识图谱，见 §5），数据源不止 PDF，还含定额电子表 / 信息价文件 / 历史项目。两轨共用同一检索引擎与多表征思路，差异在数据资产与检索原语。
 
 **风险与红线（数据/检索侧）**：
 
@@ -28,6 +29,8 @@
 | 漏召强条 = 合规事故 | 强条召回率盯死，宁可多召回不可漏 |
 | 多版本混淆 | 元数据强制带 version + status，废止条款不参与召回 |
 | 规范版权 | 规范 PDF 商业使用前必须确认版权状况；`data/` 不进 git |
+| 造价数据非强一致（造价轨） | 规范库/定额库带 version + region 强一致可审计；价格库带时效标签（`effective_period`） |
+| 能算的交给模型猜（造价轨） | 几何/扣减/综合单价走任务层确定性引擎，知识层 LLM 仅在检索候选内择优决策（见 §5.5） |
 
 ---
 
@@ -122,7 +125,7 @@ Query
 
 ## 4. 知识层设计：多表征条款库（核心）
 
-> 三个目标 agent（规范问答 / 算量组价 / 图纸审核）共享同一知识层，差异只在输入适配与计算逻辑。
+> 三个目标 agent（规范问答 / 算量组价 / 图纸审核）共享同一知识层，差异只在输入适配与计算逻辑。其中**算量组价 agent（CostAgent）**除本节多表征条款库外，还需 §5 的造价知识底座（关系库 + 知识图谱 + 价格/定额数据）。
 
 **核心判断：知识层的主资产不是 embedding，是"条款的结构化表征"。** 建筑规范两条铁律——*漏强条 = 合规事故*、*适用性判断是一切*——决定了召回不能赌语义相似。**引用图 与 适用范围索引 的权重高于向量索引**；embedding 只是众多召回入口里最不可靠的一个。
 
@@ -154,7 +157,78 @@ Query → ① 向量(语义) + ① BM25(条文号/术语) + ④ 适用范围结�
 
 ---
 
-## 5. 知识服务端点（:8100，`service/server.py`）
+## 5. 造价知识底座扩展（CostAgent / 算量组价 agent）
+
+> §1–§4 是**防火规范条款库**（服务规范问答 / 图纸审核）。本节是**算量组价 agent（CostAgent）**的数据/检索需求：把施工图最终转化为「工程量清单 + 组价」，知识层需在条款库之外新增**造价数据资产**，并从"多表征条款库"扩展为**三层知识底座**。
+> 边界：施工图解析、算量引擎（几何 + 扣减规则）、Agent 编排、Excel 导出属**任务层**（`../ce-services/`），不在知识层。知识层只负责造价**数据资产 + 检索/匹配原语**。整体方案另见根目录 `cost_agent_prd.md` / `cost_agent_tech.md`。
+
+### 5.1 三层知识底座
+
+造价两条铁律——*能算的不交给模型猜*、*清单↔定额是多对多关系*——决定了纯向量库不够用，需三层协同（关系库为单一事实来源，KG 由其派生）：
+
+| 层 | 载体 | 职责 | 数值真值 |
+|---|---|---|---|
+| 关系库 | PostgreSQL | 规范/定额/价格/历史的精确查询，强一致，version + region 维度 | ✅ 在此 |
+| 知识图谱 | Neo4j（**P0 可用 PG 关联表模拟，P1 再迁 Neo4j**） | 「构件→清单项→定额子目→工料机」多跳关系推理，组价核心 | 由关系库同步 |
+| 向量库 | Milvus（BGE-M3 dense+sparse 混检） | 规范条文/做法/历史案例语义召回，供清单匹配候选生成 | — |
+
+### 5.2 造价数据资产
+
+| 数据资产 | 内容 | 来源 | 构建方式 | 更新机制 |
+|---|---|---|---|---|
+| 清单规范库 | GB 50500 计价 + GB 50854 计量规范结构化条目（编码、计量单位、计算规则、特征项模板） | 国标 | MinerU 解析 + 规则结构化入库 | 随标准修订人工维护 |
+| 定额库 | 国家/地区定额子目、人材机含量、基价 | 各地定额电子表 | 导入/清洗 | 按地区/年份版本管理 |
+| 价格库 | 信息价 / 市场价 / 历史成交价 | 造价信息平台、历史项目 | 定期抓取/导入 | 按期（月/季）更新，带时效 |
+| 历史工程库 | 已完成项目的清单、量、价、构件特征（脱敏） | 内部沉淀 | 项目归档 + 脱敏 | 随项目持续积累 |
+| 知识图谱 | 构件—清单—定额—工料机关系网络 | 上述各库 | 实体抽取 + 关系建模 | 随底层库同步 |
+| 向量知识库 | 规范条文、做法说明、历史案例语义向量 | 规范 + 历史库 | 切分 + BGE-M3 入库 | 增量更新 |
+
+> **强一致、可审计**：规范库与定额库必须带 `version` + `region`；价格库带时效标签；历史库需脱敏与质量标注。
+
+### 5.3 关系库核心表（DDL 详见 `cost_agent_tech.md` §3.1）
+
+`bill_spec`（清单规范，9 位统一编码 + calc_rule + feature_schema + spec_version）、`quota_item`（定额子目，region + base_price + 人材机费，UNIQUE(region, quota_code, spec_version)）、`quota_resource`（定额→资源含量）、`resource` + `resource_price`（资源价格，带 `effective_period` 时效 DATERANGE）、`hist_bill`（历史工程，供对标与异常检测）。
+
+### 5.4 知识图谱 schema（详见 `cost_agent_tech.md` §3.2）
+
+```
+节点: (:ComponentType) 墙/梁/板/柱  (:BillItem code,name,unit)  (:Feature)
+      (:QuotaItem code,region)       (:Resource name,category)
+关系: (ComponentType)-[:MAPS_TO]->(BillItem)        构件→清单（多对多）
+      (BillItem)-[:HAS_FEATURE]->(Feature)
+      (BillItem)-[:APPLIES]->(QuotaItem)            套定额（多对多）
+      (QuotaItem)-[:CONSUMES {consumption}]->(Resource)  工料机含量
+```
+
+### 5.5 造价检索/匹配流程（两段，均为「检索/KG 收窄候选 + LLM 候选内决策」）
+
+```
+① 清单匹配（构件 → 12 位编码）
+   构件语义(type/material/spec)
+     → 混合召回: BGE-M3 dense+sparse 在 bill_spec_kb 取 Top-K 候选
+     → KG 约束: ComponentType-[:MAPS_TO]->BillItem 收窄候选
+     → LLM rerank + 决策: 选码 + 生成项目特征描述 + 给依据
+     → 输出 12 位编码(前9位规范 + 后3位顺序码) + 特征描述 + 置信度
+
+② 组价取数（清单项 → 工料机含量 + 价格）—— 数值由任务层确定性公式收尾
+   清单项(+region)
+     → KG 取套用定额(BillItem-[:APPLIES]->QuotaItem)
+     → 取工料机含量(QuotaItem-[:CONSUMES]->Resource)
+     → 关联价格库(按 region + 时效取 resource_price)
+     → 返回工料机清单 + 含量 + 价格(综合单价公式在任务层算)
+```
+
+LLM 在此只做「候选内择优 + 特征描述生成」，候选集由检索 + KG 限定，降低幻觉与错配。「一项清单对应多条定额」「定额地区差异」由 KG 多对多关系 + region 维度处理。
+
+### 5.6 造价侧红线
+
+- **强一致可审计**：规范库/定额库带 version + region；价格带 `effective_period` 时效，组价按期匹配 + 调差。
+- **能算的不交给模型猜**：几何/扣减/综合单价公式走任务层确定性引擎；知识层 LLM 只在检索候选内择优 + 生成特征描述，附依据与置信度。
+- **红线内只建议不定稿**：编码匹配 Top-1 ≥ 85%、定额套用准确率 ≥ 85% 等准确率红线达成前，对应输出默认只建议、必须经人工确认（HITL 在任务层）。
+
+---
+
+## 6. 知识服务端点（:8100，`service/server.py`）
 
 **只暴露检索原语**，被任务层（`ce-services/`）和 skill 以纯 HTTP 客户端方式调用：
 
@@ -165,7 +239,14 @@ GET  /clause/{std}/{path}  单条款直取
 GET  /health            含 ready_standards / vector_store / deps 地址
 ```
 
-**待补原语**：`/filter`（适用范围过滤）、`/rerank` 依赖 Phase B 谓词数据，后补（见 TODO.md）。
+**待补原语（规范轨）**：`/filter`（适用范围过滤）、`/rerank` 依赖 Phase B 谓词数据，后补（见 TODO.md）。
+
+**造价原语（算量组价轨，Phase C，依赖 §5 造价数据资产入库）**：
+```
+POST /bill/match              构件特征 → 清单项候选（混合召回 + KG 约束）   清单匹配
+POST /price/compose          清单项(+region) → 工料机含量 + 价格（KG + 价格库）  组价取数
+GET  /quota/{region}/{code}  定额子目直取
+```
 
 **代码组织**：
 ```
@@ -180,9 +261,10 @@ ce-code/
 
 ---
 
-## 6. 模型与生成约定（知识层用到的）
+## 7. 模型与生成约定（知识层用到的）
 
-- **Embedding**：`bge-large-zh-v1.5`（vLLM `http://localhost:8097`，model_id=`/model`）
+- **Embedding（规范轨）**：`bge-large-zh-v1.5`（vLLM `http://localhost:8097`，model_id=`/model`）
+- **Embedding（造价轨）**：`BGE-M3`（dense + sparse 单模型混检，对应 §5.1 向量库），按 `cost_agent_tech.md` 选型；与规范轨 bge-large-zh-v1.5 是否统一为单一 embedding 服务待评估（开放项）
 - **rerank**：本地 `bge-reranker-large`（FlagEmbedding）或 RRF fallback
 - **VLM（图示理解）**：`Qwen2.5-VL-7B`（vLLM `http://localhost:8098`，model_id=`/model`）
 - 生成/编排不在知识层（见 `ce-services/PRD.md`）

@@ -9,21 +9,18 @@ dependencies = [
     "torch==2.5.1",          # cu121 wheel 由 [tool.uv.sources] 指定；见 [tool.uv] override-dependencies
     "torchvision==0.20.1",
     "numpy>=1.26",
-    "mineru[pipeline]",      # 版面分析 + OCR（包含 six 等传递依赖）
+    "mineru[all,pipeline]",      # 版面分析 + OCR（包含 six 等传递依赖）
     "six>=1.16",             # mineru OCR 组件显式依赖
     "pymupdf>=1.24",         # PDF 分割主路径（import fitz）
     "pypdf>=4.0",            # PDF 分割 fallback
-
     # ===== 阶段 1：检索 =====
     "pymilvus>=2.4.0",
     "rank-bm25>=0.2.2",
     "requests>=2.32",        # 调 vLLM embedding / generate API
     "FlagEmbedding>=1.3",    # bge-reranker（需 torch>=2.6 时可选）
-
     # ===== 检索/合规 HTTP 服务（skill 通过 HTTP 调用，沙箱内零依赖）=====
     "fastapi>=0.110",        # service/server.py
     "uvicorn>=0.29",         # ASGI server
-
     # 辅助
     "click>=8.1",            # CLI 参数解析
     "rich>=13.7",            # 终端日志/表格输出

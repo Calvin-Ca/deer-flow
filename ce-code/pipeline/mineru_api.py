@@ -75,13 +75,18 @@ def parse_pdf_via_api(
         raise RuntimeError(f"MinerU API 解析失败（{url}）: {detail}")
 
     with zipfile.ZipFile(io.BytesIO(resp.content)) as zf:
+        names = zf.namelist()
         zf.extractall(output_dir)
 
     auto_dir = output_dir / pdf_path.stem / "auto"
     if not auto_dir.exists():
-        # 极少数情况 ZIP 顶层目录名与 stem 不符，兜底找 *_content_list.json 所在目录
-        found = next(output_dir.rglob("*_content_list.json"), None)
-        if found is None:
-            raise RuntimeError(f"ZIP 已解压但找不到 auto/ 输出，请检查 {output_dir}")
-        auto_dir = found.parent
+        # ZIP 顶层目录名可能与 stem 不符（API 对超长/中文文件名做 sanitize/截断）。
+        # 必须从**本次 ZIP 的 namelist**里定位 auto 目录，绝不能 rglob 整个 output_dir
+        # ——那会命中 data/parsed/ 下的历史解析，把别的规范的旧产物误报成本次输出。
+        rel = next((n for n in names if n.endswith("_content_list.json")), None)
+        if rel is None:
+            raise RuntimeError(
+                f"ZIP 已解压但内部找不到 _content_list.json，API 返回内容异常：{names[:20]}"
+            )
+        auto_dir = (output_dir / rel).parent
     return auto_dir

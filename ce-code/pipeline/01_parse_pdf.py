@@ -19,6 +19,7 @@ from __future__ import annotations
 import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import click
@@ -131,6 +132,7 @@ def main(
     console.print(f"  输入 PDF  : {pdf_path}")
     console.print(f"  输出目录  : {output_dir}")
 
+    t0 = time.perf_counter()
     if use_local:
         auto_dir = parse_local(pdf_path, output_dir, backend, device)
     else:
@@ -148,12 +150,15 @@ def main(
         except Exception as e:  # noqa: BLE001
             console.print(f"\n[red]✗ 远程 API 解析失败：{e}[/red]")
             sys.exit(1)
+    elapsed = time.perf_counter() - t0
+    elapsed_str = f"{elapsed:.1f}s" if elapsed < 60 else f"{int(elapsed // 60)}m{elapsed % 60:.1f}s"
 
     # 输出位置（MinerU 会自己建 <basename>/auto/ 子目录）
     if auto_dir.exists():
         md_file = next(auto_dir.glob("*.md"), None)
         json_file = next(auto_dir.glob("*_content_list.json"), None)
         console.print("\n[green]✓ 解析完成[/green]")
+        console.print(f"  解析耗时   : {elapsed_str}")
         console.print(f"  Markdown   : {md_file}")
         console.print(f"  Structured : {json_file}")
         console.print(

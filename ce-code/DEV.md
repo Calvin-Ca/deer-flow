@@ -17,27 +17,26 @@
 
 > 生成（问答）/合规编排不在知识层 —— 那是任务层（`../ce-services/`）的事，它用 Qwen3-8B 做生成/判定。
 
-### 造价轨（CostAgent / 算量组价 agent）新增依赖（待部署，对应 PRD §5 三层知识底座）
+**依赖健康自检（排查"起不来"先逐个确认依赖活着，命令单行）：**
 
-| 角色 | 选型 | 知识层用途 | 备注 |
+- Embedding：`curl -s http://localhost:8097/v1/models`
+- VLM：`curl -s http://localhost:8098/v1/models`
+- Qwen3-8B：`curl -s http://localhost:8099/v1/models`
+- Milvus：`curl -s http://localhost:9091/healthz`（默认 metrics/health 端口；19530 为 gRPC）
+- 知识服务自身：`curl -s http://localhost:8100/health`（含 ready_standards / vector_store / deps 地址）
+
+### 造价轨（CostAgent / 算量组价 agent）新增依赖（待部署）
+
+> 三层知识底座的**设计**（职责分工、数据资产、KG schema、构建管线）见 `PRD.md §5`；本表只列**依赖服务的选型/地址/约束**。
+
+| 角色 | 选型 | 地址 | 备注 |
 |---|---|---|---|
-| 关系库 | PostgreSQL | 规范(GB50500/50854)/定额/价格/历史的强一致精确查询，version + region 维度 | 单一事实来源；JSONB 存 feature_schema/适用范围 |
-| 知识图谱 | Neo4j | 构件→清单→定额→工料机多跳关系（组价核心） | **P0 先用 PG 关联表模拟，P1 再上 Neo4j** |
-| Embedding（造价） | BGE-M3 | 清单规范条文/做法/历史案例向量化（dense+sparse 混检） | 与规范轨 bge-large-zh-v1.5 是否合并待评估 |
-| 向量库 | Milvus | 造价 `bill_spec_kb` collection（复用规范轨同一 Milvus 实例 :19530） | collection 名只含字母/数字/下划线 |
+| 关系库 | PostgreSQL | 待部署 | 单一事实来源；JSONB 存 feature_schema/适用范围 |
+| 知识图谱 | Neo4j | 待部署 | **P0 先用 PG 关联表模拟，P1 再上 Neo4j** |
+| Embedding（造价） | BGE-M3 | 待部署 | dense+sparse 混检；与规范轨是否合并为单服务待评估 |
+| 向量库 | Milvus | `http://localhost:19530` | 造价 `bill_spec_kb` collection，复用规范轨同一实例 |
 
 > 算量引擎（几何 + 扣减）、图纸解析（IFC/DXF/PDF：IfcOpenShell/ezdxf/PyMuPDF）、对象存储（MinIO 图纸/产物）属**任务层**，不在知识层依赖范围。
-
-### 造价数据构建管线（PRD §5.2，对应 `cost_agent_tech.md` §3.4）
-
-```
-GB 计价/计量规范 PDF ──MinerU + 规则──> bill_spec 表
-定额电子表 ──────────导入/清洗────────> quota_item + quota_resource + resource
-信息价文件 ──────────定期抓取/导入────> resource_price（带 effective_period 时效）
-历史项目 ────────────归档 + 脱敏──────> hist_bill
-上述各库 ────────────实体/关系抽取────> Neo4j KG（P0 用 PG 关联表）
-规范/案例 ───────────切分 + BGE-M3────> Milvus bill_spec_kb
-```
 
 ---
 

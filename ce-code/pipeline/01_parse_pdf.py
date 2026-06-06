@@ -1,18 +1,17 @@
-"""阶段 0 第一步：用 MinerU 把规范 PDF 解析成 markdown + 资源（表格、图片等）。
+"""阶段 0 第一步：把规范 PDF 解析成 markdown + 资源（表格、图片等）。
 
-这是 POC 的最小可执行版本——直接 shell out 到 MinerU CLI，
-不调 Python API（API 在不同版本间变化较大；CLI 更稳定）。
+**默认走远程 MinerU API**（`172.19.2.2:8000`，热服务 + hybrid 现成可用）；
+加 --local 改用本地 MinerU CLI（shell out 到 mineru/magic-pdf）。两条路径产出布局
+完全一致，下游 02_extract_clauses.py 无差别消费。选型/环境差异见 DEV.md。
 
-跑通后，输出会落在 data/parsed/<pdf-basename>/，目录结构典型如下：
+无论哪种方式，输出都落在 data/parsed/<pdf-basename>/auto/：
     <basename>/
       auto/
-        <basename>.md          ← 主输出，markdown 形式的全文
+        <basename>.md                 ← 主输出，markdown 全文
         <basename>_content_list.json  ← 结构化版本（标题/段落/表格/图片分块）
-        images/                ← 图片资源
-        <basename>_model.json  ← OCR/版面分析的中间产物（调试用）
+        images/                       ← 图片资源
 
-下一步（02_extract_clauses.py，未实现）将基于 _content_list.json 把
-markdown/结构化输出转成"条款树"。
+下一步（02_extract_clauses.py）基于 _content_list.json 把输出转成「条款树」。
 """
 
 from __future__ import annotations
@@ -24,6 +23,8 @@ from pathlib import Path
 
 import click
 from rich.console import Console
+
+from mineru_api import DEFAULT_BACKEND, DEFAULT_SERVER_URL, parse_pdf_via_api
 
 console = Console()
 
@@ -39,9 +40,32 @@ def detect_mineru_cli() -> str:
             return candidate
     console.print(
         "[red]✗ 找不到 MinerU CLI（既没有 mineru 也没有 magic-pdf）。[/red]\n"
-        "  请先在服务器上跑 [bold]bash pipeline/setup_server.sh[/bold]。"
+        "  请先在服务器上跑 [bold]bash pipeline/setup_server.sh[/bold]，"
+        "或去掉 --local 改用默认的远程 API。"
     )
     sys.exit(1)
+
+
+def parse_local(pdf_path: Path, output_dir: Path, backend: str, device: str) -> Path:
+    """本地 CLI 解析。返回 auto 目录。"""
+    cli = detect_mineru_cli()
+    console.print(f"  方式      : 本地 CLI（{cli}）")
+    console.print(f"  后端      : {backend}")
+    console.print(f"  设备      : {device}")
+
+    # 新版：mineru -p <pdf> -o <out> --device <cpu|cuda> --backend <backend>
+    # 旧版：magic-pdf -p <pdf> -o <out> -m auto（无 backend 概念）
+    if cli == "mineru":
+        cmd = [cli, "-p", str(pdf_path), "-o", str(output_dir), "--device", device, "--backend", backend]
+    else:  # magic-pdf
+        cmd = [cli, "-p", str(pdf_path), "-o", str(output_dir), "-m", "auto"]
+
+    console.print(f"[dim]$ {' '.join(cmd)}[/dim]\n")
+    result = subprocess.run(cmd, check=False)
+    if result.returncode != 0:
+        console.print(f"\n[red]✗ MinerU 退出码 {result.returncode}[/red]")
+        sys.exit(result.returncode)
+    return output_dir / pdf_path.stem / "auto"
 
 
 @click.command()
@@ -60,42 +84,72 @@ def detect_mineru_cli() -> str:
     help="解析输出根目录，默认 data/parsed/。",
 )
 @click.option(
+    "--local",
+    "use_local",
+    is_flag=True,
+    default=False,
+    help="改用本地 MinerU CLI；不加则走默认的远程 API。",
+)
+@click.option(
+    "--backend",
+    default=DEFAULT_BACKEND,
+    show_default=True,
+    help="解析后端。hybrid-auto-engine=含 VLM 图示理解（定额表逐列对位，需 vllm）；"
+    "pipeline=纯 OCR+版面（无 VLM 依赖，密集表格会错位）。本地 venv 的 vllm 当前损坏，"
+    "--local 跑 hybrid 会失败，详见 DEV.md。",
+)
+@click.option(
+    "--server-url",
+    default=DEFAULT_SERVER_URL,
+    show_default=True,
+    help="远程 MinerU API 地址（仅默认 API 方式生效）。",
+)
+@click.option(
+    "--lang",
+    default="ch",
+    show_default=True,
+    help="OCR 语言，定额/规范类用 ch。",
+)
+@click.option(
     "--device",
     type=click.Choice(["cuda", "cpu"], case_sensitive=False),
     default="cuda",
-    help="加速设备。GPU 服务器默认 cuda。",
+    help="加速设备（仅 --local 生效）。GPU 服务器默认 cuda。",
 )
-def main(pdf_path: Path, output_dir: Path, device: str) -> None:
-    cli = detect_mineru_cli()
+def main(
+    pdf_path: Path,
+    output_dir: Path,
+    use_local: bool,
+    backend: str,
+    server_url: str,
+    lang: str,
+    device: str,
+) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
 
     console.rule(f"[bold]MinerU 解析：{pdf_path.name}[/bold]")
-    console.print(f"  CLI       : {cli}")
-    console.print(f"  设备      : {device}")
     console.print(f"  输入 PDF  : {pdf_path}")
     console.print(f"  输出目录  : {output_dir}")
-    console.print()
 
-    # MinerU 新版（mineru）和旧版（magic-pdf）参数略有不同。
-    # 新版：mineru -p <pdf> -o <out_dir> --device <cpu|cuda>
-    # 旧版：magic-pdf -p <pdf> -o <out_dir> -m auto
-    # 这里以新版为主，旧版做兜底。
-    if cli == "mineru":
-        cmd = [cli, "-p", str(pdf_path), "-o", str(output_dir), "--device", device]
-    else:  # magic-pdf
-        cmd = [cli, "-p", str(pdf_path), "-o", str(output_dir), "-m", "auto"]
-
-    console.print(f"[dim]$ {' '.join(cmd)}[/dim]\n")
-
-    # 直接透传 stdout/stderr，方便看 MinerU 自己的进度条
-    result = subprocess.run(cmd, check=False)
-    if result.returncode != 0:
-        console.print(f"\n[red]✗ MinerU 退出码 {result.returncode}[/red]")
-        sys.exit(result.returncode)
+    if use_local:
+        auto_dir = parse_local(pdf_path, output_dir, backend, device)
+    else:
+        console.print(f"  方式      : 远程 API（{server_url}）")
+        console.print(f"  后端      : {backend}")
+        console.print()
+        try:
+            auto_dir = parse_pdf_via_api(
+                pdf_path,
+                output_dir,
+                backend=backend,
+                lang=lang,
+                server_url=server_url,
+            )
+        except Exception as e:  # noqa: BLE001
+            console.print(f"\n[red]✗ 远程 API 解析失败：{e}[/red]")
+            sys.exit(1)
 
     # 输出位置（MinerU 会自己建 <basename>/auto/ 子目录）
-    basename = pdf_path.stem
-    auto_dir = output_dir / basename / "auto"
     if auto_dir.exists():
         md_file = next(auto_dir.glob("*.md"), None)
         json_file = next(auto_dir.glob("*_content_list.json"), None)
@@ -109,7 +163,7 @@ def main(pdf_path: Path, output_dir: Path, device: str) -> None:
     else:
         console.print(
             f"\n[yellow]⚠ 找不到预期的输出目录 {auto_dir}——"
-            "MinerU 版本可能改了输出布局，请进 {output_dir} 看实际产物。[/yellow]"
+            f"MinerU 版本可能改了输出布局，请进 {output_dir} 看实际产物。[/yellow]"
         )
 
 

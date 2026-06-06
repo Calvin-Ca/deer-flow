@@ -110,9 +110,9 @@ Query
 返回 top-k 条款（带元数据）
 ```
 
-**技术栈（已确定）**：
-- 嵌入：`bge-large-zh-v1.5`（vLLM 服务 localhost:8097，model_id=/model，dim=1024，max_len=512）
-- 向量库：**Milvus**（localhost:19530；MilvusClient API，collection 名只含字母/数字/下划线）
+**技术栈（已确定；服务地址/版本/dim 见 `DEV.md` 依赖表，此处只列选型）**：
+- 嵌入：`bge-large-zh-v1.5`（vLLM 服务）
+- 向量库：**Milvus**（MilvusClient API，collection 名只含字母/数字/下划线）
 - BM25：**rank-bm25**（字符级分词，无需 Elasticsearch）
 - Rerank：`bge-reranker-large`（FlagEmbedding，可选；不可用时自动 fallback 到 RRF 排序）
 
@@ -120,6 +120,25 @@ Query
 - **强条召回率 > 召回排序**：宁可多召回 10 条无关，也不能漏 1 条相关强条
 - 引用扩展默认开启（命中条款的所有 strong `references` 必须一并拉取）
 - 元数据过滤优先于向量排序（先按 standard/version/scope filter，再排）
+
+**检索验收标准（评测契约；写检索代码前先建 30–50 条评测集）**：
+
+评测集落 `data/eval_set/`（入 git），单条用例格式：
+
+```json
+{
+  "query": "24m 高的住宅楼疏散楼梯最小宽度是多少？",
+  "expected_clauses": ["GB 50016-2014(2018) 5.5.30", "5.5.31"],
+  "must_be_mandatory": true,
+  "user_type": "通用咨询"
+}
+```
+
+核心指标（达标线随阶段细化，进度见 `TODO.md`）：
+- **强条召回率**（Recall@k on mandatory clauses）—— **首要**
+- 引用条款召回率（被引用的关联条款是否被拉取）
+- 误报强条率（把推荐性当强制性的比例）
+- 适用性误判率（Phase B 谓词数据后启用）
 
 ---
 
@@ -248,25 +267,16 @@ POST /price/compose          清单项(+region) → 工料机含量 + 价格（K
 GET  /quota/{region}/{code}  定额子目直取
 ```
 
-**代码组织**：
-```
-ce-code/
-├── retrieval/          纯检索引擎库（依赖轻，不含 click/rich）
-│   ├── config.py       DEFAULTS / STANDARD_ALIASES / resolve_store_dir / collection_name
-│   └── engine.py       召回原语 + search() + get_clause()
-├── service/
-│   └── server.py       知识服务 :8100（import retrieval）
-└── scripts/            05_retrieve.py / 07_eval.py 等薄 CLI（import retrieval）
-```
+**代码组织与目录结构见 `README.md`**（实现细节随重构变动，不在 PRD 维护）：`retrieval/`（纯检索引擎库）/ `service/server.py`（知识服务 :8100）/ `scripts/`（薄 CLI）。
 
 ---
 
 ## 7. 模型与生成约定（知识层用到的）
 
-- **Embedding（规范轨）**：`bge-large-zh-v1.5`（vLLM `http://localhost:8097`，model_id=`/model`）
-- **Embedding（造价轨）**：`BGE-M3`（dense + sparse 单模型混检，对应 §5.1 向量库），按 `cost_agent_tech.md` 选型；与规范轨 bge-large-zh-v1.5 是否统一为单一 embedding 服务待评估（开放项）
-- **rerank**：本地 `bge-reranker-large`（FlagEmbedding）或 RRF fallback
-- **VLM（图示理解）**：`Qwen2.5-VL-7B`（vLLM `http://localhost:8098`，model_id=`/model`）
-- 生成/编排不在知识层（见 `ce-services/PRD.md`）
+> 选型与职责见下；**服务地址、model_id、dim、版本约束统一以 `DEV.md` 依赖表为准**，此处不重复，避免漂移。
 
-> 模型完整清单、Thinking 切换、服务器环境见根 `CLAUDE.md` §5/§10。
+- **Embedding（规范轨）**：`bge-large-zh-v1.5`（条款/query 向量化）
+- **Embedding（造价轨）**：`BGE-M3`（dense + sparse 单模型混检，对应 §5.1 向量库），按 `cost_agent_tech.md` 选型；与规范轨是否统一为单一 embedding 服务待评估（开放项）
+- **rerank**：本地 `bge-reranker-large`（FlagEmbedding）或 RRF fallback
+- **VLM（图示理解）**：`Qwen2.5-VL-7B`（PDF 解析时图示理解）
+- 生成/编排不在知识层（见 `ce-services/PRD.md`）

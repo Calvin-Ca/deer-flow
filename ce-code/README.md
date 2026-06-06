@@ -118,6 +118,25 @@ CUDA_VISIBLE_DEVICES=2 HF_ENDPOINT=https://hf-mirror.com uv run python pipeline/
 
 无论哪种方式，输出都落在 `data/parsed/<basename>/auto/`，含 `.md` 和 `_content_list.json`，直接传给 Step 4。
 
+#### 解析产物说明（`.md` vs `_content_list.json` vs `images/`）
+
+同一次解析有三份产物，用途不同：
+
+| 产物 | 给谁 | 形态 |
+|---|---|---|
+| `<basename>.md` | **人**（对照原 PDF 做质量 review，见 Step 5 评估维度） | 全文按阅读顺序渲染成 markdown：标题 `#`、表格内联成表格文字、插图 `![](images/..)`、公式 `$..$` |
+| `<basename>_content_list.json` | **程序**（02 提取条款树吃的是它） | 分块列表，每块带 `type`(text/title/table/image/equation)、`text_level`(标题层级)、`page_idx`、`bbox` 坐标 |
+| `images/` | — | 从 PDF 切出的位图（插图、以及**被裁成图的表格**），上面两份只引用路径、不内嵌字节 |
+
+> 02 必须用 json 而非 md：建条款树要知道「几级标题 / 第几页 / 是表格还是正文」，这些 md 拿不到。
+
+**图片/表格在 json 里怎么体现**：
+
+- **插图**：`type=image` 块，`content.image_source.path`(图片路径) + `content.image_caption`(图题)。md 里对应 `![](images/..)`。
+- **表格**：`type=table` 块，**三存**——`content.image_source.path`(表格裁切图) + `content.html`(结构化 `<table>`，带 colspan/rowspan) + `content.table_caption`(表题) + `bbox`。注意 md 只把 `html` 渲染成表格文字内联，**不引用**那张裁切图，所以「md 里看不到表格图路径、表格变成了文字」是正常现象。
+
+> ⚠️ **已知缺陷（待修，Phase B 波2）**：当前 MinerU 把表体放在 `content.html`，而 `02_extract_clauses.py` 的 `extract_table_body()` 只读 `content.table_body`/`cell_content`（此版输出里不存在）。结果：表题能抓到，**表体全部读成空**。对 GB 50500/50854 等「表格即正文」的造价计量规范影响严重（违反 PRD §4【P0】表格可查询）。修法：改 `extract_table_body()` 解析 `content.html` 的 `<table>` 并展开 colspan/rowspan，同时存表格裁切图路径与表题，对齐 `schema.TableRepr`。
+
 ### Step 4 — 提取条款树
 
 ```bash

@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import re
+from html.parser import HTMLParser
 from pathlib import Path
 from typing import Any
 
@@ -51,95 +52,111 @@ REFERENCE_RE = re.compile(
 )
 
 # ---------------------------------------------------------------------------
-# 格式检测与元素规范化
+# 格式检测
 # ---------------------------------------------------------------------------
 
 def detect_format(data: Any) -> str:
-    """自动检测 MinerU content_list 格式版本。"""
+    """自动检测 MinerU content_list 格式版本（v1 扁平 list / v2 外层按页嵌套）。"""
     if not data:
         return "v1"
-    first = data[0]
-    if isinstance(first, list):
-        return "v2"
-    return "v1"
-
-
-def normalize_elements(data: Any) -> list[dict]:
-    """
-    把 v1 / v2 格式统一成扁平的规范化元素列表：
-      { type, text, page, is_heading, raw }
-    """
-    fmt = detect_format(data)
-
-    if fmt == "v1":
-        return _normalize_v1(data)
-    else:
-        return _normalize_v2(data)
-
-
-def _normalize_v1(items: list[dict]) -> list[dict]:
-    result = []
-    for item in items:
-        text = item.get("text", "").strip()
-        if not text:
-            continue
-        result.append({
-            "type": item.get("type", "text"),
-            "text": text,
-            "page": item.get("page_idx", 0) + 1,
-            "is_heading": "text_level" in item,
-            "raw": item,
-        })
-    return result
-
-
-def _normalize_v2(pages: list[list[dict]]) -> list[dict]:
-    result = []
-    for page_idx, page in enumerate(pages):
-        for item in page:
-            t = item.get("type", "")
-            c = item.get("content", {})
-
-            if t == "title":
-                parts = c.get("title_content", [])
-                text = " ".join(x.get("content", "") for x in parts if x.get("type") == "text").strip()
-                is_heading = True
-            elif t == "paragraph":
-                parts = c.get("paragraph_content", [])
-                text = " ".join(x.get("content", "") for x in parts if x.get("type") == "text").strip()
-                is_heading = False
-            elif t == "table":
-                caps = c.get("table_caption", [])
-                text = " ".join(x.get("content", "") for x in caps if x.get("type") == "text").strip()
-                is_heading = False
-            elif t == "image":
-                caps = c.get("image_caption", [])
-                text = " ".join(x.get("content", "") for x in caps if x.get("type") == "text").strip()
-                is_heading = False
-            else:
-                continue
-
-            if not text and t not in ("table",):
-                continue
-
-            result.append({
-                "type": t,
-                "text": text,
-                "page": page_idx + 1,
-                "is_heading": is_heading,
-                "raw": item,
-            })
-    return result
+    return "v2" if isinstance(data[0], list) else "v1"
 
 
 # ---------------------------------------------------------------------------
-# 表格提取（仅 v2 有结构化 body）
+# 共享表格工具：HTML <table> → 矩形二维表
+#   v1(table_body) 与 v2(content.html) 的表体都是 HTML 串，解析算法与格式无关，
+#   故抽成共享 helper；两个 reader 只负责「从各自字段取出 HTML」。
 # ---------------------------------------------------------------------------
 
-def extract_table_body(raw_elem: dict) -> list[list[str]]:
-    c = raw_elem.get("content", {})
-    rows = []
-    for row in c.get("table_body", []):
+class _HTMLTableParser(HTMLParser):
+    """把单个 ``<table>`` HTML 解析成「行→(文本, colspan, rowspan)」原始单元格列表。
+
+    只收集结构，不在此展开 span（展开交给 _expand_spans，便于单测两段逻辑）。
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.raw_rows: list[list[tuple[str, int, int]]] = []
+        self._row: list[tuple[str, int, int]] | None = None
+        self._buf: list[str] | None = None
+        self._colspan = 1
+        self._rowspan = 1
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag == "tr":
+            self._row = []
+        elif tag in ("td", "th") and self._row is not None:
+            a = dict(attrs)
+            self._buf = []
+            self._colspan = int(a.get("colspan") or 1)
+            self._rowspan = int(a.get("rowspan") or 1)
+
+    def handle_data(self, data: str) -> None:
+        if self._buf is not None:
+            self._buf.append(data)
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag in ("td", "th") and self._buf is not None and self._row is not None:
+            self._row.append(("".join(self._buf).strip(), self._colspan, self._rowspan))
+            self._buf = None
+        elif tag == "tr" and self._row is not None:
+            self.raw_rows.append(self._row)
+            self._row = None
+
+
+def _expand_spans(raw_rows: list[list[tuple[str, int, int]]]) -> list[list[str]]:
+    """把带 colspan/rowspan 的原始单元格展开成**矩形**二维表（列对齐，防止串列）。
+
+    约定（保真优先，不臆造数据）：
+    - colspan=N：文本只放第 1 列，其余 N-1 列补空串；
+    - rowspan=M：把该列的值在随后 M-1 行的**同一列**继续占位（值可能是空串）。
+    这样产出的网格行列严格对齐，下游「给定行列取值」才不会错位。表头合并单元格是否
+    前向填充（forward-fill）属语义决策，留给构建层 extract/tables.py（波2）按需处理。
+    """
+    grid: list[list[str]] = []
+    carry: dict[int, list] = {}  # 列号 -> [剩余行数, 值]，记录 rowspan 跨行占位
+    for raw in raw_rows:
+        row: list[str] = []
+        col = 0
+        ci = 0
+        # 当前行还有待放的原始单元格，或仍有 rowspan 占位需要落到本行(>= 当前列)时继续
+        while ci < len(raw) or any(k >= col for k in carry):
+            if col in carry:  # 该列被上方 rowspan 占住，先填占位值
+                remaining, val = carry[col]
+                row.append(val)
+                if remaining - 1 > 0:
+                    carry[col] = [remaining - 1, val]
+                else:
+                    del carry[col]
+                col += 1
+                continue
+            if ci >= len(raw):  # 本行原始单元格已用完，剩下的高列占位下轮再处理
+                break
+            text, cspan, rspan = raw[ci]
+            ci += 1
+            for k in range(cspan):
+                val = text if k == 0 else ""  # colspan 只首列留值，其余补空
+                row.append(val)
+                if rspan > 1:
+                    carry[col] = [rspan - 1, val]  # rowspan 跨行占位
+                col += 1
+        grid.append(row)
+    return grid
+
+
+def _html_table_to_rows(html: str) -> list[list[str]]:
+    """HTML ``<table>`` 串 → 矩形二维表体；空串返回空表。"""
+    if not html:
+        return []
+    parser = _HTMLTableParser()
+    parser.feed(html)
+    return _expand_spans(parser.raw_rows)
+
+
+def _v2_cells_to_rows(table_body: list) -> list[list[str]]:
+    """v2 旧子版本：``content.table_body`` 的 cell 结构（非 HTML）→ 二维表体。"""
+    rows: list[list[str]] = []
+    for row in table_body or []:
         cells = []
         for cell in row:
             cell_text = ""
@@ -149,6 +166,135 @@ def extract_table_body(raw_elem: dict) -> list[list[str]]:
             cells.append(cell_text.strip())
         rows.append(cells)
     return rows
+
+
+# ---------------------------------------------------------------------------
+# 元素规范化：按 MinerU 格式分两个 reader，各自吃原始 JSON、吐**统一**规范化元素
+#   统一 schema：{ type, text, page, is_heading, raw, body?, img_path? }
+#     body     表体二维表（仅 table 元素，reader 内已按各自格式抽好）
+#     img_path 图/表的裁切图路径（table / image 元素）
+#   下游 parse_elements 只认这套 schema，对 v1/v2 无感——格式差异锁死在 reader 内。
+# ---------------------------------------------------------------------------
+
+def _join_text(parts: list) -> str:
+    """caption/content 片段 → 单行文本。兼容 v1 的 list[str] 与 v2 的 list[{type,content}]。"""
+    out = []
+    for x in parts or []:
+        if isinstance(x, str):
+            out.append(x)
+        elif isinstance(x, dict) and x.get("type") == "text":
+            out.append(x.get("content", ""))
+    return " ".join(s for s in out if s).strip()
+
+
+def read_v1(items: list[dict]) -> list[dict]:
+    """MinerU **v1**（扁平 list）→ 统一规范化元素。字段均为顶层键、无 content 包裹：
+
+      text        text(+可选 text_level=标题层级)
+      list        list_items: list[str]（**无 text 字段**，需合并条目，否则整段丢失）
+      table       table_body: **HTML 串** + table_caption: list[str] + img_path
+      equation    text: LaTeX（$$..$$）
+      footer      text（页脚/表注）
+      page_number text（页码，**丢弃**：是噪声，且 "1/2" 易被误判成章节号）
+    """
+    out: list[dict] = []
+    for it in items:
+        t = it.get("type", "text")
+        page = it.get("page_idx", 0) + 1
+
+        if t == "page_number":
+            continue
+
+        if t == "table":
+            out.append({
+                "type": "table",
+                "text": _join_text(it.get("table_caption")),
+                "page": page,
+                "is_heading": False,
+                "raw": it,
+                "body": _html_table_to_rows(it.get("table_body", "")),  # v1：table_body 是 HTML 串
+                "img_path": it.get("img_path", ""),
+            })
+            continue
+
+        if t == "list":
+            text = "\n".join(it.get("list_items", []))  # list 无 text 字段，合并条目
+        else:  # text / equation / footer
+            text = it.get("text", "").strip()
+        if not text:
+            continue
+
+        out.append({
+            "type": t,
+            "text": text,
+            "page": page,
+            "is_heading": "text_level" in it,  # 带 text_level 即标题（纯数字章节号靠它定位）
+            "raw": it,
+        })
+    return out
+
+
+def read_v2(pages: list[list[dict]]) -> list[dict]:
+    """MinerU **v2**（外层按页嵌套）→ 统一规范化元素。文本/表/图都藏在 content 下：
+
+      title/paragraph  content.title_content / paragraph_content: list[{type,content}]
+      table            content.html: **HTML 串**（旧子版本是 content.table_body 的 cell 结构）
+                       + content.table_caption + content.image_source.path（表格裁切图）
+      image            content.image_caption + content.image_source.path
+    """
+    out: list[dict] = []
+    for page_idx, page in enumerate(pages):
+        page_no = page_idx + 1
+        for it in page:
+            t = it.get("type", "")
+            c = it.get("content", {})
+
+            if t == "table":
+                out.append({
+                    "type": "table",
+                    "text": _join_text(c.get("table_caption")),
+                    "page": page_no,
+                    "is_heading": False,
+                    "raw": it,
+                    # 优先 html，回落旧 cell 结构（同为 v2 的两个子版本）
+                    "body": _html_table_to_rows(c.get("html", "")) or _v2_cells_to_rows(c.get("table_body", [])),
+                    "img_path": c.get("image_source", {}).get("path", ""),
+                })
+                continue
+
+            if t == "image":
+                out.append({
+                    "type": "image",
+                    "text": _join_text(c.get("image_caption")),
+                    "page": page_no,
+                    "is_heading": False,
+                    "raw": it,
+                    "img_path": c.get("image_source", {}).get("path", ""),
+                })
+                continue
+
+            if t == "title":
+                text, is_heading = _join_text(c.get("title_content")), True
+            elif t == "paragraph":
+                text, is_heading = _join_text(c.get("paragraph_content")), False
+            else:
+                continue
+            if not text:
+                continue
+
+            out.append({
+                "type": t,
+                "text": text,
+                "page": page_no,
+                "is_heading": is_heading,
+                "raw": it,
+            })
+    return out
+
+
+def normalize_elements(data: Any) -> list[dict]:
+    """按格式分发到 read_v1 / read_v2，产出统一规范化元素列表。"""
+    return read_v2(data) if detect_format(data) == "v2" else read_v1(data)
 
 
 # ---------------------------------------------------------------------------
@@ -254,16 +400,18 @@ def parse_elements(elements: list[dict], standard_id: str) -> list[dict]:
             if cur is None:
                 continue
 
-            raw = elem.get("raw", {})
             if elem["type"] == "table":
                 cur["tables"].append({
                     "caption": text,
-                    "body": extract_table_body(raw),
+                    "body": elem.get("body", []),       # 表体已在 reader 内按格式抽好
                     "page": elem["page"],
                 })
             elif elem["type"] == "image":
-                img_path = raw.get("content", {}).get("image_source", {}).get("path", "")
-                cur["images"].append({"path": img_path, "caption": text, "page": elem["page"]})
+                cur["images"].append({
+                    "path": elem.get("img_path", ""),   # 图片路径已在 reader 内按格式抽好
+                    "caption": text,
+                    "page": elem["page"],
+                })
             else:
                 cur["content"] = (cur["content"] + "\n" + text).lstrip("\n")
 

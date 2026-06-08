@@ -130,12 +130,16 @@ CUDA_VISIBLE_DEVICES=2 HF_ENDPOINT=https://hf-mirror.com uv run python pipeline/
 
 > 02 必须用 json 而非 md：建条款树要知道「几级标题 / 第几页 / 是表格还是正文」，这些 md 拿不到。
 
-**图片/表格在 json 里怎么体现**：
+**图片/表格在 json 里怎么体现（v1/v2 字段位置不同，02 按格式分 `read_v1`/`read_v2` 处理）**：
 
-- **插图**：`type=image` 块，`content.image_source.path`(图片路径) + `content.image_caption`(图题)。md 里对应 `![](images/..)`。
-- **表格**：`type=table` 块，**三存**——`content.image_source.path`(表格裁切图) + `content.html`(结构化 `<table>`，带 colspan/rowspan) + `content.table_caption`(表题) + `bbox`。注意 md 只把 `html` 渲染成表格文字内联，**不引用**那张裁切图，所以「md 里看不到表格图路径、表格变成了文字」是正常现象。
+- **插图**：`type=image`。v1 顶层 `img_path` + `image_caption`；v2 `content.image_source.path` + `content.image_caption`。md 里对应 `![](images/..)`。
+- **表格**：`type=table`，**三存**——表格裁切图 + 结构化 `<table>` HTML（带 colspan/rowspan）+ 表题。字段位置：v1 顶层 `table_body`(HTML 串) / `img_path` / `table_caption`(list[str])；v2 `content.html` / `content.image_source.path` / `content.table_caption`(list[dict])。md 只把 HTML 渲染成表格文字内联、**不引用**裁切图，所以「md 里看不到表格图路径、表格变成了文字」是正常现象。
 
-> ⚠️ **已知缺陷（待修，Phase B 波2）**：当前 MinerU 把表体放在 `content.html`，而 `02_extract_clauses.py` 的 `extract_table_body()` 只读 `content.table_body`/`cell_content`（此版输出里不存在）。结果：表题能抓到，**表体全部读成空**。对 GB 50500/50854 等「表格即正文」的造价计量规范影响严重（违反 PRD §4【P0】表格可查询）。修法：改 `extract_table_body()` 解析 `content.html` 的 `<table>` 并展开 colspan/rowspan，同时存表格裁切图路径与表题，对齐 `schema.TableRepr`。
+> ✅ **表体提取（已实现）**：`read_v1`/`read_v2` 各自从对应字段取出表格 HTML，经共享 `_HTMLTableParser` + `_expand_spans` 解析为**矩形**二维表（展开 colspan/rowspan 防串列），随条款落入 `tables[].body`；表格裁切图路径落 `images[]`/`tables` 关联。
+>
+> 解析层还处理了几个真实坑（GB/T 50500-2024 实测）：v1 `list` 多条款拆分（如 1.0.1~1.0.7 各自成条款）、目录(TOC)整列/短行剔除（含中英文目录，避免与正文条款重复）、交叉引用片段（"8.3节、…"）不误建条款、**附录字母条号识别**（`E.1`/`E.2.2` 各自成条款，表格精确归位到子条款而非堆在附录根）。
+>
+> 仍属 Phase B 波2 的是**构建层**封装：把 `tables[].body` 升级为可「给定行列取值」的 `schema.TableRepr`（分表头、继承所属条款强制性），见 `extract/`。
 
 ### Step 4 — 提取条款树
 

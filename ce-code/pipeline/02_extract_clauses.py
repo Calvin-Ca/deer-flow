@@ -36,8 +36,12 @@ DEFAULT_OUTPUT = ROOT / "data" / "structured"
 # 条款编号：1 / 1.1 / 1.1.1 / 1.1.1.1（行首，后跟空白或中文字符）
 CLAUSE_NUM_RE = re.compile(r"^(\d+(?:\.\d+){0,3})\s*[　 一-鿿]")
 
-# 附录：附录A / 附录 B
+# 附录根：附录A / 附录 B
 APPENDIX_RE = re.compile(r"^附录\s*([A-Z])\b")
+
+# 附录条款号：字母前缀，如 E.1 / E.1.1 / E.10.2。条号后必须紧跟**中文**（用 [一-鿿]，
+# 不含空格）——否则英文目录行 "F.1 Work… (78)" 会借空格误匹配；表号 "E.2.2-1" 后是连字符也不匹配。
+APPENDIX_CLAUSE_RE = re.compile(r"^([A-Z]\.\d+(?:\.\d+){0,2})\s*[一-鿿]")
 
 # 强制性：必须/严禁/不应/不得 是硬强条；"应"在 GB 规范中是 shall（强制）
 # 负向前瞻排除常见非强制用法：不应、应急、应对、应用、应付、应变、应运、应答
@@ -188,8 +192,22 @@ def _join_text(parts: list) -> str:
 
 
 # 目录条目尾巴：以「(页码)」结尾（含半/全角括号）。目录行形如 "3.1 一般规定 (5)"，
-# 其条号会被误当真条款、并与正文重复，统一在 parse_elements 入口按此剔除。
+# 其条号会被误当真条款、并与正文重复。两道防线：
+#   - list 级（_is_toc_list）：整列剔除（附录目录行很长、带点引导，候选级长度闸拦不住）；
+#   - 候选级（parse_elements 入口）：拦 text 来源的短目录行（章节级、中英文 TOC）。
 _TOC_TAIL_RE = re.compile(r"[（(]\s*\d+\s*[）)]\s*$")
+
+
+def _is_toc_list(items: list[str], thresh: float = 0.5) -> bool:
+    """目录列表判定：过半条目以「(页码)」结尾。
+
+    目录行形如 'F.1 工程计量申请(核准)表 …… (78)'，整列剔除；正文内容列表
+    （如 1.0.1~1.0.7 句子以「。」结尾）命中率为 0，不会误删。
+    """
+    if not items:
+        return False
+    hits = sum(1 for x in items if _TOC_TAIL_RE.search(x.strip()))
+    return hits >= max(1, len(items)) * thresh
 
 
 def read_v1(items: list[dict]) -> list[dict]:
@@ -223,10 +241,12 @@ def read_v1(items: list[dict]) -> list[dict]:
             continue
 
         if t == "list":
-            # 每个条目作为独立元素 emit：多条款列表(如 1.0.1~1.0.7)才能各自被识别成条款；
-            # 真枚举项(如「1. 修订…」无小数点条号)不会被 _clause_match 命中，自然并入正文；
-            # 目录行(条号+页码)由 parse_elements 入口统一剔除。
-            for sub in it.get("list_items", []):
+            li = it.get("list_items", [])
+            if _is_toc_list(li):
+                continue  # 目录列表整列丢弃（含附录中/英文目录），避免条号污染条款树
+            # 其余 list 把每个条目单独 emit：多条款列表(如 1.0.1~1.0.7)才能各自被识别成条款；
+            # 真枚举项(如「1. 修订…」无小数点条号)不会被 _clause_match 命中，自然并入正文。
+            for sub in li:
                 sub = sub.strip()
                 if sub:
                     out.append({"type": "list", "text": sub, "page": page, "is_heading": False, "raw": it})
@@ -341,6 +361,24 @@ def _clause_match(text: str, is_heading: bool) -> re.Match | None:
     return m
 
 
+def _make_clause(standard_id: str, path: str, level: int, content: str, page: int,
+                 title: str | None = None) -> dict:
+    """新建一个空条款节点（正文/附录共用）。"""
+    return {
+        "standard_id": standard_id,
+        "clause_path": path,
+        "level": level,
+        "title": title or path,
+        "content": content,
+        "tables": [],
+        "images": [],
+        "page": page,
+        "is_mandatory": False,
+        "references_to": [],
+        "applicable_scope": {},
+    }
+
+
 def parse_elements(elements: list[dict], standard_id: str) -> list[dict]:
     """把规范化元素列表解析成扁平条款列表。"""
     clauses: list[dict] = []
@@ -368,55 +406,29 @@ def parse_elements(elements: list[dict], standard_id: str) -> list[dict]:
 
         m = _clause_match(text, is_heading)
         app_m = APPENDIX_RE.match(text)
+        appc_m = APPENDIX_CLAUSE_RE.match(text)
 
-        if m:
-            num = m.group(1)
+        if m or appc_m:
+            # 正文数字条号 "5.3.4" 或附录字母条号 "E.1.1"，层级都按小数点段数计
+            # （附录根"附录E"为 level 1，E.1→2，E.1.1→3，栈按 level 归位，与正文一致）。
+            path = m.group(1) if m else appc_m.group(1)
 
             # 交叉引用片段，非标题：形如 "8.3节、第8.9节…"（MinerU 把前导"第"切到上一元素）。
             # 判据：条号后**紧跟**节/条/款/项 且无空格分隔；真标题数字后有空格("8.3 暂列金额")。
-            if text[len(num):len(num) + 1] in "节条款项":
+            if text[len(path):len(path) + 1] in "节条款项":
                 continue
 
-            lvl = clause_level(num)
-
-            # 从完整文本中分离条款号和正文
-            # "3.2.1绿色建筑..." → title="3.2.1", body="绿色建筑..."
-            body = text[len(num):].strip()
+            lvl = clause_level(path)
+            body = text[len(path):].strip()  # 条款号后的正文
 
             for k in [k for k in stack if k >= lvl]:
                 flush_clause(stack.pop(k))
-
-            stack[lvl] = {
-                "standard_id": standard_id,
-                "clause_path": num,
-                "level": lvl,
-                "title": num,
-                "content": body,   # 条款号后的正文直接放入 content
-                "tables": [],
-                "images": [],
-                "page": elem["page"],
-                "is_mandatory": False,
-                "references_to": [],
-                "applicable_scope": {},
-            }
+            stack[lvl] = _make_clause(standard_id, path, lvl, body, elem["page"])
 
         elif app_m:
             for k in list(stack):
                 flush_clause(stack.pop(k))
-            letter = app_m.group(1)
-            stack[1] = {
-                "standard_id": standard_id,
-                "clause_path": f"附录{letter}",
-                "level": 1,
-                "title": text,
-                "content": "",
-                "tables": [],
-                "images": [],
-                "page": elem["page"],
-                "is_mandatory": False,
-                "references_to": [],
-                "applicable_scope": {},
-            }
+            stack[1] = _make_clause(standard_id, f"附录{app_m.group(1)}", 1, "", elem["page"], title=text)
 
         else:
             cur = current_clause()
@@ -441,16 +453,22 @@ def parse_elements(elements: list[dict], standard_id: str) -> list[dict]:
     for clause in stack.values():
         flush_clause(clause)
 
-    # 按条款编号排序（MinerU 某些页内顺序可能颠倒）
+    # 按条款编号排序（MinerU 某些页内顺序可能颠倒）。键统一为 5 元组，首位分区：
+    #   0=正文(数字号) < 1=附录(附录根 + 字母号 E.1.1) < 2=异常
     def _sort_key(c: dict) -> tuple:
         path = c["clause_path"]
-        if path.startswith("附录"):
-            return (99,) + (0,) * 4
+        root = re.match(r"^附录\s*([A-Z])$", path)
+        if root:
+            return (1, ord(root.group(1)), 0, 0, 0)          # 附录根，排在同字母条款之前
+        ap = re.match(r"^([A-Z])\.(\d+(?:\.\d+){0,2})$", path)
+        if ap:
+            nums = [int(x) for x in ap.group(2).split(".")]
+            return (1, ord(ap.group(1))) + tuple(nums) + (0,) * (3 - len(nums))
         try:
             parts = [int(x) for x in path.split(".")]
-            return tuple(parts) + (0,) * (4 - len(parts))
+            return (0,) + tuple(parts) + (0,) * (4 - len(parts))
         except ValueError:
-            return (98,) + (0,) * 4
+            return (2, 0, 0, 0, 0)
 
     clauses.sort(key=_sort_key)
 

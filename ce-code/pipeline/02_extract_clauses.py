@@ -187,6 +187,11 @@ def _join_text(parts: list) -> str:
     return " ".join(s for s in out if s).strip()
 
 
+# 目录条目尾巴：以「(页码)」结尾（含半/全角括号）。目录行形如 "3.1 一般规定 (5)"，
+# 其条号会被误当真条款、并与正文重复，统一在 parse_elements 入口按此剔除。
+_TOC_TAIL_RE = re.compile(r"[（(]\s*\d+\s*[）)]\s*$")
+
+
 def read_v1(items: list[dict]) -> list[dict]:
     """MinerU **v1**（扁平 list）→ 统一规范化元素。字段均为顶层键、无 content 包裹：
 
@@ -218,9 +223,16 @@ def read_v1(items: list[dict]) -> list[dict]:
             continue
 
         if t == "list":
-            text = "\n".join(it.get("list_items", []))  # list 无 text 字段，合并条目
-        else:  # text / equation / footer
-            text = it.get("text", "").strip()
+            # 每个条目作为独立元素 emit：多条款列表(如 1.0.1~1.0.7)才能各自被识别成条款；
+            # 真枚举项(如「1. 修订…」无小数点条号)不会被 _clause_match 命中，自然并入正文；
+            # 目录行(条号+页码)由 parse_elements 入口统一剔除。
+            for sub in it.get("list_items", []):
+                sub = sub.strip()
+                if sub:
+                    out.append({"type": "list", "text": sub, "page": page, "is_heading": False, "raw": it})
+            continue
+
+        text = it.get("text", "").strip()  # text / equation / footer
         if not text:
             continue
 
@@ -349,11 +361,22 @@ def parse_elements(elements: list[dict], standard_id: str) -> list[dict]:
         text = elem["text"]
         is_heading = elem.get("is_heading", False)
 
+        # 目录条目（短标题 + 尾随页码，如 "9 合同价款期中支付 (35)"）不建条款——
+        # 否则与正文真实条款重复污染。覆盖章节级/附录级、中英文 TOC（list 与 text 来源都拦）。
+        if elem["type"] in ("text", "list") and len(text) < 60 and _TOC_TAIL_RE.search(text):
+            continue
+
         m = _clause_match(text, is_heading)
         app_m = APPENDIX_RE.match(text)
 
         if m:
             num = m.group(1)
+
+            # 交叉引用片段，非标题：形如 "8.3节、第8.9节…"（MinerU 把前导"第"切到上一元素）。
+            # 判据：条号后**紧跟**节/条/款/项 且无空格分隔；真标题数字后有空格("8.3 暂列金额")。
+            if text[len(num):len(num) + 1] in "节条款项":
+                continue
+
             lvl = clause_level(num)
 
             # 从完整文本中分离条款号和正文

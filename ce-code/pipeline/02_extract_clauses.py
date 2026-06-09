@@ -1,10 +1,8 @@
 """阶段 0 第二步：从 MinerU 的 content_list.json 构建条款树。
 
-支持两种 MinerU 输出格式：
-  v1 (content_list.json)：扁平列表，每条有 text / page_idx / text_level 字段
-  v2 (content_list_v2.json)：外层按页嵌套，文本藏在 paragraph_content / title_content 中
-
-实践中优先用 v1——顺序更可靠，文本字段更直接。
+只支持 MinerU **v1**（content_list.json）：扁平列表，每条有 text / page_idx /
+text_level 字段。v1 顺序可靠、文本字段直接，是本项目唯一采用的解析输入；管线
+（mineru_api.py）也只产出 v1，故不再保留 v2（按页嵌套）的读取分支。
 
 输入：data/parsed/<standard>/<mode>/<standard>_content_list.json
 输出：data/structured/<standard>_clauses.json
@@ -18,7 +16,6 @@ import json
 import re
 from html.parser import HTMLParser
 from pathlib import Path
-from typing import Any
 
 import click
 from rich.console import Console
@@ -56,20 +53,9 @@ REFERENCE_RE = re.compile(
 )
 
 # ---------------------------------------------------------------------------
-# 格式检测
-# ---------------------------------------------------------------------------
-
-def detect_format(data: Any) -> str:
-    """自动检测 MinerU content_list 格式版本（v1 扁平 list / v2 外层按页嵌套）。"""
-    if not data:
-        return "v1"
-    return "v2" if isinstance(data[0], list) else "v1"
-
-
-# ---------------------------------------------------------------------------
-# 共享表格工具：HTML <table> → 矩形二维表
-#   v1(table_body) 与 v2(content.html) 的表体都是 HTML 串，解析算法与格式无关，
-#   故抽成共享 helper；两个 reader 只负责「从各自字段取出 HTML」。
+# 表格工具：HTML <table> → 矩形二维表
+#   v1 的 table_body 是 HTML 串，解析算法与正文无关，单独抽成 helper；
+#   read_v1 只负责「从 table_body 取出 HTML」。
 # ---------------------------------------------------------------------------
 
 class _HTMLTableParser(HTMLParser):
@@ -157,38 +143,17 @@ def _html_table_to_rows(html: str) -> list[list[str]]:
     return _expand_spans(parser.raw_rows)
 
 
-def _v2_cells_to_rows(table_body: list) -> list[list[str]]:
-    """v2 旧子版本：``content.table_body`` 的 cell 结构（非 HTML）→ 二维表体。"""
-    rows: list[list[str]] = []
-    for row in table_body or []:
-        cells = []
-        for cell in row:
-            cell_text = ""
-            for item in cell.get("cell_content", []):
-                for sub in item.get("paragraph_content", item.get("title_content", [])):
-                    cell_text += sub.get("content", "")
-            cells.append(cell_text.strip())
-        rows.append(cells)
-    return rows
-
-
 # ---------------------------------------------------------------------------
-# 元素规范化：按 MinerU 格式分两个 reader，各自吃原始 JSON、吐**统一**规范化元素
+# 元素规范化：read_v1 吃原始 v1 JSON、吐**统一**规范化元素
 #   统一 schema：{ type, text, page, is_heading, raw, body?, img_path? }
-#     body     表体二维表（仅 table 元素，reader 内已按各自格式抽好）
+#     body     表体二维表（仅 table 元素，read_v1 内已抽好）
 #     img_path 图/表的裁切图路径（table / image 元素）
-#   下游 parse_elements 只认这套 schema，对 v1/v2 无感——格式差异锁死在 reader 内。
+#   下游 parse_elements 只认这套 schema。
 # ---------------------------------------------------------------------------
 
 def _join_text(parts: list) -> str:
-    """caption/content 片段 → 单行文本。兼容 v1 的 list[str] 与 v2 的 list[{type,content}]。"""
-    out = []
-    for x in parts or []:
-        if isinstance(x, str):
-            out.append(x)
-        elif isinstance(x, dict) and x.get("type") == "text":
-            out.append(x.get("content", ""))
-    return " ".join(s for s in out if s).strip()
+    """caption 片段（v1 的 list[str]）→ 单行文本。"""
+    return " ".join(s.strip() for s in (parts or []) if isinstance(s, str) and s.strip())
 
 
 # 目录条目尾巴：以「(页码)」结尾（含半/全角括号）。目录行形如 "3.1 一般规定 (5)"，
@@ -264,69 +229,6 @@ def read_v1(items: list[dict]) -> list[dict]:
             "raw": it,
         })
     return out
-
-
-def read_v2(pages: list[list[dict]]) -> list[dict]:
-    """MinerU **v2**（外层按页嵌套）→ 统一规范化元素。文本/表/图都藏在 content 下：
-
-      title/paragraph  content.title_content / paragraph_content: list[{type,content}]
-      table            content.html: **HTML 串**（旧子版本是 content.table_body 的 cell 结构）
-                       + content.table_caption + content.image_source.path（表格裁切图）
-      image            content.image_caption + content.image_source.path
-    """
-    out: list[dict] = []
-    for page_idx, page in enumerate(pages):
-        page_no = page_idx + 1
-        for it in page:
-            t = it.get("type", "")
-            c = it.get("content", {})
-
-            if t == "table":
-                out.append({
-                    "type": "table",
-                    "text": _join_text(c.get("table_caption")),
-                    "page": page_no,
-                    "is_heading": False,
-                    "raw": it,
-                    # 优先 html，回落旧 cell 结构（同为 v2 的两个子版本）
-                    "body": _html_table_to_rows(c.get("html", "")) or _v2_cells_to_rows(c.get("table_body", [])),
-                    "img_path": c.get("image_source", {}).get("path", ""),
-                })
-                continue
-
-            if t == "image":
-                out.append({
-                    "type": "image",
-                    "text": _join_text(c.get("image_caption")),
-                    "page": page_no,
-                    "is_heading": False,
-                    "raw": it,
-                    "img_path": c.get("image_source", {}).get("path", ""),
-                })
-                continue
-
-            if t == "title":
-                text, is_heading = _join_text(c.get("title_content")), True
-            elif t == "paragraph":
-                text, is_heading = _join_text(c.get("paragraph_content")), False
-            else:
-                continue
-            if not text:
-                continue
-
-            out.append({
-                "type": t,
-                "text": text,
-                "page": page_no,
-                "is_heading": is_heading,
-                "raw": it,
-            })
-    return out
-
-
-def normalize_elements(data: Any) -> list[dict]:
-    """按格式分发到 read_v1 / read_v2，产出统一规范化元素列表。"""
-    return read_v2(data) if detect_format(data) == "v2" else read_v1(data)
 
 
 # ---------------------------------------------------------------------------
@@ -516,7 +418,7 @@ def print_stats(clauses: list[dict]) -> None:
     "--input", "input_path",
     type=click.Path(exists=True, dir_okay=False, path_type=Path),
     required=True,
-    help="MinerU 输出的 _content_list.json 或 _content_list_v2.json 路径。",
+    help="MinerU 输出的 _content_list.json（v1）路径。",
 )
 @click.option("--standard-id", default="", help="规范标识，如 'GB 50016-2014(2018)'。")
 @click.option(
@@ -526,12 +428,11 @@ def print_stats(clauses: list[dict]) -> None:
 )
 @click.option("--preview", is_flag=True, help="只打印前 20 条，不写文件。")
 def main(input_path: Path, standard_id: str, output_dir: Path, preview: bool) -> None:
-    """从 MinerU content_list.json 构建结构化条款库（支持 v1/v2 格式自动识别）。"""
+    """从 MinerU content_list.json（v1）构建结构化条款库。"""
 
     if not standard_id:
         standard_id = (
             input_path.name
-            .replace("_content_list_v2.json", "")
             .replace("_content_list.json", "")
             .replace("_", " ")
             .strip()
@@ -543,10 +444,7 @@ def main(input_path: Path, standard_id: str, output_dir: Path, preview: bool) ->
     with open(input_path, encoding="utf-8") as f:
         data = json.load(f)
 
-    fmt = detect_format(data)
-    console.print(f"格式：{fmt}")
-
-    elements = normalize_elements(data)
+    elements = read_v1(data)
     console.print(f"共 {len(elements)} 个元素，开始解析…")
 
     clauses = parse_elements(elements, standard_id)

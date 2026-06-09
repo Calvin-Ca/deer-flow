@@ -130,12 +130,14 @@ CUDA_VISIBLE_DEVICES=2 HF_ENDPOINT=https://hf-mirror.com uv run python pipeline/
 
 > 02 必须用 json 而非 md：建条款树要知道「几级标题 / 第几页 / 是表格还是正文」，这些 md 拿不到。
 
-**图片/表格在 json 里怎么体现（v1/v2 字段位置不同，02 按格式分 `read_v1`/`read_v2` 处理）**：
+**图片/表格在 json 里怎么体现（只认 MinerU v1，字段均在顶层；02 由 `read_v1` 处理）**：
 
-- **插图**：`type=image`。v1 顶层 `img_path` + `image_caption`；v2 `content.image_source.path` + `content.image_caption`。md 里对应 `![](images/..)`。
-- **表格**：`type=table`，**三存**——表格裁切图 + 结构化 `<table>` HTML（带 colspan/rowspan）+ 表题。字段位置：v1 顶层 `table_body`(HTML 串) / `img_path` / `table_caption`(list[str])；v2 `content.html` / `content.image_source.path` / `content.table_caption`(list[dict])。md 只把 HTML 渲染成表格文字内联、**不引用**裁切图，所以「md 里看不到表格图路径、表格变成了文字」是正常现象。
+- **插图**：`type=image`，顶层 `img_path` + `image_caption`。md 里对应 `![](images/..)`。
+- **表格**：`type=table`，**三存**——表格裁切图 + 结构化 `<table>` HTML（带 colspan/rowspan）+ 表题。字段：顶层 `table_body`(HTML 串) / `img_path` / `table_caption`(list[str])。md 只把 HTML 渲染成表格文字内联、**不引用**裁切图，所以「md 里看不到表格图路径、表格变成了文字」是正常现象。
 
-> ✅ **表体提取（已实现）**：`read_v1`/`read_v2` 各自从对应字段取出表格 HTML，经共享 `_HTMLTableParser` + `_expand_spans` 解析为**矩形**二维表（展开 colspan/rowspan 防串列），随条款落入 `tables[].body`；表格裁切图路径落 `images[]`/`tables` 关联。
+> ℹ️ MinerU 另有 v2（按页嵌套、字段包在 `content` 下）格式，但本项目管线（mineru_api.py）只产出 v1，且 v1 顺序更可靠、取值更直接，故 02 已移除 v2 读取分支，只保留 `read_v1`。
+
+> ✅ **表体提取（已实现）**：`read_v1` 从 `table_body` 取出表格 HTML，经 `_HTMLTableParser` + `_expand_spans` 解析为**矩形**二维表（展开 colspan/rowspan 防串列），随条款落入 `tables[].body`；表格裁切图路径落 `images[]`/`tables` 关联。
 >
 > 解析层还处理了几个真实坑（GB/T 50500-2024 实测）：v1 `list` 多条款拆分（如 1.0.1~1.0.7 各自成条款）、目录(TOC)整列/短行剔除（含中英文目录，避免与正文条款重复）、交叉引用片段（"8.3节、…"）不误建条款、**附录字母条号识别**（`E.1`/`E.2.2` 各自成条款，表格精确归位到子条款而非堆在附录根）。
 >

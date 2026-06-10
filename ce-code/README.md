@@ -78,7 +78,9 @@ bash pipeline/setup_server.sh
 
 `01_parse_pdf.py` **默认走远程 MinerU API**（`172.19.2.2:8000`，热服务 + `hybrid-auto-engine` 现成可用），加 `--local` 才用本地 CLI。两条路径是同一套 MinerU，同 backend 输出逐字一致；选型与环境差异详见 `DEV.md`「MinerU 两种解析方式」。
 
-> backend 选择：定额/造价类含密集表格的文档用 `hybrid-auto-engine`（表格逐列对位，默认）；`--backend pipeline` 更快但密集表格会列错位。本地 CLI（`--local`）跑 hybrid 需先修好 venv 的 vllm（见 `DEV.md`），否则只能用 pipeline。
+> backend 选择：定额/造价类含密集表格的文档用 `hybrid-auto-engine`（表格逐列对位，默认）；`--backend pipeline` 更快但密集表格会列错位。
+
+> 本地 CLI（`--local`）跑 hybrid 需先修好 venv 的 vllm（见 `DEV.md`），否则只能用 pipeline。
 
 #### 默认 — 远程 API（推荐，无需本地 GPU/MinerU 环境）
 
@@ -146,10 +148,10 @@ CUDA_VISIBLE_DEVICES=2 HF_ENDPOINT=https://hf-mirror.com uv run python pipeline/
 ### Step 4 — 提取条款树
 
 ```bash
-uv run python pipeline/02_extract_clauses.py --input "data/parsed/<basename>/auto/<basename>_content_list.json" --standard-id "GB 50016-2014(2018)" --output-dir data/structured/
+uv run python pipeline/02_extract_clauses.py --input "data/parsed/<basename>/auto/<basename>_content_list.json" --output-dir data/structured/
 ```
 
-输出落在 `data/structured/<standard>_clauses.json`。
+输出落在 `data/structured/<basename>_clauses.json`：文件名取输入 basename（把 `_content_list` 换成 `_clauses`）。唯一标识 `standard_id` 默认也取该 basename，写入 JSON 内每条条款；如需自定义可加 `--standard-id "GB 50016-2014(2018)"`。
 
 ### Step 5 — 质量审核
 

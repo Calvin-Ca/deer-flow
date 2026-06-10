@@ -66,13 +66,14 @@ class _HTMLTableParser(HTMLParser):
 
     def __init__(self) -> None:
         super().__init__()
-        self.raw_rows: list[list[tuple[str, int, int]]] = []
-        self._row: list[tuple[str, int, int]] | None = None
-        self._buf: list[str] | None = None
-        self._colspan = 1
-        self._rowspan = 1
+        self.raw_rows: list[list[tuple[str, int, int]]] = []  # 解析产物：每行的原始单元格
+        self._row: list[tuple[str, int, int]] | None = None   # 当前正在收集的行
+        self._buf: list[str] | None = None                    # 当前单元格的文本缓冲
+        self._colspan = 1                                     # 当前单元格的 colspan
+        self._rowspan = 1                                     # 当前单元格的 rowspan
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        """开标签：``<tr>`` 起新行，``<td>/<th>`` 起新单元格并读出 colspan/rowspan。"""
         if tag == "tr":
             self._row = []
         elif tag in ("td", "th") and self._row is not None:
@@ -82,10 +83,12 @@ class _HTMLTableParser(HTMLParser):
             self._rowspan = int(a.get("rowspan") or 1)
 
     def handle_data(self, data: str) -> None:
+        """单元格内文本：累积进当前缓冲（缓冲为 None 表示当前不在单元格里，忽略）。"""
         if self._buf is not None:
             self._buf.append(data)
 
     def handle_endtag(self, tag: str) -> None:
+        """闭标签：``</td>`` 把 (文本, colspan, rowspan) 存入当前行，``</tr>`` 把整行收进 raw_rows。"""
         if tag in ("td", "th") and self._buf is not None and self._row is not None:
             self._row.append(("".join(self._buf).strip(), self._colspan, self._rowspan))
             self._buf = None
@@ -148,7 +151,7 @@ def _html_table_to_rows(html: str) -> list[list[str]]:
 #   统一 schema：{ type, text, page, is_heading, raw, body?, img_path? }
 #     body     表体二维表（仅 table 元素，read_v1 内已抽好）
 #     img_path 图/表的裁切图路径（table / image 元素）
-#   下游 parse_elements 只认这套 schema。
+#   下游 ClauseTreeBuilder 只认这套 schema。
 # ---------------------------------------------------------------------------
 
 def _join_text(parts: list) -> str:
@@ -159,7 +162,7 @@ def _join_text(parts: list) -> str:
 # 目录条目尾巴：以「(页码)」结尾（含半/全角括号）。目录行形如 "3.1 一般规定 (5)"，
 # 其条号会被误当真条款、并与正文重复。两道防线：
 #   - list 级（_is_toc_list）：整列剔除（附录目录行很长、带点引导，候选级长度闸拦不住）；
-#   - 候选级（parse_elements 入口）：拦 text 来源的短目录行（章节级、中英文 TOC）。
+#   - 候选级（ClauseTreeBuilder._consume 入口）：拦 text 来源的短目录行（章节级、中英文 TOC）。
 _TOC_TAIL_RE = re.compile(r"[（(]\s*\d+\s*[）)]\s*$")
 
 
@@ -176,27 +179,40 @@ def _is_toc_list(items: list[str], thresh: float = 0.5) -> bool:
 
 
 def read_v1(items: list[dict]) -> list[dict]:
-    """MinerU **v1**（扁平 list）→ 统一规范化元素。字段均为顶层键、无 content 包裹：
+    """MinerU **v1**（扁平 list）原始 JSON → 下游统一规范化元素列表。
 
-      text        text(+可选 text_level=标题层级)
-      list        list_items: list[str]（**无 text 字段**，需合并条目，否则整段丢失）
-      table       table_body: **HTML 串** + table_caption: list[str] + img_path
-      equation    text: LaTeX（$$..$$）
-      footer      text（页脚/表注）
-      page_number text（页码，**丢弃**：是噪声，且 "1/2" 易被误判成章节号）
+    参数：
+        items (list[dict]): MinerU v1 输出的扁平元素 list。每个 dict 至少含 type、page_idx（从 0 起），以及对应类型的取数字段：
+              text        text(+可选 text_level=标题层级)
+              list        list_items: list[str]
+              table       table_body: HTML 串 + table_caption: list[str] + img_path
+              equation    text: LaTeX（$$..$$）
+              footer      text（页脚/表注）
+              page_number text（页码）
+
+    返回：
+        list[dict]: 统一规范化元素列表，每个元素字段为：
+              type       元素类型（text / list / table / equation / footer）
+              text       单行文本（table 取 caption；page_number 整条丢弃，不出现）
+              page       页码，从 1 起（= page_idx + 1）
+              is_heading 是否标题（原始带 text_level 即 True）
+              raw        原始 v1 dict
+              body       矩形二维表，**仅 table 元素有**
+              img_path   图/表裁切图路径，**仅 table 元素有**
+            该 schema 是下游 ClauseTreeBuilder 唯一认的输入格式。
     """
     out: list[dict] = []
     for it in items:
         t = it.get("type", "text")
-        page = it.get("page_idx", 0) + 1
+        page = it.get("page_idx", 0) + 1 # 页码归一：每条 page = page_idx + 1（v1 的 page_idx 从 0 起 → 统一成从 1 起）
 
-        if t == "page_number":
-            continue
+        if t == "page_number": # 根据特征判定的页码，并非实际pdf页码
+            continue   # （页码行）整条跳过——它是噪声，且 "1/2" 这种容易被误判成章节号
 
         if t == "table":
             out.append({
                 "type": "table",
-                "text": _join_text(it.get("table_caption")),
+                "text": _join_text(it.get("table_caption")),  #  ["表 3.0.1", "工程量清单"],   # → _join_text → "表 3.0.1 工程量清单"
                 "page": page,
                 "is_heading": False,
                 "raw": it,
@@ -234,130 +250,298 @@ def read_v1(items: list[dict]) -> list[dict]:
 # ---------------------------------------------------------------------------
 # 条款树构建
 # ---------------------------------------------------------------------------
-
-def clause_level(num_str: str) -> int:
-    return len(num_str.split("."))
-
+#
+# 富化函数（强制性 / 交叉引用）留在模块级：它们是 enrichment 而非建树本身，且
+# Phase B 路线图计划外迁到 extract/strength.py、extract/references.py（波1），
+# 届时只需替换 _flush 里的调用点，无需从类里再拆出来。
 
 def is_mandatory(text: str) -> bool:
+    """是否强制性条款：命中强条正则（必须/严禁/不应/不得/禁止/应…）即为 True。"""
     return bool(MANDATORY_RE.search(text))
 
 
 def extract_references(text: str) -> list[str]:
+    """抽取条文内的交叉引用条号（如"按第 5.3.1 条"→ ``5.3.1``），去重且保持出现顺序。"""
     return list(dict.fromkeys(REFERENCE_RE.findall(text)))
 
 
-def _clause_match(text: str, is_heading: bool) -> re.Match | None:
+class ClauseTreeBuilder:
+    """把规范化元素列表（``read_v1`` 的产物）建成扁平条款树。
+
+    功能:
+        建树是个**有状态**的流水线——按文档顺序逐个吃元素，靠一个「层级栈」把条款归位
+        成树（再拍平成列表），并在落库时补算强制性、交叉引用，最后排序、修正术语章。
+
+    实例属性:
+        standard_id (str): 规范唯一标识，写入每条条款的 ``standard_id`` 字段。
+        stack (dict[int, dict]): ``level → 正在累积的条款``。新条款到来时，把同级及
+            更深的旧条款先弹出落库，再压入新条款，从而实现层级归位。
+        clauses (list[dict]): 已定稿落库的条款列表，即 ``build()`` 的最终产物。
+
+    用法:
+        ``ClauseTreeBuilder(standard_id).build(elements)``
     """
-    识别条款编号。规则：
-    - X.X / X.X.X / X.X.X.X（有小数点）：任何元素都可匹配
-    - 纯数字（如 "1 总则"）：仅在明确标记为标题（is_heading=True）时匹配，
-      避免把年份（2006年）、页码等误识别为章号
-    """
-    m = CLAUSE_NUM_RE.match(text)
-    if m is None:
-        return None
-    num = m.group(1)
-    if "." not in num and not is_heading:
-        return None
-    return m
 
+    def __init__(self, standard_id: str) -> None:
+        """初始化建树器。
 
-def _make_clause(standard_id: str, path: str, level: int, content: str, page: int,
-                 title: str | None = None) -> dict:
-    """新建一个空条款节点（正文/附录共用）。"""
-    return {
-        "standard_id": standard_id,
-        "clause_path": path,
-        "level": level,
-        "title": title or path,
-        "content": content,
-        "tables": [],
-        "images": [],
-        "page": page,
-        "is_mandatory": False,
-        "references_to": [],
-        "applicable_scope": {},
-    }
+        参数:
+            standard_id (str): 规范唯一标识（如输入文件 basename），写入每条条款。
+        返回:
+            无。
+        """
+        self.standard_id = standard_id
+        self.clauses: list[dict] = []      # 已 flush 落库的条款（最终产物）
+        self.stack: dict[int, dict] = {}   # level → 累积中的条款
 
+    def build(self, elements: list[dict]) -> list[dict]:
+        """建树主入口：逐元素建树 → flush 余栈 → 排序 → 术语章修正。
 
-def parse_elements(elements: list[dict], standard_id: str) -> list[dict]:
-    """把规范化元素列表解析成扁平条款列表。"""
-    clauses: list[dict] = []
-    stack: dict[int, dict] = {}  # level → clause_dict
+        功能:
+            驱动整条建树流水线，是本类唯一对外的建树方法。
+        参数:
+            elements (list[dict]): ``read_v1`` 产出的规范化元素列表，每个元素形如
+                ``{type, text, page, is_heading, raw, body?, img_path?}``。
+        返回:
+            list[dict]: 扁平条款列表（已排序、已富化），同 ``self.clauses``。每条结构
+                见 ``_make_clause``。
+        """
+        for elem in elements:
+            self._consume(elem)
+        # 遍历结束，栈里仍累积着的条款全部落库
+        for clause in self.stack.values():
+            self._flush(clause)
+        self._sort()
+        self._fix_terminology_chapter()
+        return self.clauses
 
-    def current_clause() -> dict | None:
-        return stack[max(stack)] if stack else None
+    # ---- 建树辅助（纯函数，无状态，做成 staticmethod）-----------------------
 
-    def flush_clause(clause: dict) -> None:
+    @staticmethod
+    def _clause_level(num_str: str) -> int:
+        """计算条款层级。
+
+        功能:
+            层级 = 条号的小数点段数，用于层级栈归位。
+        参数:
+            num_str (str): 条款号，如 ``5.3.4`` / ``1`` / ``E.1.1``（字母前缀也按段数计）。
+        返回:
+            int: 层级，如 ``5.3.4`` → 3、``1`` → 1、``E.1.1`` → 3。
+        """
+        return len(num_str.split("."))
+
+    @staticmethod
+    def _clause_match(text: str, is_heading: bool) -> re.Match | None:
+        """识别正文条款编号。
+
+        功能:
+            匹配行首的正文数字条号，并按是否标题做收紧，避免误识别。规则：
+            - ``X.X`` / ``X.X.X`` / ``X.X.X.X``（有小数点）：任何元素都可匹配；
+            - 纯数字（如 "1 总则"）：仅当明确是标题（is_heading=True）时匹配，
+              避免把年份（2006年）、页码等误识别为章号。
+        参数:
+            text (str): 待匹配的元素文本。
+            is_heading (bool): 该元素是否被标记为标题（MinerU 的 text_level）。
+        返回:
+            re.Match | None: 命中则返回 match 对象（``group(1)`` 为条号），否则 None。
+        """
+        m = CLAUSE_NUM_RE.match(text)
+        if m is None:
+            return None
+        num = m.group(1)
+        if "." not in num and not is_heading:
+            return None
+        return m
+
+    def _make_clause(self, path: str, level: int, content: str, page: int,
+                     title: str | None = None) -> dict:
+        """新建一个空条款节点（正文/附录共用）。
+
+        功能:
+            产出统一 schema 的条款 dict；``is_mandatory`` / ``references_to`` 等留待
+            ``_flush`` 落库时再填，``standard_id`` 取自实例。
+        参数:
+            path (str): 条款号 / clause_path，如 ``5.3.4`` / ``附录E``。
+            level (int): 条款层级（见 ``_clause_level``）。
+            content (str): 条款正文（后续可被 ``_attach`` 追加）。
+            page (int): 条款首次出现的页码（从 1 起）。
+            title (str | None): 标题；缺省则用 ``path``（附录根传整行标题）。
+        返回:
+            dict: 条款节点，含 standard_id / clause_path / level / title / content /
+                tables / images / page / is_mandatory / references_to / applicable_scope。
+        """
+        return {
+            "standard_id": self.standard_id,
+            "clause_path": path,
+            "level": level,
+            "title": title or path,
+            "content": content,
+            "tables": [],
+            "images": [],
+            "page": page,
+            "is_mandatory": False,
+            "references_to": [],
+            "applicable_scope": {},
+        }
+
+    # ---- 状态操作 ----------------------------------------------------------
+
+    def _current(self) -> dict | None:
+        """取当前条款（栈顶）。
+
+        功能:
+            返回层级最深的、正在累积内容的条款，供 ``_attach`` 挂载内容。
+        参数:
+            无。
+        返回:
+            dict | None: 栈顶条款；空栈返回 None。
+        """
+        return self.stack[max(self.stack)] if self.stack else None
+
+    def _flush(self, clause: dict) -> None:
+        """条款定稿落库。
+
+        功能:
+            为条款补算强制性与交叉引用后追加进 ``self.clauses``；空条款（无正文且
+            无表格）直接丢弃。
+        参数:
+            clause (dict): 待落库的条款节点（``_make_clause`` 产出、可能已被追加内容）。
+        返回:
+            无（就地 append 到 ``self.clauses``）。
+        """
         text = clause.get("content", "").strip()
         if not text and not clause.get("tables"):
             return
         clause["is_mandatory"] = is_mandatory(text)
         clause["references_to"] = extract_references(text)
-        clauses.append(clause)
+        self.clauses.append(clause)
 
-    for elem in elements:
+    # ---- 单元素分派 --------------------------------------------------------
+
+    def _consume(self, elem: dict) -> None:
+        """处理单个规范化元素（建树主循环的一步）。
+
+        功能:
+            先拦目录短行，再识别条号——命中正文/附录条号则开新条款，否则把内容挂到
+            当前条款。是 build() 里逐元素调用的分派器。
+        参数:
+            elem (dict): 一个规范化元素 ``{type, text, page, is_heading, ...}``。
+        返回:
+            无（就地改 ``self.stack`` / ``self.clauses``）。
+        """
         text = elem["text"]
         is_heading = elem.get("is_heading", False)
 
         # 目录条目（短标题 + 尾随页码，如 "9 合同价款期中支付 (35)"）不建条款——
         # 否则与正文真实条款重复污染。覆盖章节级/附录级、中英文 TOC（list 与 text 来源都拦）。
         if elem["type"] in ("text", "list") and len(text) < 60 and _TOC_TAIL_RE.search(text):
-            continue
+            return
 
-        m = _clause_match(text, is_heading)
+        m = self._clause_match(text, is_heading)
         app_m = APPENDIX_RE.match(text)
         appc_m = APPENDIX_CLAUSE_RE.match(text)
 
         if m or appc_m:
-            # 正文数字条号 "5.3.4" 或附录字母条号 "E.1.1"，层级都按小数点段数计
-            # （附录根"附录E"为 level 1，E.1→2，E.1.1→3，栈按 level 归位，与正文一致）。
-            path = m.group(1) if m else appc_m.group(1)
-
-            # 交叉引用片段，非标题：形如 "8.3节、第8.9节…"（MinerU 把前导"第"切到上一元素）。
-            # 判据：条号后**紧跟**节/条/款/项 且无空格分隔；真标题数字后有空格("8.3 暂列金额")。
-            if text[len(path):len(path) + 1] in "节条款项":
-                continue
-
-            lvl = clause_level(path)
-            body = text[len(path):].strip()  # 条款号后的正文
-
-            for k in [k for k in stack if k >= lvl]:
-                flush_clause(stack.pop(k))
-            stack[lvl] = _make_clause(standard_id, path, lvl, body, elem["page"])
-
+            self._open_clause(text, m, appc_m, elem)
         elif app_m:
-            for k in list(stack):
-                flush_clause(stack.pop(k))
-            stack[1] = _make_clause(standard_id, f"附录{app_m.group(1)}", 1, "", elem["page"], title=text)
-
+            self._open_appendix_root(app_m, text, elem)
         else:
-            cur = current_clause()
-            if cur is None:
-                continue
+            self._attach(elem, text)
 
-            if elem["type"] == "table":
-                cur["tables"].append({
-                    "caption": text,
-                    "body": elem.get("body", []),       # 表体已在 reader 内按格式抽好
-                    "page": elem["page"],
-                })
-            elif elem["type"] == "image":
-                cur["images"].append({
-                    "path": elem.get("img_path", ""),   # 图片路径已在 reader 内按格式抽好
-                    "caption": text,
-                    "page": elem["page"],
-                })
-            else:
-                cur["content"] = (cur["content"] + "\n" + text).lstrip("\n")
+    def _open_clause(self, text: str, m: re.Match | None, appc_m: re.Match | None,
+                     elem: dict) -> None:
+        """开一条新条款（正文或附录字母条号）。
 
-    for clause in stack.values():
-        flush_clause(clause)
+        功能:
+            遇正文数字条号 "5.3.4" 或附录字母条号 "E.1.1" 时，按层级把同级及更深的旧
+            条款落库，再压入新条款；交叉引用片段（如 "8.3节…"）跳过不建。
+        参数:
+            text (str): 当前元素文本（含条号 + 正文）。
+            m (re.Match | None): 正文条号 match（``_clause_match`` 结果），可能为 None。
+            appc_m (re.Match | None): 附录字母条号 match，可能为 None；m 与 appc_m 至少一个非空。
+            elem (dict): 当前规范化元素（取 page 等）。
+        返回:
+            无（就地改 ``self.stack`` / ``self.clauses``）。
+        """
+        # 层级都按小数点段数计（附录根"附录E"为 level 1，E.1→2，E.1.1→3，栈按 level 归位，与正文一致）。
+        path = m.group(1) if m else appc_m.group(1)
 
-    # 按条款编号排序（MinerU 某些页内顺序可能颠倒）。键统一为 5 元组，首位分区：
-    #   0=正文(数字号) < 1=附录(附录根 + 字母号 E.1.1) < 2=异常
+        # 交叉引用片段，非标题：形如 "8.3节、第8.9节…"（MinerU 把前导"第"切到上一元素）。
+        # 判据：条号后**紧跟**节/条/款/项 且无空格分隔；真标题数字后有空格("8.3 暂列金额")。
+        if text[len(path):len(path) + 1] in "节条款项":
+            return
+
+        lvl = self._clause_level(path)
+        body = text[len(path):].strip()  # 条款号后的正文
+
+        # 同级及更深的旧条款先落库，再把新条款压栈
+        for k in [k for k in self.stack if k >= lvl]:
+            self._flush(self.stack.pop(k))
+        self.stack[lvl] = self._make_clause(path, lvl, body, elem["page"])
+
+    def _open_appendix_root(self, app_m: re.Match, text: str, elem: dict) -> None:
+        """开一个附录根节点。
+
+        功能:
+            遇附录根"附录E"时，清空整栈（让正文段落收尾落库），再建一个 level 1 的附录
+            节点，后续 ``E.1`` / ``E.1.1`` 会挂在它之下。
+        参数:
+            app_m (re.Match): 附录根 match（``group(1)`` 为字母，如 "E"）。
+            text (str): 整行标题文本，用作附录节点的 title。
+            elem (dict): 当前规范化元素（取 page）。
+        返回:
+            无（就地改 ``self.stack`` / ``self.clauses``）。
+        """
+        for k in list(self.stack):
+            self._flush(self.stack.pop(k))
+        self.stack[1] = self._make_clause(
+            f"附录{app_m.group(1)}", 1, "", elem["page"], title=text
+        )
+
+    def _attach(self, elem: dict, text: str) -> None:
+        """把非条号元素挂到当前条款。
+
+        功能:
+            表格 → 当前条款的 ``tables``；图片 → ``images``；其余文字 → 追加进
+            ``content``。无当前条款（栈空）则丢弃。
+        参数:
+            elem (dict): 当前规范化元素（type 决定挂载方式，含 body/img_path/page）。
+            text (str): 元素文本（表格/图片时是 caption，文字时是正文）。
+        返回:
+            无（就地改栈顶条款）。
+        """
+        cur = self._current()
+        if cur is None:
+            return
+
+        if elem["type"] == "table":
+            cur["tables"].append({
+                "caption": text,
+                "body": elem.get("body", []),       # 表体已在 reader 内按格式抽好
+                "page": elem["page"],
+            })
+        elif elem["type"] == "image":
+            cur["images"].append({
+                "path": elem.get("img_path", ""),   # 图片路径已在 reader 内按格式抽好
+                "caption": text,
+                "page": elem["page"],
+            })
+        else:
+            cur["content"] = (cur["content"] + "\n" + text).lstrip("\n")
+
+    # ---- 收尾 --------------------------------------------------------------
+
+    @staticmethod
     def _sort_key(c: dict) -> tuple:
+        """计算条款的排序键。
+
+        功能:
+            把 clause_path 映射成可比较的 5 元组，首位分区把正文/附录/异常分层排开。
+        参数:
+            c (dict): 条款节点（读 ``clause_path``）。
+        返回:
+            tuple: 5 元组排序键，首位分区 0=正文(数字号) < 1=附录(根 + 字母号 E.1.1) < 2=异常。
+        """
         path = c["clause_path"]
         root = re.match(r"^附录\s*([A-Z])$", path)
         if root:
@@ -372,41 +556,68 @@ def parse_elements(elements: list[dict], standard_id: str) -> list[dict]:
         except ValueError:
             return (2, 0, 0, 0, 0)
 
-    clauses.sort(key=_sort_key)
+    def _sort(self) -> None:
+        """按条款编号重排 ``self.clauses``。
 
-    # 术语章（第2章，clause_path 以 "2." 开头）：定义文字含"应"不算强条
-    for c in clauses:
-        if c["clause_path"].startswith("2."):
-            c["is_mandatory"] = bool(
-                re.search(r"必须|严禁|不应|不得|禁止", c.get("content", ""))
-            )
+        功能:
+            修 MinerU 某些页内顺序颠倒的问题，使条款按 正文 < 附录 < 异常 排列。
+        参数:
+            无。
+        返回:
+            无（就地排序 ``self.clauses``）。
+        """
+        self.clauses.sort(key=self._sort_key)
 
-    return clauses
+    def _fix_terminology_chapter(self) -> None:
+        """修正术语章（第2章）的强制性误判。
 
+        功能:
+            术语章（clause_path 以 "2." 开头）多为定义性文字，含"应"不应算强条；这里
+            把它们的 ``is_mandatory`` 收紧为只认硬强条词（必须/严禁/不应/不得/禁止）。
+        参数:
+            无。
+        返回:
+            无（就地改 ``self.clauses`` 中相关条款的 is_mandatory）。
+        """
+        for c in self.clauses:
+            if c["clause_path"].startswith("2."):
+                c["is_mandatory"] = bool(
+                    re.search(r"必须|严禁|不应|不得|禁止", c.get("content", ""))
+                )
 
-# ---------------------------------------------------------------------------
-# 统计报告
-# ---------------------------------------------------------------------------
+    # ---- 统计报告 ----------------------------------------------------------
 
-def print_stats(clauses: list[dict]) -> None:
-    total = len(clauses)
-    mandatory = sum(1 for c in clauses if c["is_mandatory"])
-    with_tables = sum(1 for c in clauses if c["tables"])
-    with_refs = sum(1 for c in clauses if c["references_to"])
-    by_level: dict[int, int] = {}
-    for c in clauses:
-        by_level[c["level"]] = by_level.get(c["level"], 0) + 1
+    def print_stats(self) -> None:
+        """打印条款树统计报告。
 
-    t = Table(title="条款树统计")
-    t.add_column("指标")
-    t.add_column("数量", justify="right")
-    t.add_row("总条款数", str(total))
-    t.add_row("强制性条款（应/必须/严禁/不应/不得）", str(mandatory))
-    t.add_row("含表格的条款", str(with_tables))
-    t.add_row("含交叉引用的条款", str(with_refs))
-    for lvl in sorted(by_level):
-        t.add_row(f"  第 {lvl} 层条款", str(by_level[lvl]))
-    console.print(t)
+        功能:
+            用 rich 表格打印总数、强条数、含表/含引用条款数、各层级分布。纯展示、不改
+            数据，是解析后的健全性体检（条款数异常 / 强条为 0 / 层级分布异常都能一眼看出）。
+            需在 ``build()`` 之后调用。
+        参数:
+            无（读 ``self.clauses``）。
+        返回:
+            无（打印到终端）。
+        """
+        clauses = self.clauses
+        total = len(clauses)
+        mandatory = sum(1 for c in clauses if c["is_mandatory"])
+        with_tables = sum(1 for c in clauses if c["tables"])
+        with_refs = sum(1 for c in clauses if c["references_to"])
+        by_level: dict[int, int] = {}
+        for c in clauses:
+            by_level[c["level"]] = by_level.get(c["level"], 0) + 1
+
+        t = Table(title="条款树统计")
+        t.add_column("指标")
+        t.add_column("数量", justify="right")
+        t.add_row("总条款数", str(total))
+        t.add_row("强制性条款（应/必须/严禁/不应/不得）", str(mandatory))
+        t.add_row("含表格的条款", str(with_tables))
+        t.add_row("含交叉引用的条款", str(with_refs))
+        for lvl in sorted(by_level):
+            t.add_row(f"  第 {lvl} 层条款", str(by_level[lvl]))
+        console.print(t)
 
 
 # ---------------------------------------------------------------------------
@@ -420,7 +631,7 @@ def print_stats(clauses: list[dict]) -> None:
     required=True,
     help="MinerU 输出的 _content_list.json（v1）路径。",
 )
-@click.option("--standard-id", default="", help="规范标识，如 'GB 50016-2014(2018)'。")
+@click.option("--standard-id", default="", help="规范标识；不传则取输入文件名 basename。")
 @click.option(
     "--output-dir", "output_dir",
     type=click.Path(file_okay=False, path_type=Path),
@@ -430,13 +641,10 @@ def print_stats(clauses: list[dict]) -> None:
 def main(input_path: Path, standard_id: str, output_dir: Path, preview: bool) -> None:
     """从 MinerU content_list.json（v1）构建结构化条款库。"""
 
+    # 唯一标识与输出文件名同源：都取输入 basename（去掉 _content_list 后缀）。
+    base = input_path.stem.replace("_content_list", "")
     if not standard_id:
-        standard_id = (
-            input_path.name
-            .replace("_content_list.json", "")
-            .replace("_", " ")
-            .strip()
-        )
+        standard_id = base
 
     console.print(f"[bold]规范：[/bold]{standard_id}")
     console.print(f"[bold]输入：[/bold]{input_path}")
@@ -447,10 +655,11 @@ def main(input_path: Path, standard_id: str, output_dir: Path, preview: bool) ->
     elements = read_v1(data)
     console.print(f"共 {len(elements)} 个元素，开始解析…")
 
-    clauses = parse_elements(elements, standard_id)
+    builder = ClauseTreeBuilder(standard_id)
+    clauses = builder.build(elements)
     console.print(f"[green]✓ 提取到 {len(clauses)} 条条款[/green]")
 
-    print_stats(clauses)
+    builder.print_stats()
 
     if preview:
         console.print("\n[bold]--- 前 20 条预览 ---[/bold]")
@@ -464,8 +673,7 @@ def main(input_path: Path, standard_id: str, output_dir: Path, preview: bool) ->
         return
 
     output_dir.mkdir(parents=True, exist_ok=True)
-    safe = standard_id.replace(" ", "_").replace("(", "").replace(")", "")
-    out_path = output_dir / f"{safe}_clauses.json"
+    out_path = output_dir / f"{base}_clauses.json"
     with open(out_path, "w", encoding="utf-8") as f:
         json.dump(clauses, f, ensure_ascii=False, indent=2)
     console.print(f"[green]✓ 已写入 {out_path}[/green]")

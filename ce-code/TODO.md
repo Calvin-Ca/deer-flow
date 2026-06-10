@@ -53,15 +53,37 @@ MinerU 解析 + 条款树提取 + 质量审核，在 GB 50378-2006 和 GB 50016 
 
 ---
 
-## Phase B：数据模型改造（⬜ 待办，下一步优先级）
+## Phase B：数据模型改造（🟡 进行中）
 
-> 需改 `02_extract` schema + **重建索引**。与前述结构重构解耦。这四块决定三个 agent（问答/算量/审图）的能力天花板。
+> v2 schema 契约 + 构建层富化链 + 解析层按格式重写并加固，均已落地。待办：表格构建层封装、适用范围谓词、**重建索引**、新原语。这几块决定三个 agent（问答/算量/审图）的能力天花板。
 
-- [ ] **黑体强条标注**：拆 `modal_strength` / `is_mandatory_clause`，解析保留 MinerU 字重信息
-- [ ] **引用边分型 + 双向**：`strong`/`weak`/`exclude`/`cross_standard` + `referenced_by` 反向边
-- [ ] **表格结构化可查询**：表格 → JSON，支持"给定行列条件取值"，继承条款强制性
-- [ ] **适用范围谓词抽取**：散文条件 → 结构化谓词；抽不准标 `scope_status: unknown` 进保守召回
-- [ ] **条款级版本/效力**：`status`/`version`/`effective_date` 到条款粒度
+### 地基 + 富化链（✅ 2026-06-05 ~ 06-08）
+
+- [x] `schema.py`：v2 条款契约（受控词表 + TypedDict）+ `to_v1_compat` 向后兼容桥（重建索引前 engine/metadata 不崩）
+- [x] **引用边分型 + 双向**（波1，`extract/references.py`）：`strong`/`weak`/`exclude`/`cross_standard` + `referenced_by` 反向边
+- [x] **黑体强条标注**（波1，`extract/strength.py`）：拆 `modal_strength`(语气) / `is_mandatory_clause`(黑体)；官方强条清单优先 → MinerU 字重次之 → 否则保守 False
+- [x] **祖先链**（波3，`extract/ancestors.py`）：`ancestor_titles` 章/节标题链
+- [x] `extract/build.py` 编排器：v1 条款 → 跑富化链 → v2 + 兼容桥；**无官方清单时保守模式**（语气"应"并回 `is_mandatory`，保证重建索引前强条召回不回退）
+- [ ] **数据依赖（阻塞 `is_mandatory_clause` 真值，需服务器侧）**：① GB 50016 官方强制性条文清单 → `data/structured/gb50016_mandatory.json`；② dump `content_list.json` 确认 MinerU 字重字段名 → 改 `strength._BOLD_KEYS`
+
+### 解析层按 MinerU 格式重写 + 加固（✅ 2026-06-08）
+
+> `02_extract_clauses.py` 拆 `read_v1`/`read_v2` 两个 reader，格式差异锁死在 reader 内；表格 HTML 解析作共享工具。
+
+- [x] `detect_format` + `read_v1`/`read_v2`：吐统一规范化元素 schema，`parse_elements` 对 v1/v2 无感
+- [x] **表格结构化（解析层）**：v1 `table_body` / v2 `content.html` 同为 HTML 串 → `_HTMLTableParser` + `_expand_spans` 解析成**矩形**二维表（展开 colspan/rowspan 防串列），落 `tables[].body`
+- [x] v1 真实坑：`list` 多条款拆分（1.0.1~1.0.7 各自成条款）、`list`/`table` 不再因无 `text` 被丢、page_number 噪声丢弃
+- [x] 目录(TOC)剔除：list 级整列(`_is_toc_list`) + 候选级短行，含中/英文目录，避免与正文条款重复
+- [x] 交叉引用片段（"8.3节、…"）不误建条款；附录字母条号识别（`E.1`/`E.2.2` 各自成条款、表格精确归位、`_sort_key` 附录排正文后）
+- [x] `mineru_api.py` 修输出目录误定位（从本次 ZIP namelist 取，不 rglob 历史产物）；`01` 打印解析耗时
+- [x] **实测 GB/T 50500-2024**：561 条款、零重复、35 表全部归具体子条款（附录根 0 表）、1.0.x 齐
+
+### 待办（波2 构建层 + 其余）
+
+- [ ] **表格可查询封装**（波2，`extract/tables.py`）：把 `tables[].body` 升级为「给定行列取值」的 `schema.TableRepr`（分表头、继承所属条款 `is_mandatory_clause`）
+- [ ] **适用范围谓词抽取**（波3，`extract/scope.py`）：散文条件 → 结构化谓词；抽不准标 `scope_status: unknown`（build.py 现统一填 unknown 进保守召回）
+- [ ] **条款级版本/效力**：build.py 现按规范统一填 `status`/`version`/`effective_date`；局部修订到条款粒度待细化
+- [ ] **重建索引**：`02 → build → 04` 用 v2 数据重建（依赖官方强条清单到位）；`07_eval` 验证强条召回不回退
 - [ ] 新增检索原语 `/filter`（适用范围过滤）、`/rerank`（依赖谓词数据）
 - [ ] 评测集增加"适用性误判率"指标
 
@@ -78,6 +100,8 @@ MinerU 解析 + 条款树提取 + 质量审核，在 GB 50378-2006 和 GB 50016 
 
 - [ ] 关系库 PostgreSQL 建表：`bill_spec` / `quota_item` / `quota_resource` / `resource` / `resource_price` / `hist_bill`，强制带 `version` + `region`，价格带 `effective_period`
 - [ ] GB 50500 + GB 50854 清单计量规范结构化入 `bill_spec`（复用 MinerU 解析 + 规则，含 calc_rule + feature_schema）
+  - [x] **GB/T 50500-2024 已过 02 解析**（561 条款、35 表结构化、附录条款归位），下一步从条款树抽 `bill_spec` 字段入库
+  - [ ] GB/T 50854-2024 待重新解析（前次 01 运行命中 `mineru_api` 输出目录误定位 bug，已修；需重跑确认产物正确）
 - [ ] 单地区定额库导入 `quota_item` + `quota_resource` + `resource`（定额电子表清洗）
 - [ ] 价格库导入 `resource_price`（信息价/市场价，带 `effective_period` 时效）
 - [ ] 历史工程库 `hist_bill`（脱敏 + 质量标注，供审核轨对标）

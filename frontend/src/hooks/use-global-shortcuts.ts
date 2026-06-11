@@ -19,6 +19,12 @@ interface Shortcut {
 export function useGlobalShortcuts(shortcuts: Shortcut[]) {
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
+      // Some keydown events (browser autofill, IME composition) fire without a
+      // `key`, which would crash `event.key.toLowerCase()` below.
+      if (!event.key) {
+        return;
+      }
+
       const meta = event.metaKey || event.ctrlKey;
 
       for (const shortcut of shortcuts) {

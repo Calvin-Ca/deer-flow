@@ -41,9 +41,13 @@ export function Welcome({
           `✨ ${t.welcome.createYourOwnSkill} ✨`
         ) : (
           <div className="flex items-center gap-2">
-            <div className={cn("inline-block", !waved ? "animate-wave" : "")}>
-              {isUltra ? "🚀" : "👋"}
-            </div>
+            {isUltra && (
+              <div
+                className={cn("inline-block", !waved ? "animate-wave" : "")}
+              >
+                🚀
+              </div>
+            )}
             <AuroraText colors={colors}>{t.welcome.greeting}</AuroraText>
           </div>
         )}

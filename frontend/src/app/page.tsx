@@ -1,25 +1,14 @@
-import { Footer } from "@/components/landing/footer";
-import { Header } from "@/components/landing/header";
-import { Hero } from "@/components/landing/hero";
-import { CaseStudySection } from "@/components/landing/sections/case-study-section";
-import { CommunitySection } from "@/components/landing/sections/community-section";
-import { SandboxSection } from "@/components/landing/sections/sandbox-section";
-import { SkillsSection } from "@/components/landing/sections/skills-section";
-import { WhatsNewSection } from "@/components/landing/sections/whats-new-section";
+import { redirect } from "next/navigation";
 
-export default function LandingPage() {
-  return (
-    <div className="min-h-screen w-full bg-[#0a0a0a]">
-      <Header />
-      <main className="flex w-full flex-col">
-        <Hero />
-        <CaseStudySection />
-        <SkillsSection />
-        <SandboxSection />
-        <WhatsNewSection />
-        <CommunitySection />
-      </main>
-      <Footer />
-    </div>
-  );
+/**
+ * 站点根路由。
+ *
+ * 精简后前端只保留登录后的 harness（workspace），不再有营销落地页/博客/文档。
+ * 根路径直接重定向到 /workspace；/workspace 自身的布局会按登录态再转向 /login 或 /setup。
+ *
+ * 参数：无
+ * 返回：无（始终触发服务端重定向）
+ */
+export default function RootPage() {
+  redirect("/workspace");
 }

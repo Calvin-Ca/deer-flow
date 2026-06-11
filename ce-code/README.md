@@ -32,7 +32,7 @@ ce-code/
 │   ├── mineru_api.py               #   远程 MinerU API 客户端（默认解析方式）
 │   ├── 01_parse_pdf.py             #   PDF 解析入口（默认走 API，--local 用本地 CLI）
 │   ├── split_and_parse.py          #   大 PDF 分块解析（仅 --local 路径，规避本地 OOM）
-│   ├── 02_extract_clauses.py       #   构建条款树（章/节/条层级）
+│   ├── 02_parse_hierarchy.py       #   三轴层级化解析（结构→粒度→增强，ParseProfile 控制）
 │   ├── 03_review_quality.py        #   条款树质量审核与报告
 │   └── 04_build_index.py           #   建 BM25 + Milvus 向量双索引
 ├── scripts/                        # 检索层薄 CLI（只依赖 retrieval）
@@ -145,10 +145,10 @@ CUDA_VISIBLE_DEVICES=2 HF_ENDPOINT=https://hf-mirror.com uv run python pipeline/
 >
 > 仍属 Phase B 波2 的是**构建层**封装：把 `tables[].body` 升级为可「给定行列取值」的 `schema.TableRepr`（分表头、继承所属条款强制性），见 `extract/`。
 
-### Step 4 — 提取条款树
+### Step 4 — 三轴层级化解析
 
 ```bash
-uv run python pipeline/02_extract_clauses.py --input "data/parsed/<basename>/auto/<basename>_content_list.json" --output-dir data/structured/
+uv run python pipeline/02_parse_hierarchy.py --input "data/parsed/<basename>/auto/<basename>_content_list.json" --profile-name default --terminal-stage enrich
 ```
 
 输出落在 `data/structured/<basename>_clauses.json`：文件名取输入 basename（把 `_content_list` 换成 `_clauses`）。唯一标识 `standard_id` 默认也取该 basename，写入 JSON 内每条条款；如需自定义可加 `--standard-id "GB 50016-2014(2018)"`。

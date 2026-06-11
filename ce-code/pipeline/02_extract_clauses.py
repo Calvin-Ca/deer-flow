@@ -8,6 +8,9 @@ text_level 字段。v1 顺序可靠、文本字段直接，是本项目唯一采
 输出：data/structured/<standard>_clauses.json
 
 每条款格式见 ce-code/PRD.md §1。
+
+多层次解析，目录、章节、小节等
+为后续多形式表征做铺垫，不同层次提供不同表征方法
 """
 
 from __future__ import annotations

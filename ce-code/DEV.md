@@ -1,86 +1,210 @@
-# ce-code（知识层）· 开发文档
+# ce-code（知识层）· 开发指南
 
-> 知识层开发的**依赖服务与环境**。需求/设计见 `PRD.md`，进度见 `TODO.md`，操作命令（流水线/起服务）见 `README.md`，项目级共享约定（git/设备分工）见根 `CLAUDE.md`。
+> 知识层的**实现策略与技术路径**。需求见 `PRD.md`，进度见 `TODO.md`，操作命令（流水线/起服务）见 `README.md`，项目级共享约定见根 `CLAUDE.md`。
 
 ---
 
-## 依赖服务（服务器已部署）
+## 实现架构
 
-知识层 = 数据 + 检索，用到以下服务：
+知识层分**两条并行轨道**，共用同一检索引擎与多表征思路：
 
-| 角色 | 模型 | 地址 | 知识层用途 | 备注 |
-|---|---|---|---|---|
-| Embedding | bge-large-zh-v1.5 | `http://localhost:8097`，model_id `/model` | 条款向量化、query embedding | dim=1024，max_len=512 |
-| 向量库 | Milvus | `http://localhost:19530` | 向量存储与检索 | MilvusClient API；collection 名只含字母/数字/下划线 |
-| VLM | Qwen2.5-VL-7B | `http://localhost:8098`，model_id `/model` | PDF 解析时图示理解 | — |
-| 文本生成 / 推理 | Qwen3-8B | `http://localhost:8099`，model_id `qwen3-8b` | 查询改写（生成 3-5 变体）、引用图/条款树 LLM 校验 | `/think` 启用 thinking、`/no_think` 禁用；JSON 输出建议 `/no_think` |
+| 轨道 | 数据来源 | 核心载体 | 对外原语 |
+|---|---|---|---|
+| 规范轨 | PDF（防火/清单/计量规范） | MinerU → 条款树 → Milvus + BM25 | `/search` `/expand` `/clause` |
+| 造价轨 | 定额电子表 + 信息价 + 历史项目 | PostgreSQL（单一事实来源）+ KG + Milvus | `/bill/match` `/price/compose` `/quota` |
 
-> 生成（问答）/合规编排不在知识层 —— 那是任务层（`../ce-services/`）的事，它用 Qwen3-8B 做生成/判定。
+规范轨 Phase B 进行中；造价轨 Phase C 待办，两轨解耦可并行。
+
+---
+
+## 规范轨实现
+
+### 解析管线（5 个阶段）
+
+管线每阶段读上一阶段产物、写自己的产物；`parse_profile` 控制终止阶段，实验只重跑下游，不重跑 MinerU（最贵，约 60% 耗时）。
+
+| 阶段 | 脚本/模块 | 产物路径 |
+|---|---|---|
+| 0 MinerU 解析 | `pipeline/01_parse_pdf.py` + `pipeline/mineru_api.py` | `data/parsed/{standard}/` |
+| 1+2 结构/粒度轴 | `pipeline/02_extract_clauses.py` | `data/structured/{std}/{profile}/clauses.json` |
+| 3 增强轴 | `extract/build.py`（编排富化链） | 同上（附 `references`/`ancestor_titles`/`is_mandatory_clause` 等增强字段） |
+| 4 索引 | `pipeline/04_build_index.py` | `data/vector_store/{std}/{profile}/` |
+| 质量审核 | `pipeline/03_review_quality.py` | 人工检查，不阻塞流水线 |
+
+**MinerU 使用原则：**
+- 默认走远程 API（`172.19.2.2:8000`，常驻热服务，单页 ~1.8s）；`--local` 才本地 CLI
+- **定额/造价类 PDF 必须用 `hybrid-auto-engine`**（密集多列表格，pipeline backend 列错位）
+- 远程 API 每次重传整个 PDF；大 PDF 用 `split_and_parse.py` 分块（80 页/块）
+
+**parse_profile 实验隔离（命名避免覆盖彼此结果）：**
+
+```yaml
+parse_profile:
+  name: p2_clause_full
+  terminal_stage: enrich       # structure | granularity | enrich | index
+  chunk_granularity: natural   # node | paragraph | natural
+  enrichment: full             # none | ids_refs | full
+  small_to_big: true
+```
+
+产物路径和 Milvus collection 按 `{standard}/{profile}` 隔离；`/search` 接 `profile` 参数，同一 query 打不同索引做 A/B 对比。
+
+### 构建层（extract/）
+
+`extract/build.py` 是富化链编排器：把 v1 条款（`02` 输出）→ v2 schema（含可选增强字段）。
+
+```
+read_clauses(v1_json)
+  → extract/references.py    引用边分型 + 双向（strong/weak/exclude/cross_standard + referenced_by）
+  → extract/strength.py      modal_strength（语气词）/ is_mandatory_clause（黑体；官方清单优先→MinerU字重→保守False）
+  → extract/ancestors.py     ancestor_titles（章/节标题链，向量化时拼入 small-to-big 上下文）
+  → extract/scope.py         applicable_scope 谓词（当前统一填 unknown，Phase B 待实现）
+  → schema.to_v1_compat()    兼容桥（重建索引前 retrieval/engine.py 不崩）
+```
+
+**增强字段均可空**：`has_mandatory_marking: False` 的规范（如造价规范），`is_mandatory_clause` 不填、强条机制不激活；`scope.py` 抽不准则 `scope_status: unknown`，走保守召回（宁多召不漏）。
+
+### 检索引擎（retrieval/）
+
+`retrieval/engine.py` 实现四通道混合检索，`retrieval/config.py` 管权重与超参：
+
+```
+query
+  → BM25（rank-bm25；条文号/术语精确匹配）
+  → 向量（bge-large-zh-v1.5，dim=1024，MilvusClient API）
+  → 元数据过滤（standard/version/scope，先圈范围再排序）
+  → RRF 合并去重
+  → 引用图扩展（strong 边强制拉取；weak 可选；exclude 边禁止扩展）
+  → rerank（cross-encoder 精排）
+  → small-to-big 回补（返回命中块 + 完整条/节上下文 + ancestor_titles）
+```
+
+**通道权重按 intent 调**（`/search` 接收 `intent` 参数）：
+
+| intent | 主通道 | 说明 |
+|---|---|---|
+| `qa` | 向量 + BM25 均衡，引用扩展开启 | 高召回 + 高精度 |
+| `compliance` | 元数据/scope 过滤优先 | 穷尽适用条款，召回 >> 精度 |
+| `cost_match` | KG 收窄 + BGE-M3 混检（Phase C） | 候选集高命中，LLM 候选内择优 |
+
+**检索硬性约束**：引用扩展默认开启；元数据过滤优先于向量排序（先 filter 再 rank）。
+
+### 服务层（service/）
+
+`service/server.py`：FastAPI，监听 `:8100`，只暴露检索原语，不含生成。
+
+```
+POST /search          裸检索（intent / k / profile 参数）
+POST /expand          对 node_id 做引用扩展
+GET  /clause/{std}/{path}   单节点直取
+GET  /health          含 ready_standards / vector_store / deps 地址
+```
+
+待补（依赖 Phase B 谓词数据）：`/filter`（适用范围过滤）、`/rerank`。
+
+---
+
+## 造价轨实现（Phase C）
+
+关系库是单一事实来源，KG 由其派生，向量库为语义补充。**实现顺序：关系库建表 → 数据入库 → 跑通取数路径 → 加向量召回 → 加 KG 多跳**。
+
+### ① 关系库 PostgreSQL
+
+建表（DDL 详见 `cost_agent_tech.md`）：
+
+| 表 | 职责 | 关键约束 |
+|---|---|---|
+| `bill_spec` | 清单规范条目（9 位统一编码 + calc_rule + feature_schema） | `spec_version` 版本管理 |
+| `quota_item` | 定额子目（人材机费 + 基价） | `region` + `version` 强制 |
+| `quota_resource` | 定额→资源含量（consumption） | 外键 `quota_item` |
+| `resource` / `resource_price` | 资源及价格（带 `effective_period` 时效） | 按 region + 时效查 |
+| `hist_bill` | 历史工程清单（脱敏 + 质量标注） | 供历史相似案例召回 |
+
+**数据入库方式**：
+- GB 50500/50854：复用管线 02 产物（条款树 → 规则抽取 `bill_spec` 字段入库）
+- 定额电子表：CSV 清洗 → `quota_item` + `quota_resource` + `resource`
+- 信息价：定期抓取/导入 `resource_price`，带 `effective_period`
+
+### ② 知识图谱（P0 用 PG 关联表模拟）
+
+建三张关联表替代 Neo4j（数据量小时 PG join 够用，P1 再迁）：
+
+```sql
+component_bill_map   (component_type, bill_code)               -- MAPS_TO
+bill_quota_map       (bill_code, quota_code, region)            -- APPLIES
+quota_resource_detail (quota_code, resource_id, consumption)   -- CONSUMES
+```
+
+跑通组价取数路径后，再评估是否需要 Neo4j 多跳遍历性能。
+
+### ③ 向量库（Milvus bill_spec_kb）
+
+- BGE-M3 dense+sparse 混检（不复用规范轨 bge-large-zh-v1.5，造价术语分布不同）
+- 新建 `bill_spec_kb` collection，复用已有 Milvus 实例
+- 向量化内容：清单条目名称 + 特征描述 + 工程做法说明
+
+**两条检索路径**：
+```
+① 清单匹配：BGE-M3 混合召回 top-K → KG MAPS_TO 关系收窄 → LLM 候选内择优（选码+置信度）
+② 组价取数：KG APPLIES 取定额 → CONSUMES 取工料机含量 → resource_price 按 region+时效取价
+```
+
+---
+
+## 依赖服务
+
+### 规范轨（已部署）
+
+| 角色 | 模型/服务 | 地址 | 用途 |
+|---|---|---|---|
+| Embedding | bge-large-zh-v1.5 | `http://localhost:8097`，model_id `/model` | 条款向量化、query embedding（dim=1024，max_len=512） |
+| 向量库 | Milvus | `http://localhost:19530` | 向量存储与检索（MilvusClient API） |
+| VLM | Qwen2.5-VL-7B | `http://localhost:8098`，model_id `/model` | PDF 解析时图示理解 |
+| 文本推理 | Qwen3-8B | `http://localhost:8099`，model_id `qwen3-8b` | 查询改写（生成 3-5 变体）、引用图 LLM 校验 |
+| MinerU API | MinerU 3.2.1 | `http://172.19.2.2:8000` | PDF 解析（默认远程，hybrid-auto-engine 可用） |
+
+> Qwen3-8B：`/no_think` 后缀禁用思考链（JSON 输出必用，避免输出污染）。
+> 生成/问答/合规编排不在知识层——那是任务层（`../ce-services/`）的事。
+
+### 造价轨（待部署）
+
+| 角色 | 选型 | 地址 | 约束 |
+|---|---|---|---|
+| 关系库 | PostgreSQL | 待部署 | JSONB 存 feature_schema；所有表强制 version + region |
+| KG（P0） | PG 关联表（P1 迁 Neo4j） | 同上 | 多跳遍历数据量小时 PG join 已够 |
+| Embedding（造价） | BGE-M3 | 待部署 | dense+sparse 混检；是否与规范轨合并为单服务待评估 |
+| 向量库 | Milvus | `http://localhost:19530` | 复用同一实例，新建 `bill_spec_kb` collection |
+
+> 算量引擎（几何+扣减）、图纸解析（IFC/DXF）、MinIO 属**任务层**，不在知识层依赖范围。
 
 **依赖健康自检（排查"起不来"先逐个确认依赖活着，命令单行）：**
 
-- Embedding：`curl -s http://localhost:8097/v1/models`
-- VLM：`curl -s http://localhost:8098/v1/models`
-- Qwen3-8B：`curl -s http://localhost:8099/v1/models`
-- Milvus：`curl -s http://localhost:9091/healthz`（默认 metrics/health 端口；19530 为 gRPC）
-- 知识服务自身：`curl -s http://localhost:8100/health`（含 ready_standards / vector_store / deps 地址）
-
-### 造价轨（CostAgent / 算量组价 agent）新增依赖（待部署）
-
-> 三层知识底座的**设计**（职责分工、数据资产、KG schema、构建管线）见 `PRD.md §5`；本表只列**依赖服务的选型/地址/约束**。
-
-| 角色 | 选型 | 地址 | 备注 |
-|---|---|---|---|
-| 关系库 | PostgreSQL | 待部署 | 单一事实来源；JSONB 存 feature_schema/适用范围 |
-| 知识图谱 | Neo4j | 待部署 | **P0 先用 PG 关联表模拟，P1 再上 Neo4j** |
-| Embedding（造价） | BGE-M3 | 待部署 | dense+sparse 混检；与规范轨是否合并为单服务待评估 |
-| 向量库 | Milvus | `http://localhost:19530` | 造价 `bill_spec_kb` collection，复用规范轨同一实例 |
-
-> 算量引擎（几何 + 扣减）、图纸解析（IFC/DXF/PDF：IfcOpenShell/ezdxf/PyMuPDF）、对象存储（MinIO 图纸/产物）属**任务层**，不在知识层依赖范围。
+```
+curl -s http://localhost:8097/v1/models
+curl -s http://localhost:8098/v1/models
+curl -s http://localhost:8099/v1/models
+curl -s http://localhost:9091/healthz
+curl -s http://localhost:8100/health
+```
 
 ---
 
-## 开发环境要点
+## 开发环境
 
-- **GPU 选择**：MinerU 解析用 `CUDA_VISIBLE_DEVICES=2`（GPU 2 空闲显存最多 ~17 GB；GPU 1/3 被 vLLM 占用，GPU 0 偏紧）
-- **模型下载**：需设 `HF_ENDPOINT=https://hf-mirror.com`（服务器默认无法直连 HuggingFace）
-- **关键依赖版本约束**：
-  - MinerU **3.2.0**（装入项目 venv，✓ 已验证）；另有一台远程 MinerU API 主机 `172.19.2.2:8000` 版本 **3.2.1**（两者解析方式对比见下节）
-  - mineru-vl-utils **1.0.2**，依赖 `transformers>=4.51.1,<5.0.0`（**不可升 5.x**，否则 Qwen2VLConfig 不兼容）
+- **GPU 选择**：MinerU 解析用 `CUDA_VISIBLE_DEVICES=2`（GPU 2 空闲显存最多 ~17 GB；GPU 1/3 被 vLLM 占用）
+- **模型下载**：`HF_ENDPOINT=https://hf-mirror.com`（服务器默认无法直连 HuggingFace）
+- **关键依赖版本**：
+  - MinerU **3.2.0**（本地 venv）/ **3.2.1**（远程 API）；同输入产出 md 逐字一致
+  - mineru-vl-utils **1.0.2**，`transformers>=4.51.1,<5.0.0`（**不可升 5.x**，Qwen2VLConfig 不兼容）
   - pymilvus **3.0.0**（MilvusClient API；ORM-style 已弃用）；rank-bm25 ✓
-  - PyTorch **2.5.1+cu121**（`pyproject.toml` 已配 pytorch-cu121 uv index；mineru 声明需 >=2.6.0 但实测可用，`[tool.uv] override-dependencies` 绕过）
+  - PyTorch **2.5.1+cu121**（`[tool.uv] override-dependencies` 绕过 mineru 的 >=2.6.0 声明）
 
 > 共享环境基础（服务器路径、Python 版本、uv 版本、GPU 硬件）见根 `CLAUDE.md` §2.3。
 
----
-
-## MinerU 两种解析方式
-
-PDF 解析有两条路径，**本质是同一套 MinerU 代码**（CLI 运行时会临时起一个本地 mineru-api 提交任务，启动日志可见 `Started local mineru-api at http://127.0.0.1:...`，跑完即关），差异只在「冷热」和「环境」。实测同 backend 同输入下，两者产出的 md **md5 逐字一致**（pipeline / 第300页 / 即使 CLI 3.2.0 vs API 3.2.1 也无差异）。
-
-**管线默认走远程 API**：`pipeline/01_parse_pdf.py` 默认调 API（封装在 `pipeline/mineru_api.py`，请求 `response_format_zip=true` 拿到标准 `auto/` 布局 ZIP 解压落盘），加 `--local` 才用本地 CLI。原因：API 主机 vllm 正常、`hybrid-auto-engine` 现成可用，且常驻热服务无冷启动；本地 venv 的 vllm 当前损坏，CLI 跑不了 hybrid。
-
-| | 远程 API（**默认**） | 本地 CLI（`--local`） |
-|---|---|---|
-| 入口 | `01_parse_pdf.py`（默认）→ `POST http://172.19.2.2:8000/file_parse` | `01_parse_pdf.py --local` / `split_and_parse.py`（大 PDF 分块）→ `mineru -p ... -o ...` |
-| 版本 | 3.2.1 | 3.2.0 |
-| 速度 | 常驻热服务，单页 ~1.8s | 冷启动每次 ~23s 模型加载 + 起关 server，单页约 1 分钟 |
-| hybrid 后端 | ✅ 可用（该主机 vllm 正常） | ❌ 当前 venv 的 vllm ABI 损坏（见下），跑不了 |
-| 文件传输 | 每次调用都重传整个 PDF（分批解析会重复上传） | 读盘一次 |
-| 适用场景 | **默认全场景**（在线单文件 + 批量建库，hybrid 现成、零本地依赖） | 离线 / 省带宽大批量；大 PDF 用 `split_and_parse.py` 分块避免本地 OOM |
-
-### backend 选择：定额/造价类表格必须用 `hybrid-auto-engine`
-
-- `pipeline`（不依赖 vllm）：通用、多语言、无幻觉，但**密集多列定额表会列错位**（colspan/rowspan 对齐失败，数字串列）
-- `hybrid-auto-engine`（需 vllm）：表格结构、人材机编码/单位/单价/消耗量逐列对位，实测明显优于 pipeline
-- CLI 默认走 pipeline；批量建库前需显式加 `-b hybrid-auto-engine -t true`（`01_parse_pdf.py` 当前未指定 backend，待修）
-
-### ⚠️ venv 的 vllm 当前损坏（hybrid 前置阻塞）
+### ⚠️ venv 的 vllm 当前损坏（本地 CLI hybrid 前置阻塞）
 
 ```
 vllm/_C.abi3.so: undefined symbol: _ZN3c106ivalue14ConstantString6create...
 ```
 
-`_ZN3c10...` 是 PyTorch c10 符号 —— vllm 编译时链接的 libtorch 与当前 PyTorch 2.5.1+cu121 ABI 不匹配（vllm 与 torch 版本对不上）。`hybrid-auto-engine` 的 VLM 部分依赖 `vllm-async-engine`，vllm 一坏整个 hybrid 即 fail。**在本地 CLI 用 hybrid 建库前，必须先把 vllm pin 到与 torch 2.5.1 匹配的版本重装（用 `uv add`，勿 `uv pip install`）。**
-
----
+vllm 编译时链接的 libtorch 与 PyTorch 2.5.1+cu121 ABI 不匹配，`hybrid-auto-engine` 的 VLM 部分依赖 `vllm-async-engine`，vllm 一坏整个 hybrid fail。**修复前走远程 API（默认）；修复方法：`uv add` pin vllm 到与 torch 2.5.1 匹配的版本，勿 `uv pip install`。**

@@ -2,7 +2,7 @@
 
 **默认走远程 MinerU API**（`172.19.2.2:8000`，热服务 + hybrid 现成可用）；
 加 --local 改用本地 MinerU CLI（shell out 到 mineru/magic-pdf）。两条路径产出布局
-完全一致，下游 02_extract_clauses.py 无差别消费。选型/环境差异见 DEV.md。
+完全一致，下游 02_parse_hierarchy.py 无差别消费。选型/环境差异见 DEV.md。
 
 无论哪种方式，输出都落在 data/parsed/<pdf-basename>/auto/：
     <basename>/
@@ -11,7 +11,7 @@
         <basename>_content_list.json  ← 结构化版本（标题/段落/表格/图片分块）
         images/                       ← 图片资源
 
-下一步（02_extract_clauses.py）基于 _content_list.json 把输出转成「条款树」。
+下一步（02_parse_hierarchy.py）基于 _content_list.json 跑三轴层级化解析。
 """
 
 from __future__ import annotations

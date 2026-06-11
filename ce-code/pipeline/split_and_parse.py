@@ -25,7 +25,7 @@
     --pdf data/raw/GB50016-2014_2018.pdf --only-chunk 3
 
 输出：data/parsed/<basename>/auto/（与 01_parse_pdf.py 输出格式完全一致，
-      可直接传给 02_extract_clauses.py）
+      可直接传给 02_parse_hierarchy.py）
 """
 
 from __future__ import annotations

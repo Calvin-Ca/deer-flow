@@ -55,7 +55,7 @@ MinerU 解析 + 条款树提取 + 质量审核，在 GB 50378-2006 和 GB 50016 
 
 ## Phase B：数据模型改造（🟡 进行中）
 
-> v2 schema 契约 + 构建层富化链 + 解析层按格式重写并加固，均已落地。待办：表格构建层封装、适用范围谓词、**重建索引**、新原语。这几块决定三个 agent（问答/算量/审图）的能力天花板。
+> v2 schema 契约 + 构建层富化链 + 解析层按格式重写加固，均已落地。待办按 PRD §3.1 **三轴解析模型**组织：结构轴（建树/profile）+ 粒度轴（chunk/small-to-big）+ 增强轴（表格/谓词）；三轴数据完整后重建索引、新增检索原语。这几块决定三个 agent（问答/算量/审图）的能力天花板。
 
 ### 地基 + 富化链（✅ 2026-06-05 ~ 06-08）
 
@@ -63,8 +63,7 @@ MinerU 解析 + 条款树提取 + 质量审核，在 GB 50378-2006 和 GB 50016 
 - [x] **引用边分型 + 双向**（波1，`extract/references.py`）：`strong`/`weak`/`exclude`/`cross_standard` + `referenced_by` 反向边
 - [x] **黑体强条标注**（波1，`extract/strength.py`）：拆 `modal_strength`(语气) / `is_mandatory_clause`(黑体)；官方强条清单优先 → MinerU 字重次之 → 否则保守 False
 - [x] **祖先链**（波3，`extract/ancestors.py`）：`ancestor_titles` 章/节标题链
-- [x] `extract/build.py` 编排器：v1 条款 → 跑富化链 → v2 + 兼容桥；**无官方清单时保守模式**（语气"应"并回 `is_mandatory`，保证重建索引前强条召回不回退）
-- [ ] **数据依赖（阻塞 `is_mandatory_clause` 真值，需服务器侧）**：① GB 50016 官方强制性条文清单 → `data/structured/gb50016_mandatory.json`；② dump `content_list.json` 确认 MinerU 字重字段名 → 改 `strength._BOLD_KEYS`
+- [x] `extract/build.py` 编排器：v1 条款 → 跑富化链 → v2 + 兼容桥；**无官方清单时保守模式**（语气"应"并回 `is_mandatory`，保证重建索引前召回率不回退）
 
 ### 解析层按 MinerU 格式重写 + 加固（✅ 2026-06-08）
 
@@ -78,16 +77,32 @@ MinerU 解析 + 条款树提取 + 质量审核，在 GB 50378-2006 和 GB 50016 
 - [x] `mineru_api.py` 修输出目录误定位（从本次 ZIP namelist 取，不 rglob 历史产物）；`01` 打印解析耗时
 - [x] **实测 GB/T 50500-2024**：561 条款、零重复、35 表全部归具体子条款（附录根 0 表）、1.0.x 齐
 
-### 待办（波2 构建层 + 其余）
+### 待办 — 按三轴组织
 
-- [ ] **表格可查询封装**（波2，`extract/tables.py`）：把 `tables[].body` 升级为「给定行列取值」的 `schema.TableRepr`（分表头、继承所属条款 `is_mandatory_clause`）
-- [ ] **适用范围谓词抽取**（波3，`extract/scope.py`）：散文条件 → 结构化谓词；抽不准标 `scope_status: unknown`（build.py 现统一填 unknown 进保守召回）
-- [ ] **条款级版本/效力**：build.py 现按规范统一填 `status`/`version`/`effective_date`；局部修订到条款粒度待细化
-- [ ] **重建索引**：`02 → build → 04` 用 v2 数据重建（依赖官方强条清单到位以完善 `is_mandatory_clause`）；`07_eval` 验证召回率不回退
-- [ ] 新增检索原语 `/filter`（适用范围过滤）、`/rerank`（依赖谓词数据）
-- [ ] 评测集增加"适用性误判率"指标
+**① 结构轴**（阶段 1，`02_extract_clauses.py`）：按文档原生目录建树，当前基本可用，待完善：
 
-**多规范扩展**：GB 50116 待收录（当前 `火灾自动报警系统` 维度在 GB 50016 无对应强条）。
+- [ ] `parse_profile` 配置实际生效：`terminal_stage`（structure|granularity|enrich|index）控制终止阶段；产物路径按 `data/structured/{standard}/{profile}/` 隔离，`04` 索引路径同步隔离
+- [ ] `node_type` 枚举覆盖完整（chapter/section/clause/paragraph/table/formula/figure/appendix）；当前部分类型填充不全
+
+**② 粒度轴**（阶段 2，`02_extract_clauses.py`）：切最细自然单元，当前与结构轴合并，待拆分配置：
+
+- [ ] `chunk_granularity` 可配（node | paragraph | natural）与结构树解耦，`parse_profile.chunk_granularity` 实际控制切分粒度
+- [ ] `small_to_big` 联动：向量化时拼入 `ancestor_titles` + 所属上级全文；检索返回时回补完整条/节上下文（`retrieval/engine.py` 侧）
+
+**③ 增强轴**（阶段 3，`extract/build.py` 编排）：可选覆盖层，按规范类型条件挂载，仍有三块未完：
+
+- [ ] **数据依赖（阻塞 `is_mandatory_clause` 真值，需服务器侧）**：① GB 50016 官方强条清单 → `data/structured/gb50016_mandatory.json`；② dump `content_list.json` 确认 MinerU 字重字段名 → 改 `strength._BOLD_KEYS`
+- [ ] **表格可查询封装**（`extract/tables.py`）：`tables[].body` → `schema.TableRepr`（分表头 + 「给定行列取值」接口，继承所属条款 `is_mandatory_clause`）
+- [ ] **适用范围谓词抽取**（`extract/scope.py`）：散文条件 → 结构化谓词；抽不准标 `scope_status: unknown`（当前 build.py 统一填 unknown 进保守召回）
+- [ ] **条款级版本/效力**：当前按规范统一填 `status`/`version`/`effective_date`；局部修订细化到条款粒度待实现
+
+**索引重建 + 检索原语**（依赖三轴数据完整）：
+
+- [ ] **重建索引**：`02 → build → 04` 用 v2 数据重建（依赖增强轴数据依赖解除）；`07_eval` 验证召回率不回退
+- [ ] 新增 `/filter`（适用范围过滤，依赖 `scope.py` 谓词数据）、`/rerank`（同上）
+- [ ] 评测集增加"适用性误判率"指标（依赖 `scope.py` 谓词）
+
+**多规范扩展**：GB 50116（火灾自动报警系统）待收录，GB 50016 未覆盖该专项规范条款。
 
 ---
 
@@ -114,8 +129,8 @@ MinerU 解析 + 条款树提取 + 质量审核，在 GB 50378-2006 和 GB 50016 
 ### 向量库 + 检索原语
 
 - [ ] 造价 `bill_spec_kb` collection（BGE-M3 dense+sparse 混检），供清单匹配候选生成
-- [ ] 新增 `/bill/match`（构件→清单候选：混合召回 + KG 约束 + LLM 决策）
-- [ ] 新增 `/price/compose`（清单项+region→工料机含量+价格：KG + 价格库）
+- [ ] 新增 `/price/compose`（清单项+region→工料机含量+价格：KG + 价格库；**先跑通取数路径**）
+- [ ] 新增 `/bill/match`（构件→清单候选：BGE-M3 混合召回 + KG 约束 + LLM 决策；依赖上一步 KG 跑通）
 - [ ] 新增 `/quota/{region}/{code}`（定额子目直取）
 
 ### 造价评测集

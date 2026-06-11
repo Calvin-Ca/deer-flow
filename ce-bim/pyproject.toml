@@ -1,0 +1,23 @@
+[project]
+name = "ce-bim"
+version = "0.1.0"
+description = "BIM 底座层 —— 项目 BIM 模型单一 owner + BIM 原语服务（IfcOpenShell 解析 + IFC 原件存储，:8102）"
+requires-python = ">=3.12,<3.13"
+# BIM 底座自身不依赖知识服务(:8100)/任务服务(:8101)，不碰关系库/向量库/LLM。
+# 只需：fastapi/uvicorn 起服务，ifcopenshell 解析 IFC（CPU），minio 存原件/索引。
+dependencies = [
+    "fastapi>=0.110",
+    "uvicorn>=0.29",
+    "pydantic>=2.7",
+    "python-multipart>=0.0.9",  # FastAPI 文件上传（/model/ingest）
+    "ifcopenshell>=0.8",        # IFC 解析 / 几何量 / 属性 / 空间结构（无需 GPU）
+    "minio>=7.2",               # IFC 原件 + 解析索引对象存储（未配置时回退本地 FS）
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.6",
+]
+
+[tool.uv]
+package = false

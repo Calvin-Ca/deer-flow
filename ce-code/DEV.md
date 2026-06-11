@@ -26,8 +26,8 @@
 | 阶段 | 脚本/模块 | 产物路径 |
 |---|---|---|
 | 0 MinerU 解析 | `pipeline/01_parse_pdf.py` + `pipeline/mineru_api.py` | `data/parsed/{standard}/` |
-| 1+2 结构/粒度轴 | `pipeline/02_extract_clauses.py` | `data/structured/{std}/{profile}/clauses.json` |
-| 3 增强轴 | `extract/build.py`（编排富化链） | 同上（附 `references`/`ancestor_titles`/`is_mandatory_clause` 等增强字段） |
+| 1+2 结构/粒度轴 | `pipeline/02_parse_hierarchy.py` | `data/structured/{std}/{profile}/clauses.json` |
+| 3 语义轴 | `extract/build.py`（编排富化链） | 同上（附 `references`/`ancestor_titles`/`is_mandatory_clause` 等增强字段） |
 | 4 索引 | `pipeline/04_build_index.py` | `data/vector_store/{std}/{profile}/` |
 | 质量审核 | `pipeline/03_review_quality.py` | 人工检查，不阻塞流水线 |
 

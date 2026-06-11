@@ -55,7 +55,7 @@ MinerU 解析 + 条款树提取 + 质量审核，在 GB 50378-2006 和 GB 50016 
 
 ## Phase B：数据模型改造（🟡 进行中）
 
-> v2 schema 契约 + 构建层富化链 + 解析层按格式重写加固，均已落地。待办按 PRD §3.1 **三轴解析模型**组织：结构轴（建树/profile）+ 粒度轴（chunk/small-to-big）+ 增强轴（表格/谓词）；三轴数据完整后重建索引、新增检索原语。这几块决定三个 agent（问答/算量/审图）的能力天花板。
+> v2 schema 契约 + 构建层富化链 + 解析层按格式重写加固，均已落地。待办按 PRD §3.1 **三轴解析模型**组织：结构轴（建树/profile）+ 粒度轴（chunk/small-to-big）+ 语义轴（表格/谓词）；三轴数据完整后重建索引、新增检索原语。这几块决定三个 agent（问答/算量/审图）的能力天花板。
 
 ### 地基 + 富化链（✅ 2026-06-05 ~ 06-08）
 
@@ -67,7 +67,7 @@ MinerU 解析 + 条款树提取 + 质量审核，在 GB 50378-2006 和 GB 50016 
 
 ### 解析层按 MinerU 格式重写 + 加固（✅ 2026-06-08）
 
-> `02_extract_clauses.py` 拆 `read_v1`/`read_v2` 两个 reader，格式差异锁死在 reader 内；表格 HTML 解析作共享工具。
+> `02_parse_hierarchy.py`（原 `02_extract_clauses.py`，重命名为层级化解析流水线）拆 `read_v1`/`read_v2` 两个 reader，格式差异锁死在 reader 内；表格 HTML 解析作共享工具。
 
 - [x] `detect_format` + `read_v1`/`read_v2`：吐统一规范化元素 schema，`parse_elements` 对 v1/v2 无感
 - [x] **表格结构化（解析层）**：v1 `table_body` / v2 `content.html` 同为 HTML 串 → `_HTMLTableParser` + `_expand_spans` 解析成**矩形**二维表（展开 colspan/rowspan 防串列），落 `tables[].body`
@@ -79,26 +79,30 @@ MinerU 解析 + 条款树提取 + 质量审核，在 GB 50378-2006 和 GB 50016 
 
 ### 待办 — 按三轴组织
 
-**① 结构轴**（阶段 1，`02_extract_clauses.py`）：按文档原生目录建树，当前基本可用，待完善：
+> 三轴是顺序流水线（见 PRD §3.2）：① 结构轴 → ② 粒度轴 → ③ 语义轴 → 索引重建。下游阶段构建在上游产物之上，**不得跳跃**；`terminal_stage` 控制在哪层停止以便对比实验。
 
-- [ ] `parse_profile` 配置实际生效：`terminal_stage`（structure|granularity|enrich|index）控制终止阶段；产物路径按 `data/structured/{standard}/{profile}/` 隔离，`04` 索引路径同步隔离
-- [ ] `node_type` 枚举覆盖完整（chapter/section/clause/paragraph/table/formula/figure/appendix）；当前部分类型填充不全
+**① 结构轴**（阶段 1，`02_parse_hierarchy.py`）：按文档原生目录建树，当前基本可用，待完善：
 
-**② 粒度轴**（阶段 2，`02_extract_clauses.py`）：切最细自然单元，当前与结构轴合并，待拆分配置：
+- [x] `ParseProfile` dataclass + `terminal_stage`（structure|granularity|enrich|index）控制终止阶段；产物路径按 `data/structured/{standard}/{profile}/` 隔离
+- [x] `node_type` 推断（`_infer_node_type`）：chapter / section / clause / appendix 已覆盖；`HierarchyBuilder` 重命名（原 `ClauseTreeBuilder`）
+- [ ] `04_build_index.py` 索引路径同步改为 `data/vector_store/{standard}/{profile}/`（依赖本步，下一个）
+- [ ] `node_type` 覆盖完整：paragraph / table / formula / figure（需语义轴表格封装后才能单独成节点）
+
+**② 粒度轴**（阶段 2，`02_parse_hierarchy.py`；依赖①完成）：切最细自然单元，当前与结构轴合并，待拆分配置：
 
 - [ ] `chunk_granularity` 可配（node | paragraph | natural）与结构树解耦，`parse_profile.chunk_granularity` 实际控制切分粒度
-- [ ] `small_to_big` 联动：向量化时拼入 `ancestor_titles` + 所属上级全文；检索返回时回补完整条/节上下文（`retrieval/engine.py` 侧）
+- [ ] `small_to_big` 联动（**P1**）：向量化时拼入 `ancestor_titles` + 所属上级全文；检索返回时回补完整条/节上下文（`retrieval/engine.py` 侧）
 
-**③ 增强轴**（阶段 3，`extract/build.py` 编排）：可选覆盖层，按规范类型条件挂载，仍有三块未完：
+**③ 语义轴**（阶段 3，`extract/build.py` 编排；依赖②完成）：可选覆盖层，按规范类型条件挂载，仍有三块未完：
 
 - [ ] **数据依赖（阻塞 `is_mandatory_clause` 真值，需服务器侧）**：① GB 50016 官方强条清单 → `data/structured/gb50016_mandatory.json`；② dump `content_list.json` 确认 MinerU 字重字段名 → 改 `strength._BOLD_KEYS`
-- [ ] **表格可查询封装**（`extract/tables.py`）：`tables[].body` → `schema.TableRepr`（分表头 + 「给定行列取值」接口，继承所属条款 `is_mandatory_clause`）
-- [ ] **适用范围谓词抽取**（`extract/scope.py`）：散文条件 → 结构化谓词；抽不准标 `scope_status: unknown`（当前 build.py 统一填 unknown 进保守召回）
-- [ ] **条款级版本/效力**：当前按规范统一填 `status`/`version`/`effective_date`；局部修订细化到条款粒度待实现
+- [ ] **表格可查询封装**（`extract/tables.py`，**P0**）：`tables[].body` → `schema.TableRepr`（分表头 + 「给定行列取值」接口，继承所属条款 `is_mandatory_clause`）
+- [ ] **适用范围谓词抽取**（`extract/scope.py`，**P1**）：散文条件 → 结构化谓词；抽不准标 `scope_status: unknown`（当前 build.py 统一填 unknown 进保守召回）
+- [ ] **条款级版本/效力**（**P2**）：当前按规范统一填 `status`/`version`/`effective_date`；局部修订细化到条款粒度待实现
 
 **索引重建 + 检索原语**（依赖三轴数据完整）：
 
-- [ ] **重建索引**：`02 → build → 04` 用 v2 数据重建（依赖增强轴数据依赖解除）；`07_eval` 验证召回率不回退
+- [ ] **重建索引**：`02 → build → 04` 用 v2 数据重建（依赖语义轴数据依赖解除）；`07_eval` 验证召回率不回退
 - [ ] 新增 `/filter`（适用范围过滤，依赖 `scope.py` 谓词数据）、`/rerank`（同上）
 - [ ] 评测集增加"适用性误判率"指标（依赖 `scope.py` 谓词）
 

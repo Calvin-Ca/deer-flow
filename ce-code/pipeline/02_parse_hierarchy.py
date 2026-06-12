@@ -3,9 +3,11 @@
 PRD §3.2 新模型（节点树 + 多表征 + 粒度视图）：
   格式适配  FormatAdapter — 纯格式转换（page 归一、HTML 表格解析、is_heading 标记、
             block_idx 溯源），无结构语义
-  标注     StructuralAxis — 以 MinerU text_level 为主信号，给每个块追加所属目录信息
-  建树     GranularityAxis — 把标注块还原成**保留 parent/child 的节点树**（不再压平），
-            并把「固有事实」（引用图分型 + 祖先链）在此一次算定，落 nodes.json 作单一真值
+  标注     StructuralAxis — 目录打标器：只给每块打**可靠**的目录标签（is_heading /
+            text_level / is_toc + standard_id / 溯源），不解析条文号、不建树
+  建树     GranularityAxis — 把标注块还原成**保留 parent/child 的节点树**（不再压平）；
+            **条文号识别 + node_type + parent/child + 祖先链 + 引用图分型**作「固有事实」
+            在此一次算定，落 nodes.json 作单一真值
 
 设计转向（2026-06-12）：废弃「强条 / 法律强制」机制。引用图（references.py）与祖先链
 在本结构层一次算定（PRD §3.1「固有事实」）；语气/条件/表格等「语义投影」归表征层
@@ -261,33 +263,35 @@ class ParseProfile:
 
 
 # ---------------------------------------------------------------------------
-# 正则模式（结构轴）
+# 条文号正则（建树层用：GranularityAxis 从标题文字识别条款号）
 # ---------------------------------------------------------------------------
 
 CLAUSE_NUM_RE = re.compile(r"^(\d+(?:\.\d+){0,3})\s*[　 一-鿿]")
 APPENDIX_RE = re.compile(r"^附录\s*([A-Z])\b")
 APPENDIX_CLAUSE_RE = re.compile(r"^([A-Z]\.\d+(?:\.\d+){0,2})\s*[一-鿿]")
-_TOC_TAIL_RE = re.compile(r"[（(]\s*\d+\s*[）)]\s*$")
+_TOC_TAIL_RE = re.compile(r"[（(]\s*\d+\s*[）)]\s*$")  # 结构轴 is_toc 判定用
 
 # ---------------------------------------------------------------------------
-# node_type 推断（结构轴核心分类，对应 PRD §3.1 节点元数据 schema）
+# node_type 推断（建树层：由条款路径号段数定章/节/条，对应 PRD §3.1 节点 schema）
 # ---------------------------------------------------------------------------
 
 _APPENDIX_ROOT_RE = re.compile(r"^附录\s*[A-Z]$")
 
 
-def _infer_node_type(path: str, level: int) -> str:
-    """根据条款路径和层级推断 node_type。
+def _infer_node_type(path: str) -> str:
+    """由条款路径推断 node_type（层级 = 号段数，自包含，不依赖标题栈）。
 
     参数：
         path (str): 条款号，如 "1" / "5.3.4" / "附录E" / "E.1.1"。
-        level (int): 层级（小数点段数，附录按字母前缀计）。
     返回：
         str: node_type 枚举值 — chapter / section / clause / appendix。
-            paragraph / table / formula / figure 由各自挂载点在 _attach 内按元素类型赋值。
+            层级按小数点号段数：1 段→chapter、2 段→section、≥3 段→clause；
+            "附录X" 整根为 appendix。paragraph / table / figure / formula 由建树层
+            按元素类型在挂载点赋值。
     """
     if _APPENDIX_ROOT_RE.match(path):
         return "appendix"
+    level = path.count(".") + 1
     if level == 1:
         return "chapter"
     if level == 2:
@@ -304,7 +308,7 @@ def _is_toc_list(items: list[str], thresh: float = 0.5) -> bool:
     """目录页列表判定：过半条目以「(页码)」结尾则整列为文档开头的目录页。
 
     功能：识别 MinerU 解析出的「目录页」整列（与正文标题重复）。**不再据此丢弃**
-        （对 MinerU 结果不做减法），调用方据此给整列条目打 is_toc 标签保留。
+        （对 MinerU 结果不做减法），调用方据此给整列条目标 node_type="toc" 保留。
 
     参数：
         items (list[str]): list 元素的 list_items。
@@ -318,18 +322,18 @@ def _is_toc_list(items: list[str], thresh: float = 0.5) -> bool:
     return hits >= max(1, len(items)) * thresh
 
 
-def classify_heading(text: str, depth: int) -> dict | None:
-    """从一行标题文字识别条款号 / 类型 / 置信度 —— **无状态纯函数**（解耦自标题栈）。
+def classify_heading(text: str) -> dict | None:
+    """从一行标题文字识别条款号 / 类型 / 置信度 —— **无状态纯函数**（建树层调用）。
 
-    功能：把「这行标题对应哪个条款号、是什么 node_type、路径来源置信几何」这件
-        纯文本判定，从有状态的标题栈维护中解耦出来，便于单测与复用。不读栈、不改栈。
+    功能：把「这行标题对应哪个条款号、是什么 node_type、路径来源置信几何」这件纯文本
+        判定独立出来，便于单测与复用。node_type 由条款路径号段数自推（_infer_node_type），
+        不依赖标题栈/外部层级。
 
     参数：
         text (str): 标题块文字（调用方已判定 is_heading=True）。
-        depth (int): 该标题的预期目录层级（= len(stack)+1），仅用于 node_type 推断。
     返回：
         dict | None: ``{clause_path, node_type, path_source, path_confidence}``。
-            返回 None 表示该行实为交叉引用片段（如「5.3节…」），应按内容块处理、不入栈。
+            返回 None 表示该行实为交叉引用片段（如「5.3节…」），应按内容块处理。
             ``path_source``：number（命中编号正则，置信 1.0）/ text_level（无编号、
             靠 MinerU 标题标记 + 标题文字兜底作路径，置信 0.6）。
     """
@@ -343,7 +347,7 @@ def classify_heading(text: str, depth: int) -> dict | None:
     appc_m = APPENDIX_CLAUSE_RE.match(text)
     if appc_m:
         path = appc_m.group(1)
-        return {"clause_path": path, "node_type": _infer_node_type(path, depth),
+        return {"clause_path": path, "node_type": _infer_node_type(path),
                 "path_source": "number", "path_confidence": 1.0}
 
     # 本规范条号（5 / 5.3 / 5.3.4）
@@ -353,32 +357,35 @@ def classify_heading(text: str, depth: int) -> dict | None:
         # "节条款项"后缀说明这是交叉引用片段，非真实条号
         if text[len(num):len(num) + 1] in "节条款项":
             return None
-        return {"clause_path": num, "node_type": _infer_node_type(num, depth),
+        return {"clause_path": num, "node_type": _infer_node_type(num),
                 "path_source": "number", "path_confidence": 1.0}
 
     # 无编号标题（"前言"、"术语和定义" 等）：用标题文字作路径
     path = text[:30].strip()
-    return {"clause_path": path, "node_type": _infer_node_type(path, depth),
+    return {"clause_path": path, "node_type": _infer_node_type(path),
             "path_source": "text_level", "path_confidence": 0.6}
 
 
 class StructuralAxis:
-    """结构轴 = **目录打标器**：给每个解析块准确打上所属目录层级标签。
+    """结构轴 = **目录打标器**：依据文档目录，只给每个块打「它在目录里的位置」这一类
+    **可靠**标签——不做条文号解析 / 语义分类 / 建树（那些不是这一层能做好的）。
 
     功能：
-        遍历 FormatAdapter 产出的元素，维护标题栈（text_level 仅作进出栈信号），
-        给**每个块**追加 standard_id / clause_path / level / ancestor_titles /
-        node_type / path_source / path_confidence。条款号识别已解耦为无状态纯函数
-        classify_heading；list 条目在此展开。
-        **对 MinerU 结果不做减法**：不丢任何块；文档开头「目录页」那些与正文标题重复
-        的块只打 is_toc=True 标记保留（建树阶段据此不并入正文，避免污染 content）。
-        不做内容聚合——聚合/建树是 GranularityAxis 的职责。
+        遍历 FormatAdapter 元素，逐块追加：
+          standard_id  规范标识（盖章）
+          is_heading   MinerU 是否判其为标题（= text_level 字段存在，原样透传）
+          text_level   MinerU 给的目录深度（仅标题块有，原样透传，**不二次推断**）
+          is_toc       是否为文档开头「目录页」块（页码尾启发式）
+        **去除**（2026-06-12 决定）：clause_path / node_type / level / ancestor_titles /
+        path_source / path_confidence 与标题栈——这些是建树/语义层的事，不属于「打目录
+        标签」这一层，强行在此打不可能精准。
+        **对 MinerU 结果不做减法**：不丢任何块（list 条目展开后逐条打标）；目录页块只
+        标 is_toc=True 保留（建树阶段据此不并入正文）。
 
     参数：
-        standard_id (str): 规范唯一标识，写入每条输出的 standard_id 字段。
+        standard_id (str): 规范唯一标识，逐块盖章。
     返回：
-        调用 annotate(elements) 返回 list[dict]，每个块含目录上下文字段（疑似目录页
-        块另带 is_toc=True）。
+        调用 annotate(elements) 返回 list[dict]，每块带目录标签（不建树、不丢块）。
     """
 
     def __init__(self, standard_id: str) -> None:
@@ -392,109 +399,47 @@ class StructuralAxis:
         self.standard_id = standard_id
 
     def annotate(self, elements: list[dict]) -> list[dict]:
-        """遍历 FormatAdapter 元素，追加目录信息。
+        """逐块打目录标签：is_heading + text_level + is_toc（+ standard_id / 溯源透传）。
 
         参数：
             elements (list[dict]): FormatAdapter.adapt() 产出的统一元素列表。
         返回：
-            list[dict]: 每个块追加了 standard_id / clause_path / level /
-                        ancestor_titles / node_type / path_source 的扁平列表（疑似
-                        目录页块另带 is_toc=True）。**不丢任何块。**
+            list[dict]: 每块带目录标签的扁平列表（不建树、不丢块）。
         """
-        stack: list[dict] = []  # [{"raw_level", "clause_path", "title"}, ...]
         result: list[dict] = []
-
         for elem in elements:
             if elem["type"] == "list":
                 items = elem.get("list_items", [])
                 is_toc = _is_toc_list(items)  # 整列目录页 → 每条都标 is_toc（不丢）
                 for sub in items:
-                    result.append(self._annotate_one({**elem, "text": sub}, stack, is_toc=is_toc))
+                    result.append(self._tag({**elem, "text": sub}, is_toc=is_toc))
                 continue
-
-            result.append(self._annotate_one(elem, stack))
-
+            result.append(self._tag(elem))
         return result
 
-    def _annotate_one(self, elem: dict, stack: list[dict], *, is_toc: bool = False) -> dict:
-        """给单个元素打目录标签，就地更新 stack（不丢块）。
+    def _tag(self, elem: dict, *, is_toc: bool = False) -> dict:
+        """给单块打目录标签（无标题栈、无层级坐标）。
 
         参数：
-            elem (dict): 单个元素 {type, text, page, is_heading, ...}。
-            stack (list[dict]): 当前标题栈（就地修改）。
+            elem (dict): 单个元素 {type, text, page, is_heading, raw, block_idx, ...}。
             is_toc (bool): 调用方预判为目录页块（整列目录）。
         返回：
-            dict: 打了目录标签的元素；疑似目录页块带 is_toc=True。
+            dict: 原块 + standard_id + is_heading + text_level（标题块才有）+ is_toc。
         """
         text = elem.get("text", "")
-
-        # 疑似目录页短行（行尾带页码、与正文标题重复）：不删，标 is_toc 保留
+        # 疑似目录页短行（行尾带页码、与正文标题重复）：也判为目录
         if not is_toc and elem["type"] in ("text", "list") and len(text) < 60 and _TOC_TAIL_RE.search(text):
             is_toc = True
-
-        # 目录页块强制按内容处理（不入标题栈，避免目录文字污染后续块的目录坐标）
-        if elem.get("is_heading") and not is_toc:
-            node = self._process_heading(elem, stack)
-        else:
-            node = self._annotate_content(elem, stack)
-
-        if is_toc:
-            node["is_toc"] = True
-        return node
-
-    def _process_heading(self, elem: dict, stack: list[dict]) -> dict:
-        """处理标题元素：更新标题栈，调 classify_heading 提条款路径，打层级标签。
-
-        参数：
-            elem (dict): is_heading=True 的元素。
-            stack (list[dict]): 当前标题栈（就地修改）。
-        返回：
-            dict: 打了目录字段的标题元素（条款号识别交叉引用片段时按内容块处理）。
-        """
-        raw_level = elem["raw"].get("text_level", 1)
-        while stack and stack[-1]["raw_level"] >= raw_level:
-            stack.pop()
-
-        info = classify_heading(elem["text"], len(stack) + 1)
-        if info is None:
-            # 交叉引用片段（"5.3节…"），非真实条号 → 按内容块处理、不入栈
-            return self._annotate_content(elem, stack)
-
-        stack.append({"raw_level": raw_level, "clause_path": info["clause_path"], "title": elem["text"]})
-
         return {
             **elem,
             "standard_id": self.standard_id,
-            "clause_path": info["clause_path"],
-            "level": len(stack),
-            "ancestor_titles": [h["title"] for h in stack[:-1]],
-            "node_type": info["node_type"],
-            "path_source": info["path_source"],
-            "path_confidence": info["path_confidence"],
-        }
-
-    def _annotate_content(self, elem: dict, stack: list[dict]) -> dict:
-        """非标题元素：追加当前标题栈上下文。
-
-        参数：
-            elem (dict): 非标题元素。
-            stack (list[dict]): 当前标题栈。
-        返回：
-            dict: 追加了目录字段的元素。
-        """
-        base = {**elem, "standard_id": self.standard_id, "node_type": None}
-        if not stack:
-            return base
-        current = stack[-1]
-        return {
-            **base,
-            "clause_path": current["clause_path"],
-            "level": len(stack),
-            "ancestor_titles": [h["title"] for h in stack],
+            "is_heading": elem.get("is_heading", False),
+            "text_level": elem["raw"].get("text_level") if elem.get("is_heading") else None,
+            "is_toc": is_toc,
         }
 
     def print_stats(self, annotated: list[dict]) -> None:
-        """打印结构轴标注统计报告。
+        """打印结构轴标注统计报告（标题 / 目录 / 内容三类计数）。
 
         参数：
             annotated (list[dict]): annotate() 产出的标注列表。
@@ -502,20 +447,16 @@ class StructuralAxis:
             无（打印到终端）。
         """
         total = len(annotated)
-        headings = sum(1 for e in annotated if e.get("node_type"))
-        by_type: dict[str, int] = {}
-        for e in annotated:
-            nt = e.get("node_type") or "content"
-            by_type[nt] = by_type.get(nt, 0) + 1
+        headings = sum(1 for e in annotated if e.get("is_heading"))
+        tocs = sum(1 for e in annotated if e.get("is_toc"))
 
-        t = Table(title="结构轴标注统计（阶段 1）")
+        t = Table(title="结构轴标注统计（目录打标）")
         t.add_column("指标")
         t.add_column("数量", justify="right")
         t.add_row("总块数", str(total))
-        t.add_row("  标题块", str(headings))
-        t.add_row("  内容块", str(total - headings))
-        for nt in sorted(by_type):
-            t.add_row(f"    {nt}", str(by_type[nt]))
+        t.add_row("  标题块(is_heading)", str(headings))
+        t.add_row("  目录块(is_toc)", str(tocs))
+        t.add_row("  内容块", str(max(0, total - headings - tocs)))
         console.print(t)
 
 
@@ -638,14 +579,18 @@ class GranularityAxis:
         """标注块按标题分组，聚合成 schema.Node 节点（未连边）。
 
         功能：
-            遇到 node_type 为 chapter/section/clause/appendix 的块开新节点，
-            后续内容块追加进当前节点正文；表格 / 图示暂存节点 tables / images 字段
+            **条文号识别在此一次算定**（下沉自结构轴）：对结构轴标 is_heading 的块跑
+            classify_heading 提 clause_path / node_type / path_source / path_confidence，
+            命中即开新节点；返回 None（交叉引用片段如「5.3节…」）则按内容块处理。
+            非标题块追加进当前节点正文；表格 / 图示暂存节点 tables / images 字段
             （过渡，T8 转子节点）；逐块累积 block_idx / page 进 provenance。
-            is_toc 目录页块不并入正文（structure.json 已全量保留，不算减法）。
-            空节点（无正文且无表格）丢弃。level 由 clause_path 号段数推导（new_node）。
+            is_toc=True 的目录块不开节点、不并入正文（structure.json 已全量保留，不算减法）。
+            首个标题之前的内容块（无归属）丢弃；空节点（无正文且无表格）丢弃。
+            level 由 clause_path 号段数推导（new_node）。
 
         参数：
-            annotated (list[dict]): StructuralAxis.annotate() 产出的标注列表。
+            annotated (list[dict]): StructuralAxis.annotate() 产出的标注列表
+                （每块带 is_heading / is_toc / text_level / standard_id 等目录标签）。
             source_file (str): provenance.source_file。
             version / effective_date / status (str): 规范级元数据。
         返回：
@@ -662,20 +607,23 @@ class GranularityAxis:
                 nodes.append(cur)
 
         for elem in annotated:
-            nt = elem.get("node_type")
-            if nt in ("chapter", "section", "clause", "appendix"):
+            if elem.get("is_toc"):
+                continue  # 目录块不开节点、不并入正文（structure.json 已全量保留 + 溯源）
+
+            info = classify_heading(elem.get("text", "")) if elem.get("is_heading") else None
+            if info is not None:
                 _flush()
                 cur = schema.new_node(
                     elem.get("standard_id", ""),
-                    elem["clause_path"],
-                    nt,
+                    info["clause_path"],
+                    info["node_type"],
                     title=elem["text"],
                     page=elem["page"],
                     version=version,
                     effective_date=effective_date,
                     status=status,
-                    path_source=elem.get("path_source", ""),
-                    path_confidence=elem.get("path_confidence", 1.0),
+                    path_source=info["path_source"],
+                    path_confidence=info["path_confidence"],
                     provenance={
                         "source_file": source_file,
                         "block_idx": [elem["block_idx"]] if "block_idx" in elem else [],
@@ -685,29 +633,31 @@ class GranularityAxis:
                 # 过渡字段：表格 / 图示暂挂节点上，T8 转表征层子节点 + table_struct
                 cur["tables"] = []
                 cur["images"] = []
-            elif cur is not None:
-                if elem.get("is_toc"):
-                    continue  # 目录页块不并入正文（structure.json 已全量保留 + 溯源）
-                t = elem.get("type")
-                if "block_idx" in elem:
-                    cur["provenance"]["block_idx"].append(elem["block_idx"])
-                cur["provenance"]["page"].append(elem["page"])
-                if t == "table":
-                    cur["tables"].append({
-                        "caption": elem.get("text", ""),
-                        "body": elem.get("body", []),
-                        "page": elem["page"],
-                    })
-                elif t == "image":
-                    cur["images"].append({
-                        "path": elem.get("img_path", ""),
-                        "caption": elem.get("text", ""),
-                        "page": elem["page"],
-                    })
-                else:
-                    text = elem.get("text", "")
-                    if text:
-                        cur["content"] = (cur["content"] + "\n" + text).lstrip("\n")
+                continue
+
+            if cur is None:
+                continue  # 首个标题之前的内容块，无归属节点 → 丢弃
+
+            t = elem.get("type")
+            if "block_idx" in elem:
+                cur["provenance"]["block_idx"].append(elem["block_idx"])
+            cur["provenance"]["page"].append(elem["page"])
+            if t == "table":
+                cur["tables"].append({
+                    "caption": elem.get("text", ""),
+                    "body": elem.get("body", []),
+                    "page": elem["page"],
+                })
+            elif t == "image":
+                cur["images"].append({
+                    "path": elem.get("img_path", ""),
+                    "caption": elem.get("text", ""),
+                    "page": elem["page"],
+                })
+            else:
+                text = elem.get("text", "")
+                if text:
+                    cur["content"] = (cur["content"] + "\n" + text).lstrip("\n")
 
         _flush()
         return nodes

@@ -13,22 +13,33 @@
 更深块自然归属其所在节的条目——这正是「属于目录里哪一条」。无目录页时退化为以
 MinerU 标题块自身标题作边界（best-effort）。
 
-设计约束（承 2026-06-12 职责重划）：本层只产「目录归属」这一可靠标签，**不**解析
-条文号 / node_type / 层级 / 建树——那些是建树层 GranularityAxis 由 clause_path 号段
-数算定的「固有事实」。**对 MinerU 结果不做减法**：目录页块只标 ``catalog="目录"``
-保留（建树阶段据此不并入正文），目录判定采**区域**判据（连续成行 / 整列），不据
-单行启发式丢正文块。
+每块再带一个 `catalog_source` 审计字段，记录该 `catalog` 由方案 5 哪条子机制得来
+（让混合方法在结果里可见、可统计），取值：
+
+  - ``toc_page``         块本身是目录页（区域判据命中）       —— 方案2·目录识别
+  - ``toc_match``        正文块命中目录条目、确认为标题边界   —— 方案2锚定 + 方案1对齐
+  - ``inherited``        继承最近命中条目（条归节 / 成员块）  —— 归属传播
+  - ``heading_fallback`` 无目录，按 is_heading 自身标题定边界 —— 方案1·退化路径
+  - ``none``             目录前 / 未命中（catalog=None）
+
+设计约束（承 2026-06-12 职责重划）：本层只产「目录归属」这一可靠标签（catalog +
+catalog_source 审计），**不**解析条文号 / node_type / 层级 / 建树——那些是建树层
+GranularityAxis 由 clause_path 号段数算定的「固有事实」。**对 MinerU 结果不做减法**：
+目录页块只标 ``catalog="目录"`` 保留（建树阶段据此不并入正文），目录判定采**区域**
+判据（连续成行 / 整列），不据单行启发式丢正文块。
 
 从 02_parse_hierarchy.py 单独分出（保持「打目录标签」与「建节点树」两关注点解耦、
 可独立单测）。本模块纯 stdlib + rich，无项目内跨层依赖。
 
 输入：FormatAdapter.adapt() 产出的统一元素列表。
-输出：每块带 standard_id + catalog 的扁平列表（不建树、不丢块）。
+输出：每块带 standard_id + catalog + catalog_source 的扁平列表（不建树、不丢块）。
+      is_heading 由 FormatAdapter 透传、与输入一致（本层只读用于匹配，不重打、不删）。
 """
 
 from __future__ import annotations
 
 import re
+from collections import Counter
 
 from rich.console import Console
 from rich.table import Table
@@ -112,7 +123,8 @@ class StructuralAxis:
         ③ 解析目录条目表（有序，骨架真值）；
         ④ 目录定位：正文按文档序顺序扫描，归一化匹配目录条目切换「当前条目」，
            每块 catalog = 最近命中条目标题（条等深层块归属其节的条目）；无目录页时
-           退化为以 is_heading 块自身标题作边界。
+           退化为以 is_heading 块自身标题作边界。每块同时记 catalog_source 审计该
+           catalog 由哪条子机制得来（toc_page/toc_match/inherited/heading_fallback/none）。
         is_heading（MinerU 标题标志）由 FormatAdapter 已标，随 **elem 透传，本层不重打、
         不解析条文号/层级（那是建树层的事）。
 
@@ -232,17 +244,19 @@ class StructuralAxis:
 
     @staticmethod
     def _locate(blocks: list[dict], entries: list[dict]) -> None:
-        """目录定位：给每个非目录块写 catalog = 所属目录条目标题（方案 5 顺序扫描）。
+        """目录定位：给每块写 catalog（所属条目标题）+ catalog_source（来源审计，方案 5）。
 
         功能：
+            目录页块——catalog 已为 "目录"，catalog_source = toc_page。
             有目录条目时——维护单调前瞻指针，正文块归一化文本命中 entries[ptr:ptr+W]
-            中某条（精确相等，或 is_heading 块前缀相等）即切换「当前条目」、指针前移；
-            每块 catalog = 当前条目标题（首个命中前为 None）。条等更深块不命中节级条目，
-            自然归属最近命中的节条目。
-            无目录条目时——退化：以 is_heading 块自身标题作边界，块归属最近标题。
+            中某条（精确相等，或 is_heading 块前缀相等）即切换「当前条目」、指针前移，
+            该块 source = toc_match；未命中则 catalog = 当前条目（条等深层块自然归属其
+            节），source = inherited（首个命中前 catalog=None、source=none）。
+            无目录条目时——退化：is_heading 块自身标题作边界（source=heading_fallback），
+            其余继承（source=inherited / none）。
 
         参数：
-            blocks (list[dict]): 块列表（文档序，原地写 catalog）。
+            blocks (list[dict]): 块列表（文档序，原地写 catalog / catalog_source）。
             entries (list[dict]): _parse_entries 产出的有序条目表。
         返回：
             无。
@@ -251,6 +265,7 @@ class StructuralAxis:
         ptr = 0
         for b in blocks:
             if b.get("catalog") == "目录":
+                b["catalog_source"] = "toc_page"
                 continue
             if entries:
                 nb = _norm(b.get("text", ""))
@@ -265,14 +280,19 @@ class StructuralAxis:
                 if hit is not None:
                     ptr = hit + 1
                     cur = entries[hit]["title"]
+                    b["catalog"], b["catalog_source"] = cur, "toc_match"
+                else:
+                    b["catalog"] = cur
+                    b["catalog_source"] = "inherited" if cur is not None else "none"
+            elif b.get("is_heading") and b.get("text"):  # 退化：标题块自身作边界
+                cur = b["text"]
+                b["catalog"], b["catalog_source"] = cur, "heading_fallback"
+            else:
                 b["catalog"] = cur
-            else:  # 退化路径：无目录页，以 MinerU 标题块自身标题作边界
-                if b.get("is_heading") and b.get("text"):
-                    cur = b["text"]
-                b["catalog"] = cur
+                b["catalog_source"] = "inherited" if cur is not None else "none"
 
     def print_stats(self, annotated: list[dict]) -> None:
-        """打印结构轴标注统计（标题 / 目录页 / 已定位归属 / 未定位）。
+        """打印结构轴标注统计：标题数 + 按 catalog_source 分解各来源占比（方案 5 可见）。
 
         参数：
             annotated (list[dict]): annotate() 产出的标注列表。
@@ -281,15 +301,18 @@ class StructuralAxis:
         """
         total = len(annotated)
         headings = sum(1 for e in annotated if e.get("is_heading"))
-        toc = sum(1 for e in annotated if e.get("catalog") == "目录")
-        located = sum(1 for e in annotated if e.get("catalog") not in (None, "目录"))
+        src = Counter(e.get("catalog_source") for e in annotated)
+        located = src["toc_match"] + src["inherited"] + src["heading_fallback"]
 
         t = Table(title="结构轴标注统计（目录打标 + 定位）")
         t.add_column("指标")
         t.add_column("数量", justify="right")
         t.add_row("总块数", str(total))
         t.add_row("  标题块(is_heading)", str(headings))
-        t.add_row("  目录页块(catalog=目录)", str(toc))
+        t.add_row("  目录页块(toc_page)", str(src["toc_page"]))
         t.add_row("  已定位块(归属某条目)", str(located))
-        t.add_row("  未定位块(目录前/无条目)", str(max(0, total - toc - located)))
+        t.add_row("    命中目录条目(toc_match)", str(src["toc_match"]))
+        t.add_row("    继承(inherited)", str(src["inherited"]))
+        t.add_row("    无目录退化(heading_fallback)", str(src["heading_fallback"]))
+        t.add_row("  未定位块(none：目录前/无条目)", str(src["none"]))
         console.print(t)

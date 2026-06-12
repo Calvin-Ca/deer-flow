@@ -84,8 +84,8 @@ MinerU 解析 + 条款树提取 + 质量审核，在 GB 50378-2006 和 GB 50016 
 **波1 — 拆强条 + 立节点树骨架**（无新依赖，纯重构，可立即开工）：
 
 - [x] **T1 `schema.py` 换契约**（✅ 2026-06-12）：`Clause` → `Node` + `Representation` + `Provenance`；新增 `parent_id`/`children_ids`/`reprs`、结构层审计 `path_source`/`path_confidence`、溯源 `provenance`（`block_idx` 回指 MinerU 原始块，原始留 `data/parsed/` 不可变）、`ancestor_paths`；`level` 由号段数推导不取 text_level；工厂 `new_node()`/`empty_condition()`。删 `is_mandatory_clause`/`_HARD_MODAL`/`to_v1_compat`/`empty_scope`/`ApplicableScope`/`TableRepr`（v1 兼容桥退役）。保留 `RefType`/`EXPANDABLE_REF_TYPES`/`Reference`/`Modal`（语气词表，注释钉死「无法律含义」）。冒烟测试通过；下游 `extract/build.py` 待 T5 改编排。
-- [ ] **T2 结构层产树**（`02_parse_hierarchy.py`）：`GranularityAxis._group_into_nodes` 改为**保留 parent/child**，不再压平；产出 `nodes.json`（含 `parent_id`/`children_ids`）。引用图分型 + 祖先链作"固有事实"在此一次算定（`references.py`/`ancestors.py` 并入结构层）。
-- [ ] **T3 删强条排序**（`retrieval/engine.py`）：去掉 `rerank()`/`search()` 里 `mandatory + non_mandatory[...]` 的强条置顶（`engine.py:197-199`、`249-251`）与 `vector_search` 的 `filter_mandatory`；结果纯按 RRF/rerank 排。
+- [x] **T2 结构层产树**（✅ 2026-06-12，commit be0ab594）：`02_parse_hierarchy.py` 的 `GranularityAxis` 保留 parent/child 产 `nodes.json`（单一真值，含 `parent_id`/`children_ids` + `provenance` 回指 MinerU 块 + `path_source`/`path_confidence` 审计），引用图分型 + 祖先链作"固有事实"在结构层一次算定；目录解耦为打标（`is_toc` 标签保留不并入正文），条款号识别解耦为无状态 `classify_heading`；删 `build.enrich`/`--official` 强条分支。
+- [x] **T3 删强条排序**（✅ 2026-06-12）：`retrieval/engine.py` 去掉 `rerank()`/`search()` 里 `mandatory + non_mandatory[...]` 的强条置顶与 `vector_search` 的 `filter_mandatory`；结果纯按 RRF/rerank 排序后切 `top_k`。残留 `MILVUS_OUTPUT_FIELDS` 的 `is_mandatory` 与 stats 观测留 T4/T6 清理。
 - [ ] **T4 索引去强条字段**（`04_build_index.py`）：Milvus schema 删 `is_mandatory` 字段 + 其 INVERTED 索引；`metadata.json` 同步去字段；加 `node_id`/`parent_id`/`granularity` 判别字段。索引路径改 `data/vector_store/{standard}/{profile}/`。
 - [ ] **T5 改编排**（`extract/build.py`）：删保守模式、官方强条清单、`_diff_mandatory`、`to_v1_compat` 调用；改为"跑固有事实 + 表征注册表 → `nodes.json`"。
 - [ ] **T6 服务层清理**（`service/server.py`）：删 `mandatory_clauses_count`、`★强条` 日志；`/search` 返回挂 small-to-big 父节点上下文。

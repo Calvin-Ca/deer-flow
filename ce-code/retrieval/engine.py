@@ -90,11 +90,9 @@ def vector_search(
     embed_url: str,
     embed_model_id: str,
     top_k: int,
-    filter_mandatory: bool = False,
 ) -> list[dict]:
     query_vec = embed_texts([query], embed_url, embed_model_id)[0]
 
-    filter_expr = "is_mandatory == true" if filter_mandatory else ""
     search_params = {"metric_type": "COSINE", "params": {"ef": 64}}
 
     hits = client.search(
@@ -103,7 +101,6 @@ def vector_search(
         anns_field="embedding",
         search_params=search_params,
         limit=top_k,
-        filter=filter_expr or None,
         output_fields=MILVUS_OUTPUT_FIELDS,
     )
 
@@ -194,9 +191,7 @@ def rerank(query: str, results: list[dict], top_k: int) -> list[dict]:
         print(f"[retrieval] Rerank 不可用（{e}），使用 RRF 排序")
         results_sorted = results
 
-    mandatory = [r for r in results_sorted if r.get("is_mandatory")]
-    non_mandatory = [r for r in results_sorted if not r.get("is_mandatory")]
-    return mandatory + non_mandatory[: max(0, top_k - len(mandatory))]
+    return results_sorted[:top_k]
 
 
 # ---------------------------------------------------------------------------
@@ -246,9 +241,7 @@ def search(
     expanded = expand_references(merged, metadata)
 
     if skip_rerank:
-        mandatory = [r for r in expanded if r.get("is_mandatory")]
-        non_mandatory = [r for r in expanded if not r.get("is_mandatory")]
-        final = mandatory + non_mandatory[: max(0, top_k - len(mandatory))]
+        final = expanded[:top_k]
     else:
         final = rerank(query, expanded, top_k)
 

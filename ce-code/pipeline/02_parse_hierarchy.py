@@ -3,8 +3,8 @@
 PRD §3.2 新模型（节点树 + 多表征 + 粒度视图）：
   格式适配  FormatAdapter — 纯格式转换（page 归一、HTML 表格解析、is_heading 标记、
             block_idx 溯源），无结构语义
-  标注     StructuralAxis — 目录打标器：只给每块打**可靠**的目录标签（is_heading /
-            text_level / is_toc + standard_id / 溯源），不解析条文号、不建树
+  标注     StructuralAxis — 目录打标器：只给每块打**可靠**的目录标签（is_catalog +
+            standard_id；is_heading / 溯源随 FormatAdapter 透传），不解析条文号、不建树
   建树     GranularityAxis — 把标注块还原成**保留 parent/child 的节点树**（不再压平）；
             **条文号识别 + node_type + parent/child + 祖先链 + 引用图分型**作「固有事实」
             在此一次算定，落 nodes.json 作单一真值
@@ -155,7 +155,7 @@ class FormatAdapter:
     功能：
         page_number 跳过；page 归一（0-base → 1-base）；HTML 表格解析；
         is_heading 标记（text_level 字段存在即为 MinerU 标题）；
-        list 条目保留整体（不展开、不做 TOC 过滤，由结构轴处理）。
+        list 条目保留整体（不展开、不做目录过滤，由结构轴处理）。
 
     参数：无（调用静态方法 adapt(items) 传入原始列表）。
     返回：
@@ -269,7 +269,7 @@ class ParseProfile:
 CLAUSE_NUM_RE = re.compile(r"^(\d+(?:\.\d+){0,3})\s*[　 一-鿿]")
 APPENDIX_RE = re.compile(r"^附录\s*([A-Z])\b")
 APPENDIX_CLAUSE_RE = re.compile(r"^([A-Z]\.\d+(?:\.\d+){0,2})\s*[一-鿿]")
-_TOC_TAIL_RE = re.compile(r"[（(]\s*\d+\s*[）)]\s*$")  # 结构轴 is_toc 判定用
+_CATALOG_TAIL_RE = re.compile(r"[（(]\s*\d+\s*[）)]\s*$")  # 结构轴 is_catalog 判定用
 
 # ---------------------------------------------------------------------------
 # node_type 推断（建树层：由条款路径号段数定章/节/条，对应 PRD §3.1 节点 schema）
@@ -304,11 +304,11 @@ def _infer_node_type(path: str) -> str:
 # ---------------------------------------------------------------------------
 
 
-def _is_toc_list(items: list[str], thresh: float = 0.5) -> bool:
+def _is_catalog_list(items: list[str], thresh: float = 0.5) -> bool:
     """目录页列表判定：过半条目以「(页码)」结尾则整列为文档开头的目录页。
 
     功能：识别 MinerU 解析出的「目录页」整列（与正文标题重复）。**不再据此丢弃**
-        （对 MinerU 结果不做减法），调用方据此给整列条目标 node_type="toc" 保留。
+        （对 MinerU 结果不做减法），调用方据此给整列条目标 is_catalog=True 保留。
 
     参数：
         items (list[str]): list 元素的 list_items。
@@ -318,7 +318,7 @@ def _is_toc_list(items: list[str], thresh: float = 0.5) -> bool:
     """
     if not items:
         return False
-    hits = sum(1 for x in items if _TOC_TAIL_RE.search(x.strip()))
+    hits = sum(1 for x in items if _CATALOG_TAIL_RE.search(x.strip()))
     return hits >= max(1, len(items)) * thresh
 
 
@@ -373,14 +373,14 @@ class StructuralAxis:
     功能：
         遍历 FormatAdapter 元素，逐块追加：
           standard_id  规范标识（盖章）
-          is_heading   MinerU 是否判其为标题（= text_level 字段存在，原样透传）
-          text_level   MinerU 给的目录深度（仅标题块有，原样透传，**不二次推断**）
-          is_toc       是否为文档开头「目录页」块（页码尾启发式）
+          is_catalog       是否为文档开头「目录页」块（页码尾启发式）
+        is_heading（MinerU 标题标志）由 FormatAdapter 已标，随 **elem 透传——本层不重打。
         **去除**（2026-06-12 决定）：clause_path / node_type / level / ancestor_titles /
         path_source / path_confidence 与标题栈——这些是建树/语义层的事，不属于「打目录
-        标签」这一层，强行在此打不可能精准。
+        标签」这一层，强行在此打不可能精准。text_level（MinerU 目录深度）亦不再提取透传：
+        既是 is_heading 信号的重复，又被建树层明确拒用（level 取 clause_path 号段数）。
         **对 MinerU 结果不做减法**：不丢任何块（list 条目展开后逐条打标）；目录页块只
-        标 is_toc=True 保留（建树阶段据此不并入正文）。
+        标 is_catalog=True 保留（建树阶段据此不并入正文）。
 
     参数：
         standard_id (str): 规范唯一标识，逐块盖章。
@@ -399,7 +399,7 @@ class StructuralAxis:
         self.standard_id = standard_id
 
     def annotate(self, elements: list[dict]) -> list[dict]:
-        """逐块打目录标签：is_heading + text_level + is_toc（+ standard_id / 溯源透传）。
+        """逐块打目录标签：is_catalog（+ standard_id 盖章；is_heading / 溯源随 **elem 透传）。
 
         参数：
             elements (list[dict]): FormatAdapter.adapt() 产出的统一元素列表。
@@ -410,32 +410,32 @@ class StructuralAxis:
         for elem in elements:
             if elem["type"] == "list":
                 items = elem.get("list_items", [])
-                is_toc = _is_toc_list(items)  # 整列目录页 → 每条都标 is_toc（不丢）
+                is_catalog = _is_catalog_list(items)  # 整列目录页 → 每条都标 is_catalog（不丢）
                 for sub in items:
-                    result.append(self._tag({**elem, "text": sub}, is_toc=is_toc))
+                    result.append(self._tag({**elem, "text": sub}, is_catalog=is_catalog))
                 continue
             result.append(self._tag(elem))
         return result
 
-    def _tag(self, elem: dict, *, is_toc: bool = False) -> dict:
+    def _tag(self, elem: dict, *, is_catalog: bool = False) -> dict:
         """给单块打目录标签（无标题栈、无层级坐标）。
 
         参数：
             elem (dict): 单个元素 {type, text, page, is_heading, raw, block_idx, ...}。
-            is_toc (bool): 调用方预判为目录页块（整列目录）。
+            is_catalog (bool): 调用方预判为目录页块（整列目录）。
         返回：
-            dict: 原块 + standard_id + is_heading + text_level（标题块才有）+ is_toc。
+            dict: 原块 + standard_id + is_catalog（is_heading 随 **elem 由 FormatAdapter 透传）。
         """
         text = elem.get("text", "")
         # 疑似目录页短行（行尾带页码、与正文标题重复）：也判为目录
-        if not is_toc and elem["type"] in ("text", "list") and len(text) < 60 and _TOC_TAIL_RE.search(text):
-            is_toc = True
+        if not is_catalog and elem["type"] in ("text", "list") and len(text) < 60 and _CATALOG_TAIL_RE.search(text):
+            is_catalog = True
+        # is_heading 由 FormatAdapter 已标，随 **elem 透传，不重打；text_level 不可靠且
+        # 无下游消费（建树层 level 取 clause_path 号段数），不提取。
         return {
             **elem,
             "standard_id": self.standard_id,
-            "is_heading": elem.get("is_heading", False),
-            "text_level": elem["raw"].get("text_level") if elem.get("is_heading") else None,
-            "is_toc": is_toc,
+            "is_catalog": is_catalog,
         }
 
     def print_stats(self, annotated: list[dict]) -> None:
@@ -448,15 +448,15 @@ class StructuralAxis:
         """
         total = len(annotated)
         headings = sum(1 for e in annotated if e.get("is_heading"))
-        tocs = sum(1 for e in annotated if e.get("is_toc"))
+        catalogs = sum(1 for e in annotated if e.get("is_catalog"))
 
         t = Table(title="结构轴标注统计（目录打标）")
         t.add_column("指标")
         t.add_column("数量", justify="right")
         t.add_row("总块数", str(total))
         t.add_row("  标题块(is_heading)", str(headings))
-        t.add_row("  目录块(is_toc)", str(tocs))
-        t.add_row("  内容块", str(max(0, total - headings - tocs)))
+        t.add_row("  目录块(is_catalog)", str(catalogs))
+        t.add_row("  内容块", str(max(0, total - headings - catalogs)))
         console.print(t)
 
 
@@ -584,13 +584,13 @@ class GranularityAxis:
             命中即开新节点；返回 None（交叉引用片段如「5.3节…」）则按内容块处理。
             非标题块追加进当前节点正文；表格 / 图示暂存节点 tables / images 字段
             （过渡，T8 转子节点）；逐块累积 block_idx / page 进 provenance。
-            is_toc=True 的目录块不开节点、不并入正文（structure.json 已全量保留，不算减法）。
+            is_catalog=True 的目录块不开节点、不并入正文（structure.json 已全量保留，不算减法）。
             首个标题之前的内容块（无归属）丢弃；空节点（无正文且无表格）丢弃。
             level 由 clause_path 号段数推导（new_node）。
 
         参数：
             annotated (list[dict]): StructuralAxis.annotate() 产出的标注列表
-                （每块带 is_heading / is_toc / text_level / standard_id 等目录标签）。
+                （每块带 is_heading / is_catalog / standard_id 等目录标签）。
             source_file (str): provenance.source_file。
             version / effective_date / status (str): 规范级元数据。
         返回：
@@ -607,7 +607,7 @@ class GranularityAxis:
                 nodes.append(cur)
 
         for elem in annotated:
-            if elem.get("is_toc"):
+            if elem.get("is_catalog"):
                 continue  # 目录块不开节点、不并入正文（structure.json 已全量保留 + 溯源）
 
             info = classify_heading(elem.get("text", "")) if elem.get("is_heading") else None

@@ -53,9 +53,9 @@ MinerU 解析 + 条款树提取 + 质量审核，在 GB 50378-2006 和 GB 50016 
 
 ---
 
-## Phase B：数据模型改造（🟡 进行中）
+## Phase B：数据模型改造（🟡 进行中 · 2026-06-12 设计转向）
 
-> v2 schema 契约 + 构建层富化链 + 解析层按格式重写加固，均已落地。待办按 PRD §3.1 **三轴解析模型**组织：结构轴（建树/profile）+ 粒度轴（chunk/small-to-big）+ 语义轴（表格/谓词）；三轴数据完整后重建索引、新增检索原语。这几块决定三个 agent（问答/算量/审图）的能力天花板。
+> **设计转向（2026-06-12）**：废弃"强条召回"铁律与三轴顺序模型，改为 PRD §3.1 新模型 **节点树（唯一真值）+ 多表征（语义投影）+ 粒度视图（索引期选层）**。强条/法律强制整套机制移除；语气降级为 `modal` 表征（可选召回通道，不全局置顶）。下方"地基+富化链/解析层重写"为转向前已完成项，保留作历史；**实际待办以「按新模型组织」段为准**（旧"按三轴组织"段已被取代）。
 
 ### 地基 + 富化链（✅ 2026-06-05 ~ 06-08）
 
@@ -77,36 +77,32 @@ MinerU 解析 + 条款树提取 + 质量审核，在 GB 50378-2006 和 GB 50016 
 - [x] `mineru_api.py` 修输出目录误定位（从本次 ZIP namelist 取，不 rglob 历史产物）；`01` 打印解析耗时
 - [x] **实测 GB/T 50500-2024**：561 条款、零重复、35 表全部归具体子条款（附录根 0 表）、1.0.x 齐
 
-### 待办 — 按三轴组织
+### 待办 — 按新模型组织（节点树 / 多表征 / 粒度视图）
 
-> 三轴是顺序流水线（见 PRD §3.2）：① 结构轴 → ② 粒度轴 → ③ 语义轴 → 索引重建。下游阶段构建在上游产物之上，**不得跳跃**；`terminal_stage` 控制在哪层停止以便对比实验。
+> 新流水线（见 PRD §3.2）：阶段 1 结构层（建节点树 `nodes.json`）→ 阶段 2 表征层（挂 `reprs`）→ 阶段 3 索引（按 `index_granularity` 选粒度视图）。代码任务编号 T1–T10，依赖关系见下。**一次只动一个变量，每步过 `07_eval` 护栏。**
 
-**① 结构轴**（阶段 1，`02_parse_hierarchy.py`）：按文档原生目录建树，当前基本可用，待完善：
+**波1 — 拆强条 + 立节点树骨架**（无新依赖，纯重构，可立即开工）：
 
-- [x] `ParseProfile` dataclass + `terminal_stage`（structure|granularity|enrich|index）控制终止阶段；产物路径按 `data/structured/{standard}/{profile}/` 隔离
-- [x] `node_type` 推断（`_infer_node_type`）：chapter / section / clause / appendix 已覆盖；`HierarchyBuilder` 重命名（原 `ClauseTreeBuilder`）
-- [ ] `04_build_index.py` 索引路径同步改为 `data/vector_store/{standard}/{profile}/`（依赖本步，下一个）
-- [ ] `node_type` 覆盖完整：paragraph / table / formula / figure（需语义轴表格封装后才能单独成节点）
+- [ ] **T1 `schema.py` 换契约**：`Clause` → `Node` + `Representation`；新增 `parent_id`/`children_ids`/`reprs`；删 `ModalStrength` 法律语义、`is_mandatory_clause`、`_HARD_MODAL`、`to_v1_compat`（v1 兼容桥退役）。保留 `RefType`/`EXPANDABLE_REF_TYPES`/`Reference`。
+- [ ] **T2 结构层产树**（`02_parse_hierarchy.py`）：`GranularityAxis._group_into_nodes` 改为**保留 parent/child**，不再压平；产出 `nodes.json`（含 `parent_id`/`children_ids`）。引用图分型 + 祖先链作"固有事实"在此一次算定（`references.py`/`ancestors.py` 并入结构层）。
+- [ ] **T3 删强条排序**（`retrieval/engine.py`）：去掉 `rerank()`/`search()` 里 `mandatory + non_mandatory[...]` 的强条置顶（`engine.py:197-199`、`249-251`）与 `vector_search` 的 `filter_mandatory`；结果纯按 RRF/rerank 排。
+- [ ] **T4 索引去强条字段**（`04_build_index.py`）：Milvus schema 删 `is_mandatory` 字段 + 其 INVERTED 索引；`metadata.json` 同步去字段；加 `node_id`/`parent_id`/`granularity` 判别字段。索引路径改 `data/vector_store/{standard}/{profile}/`。
+- [ ] **T5 改编排**（`extract/build.py`）：删保守模式、官方强条清单、`_diff_mandatory`、`to_v1_compat` 调用；改为"跑固有事实 + 表征注册表 → `nodes.json`"。
+- [ ] **T6 服务层清理**（`service/server.py`）：删 `mandatory_clauses_count`、`★强条` 日志；`/search` 返回挂 small-to-big 父节点上下文。
 
-**② 粒度轴**（阶段 2，`02_parse_hierarchy.py`；依赖①完成）：切最细自然单元，当前与结构轴合并，待拆分配置：
+**波2 — 粒度视图 + 表征注册表**（依赖波1）：
 
-- [ ] `chunk_granularity` 可配（node | paragraph | natural）与结构树解耦，`parse_profile.chunk_granularity` 实际控制切分粒度
-- [ ] `small_to_big` 联动（**P1**）：向量化时拼入 `ancestor_titles` + 所属上级全文；检索返回时回补完整条/节上下文（`retrieval/engine.py` 侧）
+- [ ] **T7 粒度视图**：新增 `view(tree, index_granularity) → 检索单元`（索引期函数）；`ParseProfile` 去掉旧 `chunk_granularity`/`enrichment`，加 `index_granularity`（section|clause|paragraph）+ `reprs` 列表 + `small_to_big`。
+- [ ] **T8 表征注册表**（`extract/` → `reprs/`）：免费表征落地——`raw`/`sparse`/`context_aug`（接管 `ancestors.py`）/`table_struct`（接管现表格 HTML 解析）/`modal`（复用 `strength.parse_modal_strength` 正则，删 `is_mandatory` 法律逻辑，产出 `reprs.modal`）；`condition` 谓词（`reprs/condition.py`，抽不准标 `scope_status:unknown`）。
+- [ ] **T9 small-to-big 检索**（`retrieval/engine.py`）：细粒度命中后靠 `parent_id` 上探返回整条/整节；`modal` 作可选 filter 通道（query 带强制意图时启用）。
 
-**③ 语义轴**（阶段 3，`extract/build.py` 编排；依赖②完成）：可选覆盖层，按规范类型条件挂载，仍有三块未完：
+**波3 — LLM 表征 + 评测改造**（依赖波2 + Qwen3）：
 
-- [ ] **数据依赖（阻塞 `is_mandatory_clause` 真值，需服务器侧）**：① GB 50016 官方强条清单 → `data/structured/gb50016_mandatory.json`；② dump `content_list.json` 确认 MinerU 字重字段名 → 改 `strength._BOLD_KEYS`
-- [ ] **表格可查询封装**（`extract/tables.py`，**P0**）：`tables[].body` → `schema.TableRepr`（分表头 + 「给定行列取值」接口，继承所属条款 `is_mandatory_clause`）
-- [ ] **适用范围谓词抽取**（`extract/scope.py`，**P1**）：散文条件 → 结构化谓词；抽不准标 `scope_status: unknown`（当前 build.py 统一填 unknown 进保守召回）
-- [ ] **条款级版本/效力**（**P2**）：当前按规范统一填 `status`/`version`/`effective_date`；局部修订细化到条款粒度待实现
+- [ ] **T10 评测换指标**（`07_eval.py`）：删"强条召回率"首要指标，改 Recall@k / 引用召回 / MRR / 金标秩；按**包含关系**判命中（配合 small-to-big）。`03_review_quality.py` 同步：删强条统计/误标检测，改节点树健康（孤儿节点 / 空内容 / 表格归属 / 悬空引用）。
+- [ ] **LLM 表征**（`reprs/summary.py`、`reprs/questions.py`）：调 Qwen3 生成摘要 / 假设问题表征，入 `dense` 多通道。
+- [ ] **重建索引 + 验证**：`02 → build → 04` 用新模型重建 GB 50016；`07_eval` 对比新旧召回（注意基线口径已换）。
 
-**索引重建 + 检索原语**（依赖三轴数据完整）：
-
-- [ ] **重建索引**：`02 → build → 04` 用 v2 数据重建（依赖语义轴数据依赖解除）；`07_eval` 验证召回率不回退
-- [ ] 新增 `/filter`（适用范围过滤，依赖 `scope.py` 谓词数据）、`/rerank`（同上）
-- [ ] 评测集增加"适用性误判率"指标（依赖 `scope.py` 谓词）
-
-**多规范扩展**：GB 50116（火灾自动报警系统）待收录，GB 50016 未覆盖该专项规范条款。
+**多规范扩展**：GB 50116（火灾自动报警系统）待收录。
 
 ---
 

@@ -40,7 +40,7 @@
 ### 项目约束
 - MVP 规范范围：**单一规范深做**，首选《建筑设计防火规范》GB 50016-2014(2018)。
 - 数据源：**PDF**，且**解析质量是项目天花板**。
-- **按目录层级解析**：规范按文档原生标题层级（目录结构）建树，深度自适应，**不强制细化到固定的 章→条→款 层级**。并非每部规范都有黑体强条或可拆为离散条款（术语、总则常为散文，定额多为表格）——结构、粒度、增强三轴分离处理（见 §3.1）。
+- **按目录层级解析**：规范按文档原生标题层级（目录结构）建成**节点树**，深度自适应，**不强制细化到固定的 章→条→款 层级**。并非每部规范都可拆为离散条款（术语、总则常为散文，定额多为表格）——**结构（建树）/ 表征（多投影）/ 粒度（树上视图）三件事正交分离**处理（见 §3.1）。
 - **双轨知识资产**：① 规范问答/审图轨——防火规范知识库；② 算量组价轨——造价知识底座（**服务** CostAgent），数据源不止 PDF，还含定额电子表 / 信息价文件 / 历史项目。两轨共用同一检索引擎与多表征思路，差异在数据资产与检索原语。
 
 ---
@@ -53,83 +53,90 @@
 - 规范侧：条款层级/交叉引用不能按字符切分；**适用性判断是一切**，引用图与适用范围索引的权重高于向量索引。
 - 造价侧：**能算的不交给模型猜**；**清单 ↔ 定额是多对多关系**，纯向量库不够用，需三层协同。
 
-### 3.1 数据需求 — 三轴解析模型（规范轨）
+### 3.1 数据需求 — 节点树 + 多表征 + 粒度视图（规范轨）
 
-解析按**三个相互独立的轴**组织，不把结构、粒度、增强焊死成统一假设（并非每部规范都有强条/黑体，也未必能拆为离散条款）：
+解析按**三件正交的事**组织，不再焊成"三轴顺序假设"，也不含任何"强条"概念：
 
-**① 结构轴 — 文档原生目录，深度自适应。** 直接复用 MinerU 版面分析给出的标题层级建树，文档给几层标题就建几层，不固定 章→节→条→款→项。术语、总则等散文章节自然落入其所属标题节点。每个节点带 `node_type`（章/节/条/段落/表格/公式/附录），按类型差异化处理。
+**① 结构层 — 节点树（唯一真值）。** 复用 MinerU 标题层级，把扁平元素流还原成**保留 parent/child 的语义树**：document → chapter → section → clause → subitem，深度自适应；表格/公式/图示作为叶子节点挂在所属条款下（`parent_id`）。节点的**固有事实**（唯一、不存在"换种方式表达"）在建树时一次算定：祖先链（`ancestor_titles`，父链现成）、引用图（`references` 分型 + `referenced_by` 反向）。树落 `nodes.json` 作单一真值，粒度与表征都是它的派生。
 
-**② 粒度轴 — 最细自然单元，与结构深度解耦。** 层级是导航骨架，chunk 切到文档**天然支持的最细单元**：有编号条文→到条，散文→到自然段，表格→到表（或行组）。召回时带祖先链回补整条/整节上下文（**small-to-big**：小粒度匹配、大粒度返回），对应人类"先目录定位、再读上下文"的查找习惯。**不把整节作为 chunk**（会稀释向量信号、召回变粗）。
+**② 表征层 — 每个节点的多种"语义投影"。** 同一节点可被多种方式表征/检索，是可插拔、可开关、可消融的注册表；每种表征是节点意义的一个投影面，检索是多表征的可组合并集（见下表）。**旧"黑体强条/法律强制"整套机制移除**；语气（应/宜/可/严禁）降级为 `modal` 表征——仅作**可选召回通道**（query 带强制意图时 filter 或并入 sparse），不做全局置顶排序。
 
-**③ 语义轴 — 可选覆盖层，按规范类型挂载。** 强条/语气/适用范围/引用等是覆盖在节点上的**可选增强**，按规范实际具备的特征条件填充：规范级标志位 `has_mandatory_marking`、`numbering_scheme` 决定是否启用对应增强；有黑体强条的规范才填 `is_mandatory_clause`，无则留空，整套"强条召回"机制对其不激活。（强制性/推荐性区分、黑体强条 ≠ 语气强制等概念落在本轴的字段语义里。）
+**③ 粒度视图 — 树上的"投影深度"，索引期选定。** 粒度不是切树，是确定性视图函数 `view(tree, level) → 检索单元`。每次 build 选**单一主索引粒度**（`index_granularity: section | clause | paragraph`），只把该层 emit 进索引，树本身完整保留。检索期 **small-to-big**：细粒度命中后靠 `parent_id` 上探，返回整条/整节语境（小粒度匹配、大粒度返回），对应"先目录定位、再读上下文"。换粒度做实验 = 改 profile 重建索引，不重解析（阶段 0/1 最贵，只跑一次）。
 
-**条文号检测降为标注 pass**：在结构树上用正则识别"5.3.4"这类编号，有则作为引用图锚点与引用 ID，无则以"标题路径"作 ID。引用图（"应符合 5.2.1 的规定"）必须靠条文号锚定，此步保留——只是不再承担建树职责。
+**条文号检测 = 标注 pass**：在节点树上用正则识别"5.3.4"这类编号，有则作 `node_id` 与引用图锚点，无则以"标题路径"作 id。引用图（"应符合 5.2.1 的规定"）靠条文号锚定，此步保留。
 
-**节点元数据 schema**（增强字段均可空）：
+**节点 schema**（表征/条件字段均可空）：
 
 ```python
 {
+    "node_id": "GB50016#5.3.4",          # 稳定 id：条文号有则用，无则标题路径
     "standard_id": "GB 50016-2014(2018)",
-    "version": "2018",
-    "effective_date": "2018-10-01",
+    "version": "2018", "effective_date": "2018-10-01",
     "status": "active",                  # active / superseded / abolished（节点级）
-    "node_id": "5.3.4",                  # 条文号(有则用)，无则用标题路径
-    "node_type": "clause",               # chapter/section/clause/paragraph/table/formula/figure/appendix
-    "ancestor_titles": ["5 建筑分类和耐火等级", "5.3 防火分区和层数"],  # 祖先标题链
-    "modal_strength": "应",               # 语气(可空)：必须/严禁/不应/不得/应/宜/可
-    "is_mandatory_clause": True,          # 黑体强制性条文(可空；仅 has_mandatory_marking 规范填)
-    "applicable_scope": {                 # 结构化适用范围(可空) → 条件召回
-        "building_types": ["住宅"],
-        "height_range_m": [27, 54],
-        "conditions": [                   # 散文里的隐含/复杂条件抽成谓词
-            {"field": "height_m", "op": ">", "value": 27},
-            {"field": "underground", "op": "==", "value": False}
-        ],
-        "scope_status": "extracted"       # extracted / unknown（抽不准→保守召回，宁可多召）
-    },
-    "references": [                        # 引用边：分型 + 方向(可空)
-        {"to": "5.2.1", "type": "strong"},          # strong=应符合(必拉+继承强制性)
-        {"to": "6.1.2", "type": "weak"},            # weak=参见(可选拉取)
-        {"to": "GB 50116 3.1.1", "type": "cross_standard"}  # 跨规范→触发多规范召回
-    ],                                    # 另有 type="exclude"(本条不适用于X)：禁止正向扩展
+    "node_type": "clause",               # document/chapter/section/clause/subitem/table/figure/formula
+    "clause_path": "5.3.4",
+    "level": 3,
+    "parent_id": "GB50016#5.3",          # ← 树形：粒度视图 + small-to-big 全靠它
+    "children_ids": ["GB50016#表5.3.4"],
+    "page": 45,
+    "title": "...",
+    "content": "...",                    # 仅自身正文，不含子节点
+    # ── 固有事实（建树时一次算定，唯一、不可多表达）──
+    "ancestor_titles": ["5 建筑分类和耐火等级", "5.3 防火分区和层数"],
+    "references": [                       # 引用边：分型 + 方向
+        {"to": "5.2.1", "type": "strong"},          # strong=应符合(必拉) / weak=参见(可选)
+        {"to": "GB 50116 3.1.1", "type": "cross_standard"}  # 跨规范→多规范召回
+    ],                                   # type=exclude：本条不适用于X，禁止正向扩展
     "referenced_by": ["5.3.1"],          # 反向边
-    "content": "...",
-    "tables": [...],                     # 关联表格 ID（结构化可查询、继承节点强制性）
-    "formulas": [...],                   # LaTeX + 变量语义/单位
-    "figures": [...]                     # 原图 + VLM 描述（描述入向量库可语义召回）
+    # ── 表征层（多投影，可空、可部分；检索是它们的并集）──
+    "reprs": {
+        "modal":      {"text": "应", "meta": {"all": ["应"]}},          # 语气正则召回通道
+        "table_struct": {"header": [...], "rows": [...]},               # 表格"给定行列取值"
+        "condition":  {"building_types": ["住宅"], "height_range_m": [27, 54],
+                       "conditions": [{"field": "height_m", "op": ">", "value": 27}],
+                       "scope_status": "extracted"},                    # extracted / unknown
+        "context_aug": {"text": "5 建筑分类… / 5.3 防火分区… ‖ <本条正文>"},  # 拼祖先链
+        "summary":    {"text": "...", "vector": [...]},                 # 波3 LLM 表征
+        "questions":  {"text": "...", "vector": [...]}                  # 波3 LLM 表征
+    }
 }
 ```
 
-**规范级元数据**（决定语义轴是否启用）：
+**规范级元数据**：
 
 ```python
 {
     "standard_id": "GB 50016-2014(2018)",
-    "has_mandatory_marking": True,       # 是否有黑体强条标注（False→强条机制不激活）
     "numbering_scheme": "numbered",      # numbered / unnumbered / mixed
     "structure_depth": 5                 # 实际目录深度
 }
 ```
+（删除 `has_mandatory_marking` —— 不再有强条门控。）
 
-**表格/公式/图示**单独抽取存储，关联回所属节点：表格 → 结构化 JSON（支持"给定行列条件取值"，继承所属节点强制性）；公式 → LaTeX；图示 → 原图 + VLM 描述。
+**多表征知识库（核心）：** 主资产不是 embedding，是"节点的多种结构化表征"。同一批节点，多种并存表征，检索是它们的可组合并集（表征层注册表，可插拔、可消融）：
 
-**多表征知识库（核心）：** 主资产不是 embedding，是"知识节点的结构化表征"。同一批节点，四种并存表征，检索是四者的可组合并集。
-
-| 表征 | 载体 | 召回作用 | 主要场景 |
+| 表征 kind | 载体 | 投影面 / 召回作用 | 成本 |
 |---|---|---|---|
-| ① 文本 | 向量 + BM25 | 语义 / 条文号·术语精确 | 问答 |
-| ② 树 | 文档原生目录层级 | 层级上下文 | 所有场景 |
-| ③ 引用图 | references（分型+双向） | 引用扩展（强条不漏） | 所有场景 |
-| ④ 条件 | 结构化适用范围谓词 | 条件匹配召回 | 算量 / 审图 / 合规 |
+| `raw` | 存储 | 字面原文（返回用） | 免费 |
+| `dense` | 向量 | 语义召回 | embed |
+| `sparse` | BM25 | 条文号 / 术语精确召回 | 免费 |
+| `context_aug` | 向量 + BM25 | 拼祖先链的语境增强文本（small-to-big 入口） | 免费 |
+| `table_struct` | 结构化 JSON | 表格"给定行列条件取值" | 免费 |
+| `modal` | 正则标签 / facet | 语气（应/宜/可/严禁）可选召回通道，**不全局置顶** | 免费 |
+| `condition` | 适用范围谓词 | 条件匹配召回（算量/审图/合规） | 规则/LLM |
+| `summary` | 向量 | "讲了啥"摘要召回（波3） | LLM |
+| `questions` | 向量 | "能回答啥"假设问题召回（波3） | LLM |
 
-> **向量索引的归属**：表征 ① 的向量库**构建**（embedding 选型 / chunk 内容 / 索引结构 / 过滤元数据）属**知识表示**，按检索评测**离线调优、全业务共享**，**不按业务消费者重建**；embedding **按轨选型**（规范轨 bge-large-zh / 造价轨 BGE-M3），非按 agent。向量召回**在融合中占多大权重**则属**检索策略**（按 intent，见 §3.4）。这正符合"embedding 是最不可靠的召回入口"——调优重心应在引用图与适用范围通道，向量是贡献者、非承重墙。
+> **向量索引的归属**：`dense` 表征的向量库**构建**（embedding 选型 / chunk 内容 / 索引结构 / 过滤元数据）属**知识表示**，按检索评测**离线调优、全业务共享**，**不按业务消费者重建**；embedding **按轨选型**（规范轨 bge-large-zh / 造价轨 BGE-M3），非按 agent。向量召回**在融合中占多大权重**则属**检索策略**（按 intent，见 §3.4）。向量是贡献者、非承重墙，调优重心在引用图与 `condition` 通道。
 
 **资产建模要点（按优先级）：**
 
-- **【P0】引用边分型 + 双向**：`strong`（应符合→必拉、继承强制性）/ `weak`（参见→可选）/ `exclude`（本条不适用于 X→**禁止正向扩展**）/ `cross_standard`（触发多规范召回）。"命中 A 自动拉引用"只对 strong 无条件执行；同时存 `referenced_by` 反向边。引用图即规范的知识图谱，后续 GraphRAG 的底座。
-- **【P0】表格可查询**：大量强制要求（防火间距/耐火极限/疏散宽度）在表格里、不在正文。表格 → 结构化 JSON，支持"给定行列条件取值"，继承所属节点强制性。
-- **【P1】适用范围谓词抽取**：把散文条件（"建筑高度大于 54m 的住宅…"）抽成结构化谓词，是算量/审图的桥，也是工程量最大的天花板。抽不准的标 `scope_status: unknown` 进**保守召回**；评测集盯"适用性误判率"。
-- **【P1】chunk 携带祖先链**：叶子节点向量化时拼上 `ancestor_titles` + 所属上级全文（small-to-big）；召回时既给命中块、也给完整上下文。
+- **【P0】节点树 + parent/child**：粒度视图、small-to-big、表格归属全靠它；祖先链与引用图建树时一次算定。
+- **【P0】引用边分型 + 双向**：`strong`（应符合→必拉）/ `weak`（参见→可选）/ `exclude`（本条不适用于 X→**禁止正向扩展**）/ `cross_standard`（触发多规范召回）。"命中 A 自动拉引用"只对 strong 无条件执行；同存 `referenced_by` 反向边。引用图即规范的知识图谱、GraphRAG 底座。
+- **【P0】表格可查询**（`table_struct`）：大量强制要求（防火间距/耐火极限/疏散宽度）在表格里、不在正文。表格 → 结构化 JSON，支持"给定行列条件取值"。
+- **【P1】context_aug + small-to-big**：叶子节点向量化时拼 `ancestor_titles` + 所属上级全文；召回时既给命中块、也给完整条/节上下文。
+- **【P1】modal / condition 表征**：`modal` 正则抽语气作可选召回/过滤通道，不影响排序；`condition` 把散文条件（"建筑高度大于 54m 的住宅…"）抽成结构化谓词，是算量/审图的桥；抽不准标 `scope_status: unknown` 进保守召回，评测盯"适用性误判率"。
+- **【P1】LLM 表征（波3）**：`summary` / `questions`，提升语义与问答式召回；依赖 Qwen3。
 - **【P2】节点级版本/效力**：`status`/`version`/`effective_date` 到节点粒度；废止节点不参与召回但保留（可回答"何时废止"）。多规范从一开始就支持（GB 50116 待收录）。
 
 ### 3.2 分阶段解析流水线与实验配置
@@ -139,23 +146,21 @@
 | 阶段 | 职责 | 产物 |
 |---|---|---|
 | 0 原始解析 | MinerU 版面/标题/表格/公式抽取 | parsed（缓存，只跑一次） |
-| 1 结构轴 | 按文档原生目录建树（深度自适应，`node_type`） | 结构树 |
-| 2 粒度轴 | 切最细自然单元，保留上级结构 | chunk 库 |
-| 3 语义轴 | 条文号 / 引用 / 强条 / 适用范围（可空、可部分） | 增强知识库 |
-| 4 索引 | 向量 + BM25 + 元数据索引 | 向量库 |
+| 1 结构层 | 按原生目录建树（保留 parent/child）+ 引用图/祖先链等固有事实 | `nodes.json`（节点树·唯一真值） |
+| 2 表征层 | 为各节点生成多表征投影（raw/sparse/context_aug/table_struct/modal/condition；波3 加 summary/questions） | 带 `reprs` 的节点库 |
+| 3 索引 | 按 `index_granularity` 选粒度视图 emit → 向量 + BM25 + 元数据 | 向量库（按 profile 隔离） |
 
-> "解析到结构轴" = 跑到阶段 1 停；"解析到粒度轴" = 跑到阶段 2 停（阶段 2 构建在阶段 1 产物之上，**上级结构天然保留**，下游不丢上游）。
+> 粒度不再是独立阶段：节点树（阶段 1）一次建好，**粒度是索引期（阶段 3）在树上选的视图**，换粒度只重跑阶段 3，不重建树。
 
 **parse_profile 配置**（命名隔离，多套共存，结果可追溯到配置）：
 
 ```yaml
 parse_profile:
-  name: p2_clause_full
-  terminal_stage: enrich       # structure | granularity | enrich | index  → 终止阶段
-  structure_depth: clause      # section | clause | subitem  → 阶段1建树到哪层
-  chunk_granularity: natural   # node | paragraph | natural  → 阶段2切多细
-  enrichment: full             # none | ids_refs | full      → 阶段3挂多少
-  small_to_big: true           # 召回时是否回补整条/整节上下文
+  name: clause_default
+  terminal_stage: index        # structure | reprs | index  → 终止阶段
+  index_granularity: clause    # section | clause | paragraph → 阶段3选哪层视图入索引
+  reprs: [raw, sparse, dense, context_aug, table_struct, modal, condition]  # 启用的表征
+  small_to_big: true           # 检索返回时是否上探父节点回补整条/整节
 ```
 
 产物与索引按 profile 隔离：`data/structured/{standard}/{profile}/`、`data/vector_store/{standard}/{profile}/`；`/search` 支持 `profile` 参数，同一查询打到不同索引做 A/B。
@@ -208,22 +213,24 @@ parse_profile:
 | intent | 场景 | 主通道 | 召回-精度取舍 |
 |---|---|---|---|
 | `qa` | 规范问答 | 向量 + BM25，引用扩展 | 高召回 + 高精度（控噪） |
-| `compliance` | 图纸审核 | 适用范围谓词过滤为主 | 召回 >> 精度，穷尽适用强条 |
+| `compliance` | 图纸审核 | 适用范围谓词过滤为主 | 召回 >> 精度，穷尽适用条款 |
 | `cost_match` | 算量组价 | KG 收窄 + BGE-M3 混检 | 候选集高命中，LLM 候选内择优 |
 
 **规范轨 — 混合检索 + 引用扩展（四通道，对应四表征）：**
 
 ```
-Query → ① 向量(语义) + ① BM25(条文号/术语) + ④ 适用范围结构化过滤
-      → 合并去重 → ③ 引用图扩展(仅 strong 边) → rerank
-      → 返回(命中块 + 完整条/节上下文 + 强制性 + 引用)   ← small-to-big
-※ ④ 适用范围过滤优先于排序：先按 standard/version/scope 圈定范围，再在范围内排。
-※ 通道权重按 intent 调（qa 偏语义、compliance 偏 scope 过滤）。
+Query → dense(语义) + sparse(条文号/术语) + condition(适用范围过滤) [+ modal 通道, 按 intent]
+      → RRF 合并去重(按 node_id) → 引用图扩展(仅 strong 边)
+      → small-to-big 上探父节点 → rerank
+      → 返回(命中节点 + 完整条/节上下文 + 引用)
+※ condition 过滤优先于排序：先按 standard/version/scope 圈定范围，再在范围内排。
+※ 通道权重按 intent 调（qa 偏语义、compliance 偏 condition 过滤）；modal 仅在 query 带强制意图时启用。
 ```
 
 **检索硬性约束：**
 - 引用扩展默认开启（命中节点的所有 strong `references` 必须一并拉取）。
 - 元数据过滤优先于向量排序（先按 standard/version/scope filter，再排）。
+- **无全局强条置顶**：所有结果按 RRF / rerank 分数排序；`modal` 只作可选通道，不参与重排。
 
 **造价轨 — 清单匹配 + 组价取数（均为「检索/KG 收窄候选 + LLM 候选内决策」）：**
 

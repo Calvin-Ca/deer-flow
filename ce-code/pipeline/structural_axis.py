@@ -19,7 +19,7 @@ MinerU 标题块自身标题作边界（best-effort）。
   - ``toc_page``         块本身是目录页（区域判据命中）       —— 方案2·目录识别
   - ``toc_match``        正文块命中目录条目、确认为标题边界   —— 方案2锚定 + 方案1对齐
   - ``inherited``        继承最近命中条目（条归节 / 成员块）  —— 归属传播
-  - ``heading_fallback`` 无目录，按 is_heading 自身标题定边界 —— 方案1·退化路径
+  - ``heading_fallback`` 无目录，按 text_level 标题块自身标题定边界 —— 方案1·退化路径
   - ``none``             目录前 / 未命中（catalog=None）
 
 设计约束（承 2026-06-12 职责重划）：本层只产「目录归属」这一可靠标签（catalog +
@@ -33,7 +33,8 @@ GranularityAxis 由 clause_path 号段数算定的「固有事实」。**对 Min
 
 输入：FormatAdapter.adapt() 产出的统一元素列表。
 输出：每块带 standard_id + catalog + catalog_source 的扁平列表（不建树、不丢块）。
-      is_heading 由 FormatAdapter 透传、与输入一致（本层只读用于匹配，不重打、不删）。
+      text_level 由 MinerU 经 FormatAdapter 原样透传（仅标题块有此键；本层只读用于匹配，不改）。
+      list 块展平后不再保留 list_items；raw 已删（需 MinerU 原件靠 block_idx 回查 data/parsed）。
 """
 
 from __future__ import annotations
@@ -123,9 +124,9 @@ class StructuralAxis:
         ③ 解析目录条目表（有序，骨架真值）；
         ④ 目录定位：正文按文档序顺序扫描，归一化匹配目录条目切换「当前条目」，
            每块 catalog = 最近命中条目标题（条等深层块归属其节的条目）；无目录页时
-           退化为以 is_heading 块自身标题作边界。每块同时记 catalog_source 审计该
+           退化为以 text_level 标题块自身标题作边界。每块同时记 catalog_source 审计该
            catalog 由哪条子机制得来（toc_page/toc_match/inherited/heading_fallback/none）。
-        is_heading（MinerU 标题标志）由 FormatAdapter 已标，随 **elem 透传，本层不重打、
+        text_level（MinerU 标题层级）由 FormatAdapter 原样透传，本层只读用于匹配、不重打，
         不解析条文号/层级（那是建树层的事）。
 
     参数：
@@ -161,6 +162,8 @@ class StructuralAxis:
     def _flatten(self, elements: list[dict]) -> list[dict]:
         """展平为块列表，盖章 standard_id；整列目录的 list 条目直接标 catalog="目录"。
 
+        list 块逐条展开成块（展开后丢弃 list_items 字段，不逐块冗余保留）。
+
         参数：
             elements (list[dict]): FormatAdapter 元素列表。
         返回：
@@ -170,7 +173,7 @@ class StructuralAxis:
         for elem in elements:
             base = {**elem, "standard_id": self.standard_id}
             if elem["type"] == "list":
-                items = elem.get("list_items", [])
+                items = base.pop("list_items", [])  # 展开后不再逐块保留 list_items（去冗余）
                 toc = _is_catalog_list(items)  # 整列目录页 → 每条盖 catalog="目录"
                 for sub in items:
                     b = {**base, "text": sub}
@@ -249,10 +252,10 @@ class StructuralAxis:
         功能：
             目录页块——catalog 已为 "目录"，catalog_source = toc_page。
             有目录条目时——维护单调前瞻指针，正文块归一化文本命中 entries[ptr:ptr+W]
-            中某条（精确相等，或 is_heading 块前缀相等）即切换「当前条目」、指针前移，
+            中某条（精确相等，或 text_level 标题块前缀相等）即切换「当前条目」、指针前移，
             该块 source = toc_match；未命中则 catalog = 当前条目（条等深层块自然归属其
             节），source = inherited（首个命中前 catalog=None、source=none）。
-            无目录条目时——退化：is_heading 块自身标题作边界（source=heading_fallback），
+            无目录条目时——退化：text_level 标题块自身标题作边界（source=heading_fallback），
             其余继承（source=inherited / none）。
 
         参数：
@@ -274,7 +277,7 @@ class StructuralAxis:
                     en = entries[j]["norm"]
                     if len(en) < 2:
                         continue
-                    if nb == en or (b.get("is_heading") and nb.startswith(en)):
+                    if nb == en or (b.get("text_level") is not None and nb.startswith(en)):
                         hit = j
                         break
                 if hit is not None:
@@ -284,7 +287,7 @@ class StructuralAxis:
                 else:
                     b["catalog"] = cur
                     b["catalog_source"] = "inherited" if cur is not None else "none"
-            elif b.get("is_heading") and b.get("text"):  # 退化：标题块自身作边界
+            elif b.get("text_level") is not None and b.get("text"):  # 退化：标题块自身作边界
                 cur = b["text"]
                 b["catalog"], b["catalog_source"] = cur, "heading_fallback"
             else:
@@ -300,7 +303,7 @@ class StructuralAxis:
             无（打印到终端）。
         """
         total = len(annotated)
-        headings = sum(1 for e in annotated if e.get("is_heading"))
+        headings = sum(1 for e in annotated if e.get("text_level") is not None)
         src = Counter(e.get("catalog_source") for e in annotated)
         located = src["toc_match"] + src["inherited"] + src["heading_fallback"]
 
@@ -308,7 +311,7 @@ class StructuralAxis:
         t.add_column("指标")
         t.add_column("数量", justify="right")
         t.add_row("总块数", str(total))
-        t.add_row("  标题块(is_heading)", str(headings))
+        t.add_row("  标题块(text_level)", str(headings))
         t.add_row("  目录页块(toc_page)", str(src["toc_page"]))
         t.add_row("  已定位块(归属某条目)", str(located))
         t.add_row("    命中目录条目(toc_match)", str(src["toc_match"]))

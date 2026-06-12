@@ -1,10 +1,10 @@
 """层级化解析流水线（结构层）— 格式适配 → 标注 → 建节点树。
 
 PRD §3.2 新模型（节点树 + 多表征 + 粒度视图）：
-  格式适配  FormatAdapter — 纯格式转换（page 归一、HTML 表格解析、is_heading 标记、
+  格式适配  FormatAdapter — 纯格式转换（page 归一、HTML 表格解析、text_level 原样透传、
             block_idx 溯源），无结构语义
   标注     StructuralAxis — 目录打标器：给每块打 catalog 标签（"目录" / 所属目录条目
-            标题 / None）+ standard_id；is_heading / 溯源随 FormatAdapter 透传，不解析条文号、不建树
+            标题 / None）+ standard_id；text_level / block_idx 溯源随 FormatAdapter 透传，不解析条文号、不建树
   建树     GranularityAxis — 把标注块还原成**保留 parent/child 的节点树**（不再压平）；
             **条文号识别 + node_type + parent/child + 祖先链 + 引用图分型**作「固有事实」
             在此一次算定，落 nodes.json 作单一真值
@@ -154,7 +154,7 @@ class FormatAdapter:
 
     功能：
         page_number 跳过；page 归一（0-base → 1-base）；HTML 表格解析；
-        is_heading 标记（text_level 字段存在即为 MinerU 标题）；
+        text_level 原样透传（MinerU 标题层级，仅标题块有此键）；
         list 条目保留整体（不展开、不做目录过滤，由结构轴处理）。
 
     参数：无（调用静态方法 adapt(items) 传入原始列表）。
@@ -163,9 +163,8 @@ class FormatAdapter:
             type       元素类型（text / list / table / equation / footer）
             text       文本内容（list 为空字符串，table 为 caption）
             page       页码（从 1 起）
-            is_heading MinerU 标题标志（text_level 字段存在为 True）
-            raw        原始 v1 dict
-            block_idx  原始 content_list 中的下标（供节点 provenance 溯源）
+            text_level MinerU 标题层级（原样透传；仅标题块有此键，缺则非标题）
+            block_idx  原始 content_list 中的下标（供节点 provenance 溯源回 data/parsed）
             list_items list 条目列表（仅 list）
             body       矩形二维表体（仅 table）
             img_path   裁切图路径（仅 table）
@@ -195,8 +194,6 @@ class FormatAdapter:
                     "type": "table",
                     "text": caption,
                     "page": page,
-                    "is_heading": False,
-                    "raw": it,
                     "block_idx": idx,
                     "body": _html_table_to_rows(it.get("table_body", "")),
                     "img_path": it.get("img_path", ""),
@@ -210,8 +207,6 @@ class FormatAdapter:
                         "type": "list",
                         "text": "",
                         "page": page,
-                        "is_heading": False,
-                        "raw": it,
                         "block_idx": idx,
                         "list_items": list_items,
                     })
@@ -220,14 +215,15 @@ class FormatAdapter:
             text = it.get("text", "").strip()
             if not text:
                 continue
-            out.append({
+            elem = {
                 "type": t,
                 "text": text,
                 "page": page,
-                "is_heading": "text_level" in it,
-                "raw": it,
                 "block_idx": idx,
-            })
+            }
+            if "text_level" in it:  # MinerU 标题层级：原样透传，仅标题块有此键
+                elem["text_level"] = it["text_level"]
+            out.append(elem)
         return out
 
 
@@ -311,7 +307,7 @@ def classify_heading(text: str) -> dict | None:
         不依赖标题栈/外部层级。
 
     参数：
-        text (str): 标题块文字（调用方已判定 is_heading=True）。
+        text (str): 标题块文字（调用方已判定 text_level 存在，即 MinerU 标题块）。
     返回：
         dict | None: ``{clause_path, node_type, path_source, path_confidence}``。
             返回 None 表示该行实为交叉引用片段（如「5.3节…」），应按内容块处理。
@@ -466,7 +462,7 @@ class GranularityAxis:
         """标注块按标题分组，聚合成 schema.Node 节点（未连边）。
 
         功能：
-            **条文号识别在此一次算定**（下沉自结构轴）：对结构轴标 is_heading 的块跑
+            **条文号识别在此一次算定**（下沉自结构轴）：对有 text_level（MinerU 标题）的块跑
             classify_heading 提 clause_path / node_type / path_source / path_confidence，
             命中即开新节点；返回 None（交叉引用片段如「5.3节…」）则按内容块处理。
             非标题块追加进当前节点正文；表格 / 图示暂存节点 tables / images 字段
@@ -477,7 +473,7 @@ class GranularityAxis:
 
         参数：
             annotated (list[dict]): StructuralAxis.annotate() 产出的标注列表
-                （每块带 is_heading / catalog / standard_id 等目录标签）。
+                （每块带 text_level / catalog / standard_id 等标签）。
             source_file (str): provenance.source_file。
             version / effective_date / status (str): 规范级元数据。
         返回：
@@ -497,7 +493,7 @@ class GranularityAxis:
             if elem.get("catalog") == "目录":
                 continue  # 目录页块不开节点、不并入正文（structure.json 已全量保留 + 溯源）
 
-            info = classify_heading(elem.get("text", "")) if elem.get("is_heading") else None
+            info = classify_heading(elem.get("text", "")) if elem.get("text_level") is not None else None
             if info is not None:
                 _flush()
                 cur = schema.new_node(

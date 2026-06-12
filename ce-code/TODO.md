@@ -83,7 +83,7 @@ MinerU 解析 + 条款树提取 + 质量审核，在 GB 50378-2006 和 GB 50016 
 
 **波1 — 拆强条 + 立节点树骨架**（无新依赖，纯重构，可立即开工）：
 
-- [ ] **T1 `schema.py` 换契约**：`Clause` → `Node` + `Representation`；新增 `parent_id`/`children_ids`/`reprs`；删 `ModalStrength` 法律语义、`is_mandatory_clause`、`_HARD_MODAL`、`to_v1_compat`（v1 兼容桥退役）。保留 `RefType`/`EXPANDABLE_REF_TYPES`/`Reference`。
+- [x] **T1 `schema.py` 换契约**（✅ 2026-06-12）：`Clause` → `Node` + `Representation` + `Provenance`；新增 `parent_id`/`children_ids`/`reprs`、结构层审计 `path_source`/`path_confidence`、溯源 `provenance`（`block_idx` 回指 MinerU 原始块，原始留 `data/parsed/` 不可变）、`ancestor_paths`；`level` 由号段数推导不取 text_level；工厂 `new_node()`/`empty_condition()`。删 `is_mandatory_clause`/`_HARD_MODAL`/`to_v1_compat`/`empty_scope`/`ApplicableScope`/`TableRepr`（v1 兼容桥退役）。保留 `RefType`/`EXPANDABLE_REF_TYPES`/`Reference`/`Modal`（语气词表，注释钉死「无法律含义」）。冒烟测试通过；下游 `extract/build.py` 待 T5 改编排。
 - [ ] **T2 结构层产树**（`02_parse_hierarchy.py`）：`GranularityAxis._group_into_nodes` 改为**保留 parent/child**，不再压平；产出 `nodes.json`（含 `parent_id`/`children_ids`）。引用图分型 + 祖先链作"固有事实"在此一次算定（`references.py`/`ancestors.py` 并入结构层）。
 - [ ] **T3 删强条排序**（`retrieval/engine.py`）：去掉 `rerank()`/`search()` 里 `mandatory + non_mandatory[...]` 的强条置顶（`engine.py:197-199`、`249-251`）与 `vector_search` 的 `filter_mandatory`；结果纯按 RRF/rerank 排。
 - [ ] **T4 索引去强条字段**（`04_build_index.py`）：Milvus schema 删 `is_mandatory` 字段 + 其 INVERTED 索引；`metadata.json` 同步去字段；加 `node_id`/`parent_id`/`granularity` 判别字段。索引路径改 `data/vector_store/{standard}/{profile}/`。

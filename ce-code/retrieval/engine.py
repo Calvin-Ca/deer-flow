@@ -20,9 +20,11 @@ from pathlib import Path
 from .config import RERANK_MODEL
 
 MILVUS_OUTPUT_FIELDS = [
-    "clause_path", "standard_id", "content", "is_mandatory",
+    "node_id", "clause_path", "parent_id", "granularity", "standard_id", "content",
     "level", "page", "references_to", "has_tables", "has_images",
 ]
+# 注：is_mandatory 字段已随 T4 从索引移除（强条机制 2026-06-12 废）；parent_id 供 T9
+# small-to-big 上探。ref-type 感知的引用扩展与 small-to-big 仍在 T9，本处只读不变。
 
 
 # ---------------------------------------------------------------------------
@@ -252,7 +254,6 @@ def search(
             merged=len(merged),
             expanded=len(expanded),
             final=len(final),
-            mandatory=sum(1 for r in final if r.get("is_mandatory")),
         )
 
     return final

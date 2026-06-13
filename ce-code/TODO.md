@@ -81,6 +81,12 @@ MinerU 解析 + 条款树提取 + 质量审核，在 GB 50378-2006 和 GB 50016 
 
 > 新流水线（见 PRD §3.2）：阶段 1 结构层（建节点树 `nodes.json`）→ 阶段 2 表征层（挂 `reprs`）→ 阶段 3 索引（按 `index_granularity` 选粒度视图）。代码任务编号 T1–T10，依赖关系见下。**一次只动一个变量，每步过 `07_eval` 护栏。**
 
+> **⚠️ 核心现状（2026-06-13 评估）：流水线后半段已与 `nodes.json` 脱钩，护栏事实上失效。**
+> - **生产者已迁移**：`02` 现在只产 `nodes.json` + `structure.json`，**不再产 `*_clauses.json`**。
+> - **消费者全在 v1**：`extract/build.py`（读 `*_clauses.json`→`*_clauses_v2.json`）、`04`（读 `*_clauses.json`，建 `is_mandatory` INVERTED 索引）、`engine`、`server` 全部仍吃 v1 dict 行格式。
+> - **后果**：`nodes.json` 当前**零下游消费者**，`02 → build → 04` 这条链是断的（格式对不上）。`07_eval` 还能跑，只因它打的是 **T2 之前旧 `*_clauses.json` 建的陈旧索引**——新树从未被索引/检索验证过。"每步过护栏"的纪律已无所附丽。
+> - **据此重排（见下）**：把目标从"删 is_mandatory 字段"（低价值清理）重定为**"让 `nodes.json` 端到端可建索引、可被 `07_eval` 与 v1 基线对比"**；纯删除型任务（T4/T6 去字段）顺手捎上。原"波1/波2/波3"按概念分组（拆强条 / 粒度 / LLM）改为按**执行批次**分组（接通链路优先）。**第 1 步打通前，护栏不算活。**
+
 **波1 — 拆强条 + 立节点树骨架**（无新依赖，纯重构，可立即开工）：
 
 - [x] **T1 `schema.py` 换契约**（✅ 2026-06-12）：`Clause` → `Node` + `Representation` + `Provenance`；新增 `parent_id`/`children_ids`/`reprs`、结构层审计 `path_source`/`path_confidence`、溯源 `provenance`（`block_idx` 回指 MinerU 原始块，原始留 `data/parsed/` 不可变）、`ancestor_paths`；`level` 由号段数推导不取 text_level；工厂 `new_node()`/`empty_condition()`。删 `is_mandatory_clause`/`_HARD_MODAL`/`to_v1_compat`/`empty_scope`/`ApplicableScope`/`TableRepr`（v1 兼容桥退役）。保留 `RefType`/`EXPANDABLE_REF_TYPES`/`Reference`/`Modal`（语气词表，注释钉死「无法律含义」）。冒烟测试通过；下游 `extract/build.py` 待 T5 改编排。
@@ -89,22 +95,32 @@ MinerU 解析 + 条款树提取 + 质量审核，在 GB 50378-2006 和 GB 50016 
   - **T2 结构轴独立成文件 + catalog 升级值标签 + 目录定位（方案5）**（✅ 2026-06-13）：`StructuralAxis` 从 `02` 抽出为 `pipeline/structural_axis.py`（与建节点树解耦、可单测）。`is_catalog`(bool) 升级为 `catalog`(值)——块本身是目录页→`"目录"`，否则→**所属目录条目标题**（属于目录里哪一条），目录前/无目录→`None`。定位用**方案5（混合）**：目录页解析成有序条目表（骨架真值，兼容括号页码与点导引裸页码）→ 正文按文档序单调前瞻扫描、归一化匹配条目切换"当前条目"，条(x.x.x)不在目录则归属其节；无目录退化为以 `is_heading` 标题作边界。目录页识别改**区域判据**（连续成行 ≥`MIN_TOC_RUN` / 整列），孤立"行尾带数字"正文短行不误判（守"不做减法"）。建树层 `02` 跳过判据 `is_catalog` → `catalog=="目录"`。⚠️ 阈值/尾页码正则按常见排版设默认，待服务器跑真规范微调；建树层尚未改用 `catalog` 建树（仍走 `classify_heading` 号段路径）。另加 `catalog_source` 审计字段（`toc_page`/`toc_match`/`inherited`/`heading_fallback`/`none`），让方案5各定位来源在结果可见、`print_stats` 按来源分解计数。
   - **T2 删冗余透传 + is_heading 改用 text_level**（✅ 2026-06-13）：`FormatAdapter` 删 `raw`（整条 MinerU dict 冗余，需原件靠 `block_idx` 回查 `data/parsed/`；唯一读者 `strength._bold_from_raw` 本就拿不到、且强条已废弃）、`list_items` 展开后不再逐块保留（`_flatten` 里 `pop`）。`is_heading`(派生 bool) 改为 `text_level`(MinerU 标题层级原样透传，仅标题块有键)，消费方 `02` 建树判定 + 结构轴 `_locate`/`print_stats` 同步改 `text_level is not None`。审计「操作+改键」仅剩 `page_idx→page`(+1)、`table_caption→text`、`table_body→body` 三处实质转换（合理改名，与 is_heading「改名却丢原值」不同）。
   - **T2 拆 FormatAdapter + 结构轴更名 CatalogLabeler（术语统一）**（✅ 2026-06-13）：`FormatAdapter`（+ `_HTMLTableParser`/`_expand_spans`/`_html_table_to_rows`）从 `02` 抽到 `pipeline/format_adapter.py`（纯 stdlib、可复用、可单测，`02` 瘦身为「建树层 + 编排/CLI」）。**术语统一**：职责重划后「结构轴」已名不副实（只打目录标签、不建结构），故 `structural_axis.py`→`pipeline/catalog_labeler.py`、类 `StructuralAxis`→`CatalogLabeler`、中文表述「结构轴」→「目录打标器」（docstring/统计标题/`02` import 与引用同步；上文历史条目保留旧名以存真）。注意「结构**层**」仍指阶段1整层（打标+建树），未改。
+  - **T2 拆建树器独立成文件 + `GranularityAxis` 更名 `TreeBuilder`（术语统一）**（✅ 2026-06-13）：建树逻辑（`GranularityAxis` 类 + `classify_heading`/`_infer_node_type`/`_parent_path`/`_resolve_parent` + 条文号/父路径正则）从 `02` 抽到 `pipeline/tree_builder.py`（可独立单测，`02` 彻底瘦身为「编排 + CLI」；至此结构层三件 `format_adapter`/`catalog_labeler`/`tree_builder` 各自成文件并列）。**术语统一**：`GranularityAxis` 双重失准——既属已废弃「三轴」旧模型，「granularity（粒度）」又已专指索引期树上视图（`view.py`，T7），与建树无关；故类 `GranularityAxis`→`TreeBuilder`、中文「建树轴/粒度轴」→「建树器」，`02`/`catalog_labeler`/`format_adapter` 的 import 与 docstring 引用同步（历史条目保留旧名存真）。行为保持：方法体逐字搬移，合成树用例验证 `classify_heading`/parent 反推/祖先链/引用图分型一致；`02` 不再 import `schema`/`extract.references`（已随建树器迁走）。
+  - **T2 改用 catalog 建树（目录条目为骨架）·解决父链断裂**（✅ 2026-06-13，方案 B）：根因——旧建树 `_flush` 丢弃「只有标题没正文」的章/节骨架节点，致子条款号段反推父时找不到 → `parent_id=None`、祖先链空、small-to-big 失效。改 `TreeBuilder.apply` 为 **①目录条目物化骨架（恒存在，根治断裂）→ ②正文标题块并入同号骨架（接地：补 provenance）或建新条/款节点 → ③连边（号段为主、catalog 归属兜底）→ ④剪空正文叶（骨架恒留，级联到稳定）+ 祖先链 + 引用图**。条目嵌套（5.3 属 5）与条内层级（5.3.4.1 属 5.3.4）仍按号段（catalog 只定位到节深）；无目录页（`entries` 空）退化为「保留骨架 + 号段」best-effort。配套：`CatalogLabeler.annotate` 把有序条目表存到 `self.entries` 供建树取，`02.Pipeline.run`/preview 传 `entries=axis.entries`。合成用例验证：纯空骨架 `5.3` 存活、`5.3.4→5.3`/`5.3.4.1→5.3.4`、骨架被正文标题接地、空叶 `7.1.1` 剪除、无目录退化靠 catalog 兜底挂载、临时键 `_catalog`/`_skeleton` 清理。⚠️ **本地仅合成数据验证；目录解析质量（方案5 阈值）+ 真规范树形待服务器跑 GB 50016 对齐基线**——这是 B 路线的已知风险（强依赖目录解析）。
 - [x] **T3 删强条排序**（✅ 2026-06-12）：`retrieval/engine.py` 去掉 `rerank()`/`search()` 里 `mandatory + non_mandatory[...]` 的强条置顶与 `vector_search` 的 `filter_mandatory`；结果纯按 RRF/rerank 排序后切 `top_k`。残留 `MILVUS_OUTPUT_FIELDS` 的 `is_mandatory` 与 stats 观测留 T4/T6 清理。
-- [ ] **T4 索引去强条字段**（`04_build_index.py`）：Milvus schema 删 `is_mandatory` 字段 + 其 INVERTED 索引；`metadata.json` 同步去字段；加 `node_id`/`parent_id`/`granularity` 判别字段。索引路径改 `data/vector_store/{standard}/{profile}/`。
-- [ ] **T5 改编排**（`extract/build.py`）：删保守模式、官方强条清单、`_diff_mandatory`、`to_v1_compat` 调用；改为"跑固有事实 + 表征注册表 → `nodes.json`"。
+> T4/T5/T6 仍是原编号原职责，只是从"波1 拆强条收尾"重新归到下面的执行批次里——纯删字段动作（T4/T6）拆出来跟着第 1/3 步走，避免在新链路尚未打通时空删导致护栏更没得跑。
+
+**第 1 步 — 接通最小可跑链路（T7 最小切片 + T8 免费表征 + T4），让护栏复活**（无新依赖；这是当前唯一阻塞项，先做）：
+
+- [x] **T7（最小切片）粒度视图**（✅ 2026-06-13）：新增 `view.py` 的 `view(nodes, index_granularity) → 检索单元`（索引期纯函数，读 `nodes.json`），**先只做 `clause` 层 emit**（`node_type=="clause"`；section/paragraph 抛 `NotImplementedError` 留后补，bogus 值 `ValueError`）。`ParseProfile` 从 `02` 抽到可 import 的 `parse_profile.py`（数字前缀文件不可 import；命名避开 stdlib `profile`）：删 `chunk_granularity`/`enrichment`/`structure_depth`，加 `index_granularity`（section\|clause\|paragraph）+ `reprs`（list，缺省免费 4 项 `raw/sparse/dense/context_aug`）+ `small_to_big`；`terminal_stage` 改 PRD §3.2 值 `structure|reprs|index`。`02` 改 import + 同步 CLI（`--index-granularity` 替 `--chunk-granularity/--enrichment`，默认终止 `structure`）+ 删建树层对旧字段的 vestigial 引用。冒烟测试通过（default_factory 不共享、clause 选层正确、02 可加载）。待第 1 步 T8/T4 接 `view` 入索引。
+- [ ] **T8（免费 4 项）表征注册表**（`extract/` → `reprs/`）：先落 `raw`/`sparse`/`dense`/`context_aug`（`context_aug` 接管 `ancestors.py`，拼祖先链）。`table_struct`/`modal`/`condition`/LLM 表征推到第 4 步。
+- [ ] **T4 索引读 `nodes.json` + 去强条字段**（`04_build_index.py`）：改读 `nodes.json` 走 `view`；行格式带 `node_id`/`parent_id`/`granularity`，Milvus schema 删 `is_mandatory` 字段 + 其 INVERTED 索引；`metadata.json` 同步去字段。索引路径改 `data/vector_store/{standard}/{profile}/`。
+- [ ] **🏁 里程碑（护栏复活）**：用新模型重建 GB 50016（`02 → reprs → 04`），`07_eval` 与旧 v1 索引对比召回（基线口径已换，按 PRD §四**包含关系**判命中）。**此步打通前，下面各步都不算有护栏。**
+
+**第 2 步 — T5 退役/重定位 `build.py`**（依赖第 1 步的 reprs runner 形态）：
+
+- [ ] **T5 改编排**（`extract/build.py`）：固有事实（引用图/祖先链）已在 `02` 算定，故**删而非重写** v1 富化逻辑——删保守模式、官方强条清单、`_diff_mandatory`、`to_v1_compat`/`strength`；把 `build.py` 重定位成**阶段 2 表征 runner**（读 `nodes.json` → 挂 reprs → 写富化节点），与第 1 步 T8 收口为同一入口。
+
+**第 3 步 — T9 small-to-big + T6 服务层**（依赖第 1 步索引带 `parent_id`）：
+
+- [ ] **T9 small-to-big 检索**（`retrieval/engine.py`）：细粒度命中后靠 `parent_id` 上探返回整条/整节；清掉 `MILVUS_OUTPUT_FIELDS` 残留 `is_mandatory` 与 stats 观测（T3 留尾）；`modal` 作可选 filter 通道（query 带强制意图时启用，依赖第 4 步 modal 表征）。
 - [ ] **T6 服务层清理**（`service/server.py`）：删 `mandatory_clauses_count`、`★强条` 日志；`/search` 返回挂 small-to-big 父节点上下文。
 
-**波2 — 粒度视图 + 表征注册表**（依赖波1）：
+**第 4 步 — 波2 表征补全 + 波3 LLM 表征 / 评测改造**（依赖前三步 + Qwen3）：
 
-- [ ] **T7 粒度视图**：新增 `view(tree, index_granularity) → 检索单元`（索引期函数）；`ParseProfile` 去掉旧 `chunk_granularity`/`enrichment`，加 `index_granularity`（section|clause|paragraph）+ `reprs` 列表 + `small_to_big`。
-- [ ] **T8 表征注册表**（`extract/` → `reprs/`）：免费表征落地——`raw`/`sparse`/`context_aug`（接管 `ancestors.py`）/`table_struct`（接管现表格 HTML 解析）/`modal`（复用 `strength.parse_modal_strength` 正则，删 `is_mandatory` 法律逻辑，产出 `reprs.modal`）；`condition` 谓词（`reprs/condition.py`，抽不准标 `scope_status:unknown`）。
-- [ ] **T9 small-to-big 检索**（`retrieval/engine.py`）：细粒度命中后靠 `parent_id` 上探返回整条/整节；`modal` 作可选 filter 通道（query 带强制意图时启用）。
-
-**波3 — LLM 表征 + 评测改造**（依赖波2 + Qwen3）：
-
+- [ ] **T8 表征补全**：`table_struct`（接管现表格 HTML 解析）/`modal`（复用 `strength.parse_modal_strength` 正则，删 `is_mandatory` 法律逻辑，产出 `reprs.modal`）/`condition` 谓词（`reprs/condition.py`，抽不准标 `scope_status:unknown`）。
 - [ ] **T10 评测换指标**（`07_eval.py`）：删"强条召回率"首要指标，改 Recall@k / 引用召回 / MRR / 金标秩；按**包含关系**判命中（配合 small-to-big）。`03_review_quality.py` 同步：删强条统计/误标检测，改节点树健康（孤儿节点 / 空内容 / 表格归属 / 悬空引用）。
 - [ ] **LLM 表征**（`reprs/summary.py`、`reprs/questions.py`）：调 Qwen3 生成摘要 / 假设问题表征，入 `dense` 多通道。
-- [ ] **重建索引 + 验证**：`02 → build → 04` 用新模型重建 GB 50016；`07_eval` 对比新旧召回（注意基线口径已换）。
 
 **多规范扩展**：GB 50116（火灾自动报警系统）待收录。
 

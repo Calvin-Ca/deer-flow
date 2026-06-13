@@ -22,8 +22,8 @@ MinerU 标题块自身标题作边界（best-effort）。
   - ``none``             目录前 / 未命中（catalog=None）
 
 设计约束（承 2026-06-12 职责重划）：本层只产「目录归属」这一可靠标签（catalog +
-catalog_source 审计），**不**解析条文号 / node_type / 层级 / 建树——那些是建树层
-GranularityAxis 由 clause_path 号段数算定的「固有事实」。**对 MinerU 结果不做减法**：
+catalog_source 审计），**不**解析条文号 / node_type / 层级 / 建树——那些是建树器
+TreeBuilder（tree_builder.py）由 clause_path 号段数算定的「固有事实」。**对 MinerU 结果不做减法**：
 目录页块只标 ``catalog="目录"`` 保留（建树阶段据此不并入正文），目录判定采**区域**
 判据（连续成行 / 整列），不据单行启发式丢正文块。
 
@@ -143,9 +143,13 @@ class CatalogLabeler:
             无。
         """
         self.standard_id = standard_id
+        self.entries: list[dict] = []  # annotate() 后填：有序目录条目表（骨架真值，供建树器取）
 
     def annotate(self, elements: list[dict]) -> list[dict]:
         """展平 → 目录打标 → 目录定位，逐块写 standard_id + catalog。
+
+        副作用：把解析出的有序目录条目表存到 ``self.entries``（``{title, norm, page}``，
+        骨架真值），供建树器 TreeBuilder 以目录条目为骨架建树（无目录页时为空列表）。
 
         参数：
             elements (list[dict]): FormatAdapter.adapt() 产出的统一元素列表。
@@ -154,8 +158,8 @@ class CatalogLabeler:
         """
         blocks = self._flatten(elements)
         self._mark_toc(blocks)
-        entries = self._parse_entries(blocks)
-        self._locate(blocks, entries)
+        self.entries = self._parse_entries(blocks)
+        self._locate(blocks, self.entries)
         return blocks
 
     def _flatten(self, elements: list[dict]) -> list[dict]:

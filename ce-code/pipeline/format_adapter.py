@@ -3,7 +3,7 @@
 纯格式转换、无结构语义：把 MinerU v1 `content_list.json` 的扁平元素归一成下游各层
 共用的统一块 schema（page 归一、HTML 表格解析成矩形二维表、text_level 原样透传、
 block_idx 溯源）。不解析条文号 / 不打目录标签 / 不建树——那些分别是目录打标器
-（catalog_labeler.py）与建树层（GranularityAxis）的事。
+（catalog_labeler.py）与建树器（tree_builder.py 的 TreeBuilder）的事。
 
 从 02_parse_hierarchy.py 单独分出（与建树 / 编排解耦，可独立单测、可被别的入口复用）。
 本模块纯 stdlib（html.parser），无项目内跨层依赖。

@@ -1,7 +1,6 @@
-"""结构轴 — StructuralAxis（结构层·阶段 1 标注 = 目录打标 + 目录定位）。
+"""目录打标器 — CatalogLabeler（结构层·阶段 1 标注 = 目录打标 + 目录定位）。
 
-结构轴 = **目录打标器**：依据文档**目录页**这一结构真值，给每个解析块打一个
-`catalog` 标签——
+依据文档**目录页**这一结构真值，给每个解析块打一个 `catalog` 标签——
 
   - 块本身就是「文档前面的目录页」 → ``catalog = "目录"``；
   - 否则 → ``catalog = 它所属目录条目的标题``（「属于目录里哪一条」），
@@ -114,8 +113,8 @@ def _is_catalog_list(items: list[str], thresh: float = 0.5) -> bool:
     return hits >= max(1, len(items)) * thresh
 
 
-class StructuralAxis:
-    """结构轴 = 目录打标器：给每块打 `catalog`（"目录" / 所属目录条目标题 / None）。
+class CatalogLabeler:
+    """目录打标器：给每块打 `catalog`（"目录" / 所属目录条目标题 / None）。
 
     功能（方案 5 混合）：
         ① 展平 + 盖章 standard_id（list 条目逐条展开，不丢块）；
@@ -136,7 +135,7 @@ class StructuralAxis:
     """
 
     def __init__(self, standard_id: str) -> None:
-        """初始化结构轴。
+        """初始化目录打标器。
 
         参数：
             standard_id (str): 规范唯一标识。
@@ -295,7 +294,7 @@ class StructuralAxis:
                 b["catalog_source"] = "inherited" if cur is not None else "none"
 
     def print_stats(self, annotated: list[dict]) -> None:
-        """打印结构轴标注统计：标题数 + 按 catalog_source 分解各来源占比（方案 5 可见）。
+        """打印目录打标统计：标题数 + 按 catalog_source 分解各来源占比（方案 5 可见）。
 
         参数：
             annotated (list[dict]): annotate() 产出的标注列表。
@@ -307,7 +306,7 @@ class StructuralAxis:
         src = Counter(e.get("catalog_source") for e in annotated)
         located = src["toc_match"] + src["inherited"] + src["heading_fallback"]
 
-        t = Table(title="结构轴标注统计（目录打标 + 定位）")
+        t = Table(title="目录打标统计（目录打标 + 定位）")
         t.add_column("指标")
         t.add_column("数量", justify="right")
         t.add_row("总块数", str(total))

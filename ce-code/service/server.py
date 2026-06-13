@@ -124,9 +124,9 @@ def _run_search(req: SearchRequest, rid: str) -> tuple[list[dict], dict, str, fl
 
     retrieve_ms = (time.perf_counter() - t0) * 1000
     logger.info(
-        "[%s] 检索完成 bm25=%s vector=%s merged=%s expanded=%s final=%s 强条=%s (%.0fms)",
+        "[%s] 检索完成 bm25=%s vector=%s merged=%s expanded=%s final=%s (%.0fms)",
         rid, stats.get("bm25_hits"), stats.get("vector_hits"), stats.get("merged"),
-        stats.get("expanded"), stats.get("final"), stats.get("mandatory"), retrieve_ms,
+        stats.get("expanded"), stats.get("final"), retrieve_ms,
     )
     _log_clauses(rid, clauses)
     return clauses, stats, store_name, retrieve_ms
@@ -134,21 +134,19 @@ def _run_search(req: SearchRequest, rid: str) -> tuple[list[dict], dict, str, fl
 
 def _log_clauses(rid: str, clauses: list[dict]) -> None:
     """逐条输出：汇总行 + 列表头 + 每条条款（溯源可观测性）。"""
-    n_mandatory = sum(1 for c in clauses if c.get("is_mandatory"))
-    logger.info("[%s] ── 命中 %d 条（强条 %d）", rid, len(clauses), n_mandatory)
-    logger.info("[%s]   标识   条款号         页码      来源        引用关系", rid)
+    logger.info("[%s] ── 命中 %d 条", rid, len(clauses))
+    logger.info("[%s]   条款号         页码      来源        引用关系", rid)
     for c in clauses:
         refs_raw = c.get("references_to", [])
         refs = json.loads(refs_raw) if isinstance(refs_raw, str) else refs_raw
-        mandatory_tag = "★强条" if c.get("is_mandatory") else "  推荐"
         ref_str = ""
         if refs:
             preview = refs[:4]
             tail = f"+{len(refs) - 4}" if len(refs) > 4 else ""
             ref_str = f"  引用→[{', '.join(preview)}{tail}]"
         logger.info(
-            "[%s]   %s  %-10s  p.%-4d  %-10s%s",
-            rid, mandatory_tag, c.get("clause_path", "?"),
+            "[%s]   %-10s  p.%-4d  %-10s%s",
+            rid, c.get("clause_path", "?"),
             c.get("page", 0), c.get("_source", ""), ref_str,
         )
 
@@ -179,7 +177,6 @@ def search_endpoint(req: SearchRequest) -> dict:
         "query": req.query,
         "standard": store_name,
         "retrieved_clauses_count": len(clauses),
-        "mandatory_clauses_count": stats.get("mandatory", 0),
         "clauses": clauses,
         "meta": {
             "request_id": rid,

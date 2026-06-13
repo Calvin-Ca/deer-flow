@@ -109,12 +109,14 @@ MinerU 解析 + 条款树提取 + 质量审核，在 GB 50378-2006 和 GB 50016 
 
 **第 2 步 — T5 退役/重定位 `build.py`**（依赖第 1 步的 reprs runner 形态）：
 
-- [ ] **T5 改编排**（`extract/build.py`）：固有事实（引用图/祖先链）已在 `02` 算定，故**删而非重写** v1 富化逻辑——删保守模式、官方强条清单、`_diff_mandatory`、`to_v1_compat`/`strength`；把 `build.py` 重定位成**阶段 2 表征 runner**（读 `nodes.json` → 挂 reprs → 写富化节点），与第 1 步 T8 收口为同一入口。
+- [x] **T5 删 v1 富化链**（✅ 2026-06-13）：固有事实（引用图/祖先链）已在 `02` 算定、表征 runner 职责由 `reprs.enrich`（T8）+ `04` 承担，故 `build.py`**直接删除而非重定位**——连同 `strength.py`（强条/语气 v1 逻辑，机制已废）、`ancestors.py`（祖先链已被 `tree_builder._attach_ancestors` 接管）一并删。`extract/__init__.py` 改为只 import `references`（引用图分型，建树期固有事实，仍被 `tree_builder` import），`extract/` 现仅剩 `references.py`。import 烟测通过。
 
 **第 3 步 — T9 small-to-big + T6 服务层**（依赖第 1 步索引带 `parent_id`）：
 
-- [ ] **T9 small-to-big 检索**（`retrieval/engine.py`）：细粒度命中后靠 `parent_id` 上探返回整条/整节；清掉 `MILVUS_OUTPUT_FIELDS` 残留 `is_mandatory` 与 stats 观测（T3 留尾）；`modal` 作可选 filter 通道（query 带强制意图时启用，依赖第 4 步 modal 表征）。
-- [ ] **T6 服务层清理**（`service/server.py`）：删 `mandatory_clauses_count`、`★强条` 日志；`/search` 返回挂 small-to-big 父节点上下文。
+- [ ] **T9 small-to-big 检索**（`retrieval/engine.py`）：细粒度命中后靠 `parent_id` 上探返回整条/整节；`modal` 作可选 filter 通道（query 带强制意图时启用，依赖第 4 步 modal 表征）。
+  - [x] **去重键 clause_path → node_id**（✅ 2026-06-13，small-to-big 前置）：`merge_results`/`expand_references` 改按 `node_id` 去重（clause 粒度下与 clause_path 1:1 等价、行为保持；section/paragraph 粒度下 clause_path 不唯一时唯 node_id 恒唯一）。`references_to` 仍存 clause_path，故引用解析按 clause_path 查 meta、去重按 node_id；跨规范引用查不到自动跳过。合成数据烟测通过。`get_clause` 保持 clause_path 匹配（`/clause/{std}/{path}` 路径直取端点，契约即按路径）。`MILVUS_OUTPUT_FIELDS`/stats 的 `is_mandatory`/`mandatory` 残留已在 T4 清掉，本次同步清 `search` docstring 残留。
+  - [ ] **small-to-big 上探**（待做）：命中单元靠 `parent_id` 回补父节点整条/整节上下文。
+- [x] **T6 服务层清理**（✅ 2026-06-13，`service/server.py`）：删 `mandatory_clauses_count` 响应字段、`★强条`/`n_mandatory` 日志与 `强条=%s` 观测行。`/search` 返回挂 small-to-big 父节点上下文部分留 T9（依赖上探实现）。
 
 **第 4 步 — 波2 表征补全 + 波3 LLM 表征 / 评测改造**（依赖前三步 + Qwen3）：
 

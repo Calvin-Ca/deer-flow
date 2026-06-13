@@ -122,28 +122,34 @@ def vector_search(
 # ---------------------------------------------------------------------------
 
 def merge_results(bm25_results: list[dict], vector_results: list[dict]) -> list[dict]:
+    """RRF 合并去重。
+
+    去重键用 ``node_id``（节点唯一键），不用 ``clause_path``：clause 粒度下两者 1:1
+    等价，但 section / paragraph 粒度下 clause_path 不再唯一（同号多检索单元），唯有
+    node_id 恒唯一——故统一按 node_id 去重，避免换粒度后误合并。
+    """
     k = 60  # RRF 常数
     scores: dict[str, float] = {}
     items: dict[str, dict] = {}
 
     for rank, item in enumerate(bm25_results):
-        path = item["clause_path"]
-        scores[path] = scores.get(path, 0) + 1 / (k + rank + 1)
-        items[path] = item
+        nid = item["node_id"]
+        scores[nid] = scores.get(nid, 0) + 1 / (k + rank + 1)
+        items[nid] = item
 
     for rank, item in enumerate(vector_results):
-        path = item["clause_path"]
-        scores[path] = scores.get(path, 0) + 1 / (k + rank + 1)
-        if path not in items:
-            items[path] = item
+        nid = item["node_id"]
+        scores[nid] = scores.get(nid, 0) + 1 / (k + rank + 1)
+        if nid not in items:
+            items[nid] = item
         else:
-            items[path]["_source"] = "both"
-            items[path]["_vector_score"] = item.get("_vector_score")
+            items[nid]["_source"] = "both"
+            items[nid]["_vector_score"] = item.get("_vector_score")
 
     ranked = sorted(scores.items(), key=lambda x: x[1], reverse=True)
     results = []
-    for path, rrf_score in ranked:
-        item = dict(items[path])
+    for nid, rrf_score in ranked:
+        item = dict(items[nid])
         item["_rrf_score"] = rrf_score
         results.append(item)
     return results
@@ -154,24 +160,32 @@ def merge_results(bm25_results: list[dict], vector_results: list[dict]) -> list[
 # ---------------------------------------------------------------------------
 
 def expand_references(results: list[dict], metadata: list[dict], max_depth: int = 1) -> list[dict]:
+    """沿可扩展引用边（strong / cross_standard）一跳扩展命中集。
+
+    ``references_to`` 存的是被引目标的 ``clause_path``（如 "5.2.1"），故引用解析按
+    clause_path 查 ``meta_by_path``；**去重则按 node_id**（与 merge_results 一致，
+    section/paragraph 粒度下 clause_path 不唯一，node_id 恒唯一）。跨规范引用
+    （cross_standard，如 "GB 50116-2013"）不在本规范 metadata 内 → 查不到自动跳过。
+    """
     meta_by_path = {m["clause_path"]: m for m in metadata}
-    existing_paths = {r["clause_path"] for r in results}
+    existing_ids = {r.get("node_id") for r in results}
     expanded = list(results)
 
-    to_expand = list(existing_paths)
+    frontier = list(results)
     for _ in range(max_depth):
-        next_expand = []
-        for path in to_expand:
-            item = meta_by_path.get(path, {})
-            for ref in item.get("references_to", []):
-                if ref not in existing_paths and ref in meta_by_path:
-                    ref_item = dict(meta_by_path[ref])
-                    ref_item["_source"] = "ref_expand"
-                    ref_item["_rrf_score"] = 0.0
-                    expanded.append(ref_item)
-                    existing_paths.add(ref)
-                    next_expand.append(ref)
-        to_expand = next_expand
+        next_frontier = []
+        for item in frontier:
+            for ref_path in item.get("references_to", []):
+                ref_item = meta_by_path.get(ref_path)
+                if ref_item is None or ref_item.get("node_id") in existing_ids:
+                    continue
+                new_item = dict(ref_item)
+                new_item["_source"] = "ref_expand"
+                new_item["_rrf_score"] = 0.0
+                expanded.append(new_item)
+                existing_ids.add(ref_item.get("node_id"))
+                next_frontier.append(new_item)
+        frontier = next_frontier
 
     return expanded
 
@@ -229,8 +243,7 @@ def search(
     """混合检索主入口（重构前名为 ``retrieve``，逻辑不变）。
 
     若传入 ``stats`` 字典，会回填各阶段命中数（bm25_hits / vector_hits /
-    merged / expanded / final / mandatory），供服务层做可观测性输出；
-    检索逻辑本身不受影响。
+    merged / expanded / final），供服务层做可观测性输出；检索逻辑本身不受影响。
     """
     bm25, clause_paths = load_bm25(store_dir)
     metadata = load_metadata(store_dir)

@@ -19,17 +19,17 @@
 
 ## 规范轨实现
 
-### 解析管线（5 个阶段）
+### 解析管线（4 个阶段，PRD §3.2）
 
-管线每阶段读上一阶段产物、写自己的产物；`parse_profile` 控制终止阶段，实验只重跑下游，不重跑 MinerU（最贵，约 60% 耗时）。
+管线每阶段读上一阶段产物、写自己的产物；`parse_profile` 控制终止阶段，实验只重跑下游，不重跑 MinerU（最贵，约 60% 耗时）。新模型：节点树（阶段 1）一次建好，粒度是索引期（阶段 3）在树上选的视图，不是切树。
 
 | 阶段 | 脚本/模块 | 产物路径 |
 |---|---|---|
-| 0 MinerU 解析 | `pipeline/01_parse_pdf.py` + `pipeline/mineru_api.py` | `data/parsed/{standard}/` |
-| 1+2 结构/粒度轴 | `pipeline/02_parse_hierarchy.py` | `data/structured/{std}/{profile}/clauses.json` |
-| 3 语义轴 | `extract/build.py`（编排富化链） | 同上（附 `references`/`ancestor_titles`/`is_mandatory_clause` 等增强字段） |
-| 4 索引 | `pipeline/04_build_index.py` | `data/vector_store/{std}/{profile}/` |
-| 质量审核 | `pipeline/03_review_quality.py` | 人工检查，不阻塞流水线 |
+| 0 MinerU 解析 | `pipeline/01_parse_pdf.py` + `pipeline/mineru_api.py` | `data/parsed/{standard}/`（缓存，只跑一次） |
+| 1 结构层（建节点树） | `pipeline/02_parse_hierarchy.py`（`format_adapter` + `catalog_labeler` + `tree_builder`） | `data/structured/{std}/{profile}/nodes.json`（单一真值）+ `structure.json`（调试） |
+| 2 表征层（挂 reprs） | `reprs/`（`reprs.enrich`，免费 4 项；当前由 `04` 调用） | 节点附 `reprs` 字段 |
+| 3 索引 | `pipeline/04_build_index.py`（`view` 选粒度 → `reprs.enrich` → emit） | `data/vector_store/{std}/{profile}/`（BM25 + Milvus） |
+| 质量审核 | `pipeline/03_review_quality.py` | 人工检查，不阻塞流水线（⚠️ 仍 v1 强条口径，T10 待改） |
 
 **MinerU 使用原则：**
 - 默认走远程 API（`172.19.2.2:8000`，常驻热服务，单页 ~1.8s）；`--local` 才本地 CLI
@@ -39,30 +39,31 @@
 **parse_profile 实验隔离（命名避免覆盖彼此结果）：**
 
 ```yaml
-parse_profile:
-  name: p2_clause_full
-  terminal_stage: enrich       # structure | granularity | enrich | index
-  chunk_granularity: natural   # node | paragraph | natural
-  enrichment: full             # none | ids_refs | full
+parse_profile:                 # 字段契约见 parse_profile.py（PRD §3.2）
+  name: clause_default
+  terminal_stage: index        # structure | reprs | index → 终止阶段
+  index_granularity: clause    # section | clause | paragraph（当前仅 clause 已实现）
+  reprs: [raw, sparse, dense, context_aug]   # 启用的表征（缺省免费 4 项）
   small_to_big: true
 ```
 
 产物路径和 Milvus collection 按 `{standard}/{profile}` 隔离；`/search` 接 `profile` 参数，同一 query 打不同索引做 A/B 对比。
 
-### 构建层（extract/）
+### 表征层（reprs/）
 
-`extract/build.py` 是富化链编排器：把 v1 条款（`02` 输出）→ v2 schema（含可选增强字段）。
+`reprs/` 是表征注册表（`REGISTRY`：ReprKind → 产函数）；`reprs.enrich(nodes, enabled)` 原地给每个节点挂 `reprs`（多种「语义投影」，检索是它们的并集）。当前落**免费 4 项**（无 LLM、不加载模型）：
 
 ```
-read_clauses(v1_json)
-  → extract/references.py    引用边分型 + 双向（strong/weak/exclude/cross_standard + referenced_by）
-  → extract/strength.py      modal_strength（语气词）/ is_mandatory_clause（黑体；官方清单优先→MinerU字重→保守False）
-  → extract/ancestors.py     ancestor_titles（章/节标题链，向量化时拼入 small-to-big 上下文）
-  → extract/scope.py         applicable_scope 谓词（当前统一填 unknown，Phase B 待实现）
-  → schema.to_v1_compat()    兼容桥（重建索引前 retrieval/engine.py 不崩）
+reprs.enrich(nodes, profile.reprs)
+  → raw          节点 content 原文（返回 / rerank 用）
+  → sparse       clause_path + title + content 词项（BM25 语料）
+  → dense        title + content 待嵌入正文（向量；04 用 embedding 模型统一算）
+  → context_aug  祖先链 ‖ 正文（small-to-big 入口；复用 tree_builder 已算定的 ancestor_titles）
 ```
 
-**增强字段均可空**：`has_mandatory_marking: False` 的规范（如造价规范），`is_mandatory_clause` 不填、强条机制不激活；`scope.py` 抽不准则 `scope_status: unknown`，走保守召回（宁多召不漏）。
+`table_struct` / `modal` / `condition`（规则）与 `summary` / `questions`（LLM）是第 4 步（T8 补全）追加项——未注册的 kind 在 `attach` 里被安全跳过（前向兼容）。`dense` / `context_aug` 只产**待嵌入文本**，向量由索引期 `04` 用 embedding 模型统一算（模型唯一 owner 在检索栈）。
+
+> 引用图分型（`extract/references.py`）是建树期「固有事实」，已在 `02`（`tree_builder`）一次算定并落 `nodes.json`，不属表征层；`extract/` 现仅剩 `references.py`——旧 v1 富化链 `build.py` / `strength.py`（强条机制已废）/ `ancestors.py`（祖先链已由 `tree_builder._attach_ancestors` 接管）已随 T5 删除。
 
 ### 检索引擎（retrieval/）
 

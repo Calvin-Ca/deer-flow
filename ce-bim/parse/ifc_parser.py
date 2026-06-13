@@ -14,6 +14,22 @@ import tempfile
 from pathlib import Path
 
 
+def parser_health() -> dict:
+    """探活 IFC 解析依赖（ifcopenshell）。
+
+    功能：尝试导入 ifcopenshell，供 /health 上报解析能力是否就绪——未装时 FastAPI 仍可起，
+          但 /model/ingest 会 503，这里让消费方/运维提前看到。
+    参数：无。
+    返回：``{"available": bool, "version": str}`` 或 ``{"available": False, "error": str}``。
+    """
+    try:
+        import ifcopenshell
+
+        return {"available": True, "version": getattr(ifcopenshell, "version", "unknown")}
+    except Exception as exc:  # noqa: BLE001 — 任何导入/加载失败都视为不可用
+        return {"available": False, "error": str(exc)}
+
+
 def _extract_quantities(element, ue) -> dict:
     """提取构件的基础几何量（IfcElementQuantity）。
 

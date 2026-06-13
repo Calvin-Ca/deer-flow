@@ -35,6 +35,8 @@ from fastapi import FastAPI  # noqa: E402
 
 from api.model_router import router as model_router  # noqa: E402
 from common import config  # noqa: E402
+from parse.ifc_parser import parser_health  # noqa: E402
+from store.store import get_store  # noqa: E402
 
 app = FastAPI(title="Building Code · BIM Foundation", version="0.1.0")
 app.include_router(model_router)
@@ -42,16 +44,25 @@ app.include_router(model_router)
 
 @app.get("/health")
 def health() -> dict:
-    """健康检查。
+    """健康检查（含依赖探活）。
 
-    功能：上报服务状态、存储后端与端点，供依赖此底座的消费方/运维探活。
+    功能：上报服务状态 + 三项依赖探活——存储后端（local 可写 / MinIO 连通）、IFC 解析依赖
+          （ifcopenshell 可用性）、端点清单，供依赖此底座的消费方/运维探活。
     参数：无。
-    返回：``{status, service, store, routes}``。
+    返回：``{status, service, store, parser, routes}``；任一依赖不健康时 ``status`` 为 ``degraded``。
     """
+    try:
+        store = get_store().health()
+    except Exception as exc:  # noqa: BLE001 — MinioStore 构造即连库，可能在此抛
+        store = {"backend": config.store_backend(), "ok": False, "error": str(exc)}
+
+    parser = parser_health()
+    healthy = store.get("ok", False) and parser.get("available", False)
     return {
-        "status": "ok",
+        "status": "ok" if healthy else "degraded",
         "service": "bim",
-        "store": config.store_backend(),
+        "store": store,
+        "parser": parser,
         "routes": [
             "/model/ingest",
             "/model/{id}",

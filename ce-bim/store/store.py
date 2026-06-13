@@ -30,6 +30,7 @@ class Store(Protocol):
     def has(self, model_id: str) -> bool: ...
     def put_index(self, model_id: str, index: dict) -> None: ...
     def get_index(self, model_id: str) -> dict | None: ...
+    def health(self) -> dict: ...
 
 
 class LocalStore:
@@ -66,6 +67,25 @@ class LocalStore:
     def get_index(self, model_id: str) -> dict | None:
         p = self.root / model_id / "index.json"
         return json.loads(p.read_text(encoding="utf-8")) if p.exists() else None
+
+    def health(self) -> dict:
+        """探活本地存储后端。
+
+        功能：确认存储根目录存在且可写，供 /health 上报。
+        参数：无。
+        返回：``{"backend": "local", "ok": bool, "path": str}``（不可写时附 ``error``）。
+        """
+        out = {"backend": "local", "path": str(self.root)}
+        try:
+            self.root.mkdir(parents=True, exist_ok=True)
+            probe = self.root / ".health"
+            probe.write_text("ok", encoding="utf-8")
+            probe.unlink(missing_ok=True)
+            out["ok"] = True
+        except Exception as exc:  # noqa: BLE001
+            out["ok"] = False
+            out["error"] = str(exc)
+        return out
 
 
 class MinioStore:
@@ -124,6 +144,21 @@ class MinioStore:
             return json.loads(raw)
         except S3Error:
             return None
+
+    def health(self) -> dict:
+        """探活 MinIO 后端连通性。
+
+        功能：调 ``bucket_exists`` 触发一次实连，确认端点可达、凭据有效、bucket 在，供 /health 上报。
+        参数：无。
+        返回：``{"backend": "minio", "ok": bool, "endpoint": str, "bucket": str}``（失败时附 ``error``）。
+        """
+        out = {"backend": "minio", "endpoint": config.MINIO_ENDPOINT, "bucket": self.bucket}
+        try:
+            out["ok"] = bool(self.client.bucket_exists(self.bucket))
+        except Exception as exc:  # noqa: BLE001 — 连接/凭据失败都视为不健康
+            out["ok"] = False
+            out["error"] = str(exc)
+        return out
 
 
 _store: Store | None = None

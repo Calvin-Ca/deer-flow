@@ -5,23 +5,32 @@
 
 ---
 
-## Phase 0：立项与边界（✅ 本次）
+## Phase 0：立项与边界（✅ 完成）
 
 - [x] 确立 BIM 底座层定位：项目 BIM 模型单一 owner + BIM 原语服务，与 `ce-code` 平级（横切共享资产，非 CostAgent 私有输入）
 - [x] 三条核心设计判断：GlobalId 连接键 / 几何只读量确定性 / 渲染做成共享前端包 `ce-bim-viewer`
 - [x] 写入文档：`ce-bim/{PRD,DEV,TODO,README}.md`；根 `CLAUDE.md` 目录表；`cost_agent_tech.md`（ce-cost 降为消费方）
-- [ ] 新建独立 uv 项目骨架（`pyproject.toml`，端口 :8102）
+- [x] 新建独立 uv 项目骨架（`pyproject.toml`，端口 :8102；fastapi/uvicorn/ifcopenshell/minio/pydantic）
 
-## Phase 1：底座原语（CostAgent 所需，先做）（⬜ 待办）
+## Phase 1：底座原语（CostAgent 所需，先做）（🟡 代码完成，待服务器验证）
 
 > 只实现第一个消费方需要的原语：按 GlobalId 取量/属性/空间结构。
+> **代码均已落地并 commit**；尚未在服务器 `uv sync` 装依赖、未跑过真实 IFC 全链路（验证清单见 Phase 1.5）。
 
-- [ ] `store/`：IFC 原件存 MinIO；`POST /model/ingest`（上传/登记 → 解析建索引，返回 model_id）
-- [ ] `parse/`：IfcOpenShell 提取构件 + **基础几何量** + 属性 + 空间结构，**每项带 GlobalId**
-- [ ] `GET /model/{id}`：回 IFC 原件（前端 web-ifc 渲染拉取，与取量同源）
-- [ ] `GET /model/{id}/elements`（按 type/storey 过滤）、`GET /element/{guid}`、`POST /quantity`（按 GlobalId 批量取量）、`GET /spatial`（空间结构树）
-- [ ] `GET /health`（含 store / parser 依赖地址）
-- [ ] 解析索引：P0 落 JSON/对象存储，P1 再入 PG 供过滤查询
+- [x] `store/`：`Store` 协议 + `MinioStore`/`LocalStore` 双后端（MinIO 优先、未配置回退本地 FS）；`POST /model/ingest`（sha256 去重 → 解析建索引 → 落原件+`index.json`，返回 model_id + 汇总）
+- [x] `parse/`：IfcOpenShell 提取构件 + **基础几何量**（Qto_*）+ 属性（pset）+ 空间结构树，**每项带 GlobalId**；ifcopenshell 延迟导入（未装时 /health 仍可起）
+- [x] `GET /model/{id}`：回 IFC 原件（前端 web-ifc 渲染拉取，与取量同源）
+- [x] `GET /model/{id}/elements`（按 type/storey 过滤）、`GET /element/{guid}`、`POST /quantity`（按 GlobalId 批量取量）、`GET /spatial`（空间结构树）
+- [x] `GET /health`（探活 store 后端 + ifcopenshell 可用性 + MinIO 连通）
+- [x] 解析索引：P0 落 JSON/对象存储（`index.json`）；P1 再入 PG 供过滤查询（未做，按需）
+
+## Phase 1.5：验证收口（⬜ 服务器执行，先做）
+
+> 代码已写但零验证；下列须在服务器（有依赖/可装包）跑通后才算 Phase 1 真正完成。
+
+- [ ] 服务器 `cd ce-bim && uv sync` 装依赖，`uv run python main.py` 起服务，`curl /health` 三项探活全绿
+- [ ] 拿真实/样例 IFC 跑通 `ingest → elements → element → quantity → spatial` 全链路，确认 GlobalId 贯穿、量值非空
+- [ ] 补最小冒烟测试（小 IFC fixture 或 mock parse）锁回归
 
 ## Phase 2：共享前端 viewer 包 `ce-bim-viewer`（⬜ 待办）
 

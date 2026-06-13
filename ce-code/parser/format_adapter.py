@@ -1,11 +1,11 @@
-"""格式适配器 — FormatAdapter（结构层·阶段 0→1 衔接：MinerU v1 → 统一块 schema）。
+"""格式适配器 — FormatAdapter（解析层·阶段 0→1 衔接：MinerU v1 → 统一块 schema）。
 
 纯格式转换、无结构语义：把 MinerU v1 `content_list.json` 的扁平元素归一成下游各层
 共用的统一块 schema（page 归一、HTML 表格解析成矩形二维表、text_level 原样透传、
-block_idx 溯源）。不解析条文号 / 不打目录标签 / 不建树——那些分别是目录打标器
-（catalog_labeler.py）与建树器（tree_builder.py 的 TreeBuilder）的事。
+block_idx 溯源）。不解析条文号 / 不打目录标签 / 不建树——那些是切分层 `splitter/`
+（目录打标器 catalog_labeler + 建树器 tree_builder）的事。
 
-从 02_parse_hierarchy.py 单独分出（与建树 / 编排解耦，可独立单测、可被别的入口复用）。
+归属 parser/（切分前的通用适配，不内聚进某一切法，可被任意 splitter 复用；可独立单测）。
 本模块纯 stdlib（html.parser），无项目内跨层依赖。
 
 输入：MinerU v1 `content_list.json` 反序列化出的 list[dict]。

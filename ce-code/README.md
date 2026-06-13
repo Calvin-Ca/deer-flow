@@ -20,32 +20,65 @@ ce-code/
 ├── .gitignore                      # 忽略 data/ 下大文件与解析产物
 ├── data/                           # 数据资产（除 eval_set 外均不入 git）
 │   ├── raw/                        #   原始 PDF（手动放入）
-│   ├── parsed/                     #   MinerU 解析输出
-│   ├── structured/                 #   条款树 JSON（02 脚本输出）
-│   ├── vector_store/               #   BM25 + Milvus 索引（04 脚本输出）
+│   ├── parsed/                     #   MinerU 解析输出（parse.py 产物，阶段 0 缓存）
+│   ├── structured/                 #   节点树 nodes.json（build.py 结构层产物）
+│   ├── vector_store/               #   BM25 + Milvus 索引（build.py 索引层产物）
 │   ├── eval_set/                   #   评测集（入 git）
 │   │   └── gb50016_eval.json       #     GB 50016 的 45 条评测用例
-│   └── quality_reports/            #   质量审核报告（03 脚本输出）
-├── pipeline/                       # 数据流水线（解析 → 条款树 → 建索引）
-│   ├── setup_server.sh             #   服务器一次性环境准备
-│   ├── rename_raw_files.sh         #   原始 PDF 重命名工具
-│   ├── mineru_api.py               #   远程 MinerU API 客户端（默认解析方式）
-│   ├── 01_parse_pdf.py             #   PDF 解析入口（默认走 API，--local 用本地 CLI）
-│   ├── 01_split_and_parse.py       #   大 PDF 分块解析（仅 --local 路径，规避本地 OOM）
-│   ├── format_adapter.py           #   格式适配模块（MinerU v1 → 统一块 schema；被 02 import）
-│   ├── catalog_labeler.py          #   目录打标器模块（catalog/目录定位；被 02 import）
-│   ├── 02_parse_hierarchy.py       #   层级化解析（格式适配→目录打标→建节点树，ParseProfile 控制）
-│   ├── 03_review_quality.py        #   条款树质量审核与报告
-│   └── 04_build_index.py           #   建 BM25 + Milvus 向量双索引
-├── scripts/                        # 检索层薄 CLI（只依赖 retrieval）
-│   ├── 05_retrieve.py              #   混合检索 + 引用扩展 + Rerank
-│   └── 07_eval.py                  #   检索质量评测（强条召回率）
-├── retrieval/                      # 检索引擎库（纯检索，被服务/脚本共用）
-│   ├── config.py                  #   默认配置、规范别名、store/collection 解析
-│   └── engine.py                  #   混合检索 search() + 引用扩展 + rerank + get_clause
-└── service/
-    └── server.py                  #   知识服务 :8100 —— 仅原语 /search /expand /clause /health
+│   └── quality_reports/            #   质量审核报告（tools/review_quality 输出）
+│
+│  ── 编排（同级入口，从 ce-code 根运行）──
+├── parse.py                        # 阶段 0：MinerU 解析编排（single / split 子命令）
+├── build.py                        # 阶段 1→3：切分 → reprs → 索引（按 --terminal-stage）
+│
+│  ── ① 解析层 ──
+├── parser/                         # PDF → MinerU → 统一元素块
+│   ├── mineru_client.py            #   远程 MinerU API 客户端（默认解析方式）
+│   ├── pdf_parser.py               #   单 PDF 解析（默认 API，--local 本地 CLI）
+│   ├── split_parse.py              #   大 PDF 分块解析（规避本地 OOM）
+│   └── format_adapter.py           #   MinerU v1 → 统一块 schema（切分前通用适配）
+│
+│  ── core 贯穿契约 ──
+├── core/                           # 全层共享契约（不含编排）
+│   ├── schema.py                   #   节点契约：Node / Representation / Provenance
+│   ├── parse_profile.py            #   配置契约：structure_strategy / reprs / index_granularity
+│   └── view.py                     #   粒度视图（索引期选 emit 层；当前仅 clause）
+│
+│  ── ② 切分层 ──
+├── splitter/                       # 文档怎么切成节点结构（可插拔策略）
+│   ├── base.py                     #   Splitter 基类 + SplitResult
+│   ├── __init__.py                 #   REGISTRY / register / get（默认 toc）
+│   ├── toc.py                      #   TocSplitter：基于原生目录的多层级切分（核心设计原则 1）
+│   ├── catalog_labeler.py          #   ↳ 目录打标器（catalog/目录定位，TocSplitter 内部件）
+│   ├── tree_builder.py             #   ↳ 建树器（目录骨架建 parent/child 树 + 固有事实）
+│   └── references.py               #   ↳ 引用图分型 + referenced_by 反向边（建树期固有事实）
+│
+│  ── ③ 表征层 ──
+├── reprs/                          # 节点投影成可检索的样子（可插拔注册表）
+│   ├── base.py                     #   Representation 基类（kind + build）
+│   ├── __init__.py                 #   REGISTRY / register / enrich / attach
+│   └── raw / sparse / dense / context_aug.py   #   免费 4 项表征
+│
+│  ── ④ 服务/检索层 ──
+├── retrieval/                      # 检索引擎 + 索引构建 + HTTP 服务
+│   ├── config.py                   #   默认配置、规范别名、store/collection 解析
+│   ├── engine.py                   #   混合检索 search() + 引用扩展（node_id 去重）+ rerank + get_clause
+│   ├── indexer.py                  #   索引构建库（BM25 + Milvus；build.py 索引阶段调用）
+│   └── server.py                   #   知识服务 :8100 —— 仅原语 /search /expand /clause /health
+│
+│  ── 工具（非数据主链）──
+└── tools/                          # 评测 / 审核 / 运维（-m tools.X 运行）
+    ├── retrieve_cli.py             #   混合检索 CLI（薄封装 engine）
+    ├── eval.py                     #   检索质量评测（⚠️ 仍 v1 口径，T10 待改）
+    ├── review_quality.py           #   质量审核（⚠️ 仍 v1，未适配 nodes.json，T10 待改）
+    ├── setup_server.sh             #   服务器一次性环境准备
+    └── rename_raw_files.sh         #   原始 PDF 重命名工具
 ```
+
+> **运行模型**：ce-code 不安装为包（`packages=[]`），**从 ce-code 根运行**。编排入口
+> `parse.py` / `build.py` 直接 `python build.py …`；服务/工具用模块式 `python -m retrieval.server`
+> / `python -m tools.eval …`。各层绝对 import（`from core import schema` / `import splitter`），
+> 无 sys.path hack。
 
 ---
 
@@ -89,13 +122,13 @@ bash pipeline/setup_server.sh
 整本一次解析（API 主机资源充足，无本地 OOM 问题，无需分块）：
 
 ```bash
-uv run python pipeline/01_parse_pdf.py --pdf data/raw/<文件名>.pdf
+uv run python parse.py single --pdf data/raw/<文件名>.pdf
 ```
 
 换 backend / 指定 API 地址：
 
 ```bash
-uv run python pipeline/01_parse_pdf.py --pdf data/raw/<文件名>.pdf --backend pipeline --server-url http://172.19.2.2:8000
+uv run python parse.py single --pdf data/raw/<文件名>.pdf --backend pipeline --server-url http://172.19.2.2:8000
 ```
 
 也可直接 curl（同步返回 JSON，`results.<文件名>.md_content` / `.content_list`；调试单页用 `start_page_id`/`end_page_id`）：
@@ -111,13 +144,13 @@ curl -s -X POST http://172.19.2.2:8000/file_parse -F "files=@data/raw/<文件名
 小 PDF（≤100 页）整本一次解析：
 
 ```bash
-CUDA_VISIBLE_DEVICES=2 HF_ENDPOINT=https://hf-mirror.com uv run python pipeline/01_parse_pdf.py --pdf data/raw/<文件名>.pdf --local --backend pipeline
+CUDA_VISIBLE_DEVICES=2 HF_ENDPOINT=https://hf-mirror.com uv run python parse.py single --pdf data/raw/<文件名>.pdf --local --backend pipeline
 ```
 
 大 PDF（>100 页）分块解析，规避本地显存 OOM（GB 50016 共 464 页，用 80 页/块）：
 
 ```bash
-CUDA_VISIBLE_DEVICES=2 HF_ENDPOINT=https://hf-mirror.com uv run python pipeline/01_split_and_parse.py --pdf data/raw/<文件名>.pdf --chunk-size 80
+CUDA_VISIBLE_DEVICES=2 HF_ENDPOINT=https://hf-mirror.com uv run python parse.py split --pdf data/raw/<文件名>.pdf --chunk-size 80
 ```
 
 无论哪种方式，输出都落在 `data/parsed/<basename>/auto/`，含 `.md` 和 `_content_list.json`，直接传给 Step 4。
@@ -129,67 +162,63 @@ CUDA_VISIBLE_DEVICES=2 HF_ENDPOINT=https://hf-mirror.com uv run python pipeline/
 | 产物 | 给谁 | 形态 |
 |---|---|---|
 | `<basename>.md` | **人**（对照原 PDF 做质量 review，见 Step 5 评估维度） | 全文按阅读顺序渲染成 markdown：标题 `#`、表格内联成表格文字、插图 `![](images/..)`、公式 `$..$` |
-| `<basename>_content_list.json` | **程序**（02 提取条款树吃的是它） | 分块列表，每块带 `type`(text/title/table/image/equation)、`text_level`(标题层级)、`page_idx`、`bbox` 坐标 |
+| `<basename>_content_list.json` | **程序**（build.py 切分层吃的是它） | 分块列表，每块带 `type`(text/title/table/image/equation)、`text_level`(标题层级)、`page_idx`、`bbox` 坐标 |
 | `images/` | — | 从 PDF 切出的位图（插图、以及**被裁成图的表格**），上面两份只引用路径、不内嵌字节 |
 
-> 02 必须用 json 而非 md：建条款树要知道「几级标题 / 第几页 / 是表格还是正文」，这些 md 拿不到。
+> 切分层必须用 json 而非 md：建节点树要知道「几级标题 / 第几页 / 是表格还是正文」，这些 md 拿不到。
 
-**图片/表格在 json 里怎么体现（只认 MinerU v1，字段均在顶层；02 由 `read_v1` 处理）**：
+**图片/表格在 json 里怎么体现（只认 MinerU v1，字段均在顶层；由 `parser/format_adapter.py` 处理）**：
 
 - **插图**：`type=image`，顶层 `img_path` + `image_caption`。md 里对应 `![](images/..)`。
 - **表格**：`type=table`，**三存**——表格裁切图 + 结构化 `<table>` HTML（带 colspan/rowspan）+ 表题。字段：顶层 `table_body`(HTML 串) / `img_path` / `table_caption`(list[str])。md 只把 HTML 渲染成表格文字内联、**不引用**裁切图，所以「md 里看不到表格图路径、表格变成了文字」是正常现象。
 
-> ℹ️ MinerU 另有 v2（按页嵌套、字段包在 `content` 下）格式，但本项目管线（mineru_api.py）只产出 v1，且 v1 顺序更可靠、取值更直接，故 02 已移除 v2 读取分支，只保留 `read_v1`。
+> ℹ️ MinerU 另有 v2（按页嵌套、字段包在 `content` 下）格式，但本项目管线（`parser/mineru_client.py`）只产出 v1，且 v1 顺序更可靠、取值更直接，故 `format_adapter` 只认 v1。
 
-> ✅ **表体提取（已实现）**：`read_v1` 从 `table_body` 取出表格 HTML，经 `_HTMLTableParser` + `_expand_spans` 解析为**矩形**二维表（展开 colspan/rowspan 防串列），随条款落入 `tables[].body`；表格裁切图路径落 `images[]`/`tables` 关联。
+> ✅ **表体提取（已实现）**：`parser/format_adapter.py` 从 `table_body` 取出表格 HTML，经 `_HTMLTableParser` + `_expand_spans` 解析为**矩形**二维表（展开 colspan/rowspan 防串列），随块落入 `body`，建树时挂到所属节点的 `tables[]`。
 >
-> 解析层还处理了几个真实坑（GB/T 50500-2024 实测）：v1 `list` 多条款拆分（如 1.0.1~1.0.7 各自成条款）、目录(TOC)整列/短行剔除（含中英文目录，避免与正文条款重复）、交叉引用片段（"8.3节、…"）不误建条款、**附录字母条号识别**（`E.1`/`E.2.2` 各自成条款，表格精确归位到子条款而非堆在附录根）。
+> 切分层还处理了几个真实坑（GB/T 50500-2024 实测）：v1 `list` 多条款拆分（如 1.0.1~1.0.7 各自成条款）、目录(TOC)整列/短行剔除（含中英文目录，避免与正文条款重复）、交叉引用片段（"8.3节、…"）不误建条款、**附录字母条号识别**（`E.1`/`E.2.2` 各自成条款，表格精确归位到子条款而非堆在附录根）。
 >
-> 仍属 Phase B 波2 的是**构建层**封装：把 `tables[].body` 升级为可「给定行列取值」的 `schema.TableRepr`（分表头、继承所属条款强制性），见 `extract/`。
+> 待办（Phase B 第 4 步 T8）：把节点 `tables[].body` 升级为可「给定行列取值」的 `table_struct` 表征（见 `reprs/`，注册新 `Representation` 子类即并入并集）。
 
-### Step 4 — 三轴层级化解析
+### Step 4 — 知识库构建（切分 →（reprs）→ 索引，单一入口）
+
+`build.py` 按 `--terminal-stage` 决定跑多远（structure | reprs | index）。**只切分建树**（看节点树）：
 
 ```bash
-uv run python pipeline/02_parse_hierarchy.py --input "data/parsed/<basename>/auto/<basename>_content_list.json" --profile-name default --terminal-stage enrich
+uv run python build.py --input "data/parsed/<basename>/auto/<basename>_content_list.json" --profile-name default --terminal-stage structure --structure-strategy toc
 ```
 
-输出落在 `data/structured/<basename>_clauses.json`：文件名取输入 basename（把 `_content_list` 换成 `_clauses`）。唯一标识 `standard_id` 默认也取该 basename，写入 JSON 内每条条款；如需自定义可加 `--standard-id "GB 50016-2014(2018)"`。
+按 `--structure-strategy`（缺省 `toc`，基于 PDF 原生目录的多层级切分）选 splitter，输出落在 `data/structured/<standard>/<profile>/nodes.json`（节点树·单一真值）+ `structure.json`（调试）。`standard_id` 默认取输入 basename；可加 `--standard-id "GB 50016-2014(2018)"`。
+
+**一步到位建索引**（切分 → 挂 reprs → BM25 + 向量；需 Milvus + embedding 服务）：
+
+```bash
+uv run python build.py --input "data/parsed/<basename>/auto/<basename>_content_list.json" --profile-name default --terminal-stage index --index-granularity clause --embed-url http://localhost:8097 --embed-model-id /model
+```
+
+`view` 选粒度（当前仅 `clause`）→ `reprs.enrich` 挂免费 4 项 → emit；输出按 profile 隔离落 `data/vector_store/<standard>/<profile>/`，Milvus collection 名由 profile 推断（与 server/eval 一致）。无 Milvus 时加 `--bm25-only`。
 
 ### Step 5 — 质量审核
 
-```bash
-uv run python pipeline/03_review_quality.py --input data/structured/<standard>_clauses.json --standard-id "GB 50016-2014(2018)" --check-issues --export-report
-```
+> ⚠️ `tools/review_quality.py` 仍是 v1 口径（读旧 `_clauses.json`、统计强条），**尚未适配 nodes.json**，待 T10 改造成节点树健康检查（孤儿节点 / 空内容 / 表格归属 / 悬空引用）。当前流程可跳过此步。
 
-报告输出至 `data/quality_reports/`。查看单条款：
+### Step 6 — 检索验证
 
 ```bash
-uv run python pipeline/03_review_quality.py --input data/structured/<standard>_clauses.json --show-clause 5.3.1
+uv run python -m tools.retrieve_cli --store-dir data/vector_store/<standard>/<profile> --query "24米高的住宅楼疏散楼梯最小净宽度" --skip-rerank
 ```
 
-### Step 6 — 建双索引（BM25 + 向量）
+评测集批量评测：`uv run python -m tools.eval --store-dir data/vector_store/<standard>/<profile>`。
 
-```bash
-uv run python pipeline/04_build_index.py --input data/structured/GB_50016-20142018_clauses.json --embed-url http://localhost:8097 --embed-model-id /model
-```
-
-输出落在 `data/vector_store/GB_50016_20142018/`，Milvus collection 名为 `building_code_gb_50016_20142018`。
-
-### Step 7 — 检索验证
-
-```bash
-uv run python scripts/05_retrieve.py --store-dir data/vector_store/GB_50016_20142018 --query "24米高的住宅楼疏散楼梯最小净宽度" --skip-rerank
-```
-
-核心指标（强条召回率等评测口径）见 `TODO.md`。
+> ⚠️ `tools/retrieve_cli` / `tools/eval` 仍含 v1 强条召回率口径，待 T10 换 Recall@k / 引用召回 / MRR（按包含关系判命中）。评测口径见 `TODO.md`。
 
 ---
 
 ## HTTP 服务脚本
 
 ```bash
-# 知识服务（检索原语 /search /expand /clause，:8100）—— 必须先起
-cd /mnt/nvme/calvin/code/deer-flow/ce-code && uv run python service/server.py
+# 知识服务（检索原语 /search /expand /clause，:8100）—— 必须先起（从 ce-code 根，模块式）
+cd /mnt/nvme/calvin/code/deer-flow/ce-code && uv run python -m retrieval.server
 curl http://localhost:8100/health
 ```
 

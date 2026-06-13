@@ -18,16 +18,15 @@
   POST /expand                       对给定 clause_path 做引用图扩展
   GET  /clause/{standard}/{path}     单条款直取
 
-启动（服务器上）：
+启动（服务器上，从 ce-code 根运行，模块式 import 无需 sys.path hack）：
   cd /mnt/nvme/calvin/code/deer-flow/ce-code
-  .venv/bin/python service/server.py
-  # 或： .venv/bin/python -m uvicorn service.server:app --host 0.0.0.0 --port 8100
+  .venv/bin/python -m retrieval.server
+  # 或： .venv/bin/python -m uvicorn retrieval.server:app --host 0.0.0.0 --port 8100
 """
 from __future__ import annotations
 
 import json
 import logging
-import sys
 import time
 import uuid
 from pathlib import Path
@@ -35,20 +34,16 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
-# 让 `python service/server.py` 与 `uvicorn service.server:app` 两种启动方式都能
-# import retrieval / service（POC 根加入 sys.path）
-_SERVICE_DIR = Path(__file__).resolve().parent
-_POC_ROOT = _SERVICE_DIR.parent
-sys.path.insert(0, str(_POC_ROOT))
-
-from retrieval.config import (  # noqa: E402
+from retrieval.config import (
     DEFAULTS,
     STANDARD_ALIASES,
     collection_name,
     resolve_store_dir,
 )
-from retrieval.engine import expand_references, get_clause, load_metadata, search  # noqa: E402
+from retrieval.engine import expand_references, get_clause, load_metadata, search
 
+# data/ 路径由本文件位置推出（retrieval/server.py → 上一级即 ce-code 根），与 cwd 无关
+_POC_ROOT = Path(__file__).resolve().parent.parent
 _VECTOR_STORE = _POC_ROOT / "data" / "vector_store"
 
 logging.basicConfig(
@@ -72,7 +67,7 @@ def _resolve(standard: str) -> tuple[Path, str]:
             status_code=503,
             detail=(
                 f"向量索引未就绪（{store_dir} 不存在）。这是服务端配置问题，"
-                f"请在服务器上构建索引：uv run pipeline/04_build_index.py --standard {standard}"
+                f"请在服务器上构建索引：uv run python build.py --input data/parsed/.../*_content_list.json --terminal-stage index（详见 README Step 4）"
             ),
         )
     return store_dir, store_name

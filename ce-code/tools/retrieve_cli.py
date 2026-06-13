@@ -3,34 +3,22 @@
 重构说明：检索逻辑已收敛到 ``retrieval/engine.py``，本文件退化为薄 CLI——
 保留命令行参数、rich 表格展示与批量评测，检索直接调用 ``retrieval.engine.search``。
 
-使用方式：
-  # 单条查询
-  .venv/bin/python scripts/05_retrieve.py \\
-    --store-dir data/vector_store/GB_50016-20142018 \\
-    --query "24米住宅疏散楼梯宽度"
-
-  # 批量评测
-  .venv/bin/python scripts/05_retrieve.py \\
-    --store-dir data/vector_store/GB_50016-20142018 \\
-    --eval-set data/eval_set/gb50016_eval.json \\
-    --output data/eval_results/gb50016_retrieval.json
+使用方式（从 ce-code 根，单行命令）：
+  python -m tools.retrieve_cli --store-dir data/vector_store/<std>/<profile> --query "24米住宅疏散楼梯宽度"
+  python -m tools.retrieve_cli --store-dir data/vector_store/<std>/<profile> --eval-set data/eval_set/gb50016_eval.json --output data/eval_results/gb50016_retrieval.json
 """
 
 from __future__ import annotations
 
 import json
-import sys
 from pathlib import Path
 
 import click
 from rich.console import Console
 from rich.table import Table
 
-# 让 `python scripts/05_retrieve.py` 也能 import retrieval（POC 根加入 sys.path）
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-from retrieval.config import collection_name  # noqa: E402
-from retrieval.engine import search  # noqa: E402
+from retrieval.config import collection_name
+from retrieval.engine import search
 
 console = Console()
 

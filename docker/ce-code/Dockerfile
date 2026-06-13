@@ -19,11 +19,13 @@ RUN pip install --no-cache-dir \
 WORKDIR /app
 
 # 只拷送服务所需的源码，data/ 通过 volume 挂载
+# retrieval/（server + engine + config + indexer）+ core/（indexer 依赖的契约）
 COPY ce-code/retrieval/ retrieval/
-COPY ce-code/service/   service/
+COPY ce-code/core/      core/
 
 ENV PYTHONUNBUFFERED=1 \
     HF_ENDPOINT=https://hf-mirror.com
 
 EXPOSE 8100
-CMD ["python", "service/server.py"]
+# 模块式启动（WORKDIR=ce-code 根在 path，无 sys.path hack）
+CMD ["python", "-m", "retrieval.server"]

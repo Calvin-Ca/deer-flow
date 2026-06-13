@@ -27,8 +27,9 @@ TreeBuilder（tree_builder.py）由 clause_path 号段数算定的「固有事�
 目录页块只标 ``catalog="目录"`` 保留（建树阶段据此不并入正文），目录判定采**区域**
 判据（连续成行 / 整列），不据单行启发式丢正文块。
 
-从 02_parse_hierarchy.py 单独分出（保持「打目录标签」与「建节点树」两关注点解耦、
-可独立单测）。本模块纯 stdlib + rich，无项目内跨层依赖。
+归属（2026-06-13 迁入新框架）：本模块是切分策略 ``TocSplitter``（splitter/toc.py）的
+内部实现件，与建树器 ``tree_builder.py`` 同在 splitter/ 包内；与建树两关注点解耦、可独立
+单测。本模块纯 stdlib + rich，无项目内跨层依赖。
 
 输入：FormatAdapter.adapt() 产出的统一元素列表。
 输出：每块带 standard_id + catalog + catalog_source 的扁平列表（不建树、不丢块）。

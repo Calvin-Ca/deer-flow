@@ -1,7 +1,7 @@
 """分块解析长 PDF（解决**本地 CLI** 处理 400+ 页 PDF 时的 OOM / 挂起问题）。
 
 这是 **--local（本地 CLI）路径**专用的大 PDF 工具——分块是为了规避本地显存 OOM。
-管线默认走远程 API（`01_parse_pdf.py`，API 主机资源充足、无本地 OOM 问题），
+管线默认走远程 API（`parser/pdf_parser.py`，API 主机资源充足、无本地 OOM 问题），
 默认方式下整本 PDF 一次解析即可，**不需要分块**。选型见 DEV.md / README Step 3。
 
 流程：
@@ -11,21 +11,14 @@
   4. 合并 Markdown 全文
   5. 合并 images/ 目录（统一路径引用）
 
-使用方式：
-  # 基本用法（80 页 / 块）
-  .venv/bin/python pipeline/01_split_and_parse.py \\
-    --pdf data/raw/GB50016-2014_2018.pdf
+使用方式（从 ce-code 根，单行命令）：
+  python parse.py split --pdf data/raw/GB50016-2014_2018.pdf                  # 基本（80 页/块）
+  python parse.py split --pdf data/raw/GB50016-2014_2018.pdf --chunk-size 50  # 调小块（内存紧）
+  python parse.py split --pdf data/raw/GB50016-2014_2018.pdf --only-chunk 3   # 只跑某块（调试）
+  # 亦可： python -m parser.split_parse --pdf ...
 
-  # 调小块大小（内存不足时）
-  .venv/bin/python pipeline/01_split_and_parse.py \\
-    --pdf data/raw/GB50016-2014_2018.pdf --chunk-size 50
-
-  # 只跑特定块（调试用，块编号从 0 开始）
-  .venv/bin/python pipeline/01_split_and_parse.py \\
-    --pdf data/raw/GB50016-2014_2018.pdf --only-chunk 3
-
-输出：data/parsed/<basename>/auto/（与 01_parse_pdf.py 输出格式完全一致，
-      可直接传给 02_parse_hierarchy.py）
+输出：data/parsed/<basename>/auto/（与 parser/pdf_parser.py 输出格式完全一致，
+      可直接传给根 build.py 切分建树）
 """
 
 from __future__ import annotations
@@ -347,10 +340,9 @@ def main(
     console.print(f"  content_list  : {json_path}")
     console.print(f"  图片          : {img_count} 张 → {final_auto_dir / 'images'}")
     console.print(
-        f"\n[bold]下一步[/bold]：\n"
-        f"  .venv/bin/python pipeline/02_extract_clauses.py \\\n"
-        f"    {json_path} \\\n"
-        f"    --output data/structured/{basename}_clauses.json"
+        f"\n[bold]下一步[/bold]（结构层切分，单行命令）：\n"
+        f"  .venv/bin/python build.py --input {json_path} "
+        f"--profile-name default --terminal-stage structure"
     )
 
 

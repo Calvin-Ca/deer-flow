@@ -11,24 +11,29 @@ nodes.json 里作「固有事实」一次算定，本表征**直接复用、不�
 """
 from __future__ import annotations
 
-KIND = "context_aug"
+from .base import Representation
 
 _PATH_SEP = " / "   # 祖先标题之间
 _BODY_SEP = " ‖ "   # 祖先链与本条正文之间（PRD §3.1 示例用此分隔符）
 
 
-def build(node: dict) -> dict:
-    """产 context_aug 表征：祖先标题链 ‖ 本条正文。
+class ContextAugRepr(Representation):
+    """context_aug 表征：祖先标题链 ‖ 本条正文（复用 TreeBuilder 算定的 ancestor_titles）。"""
 
-    参数：
-        node (dict): schema.Node（读其 ancestor_titles / content / title）。
-    返回：
-        dict: schema.Representation —— {kind, text, meta}；text 形如
-            "5 建筑分类… / 5.3 防火分区… ‖ <本条正文>"；无祖先时退化为正文本身。
-            meta.ancestors 记拼入的祖先层数（审计）。
-    """
-    ancestors = [t for t in (node.get("ancestor_titles") or []) if t]
-    body = node.get("content", "").strip() or node.get("title", "").strip()
-    prefix = _PATH_SEP.join(ancestors)
-    text = f"{prefix}{_BODY_SEP}{body}" if prefix else body
-    return {"kind": KIND, "text": text, "meta": {"ancestors": len(ancestors)}}
+    kind = "context_aug"
+
+    def build(self, node: dict) -> dict:
+        """产 context_aug 表征：祖先标题链 ‖ 本条正文。
+
+        参数：
+            node (dict): schema.Node（读其 ancestor_titles / content / title）。
+        返回：
+            dict: schema.Representation —— {kind, text, meta}；text 形如
+                "5 建筑分类… / 5.3 防火分区… ‖ <本条正文>"；无祖先时退化为正文本身。
+                meta.ancestors 记拼入的祖先层数（审计）。
+        """
+        ancestors = [t for t in (node.get("ancestor_titles") or []) if t]
+        body = node.get("content", "").strip() or node.get("title", "").strip()
+        prefix = _PATH_SEP.join(ancestors)
+        text = f"{prefix}{_BODY_SEP}{body}" if prefix else body
+        return {"kind": self.kind, "text": text, "meta": {"ancestors": len(ancestors)}}

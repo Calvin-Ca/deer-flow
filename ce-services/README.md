@@ -59,7 +59,7 @@ docker compose -f docker/ce-services/docker-compose.yaml up -d
 ### 方式 B — 直接运行（两进程）
 
 ```bash
-cd ce-code     && uv run python service/server.py   # ① :8100 知识服务（必须先起）
+cd ce-code     && uv run python -m retrieval.server   # ① :8100 知识服务（必须先起）
 cd ce-services && uv sync && uv run python main.py   # ② :8101 任务服务（qa + compliance）
 # 或 uvicorn 形式：uv run uvicorn main:app --host 0.0.0.0 --port 8101
 ```
@@ -86,4 +86,4 @@ curl http://localhost:8101/health   # {"status":"ok","service":"tasks","routes":
 知识服务 `/search` 内部按 `bm25_top_k = vector_top_k = top_k*2` 调 `retrieval.engine.search`，
 与重构前 orchestration 直调参数（`top_k=15, bm25/vector_top_k=30, skip_rerank=True`）
 逐字一致，因此检索结果（RRF 合并、引用扩展、强条不截断）保持不变。回归用
-`../ce-code/scripts/07_eval.py` 卡强条召回率。
+`../ce-code` 的 `python -m tools.eval` 卡强条召回率（⚠️ 仍 v1 口径，T10 待改）。

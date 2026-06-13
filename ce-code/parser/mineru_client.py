@@ -8,10 +8,10 @@
 
 实现要点：请求 `response_format_zip=true`，API 返回的 ZIP 就是标准 MinerU 布局
 （`<basename>/auto/<basename>.md` + `_content_list.json` + `images/`），解压即与
-CLI 产出完全一致，下游 02_parse_hierarchy.py 无需改动。
+CLI 产出完全一致，下游切分层（build.py）无需改动。
 
 注意：API 每次调用都会重传整个 PDF。大 PDF 用 start_page/end_page 分段时会重复
-上传，若要省带宽走本地分块（01_split_and_parse.py + --local），见 DEV.md。
+上传，若要省带宽走本地分块（parser/split_parse.py + --local），见 DEV.md。
 """
 
 from __future__ import annotations

@@ -1,7 +1,6 @@
 # ce-code（知识层）· 开发指南
 
 > 知识层的**实现策略与技术路径**。需求见 `PRD.md`，进度见 `TODO.md`，操作命令（流水线/起服务）见 `README.md`，项目级共享约定见根 `CLAUDE.md`。
-
 ---
 
 ## 实现架构
@@ -25,11 +24,11 @@
 
 | 阶段 | 脚本/模块 | 产物路径 |
 |---|---|---|
-| 0 MinerU 解析 | `pipeline/01_parse_pdf.py` + `pipeline/mineru_api.py` | `data/parsed/{standard}/`（缓存，只跑一次） |
-| 1 结构层（建节点树） | `pipeline/02_parse_hierarchy.py`（`format_adapter` + `catalog_labeler` + `tree_builder`） | `data/structured/{std}/{profile}/nodes.json`（单一真值）+ `structure.json`（调试） |
-| 2 表征层（挂 reprs） | `reprs/`（`reprs.enrich`，免费 4 项；当前由 `04` 调用） | 节点附 `reprs` 字段 |
-| 3 索引 | `pipeline/04_build_index.py`（`view` 选粒度 → `reprs.enrich` → emit） | `data/vector_store/{std}/{profile}/`（BM25 + Milvus） |
-| 质量审核 | `pipeline/03_review_quality.py` | 人工检查，不阻塞流水线（⚠️ 仍 v1 强条口径，T10 待改） |
+| 0 MinerU 解析 | `parse.py`（编排）→ `parser/`（`pdf_parser` / `split_parse` / `mineru_client`） | `data/parsed/{standard}/`（缓存，只跑一次） |
+| 1 结构层（切分建树） | `build.py --terminal-stage structure` → `splitter.get(profile.structure_strategy)`（缺省 `toc`） | `data/structured/{std}/{profile}/nodes.json`（单一真值）+ `structure.json`（调试） |
+| 2 表征层（挂 reprs） | `build.py --terminal-stage reprs` → `reprs.enrich`（免费 4 项，挂全树） | 重写 nodes.json（附 `reprs` 字段） |
+| 3 索引 | `build.py --terminal-stage index` →（`view` 选粒度 → `retrieval/indexer` 建 BM25 + Milvus） | `data/vector_store/{std}/{profile}/` |
+| 质量审核 | `python -m tools.review_quality` | 人工检查，不阻塞流水线（⚠️ 仍 v1 强条口径，T10 待改） |
 
 **MinerU 使用原则：**
 - 默认走远程 API（`172.19.2.2:8000`，常驻热服务，单页 ~1.8s）；`--local` 才本地 CLI
@@ -49,9 +48,24 @@ parse_profile:                 # 字段契约见 parse_profile.py（PRD §3.2）
 
 产物路径和 Milvus collection 按 `{standard}/{profile}` 隔离；`/search` 接 `profile` 参数，同一 query 打不同索引做 A/B 对比。
 
+### 切分层（splitters/）
+
+「文档怎么切成节点结构」做成可插拔策略，与表征层 `reprs/` 对称：`splitter/base.py` 的 `Splitter` 基类（`name` + `split(...) → SplitResult`），`splitter/__init__.py` 的 `REGISTRY` 按 `name` 登记，`parse_profile.structure_strategy` 决定本次切法（缺省 `toc`）。换切法 = 换 splitter = 不同 profile = 隔离索引，`tools.eval` 直接对比召回；下游粒度（`view`）/表征（`reprs`）不动（三件正交，PRD §3.1）。
+
+```
+splitter/
+  base.py            Splitter(ABC) + SplitResult{nodes, debug_blocks}
+  toc.py             TocSplitter(name="toc")：基于原生目录的多层级切分（核心设计原则 1，当前默认/唯一）
+  catalog_labeler.py ↳ 目录打标器（CatalogLabeler：catalog 标签 + 解析有序目录条目表）
+  tree_builder.py    ↳ 建树器（TreeBuilder：目录条目骨架 + 正文挂载 → parent/child 树 + 固有事实）
+  references.py      ↳ 引用图分型 + referenced_by 反向边（建树期固有事实）
+```
+
+`Splitter.split` 出 `list[core.schema.Node]`：既可是 TOC/标题法的多层级树，也可是定长窗/语义切的扁平块（`parent_id=None`）——`schema.Node` 两者都容。**底线**：建筑规范首选 `toc`（目录是结构真值，PRD §一）；其余切法服务于「跨文档类适配」（造价定额表格 → 未来 `table_rows`，Phase C 加），不在规范上 second-guess 目录。任何切法产出的节点都须带 `provenance` 回指 MinerU 原始块。`parser/format_adapter.py` 是切分前的通用适配，不随某一切法内聚。
+
 ### 表征层（reprs/）
 
-`reprs/` 是表征注册表（`REGISTRY`：ReprKind → 产函数）；`reprs.enrich(nodes, enabled)` 原地给每个节点挂 `reprs`（多种「语义投影」，检索是它们的并集）。当前落**免费 4 项**（无 LLM、不加载模型）：
+`reprs/` 是表征注册表（`REGISTRY`：ReprKind → `Representation` 实例，基类见 `reprs/base.py`：`kind` + `build(node)`）；`reprs.enrich(nodes, enabled)` 原地给每个节点挂 `reprs`（多种「语义投影」，检索是它们的并集）。无状态表征单例复用，有状态表征（波3 `summary`/`questions` 持 LLM 客户端）在子类 `__init__` 注入依赖后 `register`。当前落**免费 4 项**（无 LLM、不加载模型）：
 
 ```
 reprs.enrich(nodes, profile.reprs)
@@ -61,9 +75,9 @@ reprs.enrich(nodes, profile.reprs)
   → context_aug  祖先链 ‖ 正文（small-to-big 入口；复用 tree_builder 已算定的 ancestor_titles）
 ```
 
-`table_struct` / `modal` / `condition`（规则）与 `summary` / `questions`（LLM）是第 4 步（T8 补全）追加项——未注册的 kind 在 `attach` 里被安全跳过（前向兼容）。`dense` / `context_aug` 只产**待嵌入文本**，向量由索引期 `04` 用 embedding 模型统一算（模型唯一 owner 在检索栈）。
+`table_struct` / `modal` / `condition`（规则）与 `summary` / `questions`（LLM）是第 4 步（T8 补全）追加项——未注册的 kind 在 `attach` 里被安全跳过（前向兼容）。`dense` / `context_aug` 只产**待嵌入文本**，向量由索引期 `retrieval/indexer` 用 embedding 模型统一算（模型唯一 owner 在检索栈）。
 
-> 引用图分型（`extract/references.py`）是建树期「固有事实」，已在 `02`（`tree_builder`）一次算定并落 `nodes.json`，不属表征层；`extract/` 现仅剩 `references.py`——旧 v1 富化链 `build.py` / `strength.py`（强条机制已废）/ `ancestors.py`（祖先链已由 `tree_builder._attach_ancestors` 接管）已随 T5 删除。
+> 引用图分型（`splitter/references.py`）是建树期「固有事实」，已由切分层 `tree_builder` 一次算定并落 `nodes.json`，不属表征层（与目录打标 / 建树同在 `splitter/` 包内）。旧 v1 富化链（`build.py` / `strength.py` 强条机制 / `ancestors.py` 祖先链）已随 T5 删除、`extract/` 包已撤销。
 
 ### 检索引擎（retrieval/）
 
@@ -90,9 +104,9 @@ query
 
 **检索硬性约束**：引用扩展默认开启；元数据过滤优先于向量排序（先 filter 再 rank）。
 
-### 服务层（service/）
+### 服务/检索层（retrieval/）
 
-`service/server.py`：FastAPI，监听 `:8100`，只暴露检索原语，不含生成。
+`retrieval/server.py`：FastAPI，监听 `:8100`，只暴露检索原语，不含生成（从 ce-code 根 `python -m retrieval.server` 起）。同层 `engine.py`（混合检索）、`config.py`（配置/路径）、`indexer.py`（索引构建库）。
 
 ```
 POST /search          裸检索（intent / k / profile 参数）

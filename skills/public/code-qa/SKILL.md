@@ -23,7 +23,7 @@ description: 规范知识问答技能。接收自然语言查询，返回结构�
 
 本 skill 是一个**薄 HTTP 客户端**。真正的逻辑跑在服务器上的常驻服务里，分两层：
 - **任务服务**（`ce-services/main.py`，默认 `http://localhost:8101`）——qa + compliance 共进程，本 skill 默认打 `/qa`（检索 + 结构化生成）。
-- **知识服务**（`ce-code/service/server.py`，默认 `http://localhost:8100`）——只提供裸检索原语；任务服务 HTTP 调它，`--no-generate` 时本 skill 也直接打它的 `/search`。
+- **知识服务**（`ce-code/retrieval/server.py`，`python -m retrieval.server`，默认 `http://localhost:8100`）——只提供裸检索原语；任务服务 HTTP 调它，`--no-generate` 时本 skill 也直接打它的 `/search`。
 
 `qa.py` 只用 Python 标准库 urllib 转发查询——**沙箱内零第三方依赖，无需 venv、无需向量索引数据、无需 POC 脚本**。
 
@@ -39,7 +39,7 @@ description: 规范知识问答技能。接收自然语言查询，返回结构�
 
 > 服务启动方式（服务器上，常驻；需先起知识服务再起任务服务）：
 > ```bash
-> cd ce-code     && uv run python service/server.py   # 知识服务 :8100
+> cd ce-code     && uv run python -m retrieval.server   # 知识服务 :8100
 > cd ce-services && uv run python main.py             # 任务服务 :8101（qa + compliance）
 > ```
 
@@ -128,7 +128,7 @@ python3 /mnt/skills/public/code-qa/qa.py \
 | 错误信息 | 原因 | 处理（在服务器上） |
 |---|---|---|
 | `无法连接服务`（默认路径） | 8101 任务服务未启动 | `cd ce-services && uv run python main.py` |
-| `无法连接服务`（--no-generate） | 8100 知识服务未启动 | `cd ce-code && uv run python service/server.py` |
-| 返回 503 `向量索引未就绪` | GB 50016 索引未建 | `uv run pipeline/04_build_index.py --standard gb50016` |
+| `无法连接服务`（--no-generate） | 8100 知识服务未启动 | `cd ce-code && uv run python -m retrieval.server` |
+| 返回 503 `向量索引未就绪` | GB 50016 索引未建 | `cd ce-code && uv run python build.py --input data/parsed/.../*_content_list.json --terminal-stage index`（详见 ce-code/README Step 4） |
 | 返回 500 `检索失败` | Milvus 或 embedding 服务未启动 | `curl http://localhost:8097/health`、Milvus 19530 检查 |
 | 返回 500 `生成失败` | Qwen3 服务未启动 | `curl http://localhost:8099/health` 检查服务 |

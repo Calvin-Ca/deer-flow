@@ -6,17 +6,22 @@ content 拼成一段词项丰富文本，交索引期 BM25 分词建倒排。向
 """
 from __future__ import annotations
 
-KIND = "sparse"
+from .base import Representation
 
 
-def build(node: dict) -> dict:
-    """产 sparse 表征：clause_path + title + content 的词项丰富拼接。
+class SparseRepr(Representation):
+    """sparse 表征：clause_path + title + content 的词项丰富拼接（供 BM25 分词索引）。"""
 
-    参数：
-        node (dict): schema.Node。
-    返回：
-        dict: schema.Representation —— {kind, text}（供 BM25 分词索引）。
-    """
-    parts = [node.get("clause_path", ""), node.get("title", ""), node.get("content", "")]
-    text = "\n".join(p for p in (s.strip() for s in parts) if p)
-    return {"kind": KIND, "text": text}
+    kind = "sparse"
+
+    def build(self, node: dict) -> dict:
+        """产 sparse 表征：clause_path + title + content 拼接。
+
+        参数：
+            node (dict): schema.Node。
+        返回：
+            dict: schema.Representation —— {kind, text}（供 BM25 分词索引）。
+        """
+        parts = [node.get("clause_path", ""), node.get("title", ""), node.get("content", "")]
+        text = "\n".join(p for p in (s.strip() for s in parts) if p)
+        return {"kind": self.kind, "text": text}

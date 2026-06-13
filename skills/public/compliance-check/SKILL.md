@@ -45,7 +45,7 @@ description: 建筑规范项目级合规审查技能。引导用户完成多轮�
 
 > 服务启动方式（服务器上，常驻；需先起知识服务，任务服务依赖它）：
 > ```bash
-> cd ce-code     && uv run python service/server.py   # 知识服务 :8100
+> cd ce-code     && uv run python -m retrieval.server   # 知识服务 :8100
 > cd ce-services && uv run python main.py             # 任务服务 :8101（qa + compliance）
 > ```
 
@@ -187,6 +187,6 @@ python3 /mnt/skills/public/compliance-check/check.py \
 | 错误信息 | 原因 | 处理（在服务器上） |
 |---|---|---|
 | `无法连接合规服务` | 8101 任务服务未启动 | `cd ce-services && uv run python main.py` |
-| 503 `无法连接知识服务` | 8100 知识服务未启动 | `cd ce-code && uv run python service/server.py` |
-| 返回 503 `向量索引未就绪` | 索引未建 | `uv run pipeline/04_build_index.py --standard gb50016` |
+| 503 `无法连接知识服务` | 8100 知识服务未启动 | `cd ce-code && uv run python -m retrieval.server` |
+| 返回 503 `向量索引未就绪` | 索引未建 | `cd ce-code && uv run python build.py --input data/parsed/.../*_content_list.json --terminal-stage index`（详见 ce-code/README Step 4） |
 | 返回 500 `合规检查失败` | Milvus / vLLM 未启动 | `curl http://localhost:8097/health`、8099、Milvus 19530 检查 |

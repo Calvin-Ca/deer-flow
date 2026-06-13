@@ -19,7 +19,7 @@ dependencies = [
     "requests>=2.32",        # 调 vLLM embedding / generate API
     "FlagEmbedding>=1.3",    # bge-reranker（需 torch>=2.6 时可选）
     # ===== 检索/合规 HTTP 服务（skill 通过 HTTP 调用，沙箱内零依赖）=====
-    "fastapi>=0.110",        # service/server.py
+    "fastapi>=0.110",        # retrieval/server.py
     "uvicorn>=0.29",         # ASGI server
     # 辅助
     "click>=8.1",            # CLI 参数解析

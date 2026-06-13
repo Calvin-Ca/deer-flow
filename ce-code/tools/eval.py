@@ -1,32 +1,25 @@
-"""阶段 1：检索质量评测。
+"""检索质量评测（⚠️ 仍 v1 强条口径，T10 待换 Recall@k / 引用召回 / MRR）。
 
 对 eval_set 中每条查询调用混合检索，计算：
   - 强条召回率（首要指标，must_be_mandatory=True 的用例）
   - 期望条款召回率（expected_clauses 命中比例）
   - 关联条款召回率（related_clauses 命中比例）
 
-使用方式：
-  .venv/bin/python scripts/07_eval.py \\
-    --store-dir data/vector_store/GB_50016_20142018 \\
-    --eval-set data/eval_set/gb50016_eval.json \\
-    --skip-rerank
+使用方式（从 ce-code 根，单行命令）：
+  python -m tools.eval --store-dir data/vector_store/<std>/<profile> --eval-set data/eval_set/gb50016_eval.json --skip-rerank
 """
 
 from __future__ import annotations
 
 import json
-import sys
 from pathlib import Path
 
 import click
 from rich.console import Console
 from rich.table import Table
 
-# 让 `python scripts/07_eval.py` 也能 import retrieval（POC 根加入 sys.path）
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-from retrieval.config import collection_name as build_collection_name  # noqa: E402
-from retrieval.engine import search  # noqa: E402
+from retrieval.config import collection_name as build_collection_name
+from retrieval.engine import search
 
 ROOT = Path(__file__).resolve().parent.parent
 

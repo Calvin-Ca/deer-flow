@@ -1,10 +1,11 @@
 """parse_profile —— 解析/索引流水线的**配置契约**（对应 PRD §3.2）。
 
-一份 profile 描述「一次 build 怎么解析、挂哪些表征、按哪层粒度建索引」，命名隔离、
+一份 profile 描述「一次 build 用哪种切法、挂哪些表征、按哪层粒度建索引」，命名隔离、
 多套共存，产物可追溯到配置（``data/structured/{std}/{profile}/`` 与
 ``data/vector_store/{std}/{profile}/``）。三个阶段共读同一份 profile：
-- **结构层（02）** 只看 ``terminal_stage``（到 structure 即止）；建树不依赖粒度，
-  粒度是索引期在树上选的视图，不是切树（PRD §3.2）。
+- **结构层（02）** 看 ``structure_strategy``（选哪种切分策略，见 splitters/）+
+  ``terminal_stage``（到 structure 即止）；切分不依赖粒度，粒度是索引期在结构上选的
+  视图，不是切树（PRD §3.2）。
 - **表征层（reprs runner，T5/T8）** 看 ``reprs``：启用哪些「语义投影」。
 - **索引层（04，T4）** 看 ``index_granularity`` 选粒度视图 emit、看 ``small_to_big``
   决定检索期是否上探父节点。
@@ -32,9 +33,12 @@ class ParseProfile:
         name (str): 配置名，作产物子目录（data/structured/{std}/{name}/、
             data/vector_store/{std}/{name}/），同一规范多 profile 隔离共存做 A/B。
         terminal_stage (str): 流水线终止阶段——
-            structure 仅建树（阶段 1，产 nodes.json）；
-            reprs     建树 + 挂表征（阶段 2，产带 reprs 的节点库）；
+            structure 仅切分（阶段 1，产 nodes.json）；
+            reprs     切分 + 挂表征（阶段 2，产带 reprs 的节点库）；
             index     继续到阶段 3（按 index_granularity 选视图 emit → 向量 + BM25）。
+        structure_strategy (str): 切分策略名（阶段 1 用哪个 splitter，见 splitters/
+            REGISTRY）。缺省 "toc"——基于 PDF 原生目录的多层级切分（建筑规范首选，
+            PRD §一 核心设计原则 1）。换切法只重跑阶段 1，下游粒度/表征不动。
         index_granularity (str): 阶段 3 在节点树上选哪层粒度视图入索引——
             section | clause | paragraph（见 view.view）。**不切树**，树本身完整保留，
             换粒度只重跑阶段 3。
@@ -47,6 +51,7 @@ class ParseProfile:
 
     name: str = "default"
     terminal_stage: Literal["structure", "reprs", "index"] = "index"
+    structure_strategy: str = "toc"  # 切分策略名（splitters/ REGISTRY 键，缺省原生目录多层级）
     index_granularity: Literal["section", "clause", "paragraph"] = "clause"
     reprs: list[str] = field(default_factory=lambda: list(DEFAULT_REPRS))
     small_to_big: bool = True

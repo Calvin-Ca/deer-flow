@@ -55,4 +55,4 @@ print(r.stdout if r.returncode == 0 else 'nvidia-smi 不可用（无 GPU 或未�
 echo
 echo "[setup] ✓ 完成。下一步："
 echo "  1. 把规范 PDF 放到 data/raw/"
-echo "  2. 跑：uv run python pipeline/01_parse_pdf.py --pdf data/raw/<your.pdf>"
+echo "  2. 跑：uv run python parse.py single --pdf data/raw/<your.pdf>"

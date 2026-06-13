@@ -10,18 +10,23 @@ owner」在检索栈（PRD §一），表征层不加载模型、不联网，故
 """
 from __future__ import annotations
 
-KIND = "dense"
+from .base import Representation
 
 
-def build(node: dict) -> dict:
-    """产 dense 表征：待嵌入文本 = title + content（向量留索引期填）。
+class DenseRepr(Representation):
+    """dense 表征：待嵌入文本 = title + content（向量留索引期 04 填）。"""
 
-    参数：
-        node (dict): schema.Node。
-    返回：
-        dict: schema.Representation —— {kind, text}（vector 字段由 04 索引期补）。
-    """
-    title = node.get("title", "").strip()
-    content = node.get("content", "").strip()
-    text = f"{title}\n{content}".strip() if content else title
-    return {"kind": KIND, "text": text}
+    kind = "dense"
+
+    def build(self, node: dict) -> dict:
+        """产 dense 表征：待嵌入文本 = title + content。
+
+        参数：
+            node (dict): schema.Node。
+        返回：
+            dict: schema.Representation —— {kind, text}（vector 字段由 04 索引期补）。
+        """
+        title = node.get("title", "").strip()
+        content = node.get("content", "").strip()
+        text = f"{title}\n{content}".strip() if content else title
+        return {"kind": self.kind, "text": text}

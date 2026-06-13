@@ -20,13 +20,14 @@
   无目录页时（entries 为空）退化为「保留骨架 + 号段建树」：正文标题块各自成节点、
   号段连边、空骨架不丢——即旧号段路径 + 不丢标题节点，best-effort。
 
-从 02_parse_hierarchy.py 单独分出（与目录打标 ``catalog_labeler.py``、格式适配
-``format_adapter.py`` 并列为结构层三件，可独立单测）。命名（承 2026-06-13 术语统一）：
-旧名 ``GranularityAxis`` 失准——「granularity」已专指索引期树上视图（``view.py``），
-与建树无关，故更名 ``TreeBuilder``（建树器）。
+归属（2026-06-13 迁入新框架）：本模块是切分策略 ``TocSplitter``（splitter/toc.py，基于
+原生目录的多层级切分）的**内部实现件**，与目录打标 ``catalog_labeler.py``、引用图分型
+``references.py`` 同在 splitter/ 包内；格式适配 ``format_adapter.py``（parser/）是切分前的
+通用适配，不随本切法内聚。命名（承 2026-06-13 术语统一）：旧名 ``GranularityAxis`` 失准——
+「granularity」已专指索引期树上视图（``core.view``），与建树无关，故更名 ``TreeBuilder``。
 
-依赖：``schema``（节点契约）、``extract.references``（引用图）、``parse_profile``
-（配置契约）——均在 ce-code 根，下方按需把 ROOT 加进 sys.path 以支持独立 import。
+依赖：``core.schema``（节点契约）、``splitter.references``（引用图）、``core.parse_profile``
+（配置契约）——均绝对 import，从 ce-code 根运行即解析（无 sys.path hack）。
 
 输入：① CatalogLabeler.annotate() 产出的标注块列表（每块带 text_level / catalog /
       catalog_source / standard_id / block_idx 溯源）；② CatalogLabeler.entries（有序
@@ -37,16 +38,10 @@
 from __future__ import annotations
 
 import re
-import sys
-from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent  # ce-code/
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
-
-import schema  # noqa: E402  (ce-code 根模块，节点契约)
-from extract import references  # noqa: E402  (引用图分型 + 反向边，纯 stdlib)
-from parse_profile import ParseProfile  # noqa: E402  (流水线配置契约，PRD §3.2)
+from core import schema  # 节点契约
+from core.parse_profile import ParseProfile  # 流水线配置契约，PRD §3.2
+from splitter import references  # 引用图分型 + 反向边，纯 stdlib
 
 
 # ---------------------------------------------------------------------------

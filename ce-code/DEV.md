@@ -34,7 +34,7 @@
 **MinerU 使用原则：**
 - 默认走远程 API（`172.19.2.2:8000`，常驻热服务，单页 ~1.8s）；`--local` 才本地 CLI
 - **定额/造价类 PDF 必须用 `hybrid-auto-engine`**（密集多列表格，pipeline backend 列错位）
-- 远程 API 每次重传整个 PDF；大 PDF 用 `split_and_parse.py` 分块（80 页/块）
+- 远程 API 每次重传整个 PDF；大 PDF 用 `01_split_and_parse.py` 分块（80 页/块）
 
 **parse_profile 实验隔离（命名避免覆盖彼此结果）：**
 

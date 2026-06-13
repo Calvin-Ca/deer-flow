@@ -13,15 +13,15 @@
 
 使用方式：
   # 基本用法（80 页 / 块）
-  .venv/bin/python pipeline/split_and_parse.py \\
+  .venv/bin/python pipeline/01_split_and_parse.py \\
     --pdf data/raw/GB50016-2014_2018.pdf
 
   # 调小块大小（内存不足时）
-  .venv/bin/python pipeline/split_and_parse.py \\
+  .venv/bin/python pipeline/01_split_and_parse.py \\
     --pdf data/raw/GB50016-2014_2018.pdf --chunk-size 50
 
   # 只跑特定块（调试用，块编号从 0 开始）
-  .venv/bin/python pipeline/split_and_parse.py \\
+  .venv/bin/python pipeline/01_split_and_parse.py \\
     --pdf data/raw/GB50016-2014_2018.pdf --only-chunk 3
 
 输出：data/parsed/<basename>/auto/（与 01_parse_pdf.py 输出格式完全一致，

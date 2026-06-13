@@ -11,7 +11,7 @@
 CLI 产出完全一致，下游 02_parse_hierarchy.py 无需改动。
 
 注意：API 每次调用都会重传整个 PDF。大 PDF 用 start_page/end_page 分段时会重复
-上传，若要省带宽走本地分块（split_and_parse.py + --local），见 DEV.md。
+上传，若要省带宽走本地分块（01_split_and_parse.py + --local），见 DEV.md。
 """
 
 from __future__ import annotations

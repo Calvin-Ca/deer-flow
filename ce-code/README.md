@@ -31,8 +31,10 @@ ce-code/
 │   ├── rename_raw_files.sh         #   原始 PDF 重命名工具
 │   ├── mineru_api.py               #   远程 MinerU API 客户端（默认解析方式）
 │   ├── 01_parse_pdf.py             #   PDF 解析入口（默认走 API，--local 用本地 CLI）
-│   ├── split_and_parse.py          #   大 PDF 分块解析（仅 --local 路径，规避本地 OOM）
-│   ├── 02_parse_hierarchy.py       #   三轴层级化解析（结构→粒度→增强，ParseProfile 控制）
+│   ├── 01_split_and_parse.py       #   大 PDF 分块解析（仅 --local 路径，规避本地 OOM）
+│   ├── format_adapter.py           #   格式适配模块（MinerU v1 → 统一块 schema；被 02 import）
+│   ├── catalog_labeler.py          #   目录打标器模块（catalog/目录定位；被 02 import）
+│   ├── 02_parse_hierarchy.py       #   层级化解析（格式适配→目录打标→建节点树，ParseProfile 控制）
 │   ├── 03_review_quality.py        #   条款树质量审核与报告
 │   └── 04_build_index.py           #   建 BM25 + Milvus 向量双索引
 ├── scripts/                        # 检索层薄 CLI（只依赖 retrieval）
@@ -115,7 +117,7 @@ CUDA_VISIBLE_DEVICES=2 HF_ENDPOINT=https://hf-mirror.com uv run python pipeline/
 大 PDF（>100 页）分块解析，规避本地显存 OOM（GB 50016 共 464 页，用 80 页/块）：
 
 ```bash
-CUDA_VISIBLE_DEVICES=2 HF_ENDPOINT=https://hf-mirror.com uv run python pipeline/split_and_parse.py --pdf data/raw/<文件名>.pdf --chunk-size 80
+CUDA_VISIBLE_DEVICES=2 HF_ENDPOINT=https://hf-mirror.com uv run python pipeline/01_split_and_parse.py --pdf data/raw/<文件名>.pdf --chunk-size 80
 ```
 
 无论哪种方式，输出都落在 `data/parsed/<basename>/auto/`，含 `.md` 和 `_content_list.json`，直接传给 Step 4。

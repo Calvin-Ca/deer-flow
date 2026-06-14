@@ -1,40 +1,31 @@
-"""目录打标器 — CatalogLabeler（结构层·阶段 1 标注 = 目录打标 + 目录定位）。
+"""目录打标器 — CatalogLabeler（切分策略 TocSplitter 的内部件，仅 stdlib + rich）。
 
-依据文档**目录页**这一结构真值，给每个解析块打一个 `catalog` 标签——
+只产「目录归属」一个可靠标签：每块打 ``catalog``（目录页一行→``"toc"`` / 所属目录条目
+标题 / 无归属→``None``）+ ``catalog_source`` 来源审计。不解析条文号 / node_type / 层级 /
+建树——那些是 TreeBuilder（tree_builder.py）的事。对 MinerU 不做减法：目录页只标不删，
+目录判定采区域判据（连续成行 / 整列），不据单行启发式丢正文块。
 
-  - 块本身就是「文档前面的目录页」 → ``catalog = "toc"``；
-  - 否则 → ``catalog = 它所属目录条目的标题``（「属于目录里哪一条」），
-    目录里没有的块（封面/前言之前等）→ ``catalog = None``。
-
-定位用**方案 5（混合）**：以目录页解析出的有序条目表为骨架（方案 2 目录锚定），
-正文按文档序顺序扫描、块文本与目录条目归一化匹配来确认标题边界（方案 1 编号/标题
-对齐），其后每块归属「最近命中的目录条目」。目录只列到节（x.x）时，条（x.x.x）等
-更深块自然归属其所在节的条目——这正是「属于目录里哪一条」。无目录页时退化为以
-MinerU 标题块自身标题作边界（best-effort）。
-
-每块再带一个 `catalog_source` 审计字段，记录该 `catalog` 由方案 5 哪条子机制得来
-（让混合方法在结果里可见、可统计），取值：
-
-  - ``toc_page``         块本身是目录页（区域判据命中）       —— 方案2·目录识别
-  - ``toc_match``        正文块命中目录条目、确认为标题边界   —— 方案2锚定 + 方案1对齐
-  - ``inherited``        继承最近命中条目（条归节 / 成员块）  —— 归属传播
-  - ``heading_fallback`` 无目录，按 text_level 标题块自身标题定边界 —— 方案1·退化路径
-  - ``front_matter``     封面 / 扉页 / 前言等正文前置内容（首个目录条目命中前，catalog=None）
-
-设计约束（承 2026-06-12 职责重划）：本层只产「目录归属」这一可靠标签（catalog +
-catalog_source 审计），**不**解析条文号 / node_type / 层级 / 建树——那些是建树器
-TreeBuilder（tree_builder.py）由 clause_path 号段数算定的「固有事实」。**对 MinerU 结果不做减法**：
-目录页块只标 ``catalog="toc"`` 保留（建树阶段据此不并入正文），目录判定采**区域**
-判据（连续成行 / 整列），不据单行启发式丢正文块。
-
-归属（2026-06-13 迁入新框架）：本模块是切分策略 ``TocSplitter``（splitter/toc.py）的
-内部实现件，与建树器 ``tree_builder.py`` 同在 splitter/ 包内；与建树两关注点解耦、可独立
-单测。本模块纯 stdlib + rich，无项目内跨层依赖。
+定位（混合）：目录页解析成有序条目表作骨架，正文按文档序扫描、归一化匹配条目切换
+「当前条目」，未命中的块归属最近命中条目（条 x.x.x 归到其节 x.x）；无目录页时退化为以
+MinerU 标题块自身标题作边界。
 
 输入：FormatAdapter.adapt() 产出的统一元素列表。
-输出：每块带 standard_id + catalog + catalog_source 的扁平列表（不建树、不丢块）。
-      text_level 由 MinerU 经 FormatAdapter 原样透传（仅标题块有此键；本层只读用于匹配，不改）。
-      list 块展平后不再保留 list_items；raw 已删（需 MinerU 原件靠 block_idx 回查 data/parsed）。
+输出：annotate() 返回每块带 standard_id + catalog + catalog_source 的扁平列表（不建树、
+      不丢块）——即 ``SplitResult.debug_blocks``，由 build.run_structure 落盘为 ``structure.json``
+      （切分中间态·调试快照，下游不读）。每块字段（— = FormatAdapter 透传，余为本层盖）：
+        block_idx       int   该块在 MinerU 原始 content_list.json 里的下标（溯源用；
+                              到 nodes.json 的 provenance.block_idx 会聚合成 list[int]）。
+        type/text/page  —     原始内容（text 对 list 为空、对 table 为 caption）。
+        text_level      int?  MinerU 标题层级，仅标题块有（本层只读用于匹配）。
+        standard_id     str   规范标识。
+        catalog         值    目录归属："toc" / 条目标题 / None。
+        catalog_source  str   catalog 的来源审计，五取值：
+                                toc_page         本块是目录页（区域判据命中）。
+                                toc_match        正文块命中目录条目，确认为标题边界。
+                                inherited        未命中，继承最近命中条目。
+                                heading_fallback 无目录页退化，用 text_level 标题块自身标题作边界。
+                                front_matter     封面/扉页/前言等前置内容（首个条目命中前，catalog=None）。
+      list 块展平后不留 list_items；raw 已删（需原件靠 block_idx 回查 data/parsed）。
 """
 
 from __future__ import annotations

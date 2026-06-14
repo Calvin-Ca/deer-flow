@@ -21,7 +21,8 @@ MinerU 解析 + 条款树提取 + 质量审核，在 GB 50378-2006 和 GB 50016 
 
 ### 评测集
 
-> 评测契约（用例格式 + 核心指标：召回率/引用召回率/适用性误判率/造价侧命中率）见 `PRD.md §四 验收标准`。当前已建 GB 50016 评测集（45 条，见上阶段 1 勾选）。
+> 评测契约（用例格式 + 核心指标：Recall@k/引用召回率/**地区隔离准确率**/清单候选集命中率/定额套用准确率）见 `PRD.md §6 验收标准`。当前已建 GB 50016 评测集（45 条，见上阶段 1 勾选）。
+> ⚠️ 旧"适用性误判率"已随 PRD v3 改为"地区隔离准确率"（时效性入库即校验后，废止/过渡期不再是检索期问题，只剩地区串库需评测）。
 
 ---
 
@@ -142,18 +143,38 @@ MinerU 解析 + 条款树提取 + 质量审核，在 GB 50378-2006 和 GB 50016 
 
 ## Phase C：造价知识底座（CostAgent / 算量组价 agent）（⬜ 待办）
 
-> 对应 PRD §3.3、`cost_agent_prd.md` 八 / `cost_agent_tech.md` 三、六，以及 CostAgent M0 数据底座里程碑。新增**关系库 + 知识图谱**两层与造价检索原语；与 Phase B（防火轨数据模型）解耦，可并行。
-> 范围：**单地区房建**先行（与 CostAgent MVP 一致）；算量引擎/图纸解析/编排在任务层，不在此。
+> 对应 PRD §4 收录范围 / §3.3、`cost_agent_prd.md` 八 / `cost_agent_tech.md` 三、六，以及 CostAgent M0 数据底座里程碑。新增**关系库 + 知识图谱**两层与造价检索原语；与 Phase B（防火轨数据模型）解耦，可并行。
+> 范围：**广东省深圳市·房建专业**先行（与 PRD v3 定位一致，组价用**深圳本地 2024 版消耗量标准**非省定额）；算量引擎/图纸解析/编排在任务层，不在此。
+
+### 知识收录进度（对齐 PRD §4 收录范围；✅已解析 / ⏳已下载待解析 / ❌未收录）
+
+> 必要性：⭐MVP（最小闭环必需）/ [必收] / [条件] / [可缓]。MVP 最小收录集 = PRD §7 五项。
+
+| doc_id | 名称 | 必要性 | 收录 | 下一步 |
+|---|---|---|---|---|
+| GB-50500 | 建设工程工程量清单计价标准 | ⭐MVP | ✅ | 从条款树抽 `bill_spec` 入库 |
+| GB-50854 | 房屋建筑与装饰工程工程量计算标准 | ⭐MVP | ✅ | 抽 calc_rule + feature_schema 入 `bill_spec` |
+| GB-50856 | 通用安装工程工程量计算标准 | [条件] 含机电 | ✅ | 含安装项目时入库 |
+| SZ-SJG171 | 深圳市建筑工程消耗量标准 | ⭐MVP | ✅ | 电子表清洗入 `quota_item`/`quota_resource`（组价主体） |
+| SZ-SJG170 | 深圳市土石方与地基基础工程消耗量标准 | [必收] 含基础/土方 | ✅ | 同上，土方/地基阶段 |
+| SZ-FLBZ-2023 | 深圳市建设工程计价费率标准（2023） | ⭐MVP | ✅ | 费率入费用表（管理费/利润/安文/规费/税金） |
+| SZ-JGXX-PRICE | 深圳市建设工程价格信息（月刊） | ⭐MVP | ⏳ 2026-05 已下载 | 解析 → `resource_price`（动态独立管道，带 `effective_period`） |
+| SZ-ZPS | 深圳市装配式建筑工程消耗量标准 | [条件] 仅装配式 | ❌ | 装配式项目再收 |
+| SZ-JXTB | 深圳市施工机械台班消耗量标准 | [条件] 信息价无台班价时 | ❌ | 按需收 |
+| SZ-2024GZ-TZ | 2024 版清单计价标准贯彻实施通知及附件 | [可缓] | ❌ | 接 2024 消耗量↔2023 费率版本缝时收 |
+| SZ-FBFX-FGBZ | 房建造价文件分部分项/措施项目划分标准 | [可缓] | ❌ | 组织口径，非取数源 |
+| SJG46-2023 | 建设工程安全文明施工标准 | [可缓] | ❌ | 安文费已由费率计取，做法标准非取数源 |
 
 ### 数据资产（关系库优先）
 
-- [ ] 关系库 PostgreSQL 建表：`bill_spec` / `quota_item` / `quota_resource` / `resource` / `resource_price` / `hist_bill`，强制带 `version` + `region`，价格带 `effective_period`
-- [ ] GB 50500 + GB 50854 清单计量规范结构化入 `bill_spec`（复用 MinerU 解析 + 规则，含 calc_rule + feature_schema）
+- [ ] 关系库 PostgreSQL 建表：`bill_spec` / `quota_item` / `quota_resource` / `resource` / `resource_price` / `hist_bill`，**强制带 `doc_id` + `version` + `region`(深圳) + `effective_priority`(深圳本地=1)**，价格带 `effective_period`
+- [ ] 清单计量规范结构化入 `bill_spec`（复用 MinerU 解析 + 规则，含 calc_rule + feature_schema）
   - [x] **GB/T 50500-2024 已过 02 解析**（561 条款、35 表结构化、附录条款归位），下一步从条款树抽 `bill_spec` 字段入库
   - [ ] GB/T 50854-2024 待重新解析（前次 01 运行命中 `mineru_api` 输出目录误定位 bug，已修；需重跑确认产物正确）
-- [ ] 单地区定额库导入 `quota_item` + `quota_resource` + `resource`（定额电子表清洗）
-- [ ] 价格库导入 `resource_price`（信息价/市场价，带 `effective_period` 时效）
-- [ ] 历史工程库 `hist_bill`（脱敏 + 质量标注，供审核轨对标）
+- [ ] **深圳消耗量标准**导入 `quota_item` + `quota_resource` + `resource`（SJG 171-2024 主体 + SJG 170-2024 土方/地基，电子表清洗；标注 `region=深圳`/`effective_priority=1`）
+- [ ] 价格库导入 `resource_price`（深圳信息价 SZ-JGXX-PRICE，带 `effective_period` 时效，**走动态独立更新管道**）
+- [ ] 费率标准（SZ-FLBZ-2023）入费用计算表（企业管理费/利润/安文费/规费/税金）
+- [ ] 历史工程库 `hist_bill`（脱敏 + 质量标注，供相似案例对标；[可缓]）
 
 ### 知识图谱
 
@@ -173,4 +194,4 @@ MinerU 解析 + 条款树提取 + 质量审核，在 GB 50378-2006 和 GB 50016 
 - [ ] 定额套用：对照已结算项目，定额套用准确率 ≥ 85%
 - [ ] 红线门禁：未达准确率红线的原语默认「只建议不定稿」（HITL 在任务层兜底）
 
-**模型/部署待评估项**：造价轨 embedding 用 BGE-M3 vs 复用规范轨 bge-large-zh-v1.5 是否统一为单服务（见 PRD §3.3 造价数据资产 + DEV.md 造价轨实现）。
+**模型/部署待评估项**：造价轨 embedding 用 BGE-M3 vs 复用规范轨 bge-large-zh-v1.5 是否统一为单服务（见 DEV.md §2.4/§3.3 造价轨实现）。

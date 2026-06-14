@@ -5,8 +5,12 @@
 >
 > **核心价值在"决策记录"**：配置参数看代码就知道，本文要记录的是"为什么这样选"，让半年后的你或新人不重复踩坑。
 >
-> **范围**：知识层是**算量组价的造价知识底座**（PRD），按两类知识组织——**规范类知识**（清单/计量规范 PDF，服务"算量"）与**结构化造价数据**（定额/价格/费用/历史，服务"组价"）。
+> **范围**：知识层是**算量组价的造价知识底座**（PRD），**定位为广东省深圳市·房屋建筑专业**，按两类知识组织——**规范类知识**（清单/计量规范 PDF，服务"算量"）与**结构化造价数据**（深圳本地定额/价格/费率/历史，服务"组价"）。
 > **进度与待办见 `TODO.md`**，本文不重复列。
+>
+> **两条贯穿全文的硬约束（PRD §4/§5 落到技术）**：
+> - **地区强隔离**：只收录、只召回深圳本地现行有效标准（深圳有独立 2024 版消耗量标准，与省内其它城市口径不同），地区元数据是过滤的硬条件，隔离失败 = 召回错误。
+> - **时效性入库即校验**：所有收录单元入库前已核对实施状态，**旧版本 / 废止单元不入库、不保留**——故检索侧**不再做废止 / 过渡期过滤**，节点级 `status` 仅作溯源标注（库内恒为现行有效）。
 
 ---
 
@@ -20,7 +24,7 @@
 | 知识类别 | 服务环节 | 数据来源 | 核心载体 | 对外原语 | 状态 |
 |---|---|---|---|---|---|
 | 规范类知识 | 算量（应该算什么/如何算） | 清单 GB 50500 / 计量 GB/T 50854（PDF） | MinerU → 节点树 → Milvus + BM25 | `/search` `/expand` `/clause` | 引擎已建（POC 验证） |
-| 结构化造价数据 | 组价（人材机 + 价格） | 定额电子表 + 信息价 + 费用定额 + 历史项目 | PostgreSQL（单一事实源）+ KG + Milvus | `/bill/match` `/price/compose` `/quota` | 待建 |
+| 结构化造价数据 | 组价（人材机 + 价格） | 深圳消耗量标准(SJG 171/170-2024) + 信息价(月刊) + 费率标准(2023) + 历史项目 | PostgreSQL（单一事实源）+ KG + Milvus | `/bill/match` `/price/compose` `/quota` | 待建 |
 
 > **引擎来历**：节点树 + 多表征 + 混合检索这套机制先在《建筑设计防火规范》GB 50016 上做 POC 验证（目录结构清晰、便于验证建树/引用图/召回），现应用于清单/计量规范入库——两者同为"带原生目录的规范 PDF"，走同一流水线。
 
@@ -114,8 +118,13 @@ PDF（清单/计量规范）
 | 字段 | 类型 | 用途 | 是否支撑业务规则 |
 |---|---|---|---|
 | `node_id` | string | 稳定 id：条文号有则用（`GB50500#1.0.3`），无则标题路径 | 去重键 / 引用图锚点 |
-| `standard_id` | string | 规范号（`GB 50500-2024`） | 支撑多规范召回 |
-| `version` / `effective_date` / `status` | string | 节点级版本/效力（active/superseded/abolished） | 支撑版本管理、废止条款过滤 |
+| `doc_id` | string | **知识库内部稳定标识**（`GB-50500`/`SZ-SJG171`），入库/检索/溯源以此为准，与 `standard_id` 解耦 | 标准编号可改版 / 待补号时锚点不变（PRD §4） |
+| `standard_id` | string | 标准编号（`GB/T 50500-2024`/`SJG 171-2024`，可能"待补号"） | 支撑多规范召回、溯源展示 |
+| `region` | string | 适用地区（`深圳`） | **地区强隔离的硬过滤键**（深圳 ≠ 省内其它城市） |
+| `discipline` | string | 适用专业（`房建`） | 房建专业过滤 |
+| `effective_priority` | int (1~4) | **效力优先级**：深圳本地=1（最高）→ 国标=4（最低，越具体越优先） | **口径冲突时取值排序**（PRD §4 元数据治理） |
+| `is_dynamic` / `update_freq` | bool / string | 是否动态数据 + 更新频率（信息价月更） | 动态数据走独立更新管道，不参与口径优先级排序 |
+| `version` / `effective_date` / `status` | string | 节点级版本 / 实施日期 / 时效状态 | 库内恒为现行有效（入库即校验）；`status` 仅作溯源标注，**检索侧不做废止过滤** |
 | `clause_path` | string | 条文号路径（`1.0.3`） | 支撑溯源、`/clause` 直取 |
 | `parent_id` / `children_ids` | string / list | 树形结构 | **粒度视图 + small-to-big 全靠它** |
 | `ancestor_titles` / `ancestor_paths` | list | 祖先链（建树时一次算定） | 支撑溯源、context_aug 拼接 |
@@ -172,7 +181,7 @@ PDF（清单/计量规范）
 > **实现顺序**：关系库建表 → 数据入库 → 跑通取数路径 → 加向量召回 → 加 KG 多跳。
 
 - **引用图（规范类，已实现）**：不另起图库，引用边作为**节点固有事实**落 `nodes.json`（`references` 分型 + `referenced_by` 反向边，建树期 `splitter/references.py` 一次算定）。检索期沿 strong 边强制扩展。引用图即规范的知识图谱、GraphRAG 底座。
-- **关系库 PostgreSQL（单一事实源）**：`bill_spec`（清单规范，9 位统一编码 + calc_rule + feature_schema + spec_version）/ `quota_item`（定额子目，region + base_price + 人材机费）/ `quota_resource`（定额→资源含量）/ `resource` + `resource_price`（资源价格，带 `effective_period` 时效）/ `hist_bill`（历史工程，脱敏 + 质量标注）。**所有表强制 version + region**，价格带时效。DDL 详见 `cost_agent_tech.md`。
+- **关系库 PostgreSQL（单一事实源）**：`bill_spec`（清单规范，9 位统一编码 + calc_rule + feature_schema + spec_version）/ `quota_item`（定额子目，region + base_price + 人材机费；MVP 取**深圳市建筑工程消耗量标准 SJG 171-2024**，非省定额）/ `quota_resource`（定额→资源含量）/ `resource` + `resource_price`（资源价格，带 `effective_period` 时效）/ `hist_bill`（历史工程，脱敏 + 质量标注）。**所有表强制 `version` + `region` + `effective_priority`**（深圳本地=1）。**动态数据（信息价月更，`SZ-JGXX-PRICE`）走独立更新管道**：`resource_price` 带 `effective_period`，按 region+时效取价，不参与口径优先级排序。DDL 详见 `cost_agent_tech.md`。
 - **知识图谱**：**P0 用 PG 关联表模拟**（`component_bill_map` MAPS_TO / `bill_quota_map` APPLIES / `quota_resource_detail` CONSUMES），数据量小时 PG join 够用，**P1 再迁 Neo4j** 评估多跳遍历性能。
 - **造价向量库**：新建 `bill_spec_kb` collection（评估 BGE-M3 dense+sparse），复用同一 Milvus 实例；向量化内容 = 清单条目名称 + 特征描述 + 工程做法说明。
 - **数据入库方式**：
@@ -193,10 +202,11 @@ PDF（清单/计量规范）
   query
     → BM25（条文号/清单编码/术语精确匹配）
     → 向量（bge-large-zh-v1.5 语义召回）
-    → 元数据过滤（standard/version/region，先圈范围再排序）
+    → 元数据过滤（region 硬隔离 + standard/discipline，先圈范围再排序）
     → RRF 合并去重（按 node_id）
     → 引用图扩展（strong 边强制拉取；weak 可选；exclude 禁止扩展）
     → rerank（cross-encoder 精排）
+    → 口径冲突按 effective_priority 取值（深圳本地=1 优先于国标=4；动态价格不参与）
     → small-to-big 回补（命中块 + 完整条/节上下文 + ancestor_titles）
   ```
 - **通道权重按 intent 调**（`/search` 接收 `intent` 参数）：
@@ -228,8 +238,10 @@ PDF（清单/计量规范）
 | 可溯源 | 每个返回节点带 `provenance`（source_file/block_idx/page）回指 MinerU 原始块；条款/页码出处随结果返回 |
 | 无结果不能编 | 向量未命中 → BM25 兜底；仍无 → 返回父级章节而非杜撰 |
 | 引用扩展默认开启 | 命中节点的 `references` 中 `type=strong/cross_standard` 边无条件拉取（`engine.expand_references`），weak 可选，exclude 禁止正向扩展 |
-| 元数据过滤优先于向量排序 | 先按 `standard/version/region` filter 圈定范围，再在范围内 RRF/rerank |
-| 版本/废止 | 节点级 `status`/`version`/`effective_date`；废止节点不参与召回但保留（可回答"何时废止"） |
+| 元数据过滤优先于向量排序 | 先按 `region`(硬隔离)/`standard`/`discipline` filter 圈定范围，再在范围内 RRF/rerank |
+| 地区不串库 | `region` 为入库即标注的硬过滤键；查询声明地区 → 只召回同地区单元，跨地区单元（省内其它城市定额）零混入 |
+| 版本/时效 | 库内只保留现行有效单元（入库即校验，旧版本/废止不入库）；节点级 `status`/`version`/`effective_date` 仅作溯源标注，**检索侧不做废止/过渡期过滤** |
+| 口径冲突取值 | 同一类知识多源命中时按 `effective_priority`(1~4) 排序：深圳本地=1 优先于国标=4；动态价格走独立管道不参与 |
 | small-to-big 上探 | 细粒度命中后靠 `parent_id` 上探返回整条/整节（**去重键已切 node_id ✅，上探回补待做**） |
 | 能算的不交给模型猜 | 数值走业务层确定性公式；LLM 仅在检索 + KG 限定的候选内择优（清单匹配/组价取数） |
 
@@ -258,6 +270,7 @@ PDF（清单/计量规范）
 | 引用条款召回率 | 被引用的关联条款是否被拉取 | — | 检验引用图扩展 |
 | 清单候选集命中率 | 构件对应正确清单项在候选内 | 支撑业务红线 | 造价侧，待建 |
 | 定额套用准确率 | 清单→定额关系正确性 | 支撑业务红线 | 造价侧（KG 正确性），待建 |
+| 地区隔离准确率 | 返回单元中跨地区单元的混入率 | 趋零 | 红线（PRD §5/§6），地区串库=召回错误 |
 | 检索延迟 (P95) | 不含下游生成 | 待定 | 规模尚小非瓶颈 |
 
 > **业务层端到端红线**（知识层需支撑，非自身指标）：编码 Top-1 ≥ 85%、组价准确率达标；红线内只建议不定稿，必须经 HITL 人工确认（在业务层）。
@@ -307,3 +320,7 @@ PDF（清单/计量规范）
 | KG 落地 | P0 用 PG 关联表，P1 迁 Neo4j | 数据量小时 PG join 够用，先跑通取数路径再上图库 |
 | 判命中口径 | 按包含关系（非严格 node_id 相等） | 否则粗粒度 profile 被系统性低估，ablation 失真 |
 | 可溯源 | 每节点 `provenance` 回指 MinerU 原始块，不可牺牲 | 改算法重派生/人工核对/PDF 高亮/出处可查全靠它（PRD 核心原则） |
+| 时效性 | 入库即校验，旧版本/废止不入库；检索侧不做废止过滤 | 库内恒现行有效，`status` 仅作溯源标注，省掉检索期过渡期/废止过滤复杂度 |
+| 地区隔离 | `region` 作硬过滤键，只收只召深圳本地 | 深圳有独立 2024 消耗量标准，最易串库；隔离失败=召回错误（PRD §5 红线） |
+| 效力优先级 | 元数据 `effective_priority`(1~4)，深圳本地=1 → 国标=4 | 口径冲突时确定性取值排序，越具体越优先；动态价格独立管道不参与 |
+| 稳定标识 | `doc_id` 为库内锚点，与 `standard_id`(标准编号) 解耦 | 标准编号可改版/待补号，`doc_id` 与入库/溯源引用不受影响 |

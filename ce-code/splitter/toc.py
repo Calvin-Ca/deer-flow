@@ -31,9 +31,6 @@ class TocSplitter(Splitter):
         standard_id,
         profile,
         source_file="",
-        version="",
-        effective_date="",
-        status="active",
     ) -> SplitResult:
         """目录打标 → 建树 → 节点树（含 parent/child + 祖先链 + 引用图）。
 
@@ -47,8 +44,5 @@ class TocSplitter(Splitter):
             annotated,
             entries=labeler.entries,
             source_file=source_file,
-            version=version,
-            effective_date=effective_date,
-            status=status,
         )
         return SplitResult(nodes=nodes, debug_blocks=annotated)

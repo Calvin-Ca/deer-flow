@@ -60,9 +60,6 @@ class Splitter(ABC):
         standard_id: str,
         profile: "ParseProfile",
         source_file: str = "",
-        version: str = "",
-        effective_date: str = "",
-        status: str = "active",
     ) -> SplitResult:
         """把解析后的统一元素流切分成节点结构。
 
@@ -71,7 +68,6 @@ class Splitter(ABC):
             standard_id (str): 规范唯一标识，逐节点盖章。
             profile (ParseProfile): 解析配置（切法可按需读其字段；TOC 法用于占位/扩展）。
             source_file (str): 原始 content_list.json 路径（写入节点 provenance 溯源）。
-            version / effective_date / status (str): 规范级元数据，写入每个节点。
         返回：
             SplitResult: nodes（节点列表）+ debug_blocks（可选中间产物）。
         """

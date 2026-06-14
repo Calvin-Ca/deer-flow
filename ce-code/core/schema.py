@@ -29,7 +29,6 @@ NodeType = Literal[
 ]
 RefType = Literal["strong", "weak", "exclude", "cross_standard"]
 ScopeStatus = Literal["extracted", "unknown"]
-NodeStatus = Literal["active", "superseded", "abolished"]
 
 # 表征注册表的种类（PRD §3.1 多表征表）。免费表征 + 波3 LLM 表征(summary/questions)
 ReprKind = Literal[
@@ -163,9 +162,9 @@ class Node(TypedDict, total=False):
         「固有事实」（引用图 / 祖先链），以及表征层挂的多种「语义投影」（reprs）。
         粒度视图与各检索索引都是它的派生。``total=False`` 允许结构层/表征层分阶段填。
     字段：
-        ── 标识与版本 ──
+        ── 标识 ──
         node_id        稳定 id：条文号有则用，无则标题路径（如 "GB50016#5.3.4"）。
-        standard_id / version / effective_date / status(NodeStatus)。
+        standard_id。
         ── 结构（树形）──
         node_type      NodeType。
         clause_path    条款号 "5.3.4" 或标题路径。
@@ -184,12 +183,9 @@ class Node(TypedDict, total=False):
         reprs          dict[ReprKind, Representation]（可空、可部分）。
     返回：无（TypedDict，作字典契约）。
     """
-    # 标识与版本
+    # 标识
     node_id: str
     standard_id: str
-    version: str
-    effective_date: str
-    status: NodeStatus
     # 结构（树形）
     node_type: NodeType
     clause_path: str
@@ -247,9 +243,6 @@ def new_node(standard_id: str, clause_path: str, node_type: str, **kw: object) -
     node: Node = {
         "node_id": node_id,
         "standard_id": standard_id,
-        "version": "",
-        "effective_date": "",
-        "status": "active",
         "node_type": node_type,  # type: ignore[typeddict-item]
         "clause_path": clause_path,
         "level": level,

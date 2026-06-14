@@ -211,9 +211,6 @@ class TreeBuilder:
         *,
         entries: list[dict] | None = None,
         source_file: str = "",
-        version: str = "",
-        effective_date: str = "",
-        status: str = "active",
     ) -> list[dict]:
         """目录条目骨架 + 正文挂载 → 节点树（含 parent/child + 引用图 + 祖先链）。
 
@@ -222,13 +219,11 @@ class TreeBuilder:
             entries (list[dict] | None): CatalogLabeler.entries（有序目录条目表，骨架真值）；
                 None / 空 → 退化为「保留骨架 + 号段建树」（无目录页 best-effort）。
             source_file (str): 原始 content_list.json 路径（写入 provenance 溯源）。
-            version / effective_date / status (str): 规范级元数据，写入每个节点。
         返回：
             list[dict]: 节点树（schema.Node 形态）。
         """
         std = next((b.get("standard_id", "") for b in annotated if b.get("standard_id")), "")
-        meta = {"version": version, "effective_date": effective_date,
-                "status": status, "source_file": source_file}
+        meta = {"source_file": source_file}
 
         by_path: dict[str, dict] = {}   # clause_path → 节点（骨架 + 正文，先现先占）
         order: list[dict] = []          # 节点创建序（≈文档序），供剪枝/连边遍历
@@ -261,7 +256,7 @@ class TreeBuilder:
         参数：
             entries (list[dict]): 有序目录条目表 {title, norm, page}。
             std (str): 规范标识。
-            meta (dict): version / effective_date / status / source_file。
+            meta (dict): source_file（provenance 溯源用）。
             by_path (dict): clause_path → 节点（原地填）。
             order (list): 节点创建序（原地追加）。
         返回：
@@ -278,8 +273,6 @@ class TreeBuilder:
             node = schema.new_node(
                 std, path, info["node_type"],
                 title=title, page=ent.get("page") or 0,
-                version=meta["version"], effective_date=meta["effective_date"],
-                status=meta["status"],
                 path_source=info["path_source"], path_confidence=info["path_confidence"],
                 provenance={"source_file": meta["source_file"], "block_idx": [], "page": []},
             )
@@ -328,8 +321,6 @@ class TreeBuilder:
                     node = schema.new_node(
                         std, path, info["node_type"],
                         title=elem["text"], page=elem["page"],
-                        version=meta["version"], effective_date=meta["effective_date"],
-                        status=meta["status"],
                         path_source=info["path_source"], path_confidence=info["path_confidence"],
                         provenance={
                             "source_file": meta["source_file"],

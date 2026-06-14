@@ -1,20 +1,36 @@
-#!/usr/bin/env python3
-"""build —— 知识库构建编排（阶段 1→3，从 ce-code 根运行）。
+"""build —— 知识库构建编排（阶段 1→3）。
 
-合并旧 ``02_parse_hierarchy.py``（结构层）与 ``04_build_index.py``（索引层）为单一入口，
-按 ``--terminal-stage`` 决定跑多远（语义即 parse_profile.terminal_stage）：
+  structure  入 *_content_list.json（阶段 0 缓存）→ ① 格式适配（FormatAdapter）→ ② splitter 切分
+             → 出 nodes.json（节点树·单一真值）+ structure.json（调试块）。
+  reprs      入 nodes.json → ③ reprs.enrich 给全树挂表征（免费 4 项）→ 出 重写 nodes.json（带表征）。
+  index      入 带表征 nodes.json → ④ view 选粒度 → indexer 建索引 → 出 BM25 + Milvus 双索引（按 profile 隔离）。
 
-  structure  ① 格式适配（parser.FormatAdapter）→ ② 选 splitter 切分（splitter.get）
-             → 写 nodes.json（单一真值）+ structure.json（调试）。
-  reprs      structure + ③ reprs.enrich 给全树挂表征（免费 4 项）→ 重写 nodes.json。
-  index      reprs + ④ view 选粒度 → indexer 建 BM25 + Milvus 双索引（按 profile 隔离）。
+参数一览（click options，详见各 @click.option；除「必填」组外均可选，括号内为默认值）：
+  必填
+    --input <path>            MinerU 输出的 *_content_list.json（阶段 0 缓存）路径，须存在。
+  流程控制
+    --terminal-stage          structure / reprs / index（默认 index）：流水线跑到哪一阶段。
+    --preview                 旗标：只切分、打印前 20 节点，不写盘、不触发 reprs/索引（验证切分效果）。
+  规范标识与切分
+    --standard-id             规范唯一标识，逐节点盖章；不传则取 --input 文件名 basename。
+    --profile-name            parse_profile 名 = 产物子目录名（默认 default，A/B 配置隔离）。
+    --structure-strategy      切分策略（splitter REGISTRY 键，默认 toc=原生目录多层级）。
+    --index-granularity       索引粒度视图 section / clause / paragraph（默认 clause，view 选哪层 emit）。
+  产物输出目录
+    --structured-dir          结构层产物根目录（默认 data/structured；落 <root>/<safe_id>/<profile>/）。
+    --store-dir               索引存储目录（默认 data/vector_store/<std>/<profile>/）。
+  索引阶段专用（仅 terminal-stage=index 生效）
+    --milvus-host             Milvus 地址（默认 localhost）。
+    --milvus-port             Milvus 端口（默认 19530）。
+    --embed-url               vLLM embedding 服务地址（默认 http://localhost:8097）。
+    --embed-model-id          embedding 模型 id（默认 /model）。
+    --batch-size              嵌入批大小（默认 64）。
+    --bm25-only               旗标：索引阶段只建 BM25，跳过向量索引（免 Milvus / embedding 服务）。
 
-阶段 0（MinerU 解析）最贵、只跑一次、产物缓存于 data/parsed/，由 ``python -m parser`` 单独跑；
-本入口从其缓存 *_content_list.json 起读。换 splitter / 粒度 / 表征只重跑本入口（不重跑
-MinerU），切分纯 python 无模型、开销可忽略。
-
-用法（从 ce-code 根）：
-  python build.py --input data/parsed/<std>/auto/<std>_content_list.json --terminal-stage index
+用法（从 ce-code 根，单行命令）：
+  python build.py --input data/parsed/<std>/auto/<std>_content_list.json --preview                    # 只测切分、不写盘
+  python build.py --input data/parsed/<std>/auto/<std>_content_list.json --terminal-stage structure   # 切分落盘、零外部依赖
+  python build.py --input data/parsed/<std>/auto/<std>_content_list.json --terminal-stage index        # 全量建库（需 Milvus+embedding）
 """
 
 from __future__ import annotations
@@ -51,7 +67,7 @@ def _safe(standard_id: str) -> str:
 
 def run_structure(
     elements: list[dict], standard_id: str, profile: ParseProfile, out_dir: Path,
-    *, source_file: str, version: str, effective_date: str, status: str,
+    *, source_file: str,
 ) -> list[dict]:
     """选 splitter 切分 → 写 structure.json + nodes.json，返回节点树。"""
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -59,7 +75,7 @@ def run_structure(
     console.print(f"[bold cyan]切分[/bold cyan]（strategy={profile.structure_strategy}）→ {out_dir / 'nodes.json'}")
     result = spl.split(
         elements, standard_id=standard_id, profile=profile,
-        source_file=source_file, version=version, effective_date=effective_date, status=status,
+        source_file=source_file,
     )
     if result.debug_blocks is not None:
         _write_json(result.debug_blocks, out_dir / "structure.json")
@@ -89,9 +105,6 @@ def _write_json(data: list, path: Path) -> None:
               help="切分策略（splitter/ REGISTRY 键；缺省 toc=原生目录多层级）。")
 @click.option("--index-granularity", type=click.Choice(["section", "clause", "paragraph"]),
               default="clause", show_default=True, help="索引粒度视图（view 选哪层 emit；当前仅 clause）。")
-@click.option("--version", default="", help="规范版本，如 2018。")
-@click.option("--effective-date", default="", help="生效日期，如 2018-10-01。")
-@click.option("--status", default="active", help="active / superseded / abolished。")
 @click.option("--structured-dir", type=click.Path(file_okay=False, path_type=Path),
               default=DEFAULT_STRUCTURED, show_default=True, help="结构层产物根目录。")
 @click.option("--store-dir", type=click.Path(file_okay=False, path_type=Path), default=None,
@@ -105,8 +118,8 @@ def _write_json(data: list, path: Path) -> None:
 @click.option("--preview", is_flag=True, help="只打印前 20 条节点，不写文件。")
 def main(
     input_path: Path, standard_id: str, profile_name: str, terminal_stage: str,
-    structure_strategy: str, index_granularity: str, version: str, effective_date: str,
-    status: str, structured_dir: Path, store_dir: Path | None, milvus_host: str,
+    structure_strategy: str, index_granularity: str,
+    structured_dir: Path, store_dir: Path | None, milvus_host: str,
     milvus_port: int, embed_url: str, embed_model_id: str, batch_size: int,
     bm25_only: bool, preview: bool,
 ) -> None:
@@ -150,7 +163,7 @@ def main(
     structured_out = structured_dir / _safe(standard_id) / profile.name
     nodes = run_structure(
         elements, standard_id, profile, structured_out,
-        source_file=source_file, version=version, effective_date=effective_date, status=status,
+        source_file=source_file,
     )
     if profile.terminal_stage == "structure":
         console.print("[bold green]✓ 结构层完成（terminal_stage=structure）[/bold green]")

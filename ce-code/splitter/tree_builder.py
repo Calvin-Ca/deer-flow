@@ -266,7 +266,7 @@ class TreeBuilder:
             title = ent.get("title", "").strip()
             info = classify_heading(title) if title else None
             if info is None:
-                continue  # "目录"标题行 / 交叉引用片段等：不开骨架节点
+                continue  # "toc"标题行 / 交叉引用片段等：不开骨架节点
             path = info["clause_path"]
             if path in by_path:
                 continue  # 同号条目去重（目录重复列、跨页续行等）
@@ -297,7 +297,7 @@ class TreeBuilder:
               · 已是骨架/已建节点 → **并入**（补 provenance/page，骨架由此接地），切为当前节点；
               · 否则建新条/款节点（目录通常只列到节，5.3.4 等在此诞生），记 _catalog 供兜底连边。
             非标题块（含表格/图示）累积进当前节点的 content / tables / images + provenance；
-            catalog=="目录" 的目录页块跳过；首个节点前的游离块丢弃。
+            catalog=="toc" 的目录页块跳过；首个节点前的游离块丢弃。
 
         参数：
             annotated (list[dict]): 标注块列表（文档序）。
@@ -310,7 +310,7 @@ class TreeBuilder:
         """
         cur: dict | None = None
         for elem in annotated:
-            if elem.get("catalog") == "目录":
+            if elem.get("catalog") == "toc":
                 continue  # 目录页块不开节点、不并入正文（structure.json 已全量保留 + 溯源）
 
             info = classify_heading(elem.get("text", "")) if elem.get("text_level") is not None else None

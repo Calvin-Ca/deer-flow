@@ -10,10 +10,6 @@
 - **索引层（04，T4）** 看 ``index_granularity`` 选粒度视图 emit、看 ``small_to_big``
   决定检索期是否上探父节点。
 
-设计转向（2026-06-12）后旧字段 ``chunk_granularity`` / ``enrichment`` /
-``structure_depth`` 已废弃——粒度不再是「切树」而是 ``view(tree, level)``（见 view.py），
-增强深度被「表征注册表」取代。本模块独立于 02（数字前缀文件不可 import），供
-02 / reprs runner / 04 共同 import。
 """
 from __future__ import annotations
 
@@ -38,7 +34,13 @@ class ParseProfile:
             index     继续到阶段 3（按 index_granularity 选视图 emit → 向量 + BM25）。
         structure_strategy (str): 切分策略名（阶段 1 用哪个 splitter，见 splitters/
             REGISTRY）。缺省 "toc"——基于 PDF 原生目录的多层级切分（建筑规范首选，
-            PRD §一 核心设计原则 1）。换切法只重跑阶段 1，下游粒度/表征不动。
+            PRD §一 核心设计原则 1）。**该阶段只产目录镜像树**（条款不在此建）。换切法只重跑
+            阶段 1，下游粒度/表征不动。
+        clause_strategy (str): **条级切分策略**（Stage 2，与目录建树解耦，2026-06-14）——
+            把目录叶节点的正文按规范规则细拆成条/款/表子节点（条款不一定有编号、有的整个是
+            一张表，故规则因规范而异，须可配）。缺省 ``"none"``（不细拆，树即目录镜像）。
+            **接口预留·未实装**：实装时做成可插拔策略，据节点 provenance.block_idx 回查原始块
+            细拆、不重跑 MinerU；只往树里加更深子节点，不改目录骨架。
         index_granularity (str): 阶段 3 在节点树上选哪层粒度视图入索引——
             section | clause | paragraph（见 view.view）。**不切树**，树本身完整保留，
             换粒度只重跑阶段 3。
@@ -52,6 +54,7 @@ class ParseProfile:
     name: str = "default"
     terminal_stage: Literal["structure", "reprs", "index"] = "index"
     structure_strategy: str = "toc"  # 切分策略名（splitters/ REGISTRY 键，缺省原生目录多层级）
+    clause_strategy: str = "none"    # 条级切分策略（Stage 2，与建树解耦；缺省不细拆·未实装）
     index_granularity: Literal["section", "clause", "paragraph"] = "clause"
     reprs: list[str] = field(default_factory=lambda: list(DEFAULT_REPRS))
     small_to_big: bool = True

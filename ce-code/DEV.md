@@ -35,22 +35,24 @@ PDF（清单/计量规范）
       │
       ▼
 [阶段0] MinerU 解析 ──► [阶段1] 切分建树 ──► [阶段2] 挂表征 ──► [阶段3] 索引
-  -m parser           build.py(structure)   build.py(reprs)   build.py(index)
-  parser/             splitter/(toc)        reprs/(免费4项)   view+retrieval/indexer
+  -m parser           build(structure)      build(reprs)      build(index)
+  parser/(mineru)     splitter/(toc)        feature/(免费4项) index/(view+各index)
       │                    │                                       │
       ▼                    ▼                                       ▼
- data/parsed/        nodes.json(唯一真值)                  BM25 + Milvus + 元数据
+ data/parsed/        chunks.json(唯一真值)                 BM25 + Milvus + 元数据
  (不可变缓存,只跑1次)  +引用图+祖先链(固有事实)               data/vector_store/{std}/{profile}/
                                                                   │
                                                                   ▼
                                                     ┌──────────────────────┐
-                                                    │ retrieval/server.py  │
+                                                    │ service/knowledge_api│
                                                     │  检索原语（对外契约） │
                                                     │  FastAPI :8100       │
                                                     └──────────────────────┘
 ```
 
 > **关键设计**：节点树（阶段 1）一次建好，**粒度是索引期（阶段 3）在树上选的视图，不是切树**。换粒度/换表征只重跑下游，不重跑 MinerU（最贵，约 60% 耗时）。结构（建树）/ 表征（多投影）/ 粒度（树上视图）三件事正交分离。
+
+> **分层重构（2026-06-15）**：各阶段数据统一为显式 IR（`core/` 的 `@dataclass` + `to_dict/from_dict`：Document / Chunk / ChunkFeature / RetrievalQuery / RetrievedChunk / KnowledgeContext），各层做成「基类 + factory + 多策略」可插拔（★实装/◌占位）：解析 mineru★·unstructured◌；切分 toc★·semantic◌·tree◌；表征 raw·bm25·dense·context_aug★·keyword◌·graph◌；索引 bm25·vector·metadata★·graph◌；检索 dense·bm25·hybrid★·graph◌。`nodes.json`→`chunks.json`；旧 `reprs/`→`feature/`、`retrieval/{engine,indexer,config,server}` 拆入 `index/`+`retrieval/`+`service/`+根 `config.py`；旧 `node_id` 废除，全层以 `node_path` 为键。对外 :8100 契约逐字不变。
 
 **对外接口契约**（上游模块依赖的唯一边界）：
 
@@ -63,7 +65,7 @@ PDF（清单/计量规范）
   filter  : standard / version / region（元数据过滤，可选）
 
 输出：ranked results[]，每条含：
-  node_id / node_path / standard_id / version
+  node_path / standard_id / version          （node_path 即节点 id；旧 node_id 已废）
   title / content（命中节点正文）
   ancestor_titles（祖先链，溯源用）
   references（引用边）

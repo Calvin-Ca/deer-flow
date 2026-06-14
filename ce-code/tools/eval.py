@@ -5,6 +5,11 @@
   - 关联条款召回率（related_clauses 命中比例）
   - 通过判定：期望召回率 ≥ 0.5（强条机制 2026-06-12 废，不再区分强条/非强条阈值）
 
+**判命中口径 = 包含关系**（DEV §5.1）：返回块**包含或等于**目标条即算命中（``_contains``），
+非严格 node_path 相等。clause 粒度下返回单元与目标条 1:1、包含=相等；但只 emit 到粗粒度
+（section）的 profile 下，返回 "5.3" 应命中期望 "5.3.4"——否则粗粒度 profile 被系统性低估、
+ablation 结论失真。
+
 使用方式（从 ce-code 根，单行命令）：
   python -m tools.eval --store-dir data/vector_store/<std>/<profile> --eval-set data/eval_set/gb50016_eval.json --skip-rerank
 """
@@ -12,18 +17,47 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 import click
 from rich.console import Console
 from rich.table import Table
 
-from retrieval.config import collection_name as build_collection_name
-from retrieval.engine import search
+from config import collection_name as build_collection_name
+from core.query import RetrievalQuery
+from retrieval.hybrid_retriever import HybridRetriever
 
 ROOT = Path(__file__).resolve().parent.parent
 
 console = Console()
+
+# 附录根 node_path（"附录E"）→ 其下条号以字母打头（E.1 / E.1.1），故包含判定需特判。
+_APPENDIX_ROOT_RE = re.compile(r"^附录\s*([A-Z])$")
+
+
+def _contains(returned_path: str, target_path: str) -> bool:
+    """返回块 ``returned_path`` 是否「包含或等于」目标条 ``target_path``（按 node_path 层级）。
+
+    包含 = 返回块是目标条本身或其祖先（粗粒度命中细粒度目标）：
+      · 相等：``"5.3.4" == "5.3.4"``。
+      · 数字/附录字母号段后代：``"5.3"`` 包含 ``"5.3.4" / "5.3.4.1"``；``"E.1"`` 包含 ``"E.1.1"``
+        （靠 ``target.startswith(returned + ".")``，号段边界以 "." 划清，避免 "5.3" 误含 "5.30"）。
+      · 附录根：``"附录E"`` 包含 ``"E.1" / "E.1.1"``（附录条号以字母 E 打头，非 "附录E." 前缀）。
+    其余（无编号标题路径、跨分支）一律不含。
+    """
+    if returned_path == target_path:
+        return True
+    app = _APPENDIX_ROOT_RE.match(returned_path)
+    if app:
+        letter = app.group(1)
+        return target_path.startswith(letter + ".")
+    return target_path.startswith(returned_path + ".")
+
+
+def _hit(targets: set[str], hit_paths: list[str]) -> set[str]:
+    """目标条集合里被「包含关系」命中的子集（任一返回块包含该目标条即命中）。"""
+    return {t for t in targets if any(_contains(p, t) for p in hit_paths)}
 
 
 def run_eval(
@@ -40,6 +74,12 @@ def run_eval(
 ) -> None:
     with open(eval_path, encoding="utf-8") as f:
         eval_set = json.load(f)
+
+    hybrid = HybridRetriever(
+        store_dir, collection_name,
+        milvus_host=milvus_host, milvus_port=milvus_port,
+        embed_url=embed_url, embed_model_id=embed_model_id,
+    )
 
     rows = []
     for item in eval_set:
@@ -65,17 +105,15 @@ def run_eval(
             })
             continue
 
-        hits = search(
-            query, store_dir, milvus_host, milvus_port, collection_name,
-            embed_url, embed_model_id, top_k, top_k * 2, top_k * 2, skip_rerank,
-        )
-        hit_paths = {h["node_path"] for h in hits}
+        hits = hybrid.retrieve(RetrievalQuery(text=query, top_k=top_k, skip_rerank=skip_rerank))
+        hit_paths = [h.node_path for h in hits]
 
-        hit_expected = expected & hit_paths
-        missed_expected = expected - hit_paths
+        # 包含关系判命中（_hit）：返回块包含或等于目标条即命中，非严格相等
+        hit_expected = _hit(expected, hit_paths)
+        missed_expected = expected - hit_expected
         expected_recall = len(hit_expected) / len(expected)
 
-        hit_related = related & hit_paths if related else set()
+        hit_related = _hit(related, hit_paths) if related else set()
         related_recall = len(hit_related) / len(related) if related else None
 
         passed = expected_recall >= 0.5
@@ -88,7 +126,7 @@ def run_eval(
             "hit_expected": list(hit_expected),
             "hit_related": list(hit_related),
             "missed_expected": list(missed_expected),
-            "missed_related": list(related - hit_paths),
+            "missed_related": list(related - hit_related),
             "expected_recall": expected_recall,
             "related_recall": related_recall,
             "pass": passed,

@@ -21,64 +21,87 @@ ce-code/
 ├── data/                           # 数据资产（除 eval_set 外均不入 git）
 │   ├── raw/                        #   原始 PDF（手动放入）
 │   ├── parsed/                     #   MinerU 解析输出（python -m parser 产物，阶段 0 缓存）
-│   ├── structured/                 #   节点树 nodes.json（build.py 结构层产物）
-│   ├── vector_store/               #   BM25 + Milvus 索引（build.py 索引层产物）
+│   ├── structured/                 #   Chunk 树 chunks.json（build 结构层产物）
+│   ├── vector_store/               #   BM25 + Milvus 索引（build 索引层产物）
 │   ├── eval_set/                   #   评测集（入 git）
 │   │   └── gb50016_eval.json       #     GB 50016 的 45 条评测用例
 │   └── quality_reports/            #   质量审核报告（tools/review_quality 输出）
 │
-│  ── 编排（从 ce-code 根运行）──
-├── build.py                        # 阶段 1→3 跨包编排：切分 → reprs → 索引（按 --terminal-stage）
+│  ── 编排 / 入口（从 ce-code 根运行）──
+├── build.py                        # 构建入口（薄壳，转 service/build_service.main）
+├── config.py                       # 共享运行配置：服务地址 / 规范别名 / collection 命名
 │
-│  ── ① 解析层 ──
-├── parser/                         # PDF → MinerU → 统一元素块
+│  ── core：统一 IR 契约（@dataclass + to_dict/from_dict）──
+├── core/                           # 各阶段中间表示（IR），全层只认这里
+│   ├── document.py                 #   Document / Block（解析层产物）
+│   ├── chunk.py                    #   Chunk / Reference / Provenance（切分层产物·单一真值）
+│   ├── feature.py                  #   ChunkFeature（表征层产物）
+│   ├── query.py                    #   RetrievalQuery（检索入参）
+│   ├── retrieval.py                #   RetrievedChunk（检索命中·含对外契约 to_response）
+│   ├── context.py                  #   KnowledgeContext（一次检索结果集 = /search 返回体）
+│   └── profile.py                  #   ParseProfile（流水线配置契约）
+│
+│  ── ① 解析层（多解析模型可插拔）──
+├── parser/                         # 原始文档 → Document IR
+│   ├── base.py / factory.py        #   Parser 基类 + 工厂（profile.parser_strategy 选）
+│   ├── mineru.py                   #   ★ MineruParser（content_list.json → Document）
+│   ├── unstructured.py             #   ◌ 占位
+│   ├── format_adapter.py           #   MinerU v1 → 统一块（MineruParser 复用）
 │   ├── __main__.py                 #   阶段 0 包级入口：python -m parser single / split
-│   ├── mineru_client.py            #   远程 MinerU API 客户端（默认解析方式）
-│   ├── pdf_parser.py               #   单 PDF 解析（默认 API，--local 本地 CLI）
-│   ├── split_parse.py              #   大 PDF 分块解析（规避本地 OOM）
-│   └── format_adapter.py           #   MinerU v1 → 统一块 schema（切分前通用适配）
+│   └── mineru_client / pdf_parser / split_parse.py   #   阶段 0 实跑 PDF→json
 │
-│  ── core 贯穿契约 ──
-├── core/                           # 全层共享契约（不含编排）
-│   ├── schema.py                   #   节点契约：Node / Representation / Provenance
-│   ├── parse_profile.py            #   配置契约：structure_strategy / reprs / index_granularity
-│   └── view.py                     #   粒度视图（索引期选 emit 层；当前仅 clause）
+│  ── ② 切分层（多切法可插拔）──
+├── splitter/                       # Document → Chunk 树
+│   ├── base.py / factory.py        #   Splitter 基类 + 工厂（profile.structure_strategy 选）
+│   ├── toc_splitter.py             #   ★ TocSplitter：基于原生目录的多层级切分
+│   ├── semantic_splitter.py        #   ◌ 占位（语义切）
+│   ├── tree_splitter.py            #   ◌ 占位（标题层级树）
+│   ├── catalog_labeler.py          #   ↳ 目录打标器（TocSplitter 内部件）
+│   ├── tree_builder.py             #   ↳ 建树器（目录骨架建树 + 固有事实；内部 dict，出口转 Chunk）
+│   └── references.py               #   ↳ 引用图分型 + 反向边（建树期固有事实）
 │
-│  ── ② 切分层 ──
-├── splitter/                       # 文档怎么切成节点结构（可插拔策略）
-│   ├── base.py                     #   Splitter 基类 + SplitResult
-│   ├── __init__.py                 #   REGISTRY / register / get（默认 toc）
-│   ├── toc.py                      #   TocSplitter：基于原生目录的多层级切分（核心设计原则 1）
-│   ├── catalog_labeler.py          #   ↳ 目录打标器（catalog/目录定位，TocSplitter 内部件）
-│   ├── tree_builder.py             #   ↳ 建树器（目录骨架建 parent/child 树 + 固有事实）
-│   └── references.py               #   ↳ 引用图分型 + referenced_by 反向边（建树期固有事实）
+│  ── ③ 表征层（多表征可插拔）──
+├── feature/                        # Chunk → 多表征（挂 chunk.features）
+│   ├── base.py / pipeline.py       #   Feature 基类 + 注册表/enrich（profile.features 选）
+│   ├── raw / bm25 / dense / context_aug.py   #   ★ 免费 4 项（bm25=旧 sparse）
+│   └── keyword.py / graph.py       #   ◌ 占位
 │
-│  ── ③ 表征层 ──
-├── reprs/                          # 节点投影成可检索的样子（可插拔注册表）
-│   ├── base.py                     #   Representation 基类（kind + build）
-│   ├── __init__.py                 #   REGISTRY / register / enrich / attach
-│   └── raw / sparse / dense / context_aug.py   #   免费 4 项表征
+│  ── ④ 索引层（多索引可插拔）──
+├── index/                          # Chunk 树 → 选粒度视图 → 各索引
+│   ├── manager.py                  #   ★ 粒度视图 view（含空骨架过滤）+ 行准备 + 编排 build_index
+│   ├── bm25_index.py               #   ★ rank-bm25 倒排（消费 sparse）
+│   ├── vector_index.py             #   ★ Milvus 向量（消费 dense，索引期统一嵌入）
+│   ├── metadata_index.py           #   ★ metadata.json 快照（+ clause 直取/引用扩展读取）
+│   └── graph_index.py              #   ◌ 占位（面向 Phase C 造价 KG）
 │
-│  ── ④ 服务/检索层 ──
-├── retrieval/                      # 检索引擎 + 索引构建 + HTTP 服务
-│   ├── config.py                   #   默认配置、规范别名、store/collection 解析
-│   ├── engine.py                   #   混合检索 search() + 引用扩展（node_id 去重）+ rerank + get_clause
-│   ├── indexer.py                  #   索引构建库（BM25 + Milvus；build.py 索引阶段调用）
-│   └── server.py                   #   知识服务 :8100 —— 仅原语 /search /expand /clause /health
+│  ── ⑤ 检索层（多召回可插拔）──
+├── retrieval/                      # RetrievalQuery → RetrievedChunk
+│   ├── base.py                     #   Retriever 基类
+│   ├── bm25_retriever / dense_retriever.py   #   ★ 单路召回
+│   ├── hybrid_retriever.py         #   ★ BM25+向量+RRF+引用扩展+rerank（主力，逐字保持旧召回）
+│   ├── rrf.py                      #   ★ RRF 合并 + 引用扩展（行 dict 层纯函数）
+│   ├── graph_retriever.py          #   ◌ 占位（KG 多跳）
+│   └── service.py                  #   RetrievalService（统一检索入口：search/expand/get_clause）
 │
-│  ── 工具（非数据主链）──
+│  ── ⑥ 服务层（对外 API + 构建编排）──
+├── service/                        # 承旧 server.py + build.py
+│   ├── build_service.py            #   构建编排（阶段 1→3）：解析→切分→表征→索引
+│   ├── retrieve_service.py         #   检索编排 + 可观测性（请求级日志/计时）
+│   └── knowledge_api.py            #   知识服务 :8100（/search /expand /clause /health，契约不变）
+│
+│  ── utils / tools ──
+├── utils/                          # tokenizer（字符级分词）/ text_cleaner / logger
 └── tools/                          # 评测 / 审核 / 运维（-m tools.X 运行）
-    ├── retrieve_cli.py             #   混合检索 CLI（薄封装 engine）
-    ├── eval.py                     #   检索质量评测（⚠️ 仍 v1 口径，T10 待改）
-    ├── review_quality.py           #   质量审核（⚠️ 仍 v1，未适配 nodes.json，T10 待改）
-    ├── setup_server.sh             #   服务器一次性环境准备
-    └── rename_raw_files.sh         #   原始 PDF 重命名工具
+    ├── retrieve_cli.py             #   混合检索 CLI（薄封装 HybridRetriever）
+    ├── eval.py                     #   检索质量评测（按包含关系判命中；⚠️ T10 待换指标）
+    ├── review_quality.py           #   质量审核（⚠️ 仍 v1，未适配 chunks.json，T10 待改）
+    └── setup_server.sh / rename_raw_files.sh   #   运维脚本
 ```
 
-> **运行模型**：ce-code 不安装为包（`packages=[]`），**从 ce-code 根运行**。跨包编排
-> `build.py` 直接 `python build.py …`；阶段 0 解析与服务/工具用模块式
-> `python -m parser single …` / `python -m retrieval.server` / `python -m tools.eval …`。
-> 各层绝对 import（`from core import schema` / `import splitter`），无 sys.path hack。
+> **运行模型**：ce-code 不安装为包（`packages=[]`），**从 ce-code 根运行**。构建 `python build.py …`；
+> 阶段 0 解析与服务/工具用模块式 `python -m parser single …` / `python -m service.knowledge_api` /
+> `python -m tools.eval …`。各层绝对 import（`from core import Chunk` / `import splitter`），无 sys.path hack。
+> ★=本轮实现、◌=占位（未实装抛 NotImplementedError）。
 
 ---
 
@@ -182,7 +205,7 @@ CUDA_VISIBLE_DEVICES=2 HF_ENDPOINT=https://hf-mirror.com uv run python -m parser
 uv run python build.py --input "data/parsed/<basename>/auto/<basename>_content_list.json" --profile-name default --terminal-stage structure --structure-strategy toc
 ```
 
-按 `--structure-strategy`（缺省 `toc`，基于 PDF 原生目录的多层级切分）选 splitter，输出落在 `data/structured/<standard>/<profile>/nodes.json`（节点树·单一真值）+ `structure.json`（调试）。`standard_id` 默认取输入 basename；可加 `--standard-id "GB 50016-2014(2018)"`。
+按 `--structure-strategy`（缺省 `toc`，基于 PDF 原生目录的多层级切分）选 splitter，输出落在 `data/structured/<standard>/<profile>/chunks.json`（Chunk 树·单一真值）+ `structure.json`（调试）。`standard_id` 默认取输入 basename；可加 `--standard-id "GB 50016-2014(2018)"`。可选 `--parser-strategy`（缺省 `mineru`）。
 
 **一步到位建索引**（切分 → 挂 reprs → BM25 + 向量；需 Milvus + embedding 服务）：
 
@@ -190,11 +213,11 @@ uv run python build.py --input "data/parsed/<basename>/auto/<basename>_content_l
 uv run python build.py --input "data/parsed/<basename>/auto/<basename>_content_list.json" --profile-name default --terminal-stage index --index-granularity clause --embed-url http://localhost:8097 --embed-model-id /model
 ```
 
-`view` 选粒度（当前仅 `clause`）→ `reprs.enrich` 挂免费 4 项 → emit；输出按 profile 隔离落 `data/vector_store/<standard>/<profile>/`，Milvus collection 名由 profile 推断（与 server/eval 一致）。无 Milvus 时加 `--bm25-only`。
+`index.view` 选粒度（当前仅 `clause`）→ `feature.enrich` 挂免费 4 项 → emit；输出按 profile 隔离落 `data/vector_store/<standard>/<profile>/`，Milvus collection 名由 profile 推断（与 service/eval 一致）。无 Milvus 时加 `--bm25-only`。
 
 ### Step 5 — 质量审核
 
-> ⚠️ `tools/review_quality.py` 仍是 v1 口径（读旧 `_clauses.json`、统计强条），**尚未适配 nodes.json**，待 T10 改造成节点树健康检查（孤儿节点 / 空内容 / 表格归属 / 悬空引用）。当前流程可跳过此步。
+> ⚠️ `tools/review_quality.py` 仍是 v1 口径（读旧 `_clauses.json`、统计强条），**尚未适配 chunks.json**，待 T10 改造成节点树健康检查（孤儿节点 / 空内容 / 表格归属 / 悬空引用）。当前流程可跳过此步。
 
 ### Step 6 — 检索验证
 
@@ -212,7 +235,7 @@ uv run python -m tools.retrieve_cli --store-dir data/vector_store/<standard>/<pr
 
 ```bash
 # 知识服务（检索原语 /search /expand /clause，:8100）—— 必须先起（从 ce-code 根，模块式）
-cd /mnt/nvme/calvin/code/deer-flow/ce-code && uv run python -m retrieval.server
+cd /mnt/nvme/calvin/code/deer-flow/ce-code && uv run python -m service.knowledge_api
 curl http://localhost:8100/health
 ```
 

@@ -1,15 +1,26 @@
-"""retrieval —— 建筑规范检索引擎（纯检索，无生成/无编排）。
+"""检索层（retrieval/）—— 多路召回 + 混合编排（RetrievalQuery → KnowledgeContext）。
 
-只对底层知识库提供检索方法；生成（问答）与合规编排在 ``service/`` 层、import 本包。
-被检索服务 / 合规服务 / POC 脚本共用，是"一个知识服务，N 个 skill"的共享内核。
+承旧 ``retrieval/engine.py`` 的检索数值逻辑，拆为可插拔多策略：
+  base            Retriever 基类。
+  bm25_retriever  BM25 关键词召回（单路）。
+  dense_retriever 向量语义召回（单路）。
+  hybrid_retriever BM25 + 向量 + RRF + 引用扩展 + rerank（默认主力，逐字保持旧召回）。
+  graph_retriever KG 多跳（占位·面向 Phase C）。
+  rrf             RRF 合并 + 引用扩展（行 dict 层纯函数）。
+  service         RetrievalService —— 对外统一检索入口（search / expand / get_clause）。
 
-常用入口：
-    from retrieval.config import DEFAULTS, STANDARD_ALIASES, resolve_store_dir, collection_name
-    from retrieval.engine import search, expand_references, get_clause
+rerank + 索引（rerank 模型 / Milvus）只在检索栈加载一份（唯一 owner）。
 """
 from __future__ import annotations
 
-from . import config, engine
-from .engine import get_clause, search
+from retrieval.base import Retriever
+from retrieval.bm25_retriever import Bm25Retriever
+from retrieval.dense_retriever import DenseRetriever
+from retrieval.graph_retriever import GraphRetriever
+from retrieval.hybrid_retriever import HybridRetriever
+from retrieval.service import RetrievalService
 
-__all__ = ["config", "engine", "search", "get_clause"]
+__all__ = [
+    "Retriever", "Bm25Retriever", "DenseRetriever", "HybridRetriever",
+    "GraphRetriever", "RetrievalService",
+]

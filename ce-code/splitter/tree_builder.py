@@ -29,10 +29,11 @@
 原生目录的多层级切分）的**内部实现件**，与目录打标 ``catalog_labeler.py``、引用图分型
 ``references.py`` 同在 splitter/ 包内；格式适配 ``format_adapter.py``（parser/）是切分前的
 通用适配，不随本切法内聚。命名（承 2026-06-13 术语统一）：旧名 ``GranularityAxis`` 失准——
-「granularity」已专指索引期树上视图（``core.view``），与建树无关，故更名 ``TreeBuilder``。
+「granularity」已专指索引期树上视图（``index.manager.view``），与建树无关，故更名 ``TreeBuilder``。
 
-依赖：``core.schema``（节点契约）、``splitter.references``（引用图）、``core.parse_profile``
-（配置契约）——均绝对 import，从 ce-code 根运行即解析（无 sys.path hack）。
+依赖：``splitter.references``（引用图）、``core.profile``（配置契约）——均绝对 import，从 ce-code
+根运行即解析（无 sys.path hack）。建树内部用**节点 dict**形态（``_new_node`` 工厂），出口由
+``toc_splitter._node_to_chunk`` 转 ``core.chunk.Chunk`` IR。
 
 输入：① CatalogLabeler.annotate() 产出的标注块列表（每块带 text_level / catalog /
       catalog_source / standard_id / block_idx 溯源）；② CatalogLabeler.entries（有序
@@ -44,9 +45,36 @@ from __future__ import annotations
 
 import re
 
-from core import schema  # 节点契约
-from core.parse_profile import ParseProfile  # 流水线配置契约，PRD §3.2
+from core.profile import ParseProfile  # 流水线配置契约，PRD §3.2
 from splitter import references  # 引用图分型 + 反向边，纯 stdlib
+
+
+def _new_node(standard_id: str, node_path: str, **kw: object) -> dict:
+    """建树期的**节点 dict 工厂**（建树内部用 dict 形态，出口由 toc_splitter 转 Chunk IR）。
+
+    产出带默认值的节点 dict：node_type/node_level 由建树末算定（_assign_node_type /
+    _attach_ancestors），故此处留空/0；provenance 等可经 kw 覆盖。键集与 Chunk.from_dict 兼容
+    （node_type→chunk_type、node_level→level、reprs 丢弃 由 toc_splitter._node_to_chunk 处理）。
+    """
+    node: dict = {
+        "node_path": node_path,
+        "standard_id": standard_id,
+        "node_type": "",
+        "node_level": int(kw.pop("node_level", 0)),  # type: ignore[arg-type]
+        "parent_id": None,
+        "children_ids": [],
+        "title": "",
+        "content": "",
+        "ancestor_titles": [],
+        "ancestor_paths": [],
+        "references": [],
+        "referenced_by": [],
+        "node_path_source": "",
+        "node_path_confidence": 1.0,
+        "provenance": {"source_file": "", "block_idx": [], "page": []},
+    }
+    node.update(kw)  # type: ignore[arg-type]
+    return node
 
 
 # ---------------------------------------------------------------------------
@@ -280,7 +308,7 @@ class TreeBuilder:
             path = info["node_path"]
             if path in by_path:
                 continue  # 同号条目去重（目录重复列、跨页续行等）
-            node = schema.new_node(
+            node = _new_node(
                 std, path,
                 title=title,
                 node_path_source=info["node_path_source"], node_path_confidence=info["node_path_confidence"],
@@ -341,7 +369,7 @@ class TreeBuilder:
                 heading_is_content = False
                 if node is None:
                     if build_missing:           # 无目录页：标题即结构 → 建骨架节点（退化兜底）
-                        node = schema.new_node(
+                        node = _new_node(
                             std, path, title=elem["text"],
                             node_path_source=info["node_path_source"], node_path_confidence=info["node_path_confidence"],
                             provenance={

@@ -1,7 +1,7 @@
-"""混合检索单查询调试 CLI —— 薄封装 ``retrieval.engine.search``（看单条 query 命中）。
+"""混合检索单查询调试 CLI —— 薄封装 ``retrieval.HybridRetriever``（看单条 query 命中）。
 
-职责单一：给检索引擎套命令行参数 + rich 表格展示，人肉抽查「某条 query 召回了哪些
-条款」。检索逻辑全在 ``retrieval/engine.py``，本文件只管参数解析与结果展示。
+职责单一：给检索器套命令行参数 + rich 表格展示，人肉抽查「某条 query 召回了哪些条款」。检索逻辑
+全在 ``retrieval/``（hybrid + RRF + 引用扩展 + rerank），本文件只管参数解析与结果展示。
 
 批量评测（eval-set / 召回率报告）见 ``tools/eval.py``，两处不重复实现。
 
@@ -17,8 +17,10 @@ import click
 from rich.console import Console
 from rich.table import Table
 
-from retrieval.config import collection_name
-from retrieval.engine import search
+from config import collection_name
+from core.query import RetrievalQuery
+from core.retrieval import RetrievedChunk
+from retrieval.hybrid_retriever import HybridRetriever
 
 console = Console()
 
@@ -27,13 +29,13 @@ console = Console()
 # 结果展示
 # ---------------------------------------------------------------------------
 
-def print_results(query: str, results: list[dict]) -> None:
+def print_results(query: str, results: list[RetrievedChunk]) -> None:
     """把单查询的命中条款渲染成 rich 表格打印到终端。
 
     参数：
         query (str): 检索查询原文。
-        results (list[dict]): ``engine.search`` 的返回（每条带 node_path / _source /
-            _rerank_score / content 等字段）。
+        results (list[RetrievedChunk]): hybrid.retrieve 的返回（每条带 node_path / source /
+            scores / content 等）。
     返回：
         无（直接打印）。
     """
@@ -47,9 +49,9 @@ def print_results(query: str, results: list[dict]) -> None:
     t.add_column("正文片段", no_wrap=False, max_width=60)
 
     for r in results:
-        rerank_score = f"{r['_rerank_score']:.3f}" if "_rerank_score" in r else "-"
-        snippet = (r.get("content") or "")[:80].replace("\n", " ")
-        t.add_row(r["node_path"], r.get("_source", ""), rerank_score, snippet)
+        rerank_score = f"{r.scores['rerank']:.3f}" if "rerank" in r.scores else "-"
+        snippet = (r.content or "")[:80].replace("\n", " ")
+        t.add_row(r.node_path, r.source, rerank_score, snippet)
 
     console.print(t)
 
@@ -90,10 +92,12 @@ def main(
     if not collection:
         collection = collection_name(store_dir.name)
 
-    results = search(
-        query, store_dir, milvus_host, milvus_port, collection,
-        embed_url, embed_model_id, top_k, top_k * 2, top_k * 2, skip_rerank,
+    hybrid = HybridRetriever(
+        store_dir, collection,
+        milvus_host=milvus_host, milvus_port=milvus_port,
+        embed_url=embed_url, embed_model_id=embed_model_id,
     )
+    results = hybrid.retrieve(RetrievalQuery(text=query, top_k=top_k, skip_rerank=skip_rerank))
     print_results(query, results)
 
 

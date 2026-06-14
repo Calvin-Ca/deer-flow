@@ -70,6 +70,21 @@ MinerU 解析 + 条款树提取 + 质量审核，在 GB 50378-2006 和 GB 50016 
 - **parse.py → parser/__main__.py**：阶段 0 编排只调 `parser.*` 子命令（包内编排，区别于 build.py 跨包编排留根），下沉为包级入口 `python -m parser single / split`；同步 README/DEV 引用。
 - **删孤儿目录**：`extract/`、`pipeline/` 仅余过期 `__pycache__`（源码早已并入 splitter/parser/build），git 未跟踪，清掉。
 
+### 分层重构：统一 IR + 各层基类/factory/多策略（✅ 2026-06-15）
+
+把各阶段数据统一为**显式 IR**（`core/` 全 `@dataclass` + `to_dict/from_dict`），各层做成「基类 + factory + 可插拔多策略」，当前实装一条链路、其余占位（抛 `NotImplementedError`）：
+
+- **IR（core/）**：`document`(Document/Block) / `chunk`(Chunk/Reference/Provenance) / `feature`(ChunkFeature) / `query`(RetrievalQuery) / `retrieval`(RetrievedChunk) / `context`(KnowledgeContext) / `profile`(ParseProfile)。`Chunk` 替代旧 `schema.Node`，**保留 `node_path` 作 id**（`chunk_id ≡ node_path`，旧 `node_id` 全层废除）。
+- **解析层 parser/**：`base`+`factory` + ★`mineru`(包 format_adapter，产 Document) + ◌`unstructured`。
+- **切分层 splitter/**：`base`(`split(Document)->list[Chunk]`)+`factory` + ★`toc_splitter`(承旧 toc，内部 `catalog_labeler`/`tree_builder`/`references` 保持 dict 管道、出口转 Chunk) + ◌`semantic`/`tree`。
+- **表征层 feature/**（承旧 `reprs/`）：`base`+`pipeline` + ★`raw`/`bm25`(=旧 sparse)/`dense`/`context_aug` + ◌`keyword`/`graph`。
+- **索引层 index/**（拆旧 `indexer.py`+`view.py`）：★`manager`(view 选粒度 + **空骨架过滤** + 行准备 + 编排) / `bm25_index` / `vector_index` / `metadata_index` + ◌`graph_index`。
+- **检索层 retrieval/**（拆旧 `engine.py`）：`base` + ★`dense_retriever`/`bm25_retriever`/`hybrid_retriever`(RRF+引用扩展+rerank，逐字保持旧召回)/`rrf`/`service`(RetrievalService) + ◌`graph_retriever`。
+- **服务层 service/**（承旧 `server.py`+`build.py`）：★`build_service`(阶段1→3 编排) / `retrieve_service`(可观测性) / `knowledge_api`(:8100，**4 端点契约逐字不变**)。
+- **utils/**：`tokenizer`(字符级分词，建/检索共用) / `text_cleaner` / `logger`；**根 `config.py`**：服务地址/别名/collection 命名（承旧 `retrieval/config.py`）。
+- **删除**：旧 `core/{schema,parse_profile,view}.py`、`reprs/`、`retrieval/{engine,indexer,config,server}.py`。产物 `nodes.json`→`chunks.json`。
+- **验证**：全 65 文件 `py_compile` 通过；各层从根 import 无 sys.path hack；`tests/test_splitter_pure.py` 14/14 + 新 `tests/test_ir_pipeline.py` 7/7（IR 往返 / 合成 Document→Chunk→feature→view 全链路 / 空骨架过滤 / RetrievedChunk 契约 / RRF·引用扩展）。⚠️ Milvus/embedding 真链路仍待服务器（同 🏁 里程碑）。
+
 ---
 
 ## Phase B：数据模型改造（🟡 进行中 · 2026-06-12 设计转向）

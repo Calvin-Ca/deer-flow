@@ -19,8 +19,20 @@ from typing import Literal
 # 与 schema.RefType 保持一致;extract 包对 plain dict 操作,不强依赖 schema 导入路径
 RefType = Literal["strong", "weak", "exclude", "cross_standard"]
 
-# 本规范内条款号:第?5.2.1条/款/项(2~4 段,至少两段以排除年份/页码)
-_NUM_RE = re.compile(r"第?\s*(\d+\.\d+(?:\.\d+){0,2})\s*(?:条|款|项|节)?")
+# 本规范内条款号:可选「第」前缀(g1) + 2~4 段编号(g2) + 可选「条/款/项/节」量词后缀(g3)。
+# 至少两段以排除年份/页码/章号。两段 d.d 与正文量值高度同形(6.0m/1.5h/坡度5.3%),故
+# extract_references 对**无锚点**(无 第/条款项节)的号再加两道召回安全的精度闸,见该函数。
+_NUM_RE = re.compile(r"(第)?\s*(\d+\.\d+(?:\.\d+){0,2})\s*(条|款|项|节)?")
+
+# 号后紧跟量纲单位 → 这是量值不是条款引用(6.0m/1.5h/0.5MPa/5.3%/3.6kN)。召回安全:
+# 真实条款引用号后从不接单位。
+_UNIT_AFTER_RE = re.compile(
+    r"^\s*(?:mm|cm|km|m²|m³|m2|m3|m/s|kN|kPa|MPa|Pa|kg|m|h|s|t|N|%|‰|℃|°"
+    r"|毫米|厘米|千米|米|秒|小时|倍)"
+)
+# 号前紧邻 表/图/式 → 这是表/图/公式引用不是条款引用(表5.3/图5.3/式5.3)。召回安全:
+# 真实条款引用号前不会是这三个字。
+_FIGURE_LEAD = ("表", "图", "式")
 
 # 跨规范:《建筑设计防火规范》GB 50016-2014 / 现行国家标准…GB 50116
 _CROSS_RE = re.compile(
@@ -62,10 +74,19 @@ def extract_references(text: str, self_path: str = "") -> list[dict]:
     for m in _NUM_RE.finditer(text):
         if any(s <= m.start() < e for s, e in cross_spans):
             continue  # 跨规范号里的内部条号,已由 cross 边覆盖
-        to = m.group(1)
+        to = m.group(2)
         if to == self_path:
             continue
-        rtype = _classify(text[max(0, m.start() - 10): m.start()])
+        prefix = text[max(0, m.start() - 10): m.start()]
+        anchored = bool(m.group(1) or m.group(3))  # 第… / …条款项节:确是条款引用
+        if not anchored:
+            # 无锚点号:两道召回安全的精度闸,滤掉与条款号同形的量值/表图引用。
+            lead = prefix.rstrip()
+            if lead and lead[-1] in _FIGURE_LEAD:
+                continue  # 表5.3 / 图5.3 / 式5.3
+            if _UNIT_AFTER_RE.match(text[m.end():]):
+                continue  # 6.0m / 1.5h / 5.3%
+        rtype = _classify(prefix)
         key = (to, rtype)
         if key not in seen:
             seen.add(key)
@@ -73,11 +94,11 @@ def extract_references(text: str, self_path: str = "") -> list[dict]:
     return found
 
 
-def build_referenced_by(clauses: list[dict]) -> None:
-    """全量扫描 references,原地回填每条 ``referenced_by``(仅本规范内边)。"""
-    paths = {c["node_path"] for c in clauses}
+def build_referenced_by(nodes: list[dict]) -> None:
+    """全量扫描 references,原地回填每个节点 ``referenced_by``(仅本规范内边)。"""
+    paths = {c["node_path"] for c in nodes}
     reverse: dict[str, list[str]] = {}
-    for c in clauses:
+    for c in nodes:
         src = c["node_path"]
         for ref in c.get("references", []):
             tgt = ref["to"]
@@ -86,15 +107,17 @@ def build_referenced_by(clauses: list[dict]) -> None:
             reverse.setdefault(tgt, [])
             if src not in reverse[tgt]:
                 reverse[tgt].append(src)
-    for c in clauses:
+    for c in nodes:
         c["referenced_by"] = reverse.get(c["node_path"], [])
 
 
-def annotate_references(clauses: list[dict]) -> None:
-    """原地富化:为每条写 ``references``(分型)+ ``referenced_by``(反向)。
+def annotate_references(nodes: list[dict]) -> None:
+    """原地富化:为每个节点写 ``references``(分型)+ ``referenced_by``(反向)。
 
-    保留旧 ``references_to`` 不动(由 to_v1_compat 在落库时统一桥接),便于对照。
+    只产 typed ``references``/``referenced_by``;检索期扩展用的扁平 ``references_to``
+    由 ``retrieval/indexer._expandable_refs`` 在建索引时从 typed 边派生(strong/cross_standard
+    才入),不在本层落字段。
     """
-    for c in clauses:
+    for c in nodes:
         c["references"] = extract_references(c.get("content", ""), c.get("node_path", ""))
-    build_referenced_by(clauses)
+    build_referenced_by(nodes)

@@ -96,6 +96,10 @@ def classify_heading(text: str) -> dict | None:
             返回 None 表示该行实为交叉引用片段（如「5.3节…」），应按内容块处理。
             ``node_path_source``：number（命中编号正则，置信 1.0）/ text_level（无编号、
             靠 MinerU 标题标记 + 标题文字兜底作路径，置信 0.6）。
+            ⚠ 无编号标题取 ``text[:30]`` 作 node_path，前 30 字相同的两个散文标题会撞 path：
+            骨架阶段去重丢后者（``_build_skeleton`` 的 ``path in by_path`` 跳过），无目录页
+            （build_missing）时后者并入前者节点（``by_path.get(path)`` 命中即接地）——均非
+            数据丢失但是非预期合并，故 text_level 路径置信仅 0.6、进 03 抽查。
     """
     # 附录根（附录A / 附录B）
     app_m = APPENDIX_RE.match(text)
@@ -197,7 +201,7 @@ class TreeBuilder:
         返回：
             无。
         """
-        self.profile = profile
+        self.profile = profile  # 当前建树逻辑未读取（号段/catalog 自决）；留作 Stage 2 clause_strategy 等扩展挂载点
 
     def apply(
         self,
@@ -244,6 +248,10 @@ class TreeBuilder:
         for n in nodes:
             n.pop("_catalog", None)
             n.pop("_skeleton", None)
+            # page 累积时按块追加,同页多块会重复;去重升序后 page[0]=首页(展示页)。
+            pg = n["provenance"].get("page")
+            if pg:
+                n["provenance"]["page"] = sorted(set(pg))
         return nodes
 
     # -- ① 骨架 ----------------------------------------------------------------
@@ -403,6 +411,11 @@ class TreeBuilder:
             目录条目」对应的骨架节点（按条目标题匹配，且不自指）。条款内层级（5.3.4.1
             归 5.3.4）由号段决定——catalog 只定位到节深，故不参与条内嵌套。
 
+            ⚠ **catalog 兜底假定标题在全规范唯一**：``by_title`` 取首现（setdefault），故若
+            「一般规定 / 术语」等重复节标题走到兜底（仅号段失效时触发，带编号节通常不会），
+            会一律挂到首个同名节点、错挂父。带编号节点几乎都靠号段解析，触发率低；无编号散文
+            才有此风险，待 Stage 2 按位置消歧。
+
         参数：
             order (list[dict]): 全部节点（骨架 + 正文，创建序）。
             by_path (dict): node_path → 节点。
@@ -434,6 +447,11 @@ class TreeBuilder:
 
         功能：节点保留条件 = 骨架 / 有正文 / 有表格 / 有存活子节点。剪一个空叶可能令其
             父变空叶，故循环到稳定。删除时从父 children_ids 摘除，保证树一致。
+
+            ⚠ **未接地空骨架的叶子会留下**（``_skeleton`` 恒留压过空正文）：容器骨架留作父链
+            是对的，但 ``provenance.block_idx==[]`` 且无子的 **leaf** 骨架（目录列了、正文从未
+            抽到块）``content`` 为空，对检索是死单元。**契约**：下游 view / index 须跳过
+            「``block_idx==[]`` 且 node_type==leaf」的空骨架，勿 emit 成空检索单元。
 
         参数：
             order (list[dict]): 已连边的全部节点。

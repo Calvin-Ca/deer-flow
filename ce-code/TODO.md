@@ -64,6 +64,12 @@ MinerU 解析 + 条款树提取 + 质量审核，在 GB 50378-2006 和 GB 50016 
 - **统一目录命名**：build.py 用单一 `_safe()` 给 structured / vector_store 目录命名，消除旧 02/04 两套 sanitize 分歧（data/ 不入 git，无既存产物，安全）。
 - **验证**：全模块 `py_compile` OK；从根 import 全层解析 OK（无 hack）；E2E 合成（FormatAdapter→splitter(toc)→reprs.enrich→view→indexer.node_to_row）阶层/引用/表征/行生成全对；`build.py`/`parse.py --help` 与 `retrieval.server` app import OK。⚠️ Milvus/embedding 路径仍待服务器（同 🏁 里程碑跑）。
 
+### tools 去重 + parse.py 下沉（✅ 2026-06-14）
+
+- **tools 去重 + 清 v1 强条**：`retrieve_cli.py` 删 `run_eval`（与 `tools/eval.py` 重复）回归纯单查询调试；`eval.py` 删强条口径（`must_be_mandatory`/`mandatory_recall`，通过判定统一为期望召回率 ≥ 0.5），强条机制 2026-06-12 已废（见 schema.py）。
+- **parse.py → parser/__main__.py**：阶段 0 编排只调 `parser.*` 子命令（包内编排，区别于 build.py 跨包编排留根），下沉为包级入口 `python -m parser single / split`；同步 README/DEV 引用。
+- **删孤儿目录**：`extract/`、`pipeline/` 仅余过期 `__pycache__`（源码早已并入 splitter/parser/build），git 未跟踪，清掉。
+
 ---
 
 ## Phase B：数据模型改造（🟡 进行中 · 2026-06-12 设计转向）

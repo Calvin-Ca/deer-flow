@@ -12,9 +12,9 @@
   5. 合并 images/ 目录（统一路径引用）
 
 使用方式（从 ce-code 根，单行命令）：
-  python parse.py split --pdf data/raw/GB50016-2014_2018.pdf                  # 基本（80 页/块）
-  python parse.py split --pdf data/raw/GB50016-2014_2018.pdf --chunk-size 50  # 调小块（内存紧）
-  python parse.py split --pdf data/raw/GB50016-2014_2018.pdf --only-chunk 3   # 只跑某块（调试）
+  python -m parser split --pdf data/raw/GB50016-2014_2018.pdf                  # 基本（80 页/块）
+  python -m parser split --pdf data/raw/GB50016-2014_2018.pdf --chunk-size 50  # 调小块（内存紧）
+  python -m parser split --pdf data/raw/GB50016-2014_2018.pdf --only-chunk 3   # 只跑某块（调试）
   # 亦可： python -m parser.split_parse --pdf ...
 
 输出：data/parsed/<basename>/auto/（与 parser/pdf_parser.py 输出格式完全一致，

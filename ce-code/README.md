@@ -20,19 +20,19 @@ ce-code/
 ├── .gitignore                      # 忽略 data/ 下大文件与解析产物
 ├── data/                           # 数据资产（除 eval_set 外均不入 git）
 │   ├── raw/                        #   原始 PDF（手动放入）
-│   ├── parsed/                     #   MinerU 解析输出（parse.py 产物，阶段 0 缓存）
+│   ├── parsed/                     #   MinerU 解析输出（python -m parser 产物，阶段 0 缓存）
 │   ├── structured/                 #   节点树 nodes.json（build.py 结构层产物）
 │   ├── vector_store/               #   BM25 + Milvus 索引（build.py 索引层产物）
 │   ├── eval_set/                   #   评测集（入 git）
 │   │   └── gb50016_eval.json       #     GB 50016 的 45 条评测用例
 │   └── quality_reports/            #   质量审核报告（tools/review_quality 输出）
 │
-│  ── 编排（同级入口，从 ce-code 根运行）──
-├── parse.py                        # 阶段 0：MinerU 解析编排（single / split 子命令）
-├── build.py                        # 阶段 1→3：切分 → reprs → 索引（按 --terminal-stage）
+│  ── 编排（从 ce-code 根运行）──
+├── build.py                        # 阶段 1→3 跨包编排：切分 → reprs → 索引（按 --terminal-stage）
 │
 │  ── ① 解析层 ──
 ├── parser/                         # PDF → MinerU → 统一元素块
+│   ├── __main__.py                 #   阶段 0 包级入口：python -m parser single / split
 │   ├── mineru_client.py            #   远程 MinerU API 客户端（默认解析方式）
 │   ├── pdf_parser.py               #   单 PDF 解析（默认 API，--local 本地 CLI）
 │   ├── split_parse.py              #   大 PDF 分块解析（规避本地 OOM）
@@ -75,10 +75,10 @@ ce-code/
     └── rename_raw_files.sh         #   原始 PDF 重命名工具
 ```
 
-> **运行模型**：ce-code 不安装为包（`packages=[]`），**从 ce-code 根运行**。编排入口
-> `parse.py` / `build.py` 直接 `python build.py …`；服务/工具用模块式 `python -m retrieval.server`
-> / `python -m tools.eval …`。各层绝对 import（`from core import schema` / `import splitter`），
-> 无 sys.path hack。
+> **运行模型**：ce-code 不安装为包（`packages=[]`），**从 ce-code 根运行**。跨包编排
+> `build.py` 直接 `python build.py …`；阶段 0 解析与服务/工具用模块式
+> `python -m parser single …` / `python -m retrieval.server` / `python -m tools.eval …`。
+> 各层绝对 import（`from core import schema` / `import splitter`），无 sys.path hack。
 
 ---
 
@@ -122,13 +122,13 @@ bash pipeline/setup_server.sh
 整本一次解析（API 主机资源充足，无本地 OOM 问题，无需分块）：
 
 ```bash
-uv run python parse.py single --pdf data/raw/<文件名>.pdf
+uv run python -m parser single --pdf data/raw/<文件名>.pdf
 ```
 
 换 backend / 指定 API 地址：
 
 ```bash
-uv run python parse.py single --pdf data/raw/<文件名>.pdf --backend pipeline --server-url http://172.19.2.2:8000
+uv run python -m parser single --pdf data/raw/<文件名>.pdf --backend pipeline --server-url http://172.19.2.2:8000
 ```
 
 也可直接 curl（同步返回 JSON，`results.<文件名>.md_content` / `.content_list`；调试单页用 `start_page_id`/`end_page_id`）：
@@ -144,13 +144,13 @@ curl -s -X POST http://172.19.2.2:8000/file_parse -F "files=@data/raw/<文件名
 小 PDF（≤100 页）整本一次解析：
 
 ```bash
-CUDA_VISIBLE_DEVICES=2 HF_ENDPOINT=https://hf-mirror.com uv run python parse.py single --pdf data/raw/<文件名>.pdf --local --backend pipeline
+CUDA_VISIBLE_DEVICES=2 HF_ENDPOINT=https://hf-mirror.com uv run python -m parser single --pdf data/raw/<文件名>.pdf --local --backend pipeline
 ```
 
 大 PDF（>100 页）分块解析，规避本地显存 OOM（GB 50016 共 464 页，用 80 页/块）：
 
 ```bash
-CUDA_VISIBLE_DEVICES=2 HF_ENDPOINT=https://hf-mirror.com uv run python parse.py split --pdf data/raw/<文件名>.pdf --chunk-size 80
+CUDA_VISIBLE_DEVICES=2 HF_ENDPOINT=https://hf-mirror.com uv run python -m parser split --pdf data/raw/<文件名>.pdf --chunk-size 80
 ```
 
 无论哪种方式，输出都落在 `data/parsed/<basename>/auto/`，含 `.md` 和 `_content_list.json`，直接传给 Step 4。

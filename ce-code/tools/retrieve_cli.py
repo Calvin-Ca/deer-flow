@@ -1,16 +1,16 @@
-"""阶段 1 第二步：混合检索 + 引用扩展 + Rerank —— CLI 入口（逻辑在 retrieval.engine）。
+"""混合检索单查询调试 CLI —— 薄封装 ``retrieval.engine.search``（看单条 query 命中）。
 
-重构说明：检索逻辑已收敛到 ``retrieval/engine.py``，本文件退化为薄 CLI——
-保留命令行参数、rich 表格展示与批量评测，检索直接调用 ``retrieval.engine.search``。
+职责单一：给检索引擎套命令行参数 + rich 表格展示，人肉抽查「某条 query 召回了哪些
+条款」。检索逻辑全在 ``retrieval/engine.py``，本文件只管参数解析与结果展示。
+
+批量评测（eval-set / 召回率报告）见 ``tools/eval.py``，两处不重复实现。
 
 使用方式（从 ce-code 根，单行命令）：
   python -m tools.retrieve_cli --store-dir data/vector_store/<std>/<profile> --query "24米住宅疏散楼梯宽度"
-  python -m tools.retrieve_cli --store-dir data/vector_store/<std>/<profile> --eval-set data/eval_set/gb50016_eval.json --output data/eval_results/gb50016_retrieval.json
 """
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 import click
@@ -22,102 +22,34 @@ from retrieval.engine import search
 
 console = Console()
 
-ROOT = Path(__file__).resolve().parent.parent
-
-
-# ---------------------------------------------------------------------------
-# 批量评测
-# ---------------------------------------------------------------------------
-
-def run_eval(
-    eval_path: Path,
-    store_dir: Path,
-    milvus_host: str,
-    milvus_port: int,
-    collection: str,
-    embed_url: str,
-    embed_model_id: str,
-    top_k: int,
-    skip_rerank: bool,
-    output_path: Path,
-) -> None:
-    with open(eval_path, encoding="utf-8") as f:
-        eval_set = json.load(f)
-
-    results = []
-    recall_scores = []
-
-    for item in eval_set:
-        query = item["query"]
-        expected = set(item.get("expected_clauses", []))
-        if not expected:
-            continue
-
-        hits = search(
-            query, store_dir, milvus_host, milvus_port, collection,
-            embed_url, embed_model_id, top_k, top_k * 2, top_k * 2, skip_rerank,
-        )
-        hit_paths = {h["clause_path"] for h in hits}
-        recalled = expected & hit_paths
-        recall = len(recalled) / len(expected)
-
-        mandatory_expected = set(item.get("expected_clauses", [])) if item.get("must_be_mandatory") else set()
-        mandatory_recalled = mandatory_expected & hit_paths
-        mandatory_recall = len(mandatory_recalled) / len(mandatory_expected) if mandatory_expected else None
-
-        results.append({
-            "id": item["id"],
-            "query": query,
-            "expected": list(expected),
-            "recalled": list(recalled),
-            "missed": list(expected - hit_paths),
-            "recall": recall,
-            "mandatory_recall": mandatory_recall,
-        })
-        recall_scores.append(recall)
-
-    avg_recall = sum(recall_scores) / len(recall_scores) if recall_scores else 0
-    mandatory_recalls = [r["mandatory_recall"] for r in results if r["mandatory_recall"] is not None]
-    avg_mandatory_recall = sum(mandatory_recalls) / len(mandatory_recalls) if mandatory_recalls else 0
-
-    summary = {
-        "total_queries": len(results),
-        "avg_recall": avg_recall,
-        "avg_mandatory_recall": avg_mandatory_recall,
-        "results": results,
-    }
-
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(output_path, "w", encoding="utf-8") as f:
-        json.dump(summary, f, ensure_ascii=False, indent=2)
-
-    console.print(f"\n[bold]评测结果[/bold]")
-    console.print(f"  查询数：{len(results)}")
-    console.print(f"  平均召回率：{avg_recall:.1%}")
-    console.print(f"  强条平均召回率：{avg_mandatory_recall:.1%}  ← 核心指标")
-    console.print(f"[green]✓ 详细结果写入 {output_path}[/green]")
-
 
 # ---------------------------------------------------------------------------
 # 结果展示
 # ---------------------------------------------------------------------------
 
 def print_results(query: str, results: list[dict]) -> None:
+    """把单查询的命中条款渲染成 rich 表格打印到终端。
+
+    参数：
+        query (str): 检索查询原文。
+        results (list[dict]): ``engine.search`` 的返回（每条带 clause_path / _source /
+            _rerank_score / content 等字段）。
+    返回：
+        无（直接打印）。
+    """
     console.print(f"\n[bold]查询：[/bold]{query}")
     console.print(f"[bold]召回 {len(results)} 条条款[/bold]\n")
 
     t = Table(show_header=True, header_style="bold cyan")
     t.add_column("条款号", style="cyan", width=12)
-    t.add_column("强条", width=4)
     t.add_column("来源", width=10)
     t.add_column("Rerank", justify="right", width=7)
     t.add_column("正文片段", no_wrap=False, max_width=60)
 
     for r in results:
-        mandatory = "[red]✓[/red]" if r.get("is_mandatory") else ""
         rerank_score = f"{r['_rerank_score']:.3f}" if "_rerank_score" in r else "-"
         snippet = (r.get("content") or "")[:80].replace("\n", " ")
-        t.add_row(r["clause_path"], mandatory, r.get("_source", ""), rerank_score, snippet)
+        t.add_row(r["clause_path"], r.get("_source", ""), rerank_score, snippet)
 
     console.print(t)
 
@@ -131,20 +63,10 @@ def print_results(query: str, results: list[dict]) -> None:
     "--store-dir", "store_dir",
     type=click.Path(exists=True, file_okay=False, path_type=Path),
     required=True,
-    help="data/vector_store/<standard>/",
+    help="data/vector_store/<standard>/<profile>",
 )
-@click.option("--query", "-q", default="", help="单条检索查询。")
-@click.option(
-    "--eval-set", "eval_path",
-    type=click.Path(exists=True, dir_okay=False, path_type=Path),
-    default=None,
-)
-@click.option(
-    "--output", "output_path",
-    type=click.Path(dir_okay=False, path_type=Path),
-    default=None,
-)
-@click.option("--top-k", default=20, show_default=True, help="最终返回条款数（强条不截断）。")
+@click.option("--query", "-q", required=True, help="单条检索查询。")
+@click.option("--top-k", default=20, show_default=True, help="最终返回条款数。")
 @click.option("--milvus-host", default="localhost", show_default=True)
 @click.option("--milvus-port", default=19530, show_default=True)
 @click.option("--collection", default="", help="Milvus collection 名（默认从 store-dir 推断）。")
@@ -155,8 +77,6 @@ def print_results(query: str, results: list[dict]) -> None:
 def main(
     store_dir: Path,
     query: str,
-    eval_path: Path | None,
-    output_path: Path | None,
     top_k: int,
     milvus_host: str,
     milvus_port: int,
@@ -165,24 +85,16 @@ def main(
     embed_model_id: str,
     skip_rerank: bool,
 ) -> None:
-    """混合检索 + 引用扩展 + Rerank（Milvus + vLLM）。"""
+    """单查询混合检索 + 引用扩展 + Rerank（Milvus + vLLM），打印命中条款。"""
 
     if not collection:
         collection = collection_name(store_dir.name)
 
-    if eval_path:
-        if output_path is None:
-            output_path = ROOT / "data" / "eval_results" / f"{store_dir.name}_retrieval.json"
-        run_eval(eval_path, store_dir, milvus_host, milvus_port, collection,
-                 embed_url, embed_model_id, top_k, skip_rerank, output_path)
-    elif query:
-        results = search(
-            query, store_dir, milvus_host, milvus_port, collection,
-            embed_url, embed_model_id, top_k, top_k * 2, top_k * 2, skip_rerank,
-        )
-        print_results(query, results)
-    else:
-        console.print("[red]请指定 --query 或 --eval-set[/red]")
+    results = search(
+        query, store_dir, milvus_host, milvus_port, collection,
+        embed_url, embed_model_id, top_k, top_k * 2, top_k * 2, skip_rerank,
+    )
+    print_results(query, results)
 
 
 if __name__ == "__main__":

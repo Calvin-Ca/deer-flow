@@ -1,9 +1,9 @@
-"""检索质量评测（⚠️ 仍 v1 强条口径，T10 待换 Recall@k / 引用召回 / MRR）。
+"""检索质量评测（⚠️ T10 待换 Recall@k / 引用召回 / MRR；强条口径已废，见 schema.py）。
 
 对 eval_set 中每条查询调用混合检索，计算：
-  - 强条召回率（首要指标，must_be_mandatory=True 的用例）
-  - 期望条款召回率（expected_clauses 命中比例）
+  - 期望条款召回率（expected_clauses 命中比例，首要指标）
   - 关联条款召回率（related_clauses 命中比例）
+  - 通过判定：期望召回率 ≥ 0.5（强条机制 2026-06-12 废，不再区分强条/非强条阈值）
 
 使用方式（从 ce-code 根，单行命令）：
   python -m tools.eval --store-dir data/vector_store/<std>/<profile> --eval-set data/eval_set/gb50016_eval.json --skip-rerank
@@ -46,14 +46,12 @@ def run_eval(
         query = item["query"]
         expected = set(item.get("expected_clauses", []))
         related = set(item.get("related_clauses", []))
-        must_mandatory = item.get("must_be_mandatory", False)
 
         if not expected:
             # 超范围测试用例：不计入召回指标，单独记录
             rows.append({
                 "id": item["id"],
                 "query": query,
-                "must_mandatory": must_mandatory,
                 "expected": [],
                 "related": list(related),
                 "hit_expected": [],
@@ -62,7 +60,6 @@ def run_eval(
                 "missed_related": list(related),
                 "expected_recall": None,
                 "related_recall": None,
-                "mandatory_recall": None,
                 "pass": None,
                 "notes": item.get("notes", ""),
             })
@@ -81,13 +78,11 @@ def run_eval(
         hit_related = related & hit_paths if related else set()
         related_recall = len(hit_related) / len(related) if related else None
 
-        mandatory_recall = expected_recall if must_mandatory else None
-        passed = (expected_recall == 1.0) if must_mandatory else (expected_recall >= 0.5)
+        passed = expected_recall >= 0.5
 
         rows.append({
             "id": item["id"],
             "query": query,
-            "must_mandatory": must_mandatory,
             "expected": list(expected),
             "related": list(related),
             "hit_expected": list(hit_expected),
@@ -96,7 +91,6 @@ def run_eval(
             "missed_related": list(related - hit_paths),
             "expected_recall": expected_recall,
             "related_recall": related_recall,
-            "mandatory_recall": mandatory_recall,
             "pass": passed,
             "notes": item.get("notes", ""),
         })
@@ -112,14 +106,9 @@ def run_eval(
 
 def _build_summary(rows: list[dict], top_k: int) -> dict:
     scored = [r for r in rows if r["expected_recall"] is not None]
-    mandatory_rows = [r for r in scored if r["must_mandatory"]]
     passed = [r for r in scored if r["pass"]]
 
     avg_expected = sum(r["expected_recall"] for r in scored) / len(scored) if scored else 0
-    avg_mandatory = (
-        sum(r["mandatory_recall"] for r in mandatory_rows) / len(mandatory_rows)
-        if mandatory_rows else 0
-    )
     related_scored = [r for r in scored if r["related_recall"] is not None]
     avg_related = (
         sum(r["related_recall"] for r in related_scored) / len(related_scored)
@@ -133,7 +122,6 @@ def _build_summary(rows: list[dict], top_k: int) -> dict:
         "pass_count": len(passed),
         "pass_rate": len(passed) / len(scored) if scored else 0,
         "avg_expected_recall": avg_expected,
-        "avg_mandatory_recall": avg_mandatory,
         "avg_related_recall": avg_related,
         "missed_queries": [r["id"] for r in scored if not r["pass"]],
     }
@@ -141,7 +129,6 @@ def _build_summary(rows: list[dict], top_k: int) -> dict:
 
 def _print_report(rows: list[dict], top_k: int) -> None:
     scored = [r for r in rows if r["expected_recall"] is not None]
-    mandatory_rows = [r for r in scored if r["must_mandatory"]]
 
     # 逐条结果表
     t = Table(title=f"逐条结果（top_k={top_k}）", show_header=True, header_style="bold cyan")
@@ -149,16 +136,14 @@ def _print_report(rows: list[dict], top_k: int) -> None:
     t.add_column("查询", max_width=30, no_wrap=False)
     t.add_column("期望召回", width=8, justify="right")
     t.add_column("关联召回", width=8, justify="right")
-    t.add_column("强条", width=4)
     t.add_column("漏召", max_width=20, no_wrap=False)
 
     for r in rows:
         if r["expected_recall"] is None:
-            t.add_row(r["id"], r["query"][:28], "[dim]N/A[/dim]", "[dim]N/A[/dim]", "", "[dim]超范围[/dim]")
+            t.add_row(r["id"], r["query"][:28], "[dim]N/A[/dim]", "[dim]N/A[/dim]", "[dim]超范围[/dim]")
             continue
         exp_pct = f"{r['expected_recall']:.0%}"
         rel_pct = f"{r['related_recall']:.0%}" if r["related_recall"] is not None else "-"
-        mandatory_mark = "[red]✓[/red]" if r["must_mandatory"] else ""
         missed = ", ".join(r["missed_expected"]) or "[green]无[/green]"
         pass_color = "green" if r["pass"] else "red"
         t.add_row(
@@ -166,7 +151,6 @@ def _print_report(rows: list[dict], top_k: int) -> None:
             r["query"][:28],
             f"[{pass_color}]{exp_pct}[/{pass_color}]",
             rel_pct,
-            mandatory_mark,
             missed,
         )
 
@@ -174,10 +158,6 @@ def _print_report(rows: list[dict], top_k: int) -> None:
 
     # 汇总
     avg_expected = sum(r["expected_recall"] for r in scored) / len(scored) if scored else 0
-    avg_mandatory = (
-        sum(r["mandatory_recall"] for r in mandatory_rows) / len(mandatory_rows)
-        if mandatory_rows else 0
-    )
     related_scored = [r for r in scored if r["related_recall"] is not None]
     avg_related = (
         sum(r["related_recall"] for r in related_scored) / len(related_scored)
@@ -188,8 +168,7 @@ def _print_report(rows: list[dict], top_k: int) -> None:
     console.print(f"\n[bold]汇总（top_k={top_k}）[/bold]")
     console.print(f"  有效查询数：{len(scored)} / {len(rows)}")
     console.print(f"  通过数：{len(passed)} / {len(scored)}")
-    console.print(f"  [bold red]强条平均召回率：{avg_mandatory:.1%}[/bold red]  ← 核心指标")
-    console.print(f"  期望条款平均召回率：{avg_expected:.1%}")
+    console.print(f"  [bold]期望条款平均召回率：{avg_expected:.1%}[/bold]  ← 核心指标")
     console.print(f"  关联条款平均召回率：{avg_related:.1%}")
 
     if failed := [r for r in scored if not r["pass"]]:
@@ -233,7 +212,7 @@ def main(
     skip_rerank: bool,
     output_path: Path | None,
 ) -> None:
-    """批量评测检索质量，输出强条召回率报告。"""
+    """批量评测检索质量，输出期望/关联条款召回率报告。"""
 
     if eval_path is None:
         eval_path = ROOT / "data" / "eval_set" / "gb50016_eval.json"

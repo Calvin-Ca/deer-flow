@@ -7,8 +7,8 @@
                   解析成矩形二维表、text_level 透传、block_idx 溯源）；切分前通用适配，
                   不内聚进某一切法（splitter）。
 
-阶段 0（MinerU）最贵、只跑一次，产物缓存于 ``data/parsed/<std>/``（不可变）；编排见根
-``parse.py``。format_adapter 的产物喂给切分层 ``splitter``（见根 ``build.py``）。
+阶段 0（MinerU）最贵、只跑一次，产物缓存于 ``data/parsed/<std>/``（不可变）；编排见包级入口
+``__main__.py``（``python -m parser``）。format_adapter 的产物喂给切分层 ``splitter``（见根 ``build.py``）。
 """
 from __future__ import annotations
 

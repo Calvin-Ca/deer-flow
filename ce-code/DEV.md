@@ -35,7 +35,7 @@ PDF（清单/计量规范）
       │
       ▼
 [阶段0] MinerU 解析 ──► [阶段1] 切分建树 ──► [阶段2] 挂表征 ──► [阶段3] 索引
-  parse.py            build.py(structure)   build.py(reprs)   build.py(index)
+  -m parser           build.py(structure)   build.py(reprs)   build.py(index)
   parser/             splitter/(toc)        reprs/(免费4项)   view+retrieval/indexer
       │                    │                                       │
       ▼                    ▼                                       ▼

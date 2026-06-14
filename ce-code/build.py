@@ -9,7 +9,7 @@
   reprs      structure + ③ reprs.enrich 给全树挂表征（免费 4 项）→ 重写 nodes.json。
   index      reprs + ④ view 选粒度 → indexer 建 BM25 + Milvus 双索引（按 profile 隔离）。
 
-阶段 0（MinerU 解析）最贵、只跑一次、产物缓存于 data/parsed/，由根 ``parse.py`` 单独跑；
+阶段 0（MinerU 解析）最贵、只跑一次、产物缓存于 data/parsed/，由 ``python -m parser`` 单独跑；
 本入口从其缓存 *_content_list.json 起读。换 splitter / 粒度 / 表征只重跑本入口（不重跑
 MinerU），切分纯 python 无模型、开销可忽略。
 

@@ -11,6 +11,39 @@
 
 中间产物 ``annotated``（带 catalog/catalog_source 的扁平块）作 ``SplitResult.debug_blocks``
 落 structure.json 供调试；切分统计（catalog_source 分解）由 CatalogLabeler.print_stats 打印。
+
+────────────────────────────────────────────────────────────────────────────
+一个原始块（MinerU content_list 里的一项）如何变成节点字段 —— **三道判断，各管一件事**
+（这段是给将来的自己看的完整心智模型，别再重新推一遍）：
+
+  ┌ 是不是标题？  看 MinerU 给的 ``text_level``（FormatAdapter 原样透传，本流程**只读不
+  │              重判**：有此键=标题、没有=正文）。**只用它回答是非，不取其层级数值**——
+  │              真正层级另由 node_path 号段数算（MinerU 标的"几级"不可靠）。
+  │
+  ├ 是不是目录页？看 ``catalog``（CatalogLabeler 盖）。判据 = 「**行尾带页码**」
+  │              （_CATALOG_TAIL_RE：`标题……23` / `标题(23)` / `标题　　23`）**且扎堆出现**
+  │              （整列过半带页码 _is_catalog_list，或连续 ≥4 行像目录行 _mark_toc）——
+  │              单独一行带数字不算，避免误伤正文。命中 → ``catalog="toc"``。
+  │              ⚠ 正文里「复述目录的标题」（如正文中的 "1总则"）**不算目录页**：它没有
+  │              行尾页码、不扎堆，故 catalog≠"toc"；它会被拿去和目录条目表比对，命中后打
+  │              ``catalog=<条目标题>``、source=``toc_match`` —— 这是「归属某节」，不是
+  │              「目录页那几页」。建树时 catalog=="toc" 跳过、catalog=<标题> 留下接地。
+  │
+  └ 编号是多少？  TreeBuilder.classify_heading 抠 ``node_path``（只对"是标题且非目录页"
+                 的块、以及目录条目标题调用）。四级判定详见该函数 docstring。
+
+block → node 的主干（TreeBuilder._absorb_body，按文档序逐块）：
+  ① catalog=="toc" → 跳过（真目录页不进树，structure.json 已全量留档 + 溯源）。
+  ② 是标题（text_level 非 None）→ 抠编号 classify_heading：
+       · 抠出 None（数字后紧跟 节/条/款/项 = 交叉引用片段）→ 当内容块处理，不建节点；
+       · 抠出 path → 查 by_path（已预放全部目录条目骨架）：
+           查到 = **接地**（补 provenance/page，标题保留目录版，空骨架由此长出溯源）；
+           查不到 = **新建节点**（多为目录没列的"条" 5.3.4）。
+         随后把游标 ``cur`` 指向它。
+  ③ 非标题块 → 累积进当前 ``cur``（content / tables / images + provenance）；
+     cur 为空（首个标题之前的散块）则丢弃。
+  即「**碰到标题切一次 cur，下一个标题出现前的普通块都算这个标题的正文**」。
+────────────────────────────────────────────────────────────────────────────
 """
 from __future__ import annotations
 

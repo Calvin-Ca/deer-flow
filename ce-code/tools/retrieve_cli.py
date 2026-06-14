@@ -32,7 +32,7 @@ def print_results(query: str, results: list[dict]) -> None:
 
     参数：
         query (str): 检索查询原文。
-        results (list[dict]): ``engine.search`` 的返回（每条带 clause_path / _source /
+        results (list[dict]): ``engine.search`` 的返回（每条带 node_path / _source /
             _rerank_score / content 等字段）。
     返回：
         无（直接打印）。
@@ -49,7 +49,7 @@ def print_results(query: str, results: list[dict]) -> None:
     for r in results:
         rerank_score = f"{r['_rerank_score']:.3f}" if "_rerank_score" in r else "-"
         snippet = (r.get("content") or "")[:80].replace("\n", " ")
-        t.add_row(r["clause_path"], r.get("_source", ""), rerank_score, snippet)
+        t.add_row(r["node_path"], r.get("_source", ""), rerank_score, snippet)
 
     console.print(t)
 

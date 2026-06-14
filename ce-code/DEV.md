@@ -63,7 +63,7 @@ PDF（清单/计量规范）
   filter  : standard / version / region（元数据过滤，可选）
 
 输出：ranked results[]，每条含：
-  node_id / clause_path / standard_id / version
+  node_id / node_path / standard_id / version
   title / content（命中节点正文）
   ancestor_titles（祖先链，溯源用）
   references（引用边）
@@ -125,7 +125,7 @@ PDF（清单/计量规范）
 | `effective_priority` | int (1~4) | **效力优先级**：深圳本地=1（最高）→ 国标=4（最低，越具体越优先） | **口径冲突时取值排序**（PRD §4 元数据治理） |
 | `is_dynamic` / `update_freq` | bool / string | 是否动态数据 + 更新频率（信息价月更） | 动态数据走独立更新管道，不参与口径优先级排序 |
 | `version` / `effective_date` / `status` | string | 节点级版本 / 实施日期 / 时效状态 | 库内恒为现行有效（入库即校验）；`status` 仅作溯源标注，**检索侧不做废止过滤** |
-| `clause_path` | string | 条文号路径（`1.0.3`） | 支撑溯源、`/clause` 直取 |
+| `node_path` | string | 条文号路径（`1.0.3`） | 支撑溯源、`/clause` 直取 |
 | `parent_id` / `children_ids` | string / list | 树形结构 | **粒度视图 + small-to-big 全靠它** |
 | `ancestor_titles` / `ancestor_paths` | list | 祖先链（建树时一次算定） | 支撑溯源、context_aug 拼接 |
 | `references` / `referenced_by` | list | 引用边分型（strong/weak/exclude/cross_standard）+ 反向边 | **引用图扩展核心**（GraphRAG 底座） |
@@ -172,7 +172,7 @@ PDF（清单/计量规范）
 ### 3.2 关键词索引
 
 - **方案**：BM25（rank-bm25 库）。
-- **语料来源**：`reprs.sparse` 表征 = clause_path + title + content 词项拼接。
+- **语料来源**：`reprs.sparse` 表征 = node_path + title + content 词项拼接。
 - **用途**：补充向量检索的**精确匹配能力**——条文号（"1.0.3"）/ 清单编码 / 专业术语精确召回，这是纯向量召回的短板。
 
 ### 3.3 关系/图谱 + 结构化造价数据（组价核心，待建）

@@ -119,7 +119,7 @@ def _judge_one_dimension(
     # 只取强条，去掉已在其他维度出现过的
     mandatory = [
         c for c in clauses
-        if c.get("is_mandatory") and c.get("clause_path") not in seen_paths
+        if c.get("is_mandatory") and c.get("node_path") not in seen_paths
     ]
     if not mandatory:
         return {"dimension": dimension, "clauses": []}
@@ -136,7 +136,7 @@ def _judge_one_dimension(
     clause_lines = []
     for c in mandatory:
         content_snippet = (c.get("content") or "")[:150].replace("\n", " ")
-        clause_lines.append(f"[{c['clause_path']}] {content_snippet}")
+        clause_lines.append(f"[{c['node_path']}] {content_snippet}")
 
     user_msg = (
         f"项目参数：\n{params_summary}\n\n"

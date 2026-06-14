@@ -53,7 +53,7 @@ def node_to_row(node: dict, granularity: str) -> dict:
     """Milvus 一行标量字段（embedding 由调用方填）。无 is_mandatory（强条机制已废）。"""
     return {
         "node_id":       node.get("node_id", ""),
-        "clause_path":   node.get("clause_path", ""),
+        "node_path":   node.get("node_path", ""),
         "parent_id":     node.get("parent_id") or "",      # 检索期 small-to-big 锚点（T9）
         "granularity":   granularity,
         "standard_id":   node.get("standard_id", ""),
@@ -79,7 +79,7 @@ def build_bm25(units: list[dict], store_dir: Path) -> None:
 
     out = store_dir / "bm25.pkl"
     with open(out, "wb") as f:
-        pickle.dump({"bm25": bm25, "clause_paths": [u.get("clause_path", "") for u in units]}, f)
+        pickle.dump({"bm25": bm25, "node_paths": [u.get("node_path", "") for u in units]}, f)
     console.print(f"[green]✓ BM25 索引已写入 {out}[/green]")
 
 
@@ -132,7 +132,7 @@ def build_vector_index(
     schema_ = client.create_schema(auto_id=True, enable_dynamic_field=False)
     schema_.add_field("id",            DataType.INT64,        is_primary=True)
     schema_.add_field("node_id",       DataType.VARCHAR,      max_length=192)
-    schema_.add_field("clause_path",   DataType.VARCHAR,      max_length=128)
+    schema_.add_field("node_path",   DataType.VARCHAR,      max_length=128)
     schema_.add_field("parent_id",     DataType.VARCHAR,      max_length=192)
     schema_.add_field("granularity",   DataType.VARCHAR,      max_length=16)
     schema_.add_field("standard_id",   DataType.VARCHAR,      max_length=64)
@@ -147,7 +147,7 @@ def build_vector_index(
     index_params = client.prepare_index_params()
     index_params.add_index("embedding",   metric_type="COSINE", index_type="HNSW",
                            params={"M": 16, "efConstruction": 200})
-    index_params.add_index("clause_path", index_type="INVERTED")
+    index_params.add_index("node_path", index_type="INVERTED")
     index_params.add_index("node_id",     index_type="INVERTED")
 
     client.create_collection(collection_name=collection_name,

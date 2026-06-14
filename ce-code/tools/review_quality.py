@@ -63,7 +63,7 @@ def compute_stats(clauses: list[dict]) -> dict[str, Any]:
     # 强条按章分布
     mandatory_by_chapter: dict[str, int] = {}
     for c in mandatory:
-        path = c.get("clause_path", "")
+        path = c.get("node_path", "")
         chapter = path.split(".")[0] if "." in path else path
         mandatory_by_chapter[chapter] = mandatory_by_chapter.get(chapter, 0) + 1
 
@@ -104,7 +104,7 @@ def print_stats(stats: dict[str, Any]) -> None:
     t2.add_column("条款数", justify="right")
     t2.add_column("示例", style="dim")
     for lvl in sorted(stats["by_level"]):
-        examples = [c["clause_path"] for c in stats["by_level"][lvl][:3]]
+        examples = [c["node_path"] for c in stats["by_level"][lvl][:3]]
         t2.add_row(f"第 {lvl} 层", str(len(stats["by_level"][lvl])), "  ".join(examples))
     console.print(t2)
 
@@ -125,10 +125,10 @@ def print_stats(stats: dict[str, Any]) -> None:
 def detect_issues(clauses: list[dict]) -> list[dict]:
     issues = []
 
-    all_paths = {c["clause_path"] for c in clauses}
+    all_paths = {c["node_path"] for c in clauses}
 
     for c in clauses:
-        path = c.get("clause_path", "")
+        path = c.get("node_path", "")
         content = c.get("content", "").strip()
         is_mandatory = c.get("is_mandatory", False)
         refs = c.get("references_to", [])
@@ -195,18 +195,18 @@ def print_issues(issues: list[dict]) -> None:
 # 单条款查看
 # ---------------------------------------------------------------------------
 
-def show_clause_detail(clauses: list[dict], clause_path: str) -> None:
-    hits = [c for c in clauses if c.get("clause_path") == clause_path]
+def show_clause_detail(clauses: list[dict], node_path: str) -> None:
+    hits = [c for c in clauses if c.get("node_path") == node_path]
     if not hits:
         # 前缀匹配（如输入"5.3"返回5.3.x）
-        hits = [c for c in clauses if c.get("clause_path", "").startswith(clause_path + ".")]
+        hits = [c for c in clauses if c.get("node_path", "").startswith(node_path + ".")]
     if not hits:
-        console.print(f"[red]未找到条款 {clause_path}[/red]")
+        console.print(f"[red]未找到条款 {node_path}[/red]")
         return
 
     for c in hits:
         mandatory_tag = " [red][强条][/red]" if c.get("is_mandatory") else " [dim][推荐][/dim]"
-        title = f"[bold cyan]{c['clause_path']}[/bold cyan]{mandatory_tag}  p{c.get('page','?')}"
+        title = f"[bold cyan]{c['node_path']}[/bold cyan]{mandatory_tag}  p{c.get('page','?')}"
         body = c.get("content", "(空)") or "(空)"
         refs = c.get("references_to", [])
         tables = c.get("tables", [])
@@ -267,7 +267,7 @@ def write_report(clauses: list[dict], stats: dict, issues: list[dict], out_path:
     lines.append("\n## 强条列表（前50条）\n\n")
     for c in stats["mandatory"][:50]:
         snippet = (c.get("content") or "")[:80].replace("\n", " ")
-        lines.append(f"- **{c['clause_path']}** (p{c.get('page','?')}): {snippet}…\n")
+        lines.append(f"- **{c['node_path']}** (p{c.get('page','?')}): {snippet}…\n")
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text("".join(lines), encoding="utf-8")

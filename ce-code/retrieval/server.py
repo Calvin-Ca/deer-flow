@@ -15,7 +15,7 @@
 端点（原语）：
   GET  /health                       健康检查（含已就绪的 standard 列表）
   POST /search                       裸检索（条款 + meta，无生成）—— qa/compliance/算量/审图复用
-  POST /expand                       对给定 clause_path 做引用图扩展
+  POST /expand                       对给定 node_path 做引用图扩展
   GET  /clause/{standard}/{path}     单条款直取
 
 启动（服务器上，从 ce-code 根运行，模块式 import 无需 sys.path hack）：
@@ -83,7 +83,7 @@ class SearchRequest(BaseModel):
 
 
 class ExpandRequest(BaseModel):
-    clause_paths: list[str] = Field(..., description="种子条款号列表")
+    node_paths: list[str] = Field(..., description="种子条款号列表")
     standard: str = "gb50016"
 
 
@@ -141,7 +141,7 @@ def _log_clauses(rid: str, clauses: list[dict]) -> None:
             ref_str = f"  引用→[{', '.join(preview)}{tail}]"
         logger.info(
             "[%s]   %-10s  p.%-4d  %-10s%s",
-            rid, c.get("clause_path", "?"),
+            rid, c.get("node_path", "?"),
             c.get("page", 0), c.get("_source", ""), ref_str,
         )
 
@@ -184,32 +184,32 @@ def search_endpoint(req: SearchRequest) -> dict:
 
 @app.post("/expand")
 def expand_endpoint(req: ExpandRequest) -> dict:
-    """对给定 clause_path 做一跳引用图扩展，返回新增的关联条款。"""
+    """对给定 node_path 做一跳引用图扩展，返回新增的关联条款。"""
     rid = uuid.uuid4().hex[:8]
     store_dir, store_name = _resolve(req.standard)
     metadata = load_metadata(store_dir)
-    seed_set = set(req.clause_paths)
-    seeds = [m for m in metadata if m.get("clause_path") in seed_set]
+    seed_set = set(req.node_paths)
+    seeds = [m for m in metadata if m.get("node_path") in seed_set]
     expanded = expand_references(seeds, metadata)
-    added = [c for c in expanded if c.get("clause_path") not in seed_set]
+    added = [c for c in expanded if c.get("node_path") not in seed_set]
     logger.info("[%s] /expand standard=%s seeds=%d → 新增 %d 条",
                 rid, store_name, len(seeds), len(added))
     return {
         "standard": store_name,
-        "seeds": req.clause_paths,
+        "seeds": req.node_paths,
         "expanded_clauses": added,
         "meta": {"request_id": rid, "seeds": len(seeds), "added": len(added)},
     }
 
 
-@app.get("/clause/{standard}/{clause_path}")
-def clause_endpoint(standard: str, clause_path: str) -> dict:
+@app.get("/clause/{standard}/{node_path}")
+def clause_endpoint(standard: str, node_path: str) -> dict:
     """按条款号直取单条款。"""
     store_dir, store_name = _resolve(standard)
-    clause = get_clause(store_dir, clause_path)
+    clause = get_clause(store_dir, node_path)
     if clause is None:
-        raise HTTPException(status_code=404, detail=f"条款 {clause_path} 不存在于 {store_name}")
-    return {"standard": store_name, "clause_path": clause_path, "clause": clause}
+        raise HTTPException(status_code=404, detail=f"条款 {node_path} 不存在于 {store_name}")
+    return {"standard": store_name, "node_path": node_path, "clause": clause}
 
 
 if __name__ == "__main__":

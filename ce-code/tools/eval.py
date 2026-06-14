@@ -69,7 +69,7 @@ def run_eval(
             query, store_dir, milvus_host, milvus_port, collection_name,
             embed_url, embed_model_id, top_k, top_k * 2, top_k * 2, skip_rerank,
         )
-        hit_paths = {h["clause_path"] for h in hits}
+        hit_paths = {h["node_path"] for h in hits}
 
         hit_expected = expected & hit_paths
         missed_expected = expected - hit_paths

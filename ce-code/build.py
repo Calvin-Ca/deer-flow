@@ -150,7 +150,7 @@ def main(
         console.print("\n[bold]--- 前 20 条节点预览 ---[/bold]")
         for c in chunks[:20]:
             tables = f"  [{len(c['tables'])}表]" if c.get("tables") else ""
-            console.print(f"  [cyan]{c['clause_path']}[/cyan] [{c.get('node_type','?')}] (p{c['page']}) {c['title'][:50]}{tables}")
+            console.print(f"  [cyan]{c['node_path']}[/cyan] [{c.get('node_type','?')}] (p{c['page']}) {c['title'][:50]}{tables}")
         return
 
     # provenance.source_file：尽量记为相对 data/parsed 的路径，回指阶段 0 缓存

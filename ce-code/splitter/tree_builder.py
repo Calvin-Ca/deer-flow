@@ -6,11 +6,11 @@
 建树策略（PRD §3.1「按文档原生目录层级建树」；2026-06-13 改用 catalog 建树，解决父链断裂）：
 
   ① **目录条目物化骨架**：每个 TOC 条目 → 一个骨架节点（**恒存在**，即使正文里没有
-     对应正文块 / 被 MinerU 漏抽），条目标题跑 ``classify_heading`` 取 clause_path /
+     对应正文块 / 被 MinerU 漏抽），条目标题跑 ``classify_heading`` 取 node_path /
      node_type。这是「父链断裂」的根治——上层章/节不再因「只有标题没正文」被丢。
-  ② **条目按号段嵌套**：目录只给有序扁平条目，「5.3 属于 5」仍靠 clause_path 号段
+  ② **条目按号段嵌套**：目录只给有序扁平条目，「5.3 属于 5」仍靠 node_path 号段
      （``_resolve_parent``）；号段失效（无编号散文）则回退到 catalog 归属。
-  ③ **正文/条款挂载**：正文标题块若 clause_path 已是骨架节点 → **并入**（接地：补
+  ③ **正文/条款挂载**：正文标题块若 node_path 已是骨架节点 → **并入**（接地：补
      provenance / 正文 / 表格）；否则建为新节点（条/款，目录通常只列到节），按号段找父、
      号段失效则回退到「它 ``catalog`` 所属条目」的骨架节点（catalog 只定位到节深，
      不能决定条内层级，故条款内嵌套仍以号段为准）。
@@ -92,11 +92,23 @@ def classify_heading(text: str) -> dict | None:
         判定独立出来，便于单测与复用。node_type 由条款路径号段数自推（_infer_node_type），
         不依赖标题栈/外部层级。
 
+        判定顺序（**四级短路**，命中即返回；只看本行文字，不依赖上下文/父节点/页码）：
+          ① 「附录X」开头（附录E 钢筋计算）         → node_path="附录"+字母（附录E），number/1.0
+          ② 「字母.数字…」开头（E.1.1 ……）         → node_path=该号（E.1.1），number/1.0
+          ③ 「数字(可带小数点)+紧跟汉字/空格」开头   → node_path=开头数字号（1 / 5.3 / 5.3.4），
+               number/1.0；**但**数字后紧跟「节/条/款/项」者 = 交叉引用片段（"5.3节…"）
+               → 返回 None，调用方按内容块处理、不建节点。
+          ④ 三者都不中（无编号标题，如 前言 / 术语和定义）→ node_path=标题文字前 30 字，
+               text_level/0.6（低置信，进 03 抽查）。
+        node_path 定后：level=号段数、node_type 由号段数推（_infer_node_type）。号 ③ 的
+        "紧跟汉字/空格"约束让 "1总则" 命中而纯页码 "9"/年份 "2024" 不误判为条号（但注意：
+        排除引用只看号后**紧邻**字符，"5.3 节"带空格会绕过排除、误当标题——已知边界）。
+
     参数：
         text (str): 标题块文字（调用方已判定 text_level 存在，即 MinerU 标题块；
             建骨架时亦对目录条目标题调用）。
     返回：
-        dict | None: ``{clause_path, node_type, path_source, path_confidence}``。
+        dict | None: ``{node_path, node_type, path_source, path_confidence}``。
             返回 None 表示该行实为交叉引用片段（如「5.3节…」），应按内容块处理。
             ``path_source``：number（命中编号正则，置信 1.0）/ text_level（无编号、
             靠 MinerU 标题标记 + 标题文字兜底作路径，置信 0.6）。
@@ -104,14 +116,14 @@ def classify_heading(text: str) -> dict | None:
     # 附录根（附录A / 附录B）
     app_m = APPENDIX_RE.match(text)
     if app_m:
-        return {"clause_path": f"附录{app_m.group(1)}", "node_type": "appendix",
+        return {"node_path": f"附录{app_m.group(1)}", "node_type": "appendix",
                 "path_source": "number", "path_confidence": 1.0}
 
     # 附录字母条号（E.1 / E.2.2）
     appc_m = APPENDIX_CLAUSE_RE.match(text)
     if appc_m:
         path = appc_m.group(1)
-        return {"clause_path": path, "node_type": _infer_node_type(path),
+        return {"node_path": path, "node_type": _infer_node_type(path),
                 "path_source": "number", "path_confidence": 1.0}
 
     # 本规范条号（5 / 5.3 / 5.3.4）
@@ -121,17 +133,17 @@ def classify_heading(text: str) -> dict | None:
         # "节条款项"后缀说明这是交叉引用片段，非真实条号
         if text[len(num):len(num) + 1] in "节条款项":
             return None
-        return {"clause_path": num, "node_type": _infer_node_type(num),
+        return {"node_path": num, "node_type": _infer_node_type(num),
                 "path_source": "number", "path_confidence": 1.0}
 
     # 无编号标题（"前言"、"术语和定义" 等）：用标题文字作路径
     path = text[:30].strip()
-    return {"clause_path": path, "node_type": _infer_node_type(path),
+    return {"node_path": path, "node_type": _infer_node_type(path),
             "path_source": "text_level", "path_confidence": 0.6}
 
 
 # ---------------------------------------------------------------------------
-# 父路径推断（由 clause_path 反推父节点路径）
+# 父路径推断（由 node_path 反推父节点路径）
 # ---------------------------------------------------------------------------
 
 _NUMERIC_PATH_RE = re.compile(r"^\d+(?:\.\d+)*$")        # 5 / 5.3 / 5.3.4
@@ -162,7 +174,7 @@ def _resolve_parent(path: str, by_path: dict[str, dict]) -> str | None:
 
     参数：
         path (str): 当前节点条款路径。
-        by_path (dict): clause_path → 节点 的映射。
+        by_path (dict): node_path → 节点 的映射。
     返回：
         str | None: 最近存在的祖先条款路径；无则 None（顶层）。
     """
@@ -225,7 +237,7 @@ class TreeBuilder:
         std = next((b.get("standard_id", "") for b in annotated if b.get("standard_id")), "")
         meta = {"source_file": source_file}
 
-        by_path: dict[str, dict] = {}   # clause_path → 节点（骨架 + 正文，先现先占）
+        by_path: dict[str, dict] = {}   # node_path → 节点（骨架 + 正文，先现先占）
         order: list[dict] = []          # 节点创建序（≈文档序），供剪枝/连边遍历
 
         # ① 目录条目 → 骨架节点（恒存在）
@@ -239,7 +251,9 @@ class TreeBuilder:
         self._attach_ancestors(nodes)
         references.annotate_references(nodes)  # 固有事实：引用图分型 + referenced_by 反向边
 
-        for n in nodes:  # 清理建树期临时键（不进 nodes.json）
+        for n in nodes:  # 标记未接地空骨架 + 清理建树期临时键（不进 nodes.json）
+            if n.get("_skeleton") and not n["provenance"]["block_idx"]:
+                n["path_source"] = "synthesized"  # 目录列出但正文未抽到对应块 → 合成节点
             n.pop("_catalog", None)
             n.pop("_skeleton", None)
         return nodes
@@ -257,7 +271,7 @@ class TreeBuilder:
             entries (list[dict]): 有序目录条目表 {title, norm, page}。
             std (str): 规范标识。
             meta (dict): source_file（provenance 溯源用）。
-            by_path (dict): clause_path → 节点（原地填）。
+            by_path (dict): node_path → 节点（原地填）。
             order (list): 节点创建序（原地追加）。
         返回：
             无。
@@ -267,7 +281,7 @@ class TreeBuilder:
             info = classify_heading(title) if title else None
             if info is None:
                 continue  # "toc"标题行 / 交叉引用片段等：不开骨架节点
-            path = info["clause_path"]
+            path = info["node_path"]
             if path in by_path:
                 continue  # 同号条目去重（目录重复列、跨页续行等）
             node = schema.new_node(
@@ -293,7 +307,7 @@ class TreeBuilder:
         """正文块按标题分组：同号骨架则并入（接地），否则建新节点；内容块累积进当前节点。
 
         功能：
-            标题块（有 text_level）跑 classify_heading 取 clause_path：
+            标题块（有 text_level）跑 classify_heading 取 node_path：
               · 已是骨架/已建节点 → **并入**（补 provenance/page，骨架由此接地），切为当前节点；
               · 否则建新条/款节点（目录通常只列到节，5.3.4 等在此诞生），记 _catalog 供兜底连边。
             非标题块（含表格/图示）累积进当前节点的 content / tables / images + provenance；
@@ -303,7 +317,7 @@ class TreeBuilder:
             annotated (list[dict]): 标注块列表（文档序）。
             std (str): 规范标识。
             meta (dict): 规范级元数据。
-            by_path (dict): clause_path → 节点（原地补/并入）。
+            by_path (dict): node_path → 节点（原地补/并入）。
             order (list): 节点创建序（原地追加新节点）。
         返回：
             无。
@@ -315,7 +329,7 @@ class TreeBuilder:
 
             info = classify_heading(elem.get("text", "")) if elem.get("text_level") is not None else None
             if info is not None:
-                path = info["clause_path"]
+                path = info["node_path"]
                 node = by_path.get(path)
                 if node is None:  # 新条/款节点（不在目录骨架里）
                     node = schema.new_node(
@@ -334,7 +348,7 @@ class TreeBuilder:
                     by_path[path] = node
                     order.append(node)
                 else:  # 并入同号骨架/既有节点：接地（补溯源），保留骨架的目录条目标题
-                    if not node.get("page"):
+                    if not node["provenance"]["page"]:  # 首次接地：用正文实际页校正目录声明页
                         node["page"] = elem["page"]
                     if "block_idx" in elem:
                         node["provenance"]["block_idx"].append(elem["block_idx"])
@@ -375,14 +389,14 @@ class TreeBuilder:
         """原地连边：号段反推为主、catalog 归属为兜底，回填 children_ids。
 
         功能：
-            每个节点先按 clause_path 号段反推最近**已存在**祖先（_resolve_parent）；
+            每个节点先按 node_path 号段反推最近**已存在**祖先（_resolve_parent）；
             号段反推不到（无编号散文 / 目录与编号不一致）则回退到「它 _catalog 所属
             目录条目」对应的骨架节点（按条目标题匹配，且不自指）。条款内层级（5.3.4.1
             归 5.3.4）由号段决定——catalog 只定位到节深，故不参与条内嵌套。
 
         参数：
             order (list[dict]): 全部节点（骨架 + 正文，创建序）。
-            by_path (dict): clause_path → 节点。
+            by_path (dict): node_path → 节点。
         返回：
             无（原地写 parent_id / children_ids）。
         """
@@ -392,7 +406,7 @@ class TreeBuilder:
             n["children_ids"] = []
         for n in order:
             parent: dict | None = None
-            pp = _resolve_parent(n["clause_path"], by_path)
+            pp = _resolve_parent(n["node_path"], by_path)
             if pp is not None:
                 parent = by_path.get(pp)
             if parent is None and n.get("_catalog"):  # 号段失效 → catalog 归属兜底
@@ -454,7 +468,7 @@ class TreeBuilder:
             while cur is not None and cur["node_id"] not in seen:
                 seen.add(cur["node_id"])
                 titles.append(cur["title"])
-                paths.append(cur["clause_path"])
+                paths.append(cur["node_path"])
                 cur = by_id.get(cur["parent_id"]) if cur["parent_id"] else None
             n["ancestor_titles"] = titles[::-1]
             n["ancestor_paths"] = paths[::-1]

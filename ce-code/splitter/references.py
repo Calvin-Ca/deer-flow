@@ -75,10 +75,10 @@ def extract_references(text: str, self_path: str = "") -> list[dict]:
 
 def build_referenced_by(clauses: list[dict]) -> None:
     """全量扫描 references,原地回填每条 ``referenced_by``(仅本规范内边)。"""
-    paths = {c["clause_path"] for c in clauses}
+    paths = {c["node_path"] for c in clauses}
     reverse: dict[str, list[str]] = {}
     for c in clauses:
-        src = c["clause_path"]
+        src = c["node_path"]
         for ref in c.get("references", []):
             tgt = ref["to"]
             if ref["type"] == "cross_standard" or tgt not in paths:
@@ -87,7 +87,7 @@ def build_referenced_by(clauses: list[dict]) -> None:
             if src not in reverse[tgt]:
                 reverse[tgt].append(src)
     for c in clauses:
-        c["referenced_by"] = reverse.get(c["clause_path"], [])
+        c["referenced_by"] = reverse.get(c["node_path"], [])
 
 
 def annotate_references(clauses: list[dict]) -> None:
@@ -96,5 +96,5 @@ def annotate_references(clauses: list[dict]) -> None:
     保留旧 ``references_to`` 不动(由 to_v1_compat 在落库时统一桥接),便于对照。
     """
     for c in clauses:
-        c["references"] = extract_references(c.get("content", ""), c.get("clause_path", ""))
+        c["references"] = extract_references(c.get("content", ""), c.get("node_path", ""))
     build_referenced_by(clauses)

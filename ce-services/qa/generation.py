@@ -39,7 +39,7 @@ def build_user_message(query: str, clauses: list[dict]) -> str:
         # is_mandatory 显式写入，要求模型原样复制，不自行判断
         mandatory_flag = "true【强制性，必须/严禁/不应/不得】" if c.get("is_mandatory") else "false【推荐性，宜/可】"
         return [
-            f"--- 条款 {c['clause_path']} | is_mandatory={mandatory_flag} ---",
+            f"--- 条款 {c['node_path']} | is_mandatory={mandatory_flag} ---",
             f"规范：{c.get('standard_id', '未知')}",
             f"正文：{c.get('content', '').strip()}",
             "",

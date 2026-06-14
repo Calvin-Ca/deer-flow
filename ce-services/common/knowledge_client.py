@@ -44,7 +44,7 @@ def search(
 
 
 def expand(
-    clause_paths: list[str],
+    node_paths: list[str],
     standard: str = "gb50016",
     base_url: str | None = None,
     timeout: int = 60,
@@ -53,7 +53,7 @@ def expand(
     base = (base_url or KNOWLEDGE_URL).rstrip("/")
     resp = requests.post(
         f"{base}/expand",
-        json={"clause_paths": clause_paths, "standard": standard},
+        json={"node_paths": node_paths, "standard": standard},
         timeout=timeout,
     )
     resp.raise_for_status()
@@ -62,12 +62,12 @@ def expand(
 
 def get_clause(
     standard: str,
-    clause_path: str,
+    node_path: str,
     base_url: str | None = None,
     timeout: int = 60,
 ) -> dict:
     """打知识服务 /clause/{standard}/{path}，按条款号直取单条款。"""
     base = (base_url or KNOWLEDGE_URL).rstrip("/")
-    resp = requests.get(f"{base}/clause/{standard}/{clause_path}", timeout=timeout)
+    resp = requests.get(f"{base}/clause/{standard}/{node_path}", timeout=timeout)
     resp.raise_for_status()
     return resp.json()

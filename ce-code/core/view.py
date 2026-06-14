@@ -31,7 +31,7 @@ def view(nodes: list[dict], index_granularity: str = "clause") -> list[dict]:
 
     返回：
         list[dict]: 选中的检索单元（节点 dict 的子集，保持原引用，不拷贝）。
-            每个单元带 node_id / parent_id / clause_path / content 等，供 04 建行；
+            每个单元带 node_id / parent_id / node_path / content 等，供 04 建行；
             parent_id 是检索期 small-to-big 上探的锚点。
 
     异常：

@@ -22,7 +22,11 @@ from typing import Literal, TypedDict
 
 # ── 受控词表 ───────────────────────────────────────────────────────────────────
 
-# 结构层 node_type：前 5 个是目录层级节点，后 4 个是挂在条款下的内容/切片节点
+# 结构层 node_type：目录层级节点 + 挂在条款下的内容/切片节点。
+# 当前 TocSplitter 建树**只产出** chapter / section / clause / appendix（由 node_path
+# 号段数推，见 tree_builder._infer_node_type）；其余（document / subitem / paragraph /
+# table / figure / formula）为**契约占位**，建树阶段未产出（表格/图示暂存 Node.tables /
+# images 字段，待表征层转 table_struct，故 table / figure 未实装）。
 NodeType = Literal[
     "document", "chapter", "section", "clause", "subitem", "appendix",
     "paragraph", "table", "figure", "formula",
@@ -166,16 +170,28 @@ class Node(TypedDict, total=False):
         node_id        稳定 id：条文号有则用，无则标题路径（如 "GB50016#5.3.4"）。
         standard_id。
         ── 结构（树形）──
-        node_type      NodeType。
-        clause_path    条款号 "5.3.4" 或标题路径。
-        level          = clause_path 号段数，**不取 MinerU text_level**（后者不可靠）。
+        node_type      NodeType；章/节/条三档与 ``level`` **同源**（都由 node_path
+                       号段数推），仅 appendix 及未来内容型类型带 level 给不出的信息。
+        node_path      节点在文档原生层级里的**结构地址**：条款号 "5.3.4"/附录号 "附录E"/
+                       "E.1.1"，**或**无编号标题路径（"前言"/"术语和定义"）。曾名 clause_path
+                       （2026-06-14 改名）——它装的不只是条款，故消费方**勿假定恒为数字号**。
+        level          = node_path 号段数（**派生·去范式**，便利字段，不取 MinerU
+                       text_level——后者不可靠）；可由 node_path 重算，存盘仅为省事。
         parent_id / children_ids   树形边（粒度视图 + small-to-big 全靠它）。
-        page / title / content     content 仅自身正文，不含子节点。
+        page           **单一**展示页（1-base）：接地节点 = 正文首块实际页（建树时由
+                       provenance 校正）；未接地空骨架 = 目录声明页（兜底）。逐块页全集见
+                       ``provenance.page``，二者可不等（骨架声明页 ≠ 正文实际页）。
+        title / content   content 仅自身正文文本（确有副本，作检索载荷），不含子节点；
+                       与 provenance 只存指针**并行不悖**（指针用于回指版面/被丢信息）。
         ── 固有事实（建树时一次算定，唯一、不可多表达）──
-        ancestor_titles / ancestor_paths   祖先标题链 / 路径链。
-        references(list[Reference]) / referenced_by(list[str])  引用图正反向边。
+        ancestor_titles / ancestor_paths   祖先标题链 / 路径链（沿 parent_id 上溯·去范式）。
+        references(list[Reference]) / referenced_by(list[str])  引用图正反向边——**类型
+                       不对称**：正向带分型 {to,type}，反向仅裸 node_id 列表（按需自查类型）。
         ── 结构层审计（编号驱动建树的溯源，见 PRD §3.1）──
-        path_source    number / text_level / inherited / synthesized / lexicon。
+        path_source    路径来源标签：已实装 number（命中条号正则·置信 1.0）/ text_level
+                       （无编号靠标题文字兜底·0.6）/ synthesized（目录有条目但正文未抽到
+                       对应块的空骨架，建树末标定，见 tree_builder.apply）；
+                       inherited / lexicon 为枚举占位，**未实装**。
         path_confidence 低置信进 03 抽查。
         ── 溯源（回指 MinerU 原始块）──
         provenance(Provenance)  本节点由哪些原始块构成，链回阶段 0 缓存。
@@ -188,7 +204,7 @@ class Node(TypedDict, total=False):
     standard_id: str
     # 结构（树形）
     node_type: NodeType
-    clause_path: str
+    node_path: str
     level: int
     parent_id: str | None
     children_ids: list[str]
@@ -226,25 +242,25 @@ def empty_condition() -> ConditionData:
     }
 
 
-def new_node(standard_id: str, clause_path: str, node_type: str, **kw: object) -> Node:
+def new_node(standard_id: str, node_path: str, node_type: str, **kw: object) -> Node:
     """构造带默认值的空节点（其余字段由结构层 / 表征层逐步填）。
 
     参数：
         standard_id (str): 规范标识。
-        clause_path (str): 条款号或标题路径。
+        node_path (str): 条款号或标题路径。
         node_type (str): 节点类型（NodeType）。
-        **kw: 覆盖默认值的字段；``node_id`` 缺省由 ``<standard_id>#<clause_path>``
-            合成，``level`` 缺省由 clause_path 号段数推导。
+        **kw: 覆盖默认值的字段；``node_id`` 缺省由 ``<standard_id>#<node_path>``
+            合成，``level`` 缺省由 node_path 号段数推导。
     返回：
         Node: 填好标识/结构默认、固有事实为空、reprs 为空 dict 的节点。
     """
-    node_id = str(kw.pop("node_id", "") or "") or f"{standard_id}#{clause_path}"
-    level = int(kw.pop("level", clause_path.count(".") + 1))  # "5.3.1"→3 / "5"→1 / "前言"→1
+    node_id = str(kw.pop("node_id", "") or "") or f"{standard_id}#{node_path}"
+    level = int(kw.pop("level", node_path.count(".") + 1))  # "5.3.1"→3 / "5"→1 / "前言"→1
     node: Node = {
         "node_id": node_id,
         "standard_id": standard_id,
         "node_type": node_type,  # type: ignore[typeddict-item]
-        "clause_path": clause_path,
+        "node_path": node_path,
         "level": level,
         "parent_id": None,
         "children_ids": [],

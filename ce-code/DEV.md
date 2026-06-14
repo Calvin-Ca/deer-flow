@@ -130,7 +130,7 @@ PDF（清单/计量规范）
 | `ancestor_titles` / `ancestor_paths` | list | 祖先链（建树时一次算定） | 支撑溯源、context_aug 拼接 |
 | `references` / `referenced_by` | list | 引用边分型（strong/weak/exclude/cross_standard）+ 反向边 | **引用图扩展核心**（GraphRAG 底座） |
 | `provenance` | dict | 回指 MinerU 原始块（source_file / block_idx / page） | **可溯源底线（PRD 核心原则）** |
-| `path_source` / `path_confidence` | string / float | 路径来源审计（number/text_level/inherited/synthesized） | 低置信进抽查 |
+| `node_path_source` / `node_path_confidence` | string / float | 路径来源审计（number/text_level/inherited/synthesized） | 低置信进抽查 |
 | `reprs` | dict | 多表征投影（见 2.4 + §4） | 多通道召回 |
 
 > **可溯源是底线**：任何节点都必须能回指其 MinerU 原始块（`provenance.block_idx → data/parsed/` 不可变缓存）。原始内容只读、不可变，派生物只持轻量指针。**不得因任何检索/表征优化被牺牲。**

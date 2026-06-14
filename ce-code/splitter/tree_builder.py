@@ -92,22 +92,22 @@ def classify_heading(text: str) -> dict | None:
         text (str): 标题块文字（调用方已判定 text_level 存在，即 MinerU 标题块；
             建骨架时亦对目录条目标题调用）。
     返回：
-        dict | None: ``{node_path, path_source, path_confidence}``。
+        dict | None: ``{node_path, node_path_source, node_path_confidence}``。
             返回 None 表示该行实为交叉引用片段（如「5.3节…」），应按内容块处理。
-            ``path_source``：number（命中编号正则，置信 1.0）/ text_level（无编号、
+            ``node_path_source``：number（命中编号正则，置信 1.0）/ text_level（无编号、
             靠 MinerU 标题标记 + 标题文字兜底作路径，置信 0.6）。
     """
     # 附录根（附录A / 附录B）
     app_m = APPENDIX_RE.match(text)
     if app_m:
         return {"node_path": f"附录{app_m.group(1)}",
-                "path_source": "number", "path_confidence": 1.0}
+                "node_path_source": "number", "node_path_confidence": 1.0}
 
     # 附录字母条号（E.1 / E.2.2）
     appc_m = APPENDIX_CLAUSE_RE.match(text)
     if appc_m:
         return {"node_path": appc_m.group(1),
-                "path_source": "number", "path_confidence": 1.0}
+                "node_path_source": "number", "node_path_confidence": 1.0}
 
     # 本规范条号（5 / 5.3 / 5.3.4）
     m = CLAUSE_NUM_RE.match(text)
@@ -117,11 +117,11 @@ def classify_heading(text: str) -> dict | None:
         if text[len(num):len(num) + 1] in "节条款项":
             return None
         return {"node_path": num,
-                "path_source": "number", "path_confidence": 1.0}
+                "node_path_source": "number", "node_path_confidence": 1.0}
 
     # 无编号标题（"前言"、"术语和定义" 等）：用标题文字作路径
     return {"node_path": text[:30].strip(),
-            "path_source": "text_level", "path_confidence": 0.6}
+            "node_path_source": "text_level", "node_path_confidence": 0.6}
 
 
 # ---------------------------------------------------------------------------
@@ -239,7 +239,7 @@ class TreeBuilder:
 
         # 清理建树期临时键（不进 nodes.json）。未接地空骨架不额外打标——它即
         # ``provenance.block_idx == []``（无原始块 = 目录列了但正文没抽到，schema.Provenance
-        # 已声明此不变式）；path_source 因此保留 node_path 的真实来源（number / text_level），
+        # 已声明此不变式）；node_path_source 因此保留 node_path 的真实来源（number / text_level），
         # 不被 synthesized 覆盖。
         for n in nodes:
             n.pop("_catalog", None)
@@ -275,7 +275,7 @@ class TreeBuilder:
             node = schema.new_node(
                 std, path,
                 title=title,
-                path_source=info["path_source"], path_confidence=info["path_confidence"],
+                node_path_source=info["node_path_source"], node_path_confidence=info["node_path_confidence"],
                 provenance={"source_file": meta["source_file"], "block_idx": [], "page": []},
             )
             node["tables"] = []
@@ -335,7 +335,7 @@ class TreeBuilder:
                     if build_missing:           # 无目录页：标题即结构 → 建骨架节点（退化兜底）
                         node = schema.new_node(
                             std, path, title=elem["text"],
-                            path_source=info["path_source"], path_confidence=info["path_confidence"],
+                            node_path_source=info["node_path_source"], node_path_confidence=info["node_path_confidence"],
                             provenance={
                                 "source_file": meta.get("source_file", ""),
                                 "block_idx": [elem["block_idx"]] if "block_idx" in elem else [],

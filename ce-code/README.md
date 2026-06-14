@@ -167,18 +167,12 @@ CUDA_VISIBLE_DEVICES=2 HF_ENDPOINT=https://hf-mirror.com uv run python -m parser
 
 > 切分层必须用 json 而非 md：建节点树要知道「几级标题 / 第几页 / 是表格还是正文」，这些 md 拿不到。
 
-**图片/表格在 json 里怎么体现（只认 MinerU v1，字段均在顶层；由 `parser/format_adapter.py` 处理）**：
+**图片/表格在 json 里怎么体现（MinerU v1，字段均在顶层；由 `parser/format_adapter.py` 处理）**：
 
 - **插图**：`type=image`，顶层 `img_path` + `image_caption`。md 里对应 `![](images/..)`。
 - **表格**：`type=table`，**三存**——表格裁切图 + 结构化 `<table>` HTML（带 colspan/rowspan）+ 表题。字段：顶层 `table_body`(HTML 串) / `img_path` / `table_caption`(list[str])。md 只把 HTML 渲染成表格文字内联、**不引用**裁切图，所以「md 里看不到表格图路径、表格变成了文字」是正常现象。
 
-> ℹ️ MinerU 另有 v2（按页嵌套、字段包在 `content` 下）格式，但本项目管线（`parser/mineru_client.py`）只产出 v1，且 v1 顺序更可靠、取值更直接，故 `format_adapter` 只认 v1。
-
 > ✅ **表体提取（已实现）**：`parser/format_adapter.py` 从 `table_body` 取出表格 HTML，经 `_HTMLTableParser` + `_expand_spans` 解析为**矩形**二维表（展开 colspan/rowspan 防串列），随块落入 `body`，建树时挂到所属节点的 `tables[]`。
->
-> 切分层还处理了几个真实坑（GB/T 50500-2024 实测）：v1 `list` 多条款拆分（如 1.0.1~1.0.7 各自成条款）、目录(TOC)整列/短行剔除（含中英文目录，避免与正文条款重复）、交叉引用片段（"8.3节、…"）不误建条款、**附录字母条号识别**（`E.1`/`E.2.2` 各自成条款，表格精确归位到子条款而非堆在附录根）。
->
-> 待办（Phase B 第 4 步 T8）：把节点 `tables[].body` 升级为可「给定行列取值」的 `table_struct` 表征（见 `reprs/`，注册新 `Representation` 子类即并入并集）。
 
 ### Step 4 — 知识库构建（切分 →（reprs）→ 索引，单一入口）
 

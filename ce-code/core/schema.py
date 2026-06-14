@@ -199,13 +199,13 @@ class Node(TypedDict, total=False):
         references(list[Reference]) / referenced_by(list[str])  引用图正反向边——**类型
                        不对称**：正向带分型 {to,type}，反向仅裸 node_path 列表（按需自查类型）。
         ── 结构层审计（编号驱动建树的溯源，见 PRD §3.1）──
-        path_source    路径来源标签：node_path **怎么定出来的**——已实装 number（命中条号
+        node_path_source 路径来源标签：node_path **怎么定出来的**——已实装 number（命中条号
                        正则·置信 1.0）/ text_level（无编号靠标题文字兜底·0.6）；inherited /
                        lexicon 为枚举占位，**未实装**。**与"是否接地"正交**：未接地空骨架
                        （目录有条目但正文未抽到块）不在此打标，由 ``provenance.block_idx == []``
                        判定（schema.Provenance 已声明该不变式），故空骨架仍保留 number /
                        text_level 的真实来源、不被覆盖。
-        path_confidence 低置信进 03 抽查。
+        node_path_confidence 低置信进 03 抽查。
         ── 溯源（回指 MinerU 原始块）──
         provenance(Provenance)  本节点由哪些原始块构成，链回阶段 0 缓存。
         ── 表征层 ──
@@ -228,8 +228,8 @@ class Node(TypedDict, total=False):
     references: list[Reference]
     referenced_by: list[str]
     # 结构层审计
-    path_source: str
-    path_confidence: float
+    node_path_source: str
+    node_path_confidence: float
     # 溯源
     provenance: Provenance
     # 表征层
@@ -279,8 +279,8 @@ def new_node(standard_id: str, node_path: str, node_type: str = "", **kw: object
         "ancestor_paths": [],
         "references": [],
         "referenced_by": [],
-        "path_source": "",
-        "path_confidence": 1.0,
+        "node_path_source": "",
+        "node_path_confidence": 1.0,
         "provenance": {"source_file": "", "block_idx": [], "page": []},
         "reprs": {},
     }

@@ -57,7 +57,7 @@ def compute_stats(clauses: list[dict]) -> dict[str, Any]:
 
     by_level: dict[int, list] = {}
     for c in clauses:
-        lvl = c.get("level", 0)
+        lvl = c.get("node_level", 0)
         by_level.setdefault(lvl, []).append(c)
 
     # 强条按章分布
@@ -206,7 +206,7 @@ def show_clause_detail(clauses: list[dict], node_path: str) -> None:
 
     for c in hits:
         mandatory_tag = " [red][强条][/red]" if c.get("is_mandatory") else " [dim][推荐][/dim]"
-        title = f"[bold cyan]{c['node_path']}[/bold cyan]{mandatory_tag}  p{c.get('page','?')}"
+        title = f"[bold cyan]{c['node_path']}[/bold cyan]{mandatory_tag}  p{(c.get('provenance',{}).get('page') or ['?'])[0]}"
         body = c.get("content", "(空)") or "(空)"
         refs = c.get("references_to", [])
         tables = c.get("tables", [])
@@ -267,7 +267,7 @@ def write_report(clauses: list[dict], stats: dict, issues: list[dict], out_path:
     lines.append("\n## 强条列表（前50条）\n\n")
     for c in stats["mandatory"][:50]:
         snippet = (c.get("content") or "")[:80].replace("\n", " ")
-        lines.append(f"- **{c['node_path']}** (p{c.get('page','?')}): {snippet}…\n")
+        lines.append(f"- **{c['node_path']}** (p{(c.get('provenance',{}).get('page') or ['?'])[0]}): {snippet}…\n")
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text("".join(lines), encoding="utf-8")

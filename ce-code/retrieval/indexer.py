@@ -6,8 +6,9 @@
 嵌入文本（向量）、``raw``→content 字段（返回/rerank 用）；引用扩展用 ``references_to``
 （从节点 references 桥接出 strong/cross_standard 边的 to，供 engine 沿用 list[str] 口径）。
 
-设计转向（2026-06-12）后：**无 is_mandatory 字段 / 强条索引**。行带 node_id / parent_id /
-granularity——parent_id 是检索期 small-to-big（T9）上探父节点的锚点。
+设计转向（2026-06-12）后：**无 is_mandatory 字段 / 强条索引**。行以 node_path 为 id（本
+集合内唯一，废 node_id），带 parent_id（父 node_path）/ granularity——parent_id 是检索期
+small-to-big（T9）上探父节点的锚点。
 
 依赖服务（服务器已部署）：Milvus localhost:19530 / vLLM BGE-large localhost:8097（dim 1024）。
 """
@@ -52,14 +53,14 @@ def _expandable_refs(node: dict) -> list[str]:
 def node_to_row(node: dict, granularity: str) -> dict:
     """Milvus 一行标量字段（embedding 由调用方填）。无 is_mandatory（强条机制已废）。"""
     return {
-        "node_id":       node.get("node_id", ""),
-        "node_path":   node.get("node_path", ""),
-        "parent_id":     node.get("parent_id") or "",      # 检索期 small-to-big 锚点（T9）
+        "node_path":   node.get("node_path", ""),          # 节点 id（本集合内唯一，去重键）
+        "parent_id":     node.get("parent_id") or "",      # 父 node_path，small-to-big 锚点（T9）
         "granularity":   granularity,
         "standard_id":   node.get("standard_id", ""),
         "content":       _repr_text(node, "raw", node.get("content", ""))[:65_000],
-        "level":         int(node.get("level", 0)),
-        "page":          int(node.get("page", 0)),
+        "node_level":    int(node.get("node_level", 0)),
+        # 展示页 = provenance 首块物理页；未接地空骨架 provenance.page 为空 → 0（无正文即无页）
+        "page":          int((node.get("provenance", {}).get("page") or [0])[0]),
         "references_to": json.dumps(_expandable_refs(node), ensure_ascii=False),
         "has_tables":    bool(node.get("tables")),
         "has_images":    bool(node.get("images")),
@@ -131,13 +132,12 @@ def build_vector_index(
 
     schema_ = client.create_schema(auto_id=True, enable_dynamic_field=False)
     schema_.add_field("id",            DataType.INT64,        is_primary=True)
-    schema_.add_field("node_id",       DataType.VARCHAR,      max_length=192)
-    schema_.add_field("node_path",   DataType.VARCHAR,      max_length=128)
+    schema_.add_field("node_path",   DataType.VARCHAR,      max_length=192)
     schema_.add_field("parent_id",     DataType.VARCHAR,      max_length=192)
     schema_.add_field("granularity",   DataType.VARCHAR,      max_length=16)
     schema_.add_field("standard_id",   DataType.VARCHAR,      max_length=64)
     schema_.add_field("content",       DataType.VARCHAR,      max_length=65_535)
-    schema_.add_field("level",         DataType.INT64)
+    schema_.add_field("node_level",    DataType.INT64)
     schema_.add_field("page",          DataType.INT64)
     schema_.add_field("references_to", DataType.VARCHAR,      max_length=2_048)
     schema_.add_field("has_tables",    DataType.BOOL)
@@ -148,7 +148,6 @@ def build_vector_index(
     index_params.add_index("embedding",   metric_type="COSINE", index_type="HNSW",
                            params={"M": 16, "efConstruction": 200})
     index_params.add_index("node_path", index_type="INVERTED")
-    index_params.add_index("node_id",     index_type="INVERTED")
 
     client.create_collection(collection_name=collection_name,
                              schema=schema_, index_params=index_params)

@@ -150,7 +150,8 @@ def main(
         console.print("\n[bold]--- 前 20 条节点预览 ---[/bold]")
         for c in chunks[:20]:
             tables = f"  [{len(c['tables'])}表]" if c.get("tables") else ""
-            console.print(f"  [cyan]{c['node_path']}[/cyan] [{c.get('node_type','?')}] (p{c['page']}) {c['title'][:50]}{tables}")
+            pg = (c.get("provenance", {}).get("page") or [0])[0]  # 展示页 = 首块物理页，空骨架 0
+            console.print(f"  [cyan]{c['node_path']}[/cyan] [{c.get('node_type','?')}] (p{pg}) {c['title'][:50]}{tables}")
         return
 
     # provenance.source_file：尽量记为相对 data/parsed 的路径，回指阶段 0 缓存

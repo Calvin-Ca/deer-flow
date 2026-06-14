@@ -20,8 +20,8 @@ from pathlib import Path
 from .config import RERANK_MODEL
 
 MILVUS_OUTPUT_FIELDS = [
-    "node_id", "node_path", "parent_id", "granularity", "standard_id", "content",
-    "level", "page", "references_to", "has_tables", "has_images",
+    "node_path", "parent_id", "granularity", "standard_id", "content",
+    "node_level", "page", "references_to", "has_tables", "has_images",
 ]
 # 注：is_mandatory 字段已随 T4 从索引移除（强条机制 2026-06-12 废）；parent_id 供 T9
 # small-to-big 上探。ref-type 感知的引用扩展与 small-to-big 仍在 T9，本处只读不变。
@@ -124,21 +124,20 @@ def vector_search(
 def merge_results(bm25_results: list[dict], vector_results: list[dict]) -> list[dict]:
     """RRF 合并去重。
 
-    去重键用 ``node_id``（节点唯一键），不用 ``node_path``：clause 粒度下两者 1:1
-    等价，但 section / paragraph 粒度下 node_path 不再唯一（同号多检索单元），唯有
-    node_id 恒唯一——故统一按 node_id 去重，避免换粒度后误合并。
+    去重键用 ``node_path``：废 node_id 后它即节点 id，本集合（单规范）内唯一——同一
+    node_path 在 BM25 / 向量两路命中即合并，避免重复。
     """
     k = 60  # RRF 常数
     scores: dict[str, float] = {}
     items: dict[str, dict] = {}
 
     for rank, item in enumerate(bm25_results):
-        nid = item["node_id"]
+        nid = item["node_path"]
         scores[nid] = scores.get(nid, 0) + 1 / (k + rank + 1)
         items[nid] = item
 
     for rank, item in enumerate(vector_results):
-        nid = item["node_id"]
+        nid = item["node_path"]
         scores[nid] = scores.get(nid, 0) + 1 / (k + rank + 1)
         if nid not in items:
             items[nid] = item
@@ -162,13 +161,12 @@ def merge_results(bm25_results: list[dict], vector_results: list[dict]) -> list[
 def expand_references(results: list[dict], metadata: list[dict], max_depth: int = 1) -> list[dict]:
     """沿可扩展引用边（strong / cross_standard）一跳扩展命中集。
 
-    ``references_to`` 存的是被引目标的 ``node_path``（如 "5.2.1"），故引用解析按
-    node_path 查 ``meta_by_path``；**去重则按 node_id**（与 merge_results 一致，
-    section/paragraph 粒度下 node_path 不唯一，node_id 恒唯一）。跨规范引用
+    ``references_to`` 存的是被引目标的 ``node_path``（如 "5.2.1"），故引用解析与去重
+    都按 node_path（废 node_id 后即节点 id，本集合内唯一）。跨规范引用
     （cross_standard，如 "GB 50116-2013"）不在本规范 metadata 内 → 查不到自动跳过。
     """
     meta_by_path = {m["node_path"]: m for m in metadata}
-    existing_ids = {r.get("node_id") for r in results}
+    existing_ids = {r.get("node_path") for r in results}
     expanded = list(results)
 
     frontier = list(results)
@@ -177,13 +175,13 @@ def expand_references(results: list[dict], metadata: list[dict], max_depth: int 
         for item in frontier:
             for ref_path in item.get("references_to", []):
                 ref_item = meta_by_path.get(ref_path)
-                if ref_item is None or ref_item.get("node_id") in existing_ids:
+                if ref_item is None or ref_item.get("node_path") in existing_ids:
                     continue
                 new_item = dict(ref_item)
                 new_item["_source"] = "ref_expand"
                 new_item["_rrf_score"] = 0.0
                 expanded.append(new_item)
-                existing_ids.add(ref_item.get("node_id"))
+                existing_ids.add(ref_item.get("node_path"))
                 next_frontier.append(new_item)
         frontier = next_frontier
 

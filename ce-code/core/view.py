@@ -12,10 +12,11 @@
 """
 from __future__ import annotations
 
-# index_granularity → emit 该粒度的 node_type 集合。
-# clause：条款级检索单元（GB 50016 的 "5.3.4"、总则 "1.0.1"、附录条款均归此）。
-#   appendix 根、chapter、section 等目录骨架节点不单独 emit，靠 small-to-big 上探回补。
-_CLAUSE_NODE_TYPES: frozenset[str] = frozenset({"clause"})
+# index_granularity → emit 该粒度的 node_type（种类）集合。
+# clause 粒度 emit node_type=="leaf" 的节点（叶·检索单元：GB 50016 的 "5.3.4"、总则
+#   "1.0.1"、附录条款均归此）；container（容器章/节/附录根）等骨架不单独 emit，靠
+#   small-to-big 上探回补。注：index_granularity 是用户轴名、node_type 是结构种类，二者不同名属正常。
+_LEAF_NODE_TYPES: frozenset[str] = frozenset({"leaf"})
 
 
 def view(nodes: list[dict], index_granularity: str = "clause") -> list[dict]:
@@ -31,7 +32,7 @@ def view(nodes: list[dict], index_granularity: str = "clause") -> list[dict]:
 
     返回：
         list[dict]: 选中的检索单元（节点 dict 的子集，保持原引用，不拷贝）。
-            每个单元带 node_id / parent_id / node_path / content 等，供 04 建行；
+            每个单元带 node_path / parent_id / content 等，供 04 建行；
             parent_id 是检索期 small-to-big 上探的锚点。
 
     异常：
@@ -39,7 +40,7 @@ def view(nodes: list[dict], index_granularity: str = "clause") -> list[dict]:
         ValueError: index_granularity 取值非法。
     """
     if index_granularity == "clause":
-        return [n for n in nodes if n.get("node_type") in _CLAUSE_NODE_TYPES]
+        return [n for n in nodes if n.get("node_type") in _LEAF_NODE_TYPES]
     if index_granularity in ("section", "paragraph"):
         raise NotImplementedError(
             f"index_granularity={index_granularity!r} 后补；T7 最小切片先只做 clause 层 emit"

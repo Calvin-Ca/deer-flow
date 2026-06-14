@@ -22,14 +22,18 @@ from typing import Literal, TypedDict
 
 # ── 受控词表 ───────────────────────────────────────────────────────────────────
 
-# 结构层 node_type：目录层级节点 + 挂在条款下的内容/切片节点。
-# 当前 TocSplitter 建树**只产出** chapter / section / clause / appendix（由 node_path
-# 号段数推，见 tree_builder._infer_node_type）；其余（document / subitem / paragraph /
-# table / figure / formula）为**契约占位**，建树阶段未产出（表格/图示暂存 Node.tables /
-# images 字段，待表征层转 table_struct，故 table / figure 未实装）。
+# 结构层 node_type = 节点**种类**（kind），**与深度正交**：层级深度由 node_level（真实
+# 目录树层级）单独承载，node_type 不编码"第几层"，也**不由 node_path 派生**——这样不假定
+# 文档一定有"章/节/条"原生层级（造价定额表等套不上固定档名，见 PRD 跨文档适配）。
+# 当前 TocSplitter 建树末按**树结构**二分（纯看"有无子节点"，见 tree_builder._assign_node_type）：
+#   container  有子节点的容器（章 / 节 / 附录根等目录骨架，不单独 emit 检索单元，靠 small-to-big 回补）
+#   leaf       叶节点·检索单元（条款 / 总则 / 无编号正文段 / 附录条款均归此，粒度视图 emit 这层）
+# "是不是附录"等语义不进 node_type（它能从 node_path 前缀 "附录X" 直接读出，避免与 node_path 冗余）。
+# 其余（document / paragraph / table / figure / formula）为**契约占位**，建树阶段未产出
+# （表格/图示暂存 Node.tables / images 字段，待表征层转 table_struct，故 table / figure 未实装）。
 NodeType = Literal[
-    "document", "chapter", "section", "clause", "subitem", "appendix",
-    "paragraph", "table", "figure", "formula",
+    "container", "leaf",
+    "document", "paragraph", "table", "figure", "formula",
 ]
 RefType = Literal["strong", "weak", "exclude", "cross_standard"]
 ScopeStatus = Literal["extracted", "unknown"]
@@ -122,7 +126,8 @@ class Provenance(TypedDict, total=False):
         重跑 MinerU。原始文本不复制进 nodes.json，只存轻量指针（``total=False``）。
     字段：
         source_file MinerU content_list.json 路径（相对 data/parsed/）。
-        block_idx   本节点聚合的原始块下标列表；synthesized（凭空合成）节点为 []。
+        block_idx   本节点聚合的原始块下标列表；**为 [] 即"未接地空骨架"**（目录列了条目
+                    但正文未抽到对应块，无真身可溯）——这是判定该状态的**单一真值**（不另设标记）。
         page        涉及页码（1-base），便于定位。
         bbox        可选版面框 [{"page": int, "box": [x0,y0,x1,y1]}]，供 PDF 高亮。
     返回：无（TypedDict，作字典契约）。
@@ -167,31 +172,39 @@ class Node(TypedDict, total=False):
         粒度视图与各检索索引都是它的派生。``total=False`` 允许结构层/表征层分阶段填。
     字段：
         ── 标识 ──
-        node_id        稳定 id：条文号有则用，无则标题路径（如 "GB50016#5.3.4"）。
-        standard_id。
+        node_path      节点在文档原生层级里的**结构地址** = 节点 id：条款号 "5.3.4"/附录号
+                       "附录E"/"E.1.1"，**或**无编号标题路径（"前言"/"术语和定义"）。本规范内
+                       唯一，直接作树边 / 引用边的引用键（2026-06-14 由 clause_path 改名，并废
+                       node_id——全层统一以 node_path 为键，不再存 ``standard_id#path`` 冗余 id）。
+                       消费方**勿假定恒为数字号**。
+        standard_id    规范标识；与 node_path 一起构成**跨规范全局身份**（单文件/单集合内
+                       node_path 已唯一，跨规范才需带 standard_id 消歧）。
         ── 结构（树形）──
-        node_type      NodeType；章/节/条三档与 ``level`` **同源**（都由 node_path
-                       号段数推），仅 appendix 及未来内容型类型带 level 给不出的信息。
-        node_path      节点在文档原生层级里的**结构地址**：条款号 "5.3.4"/附录号 "附录E"/
-                       "E.1.1"，**或**无编号标题路径（"前言"/"术语和定义"）。曾名 clause_path
-                       （2026-06-14 改名）——它装的不只是条款，故消费方**勿假定恒为数字号**。
-        level          = node_path 号段数（**派生·去范式**，便利字段，不取 MinerU
-                       text_level——后者不可靠）；可由 node_path 重算，存盘仅为省事。
-        parent_id / children_ids   树形边（粒度视图 + small-to-big 全靠它）。
-        page           **单一**展示页（1-base）：接地节点 = 正文首块实际页（建树时由
-                       provenance 校正）；未接地空骨架 = 目录声明页（兜底）。逐块页全集见
-                       ``provenance.page``，二者可不等（骨架声明页 ≠ 正文实际页）。
+        node_type      NodeType = 节点**种类**（kind），**与深度正交**：container（容器·有子）
+                       / leaf（叶·检索单元·无子）。建树末纯按"有无子节点"判定（见
+                       tree_builder._assign_node_type），**不由 node_path 派生**——深度交给
+                       node_level，"是否附录"等语义按需读 node_path 前缀。
+        node_level     节点在**还原出的目录树**里的深度（1-base，根=1）= 沿 parent_id 上溯的
+                       祖先数 +1，建树时算定（_attach_ancestors）。**不取** node_path 号段数：
+                       中间层级缺节点时按真实父链算（5.3 缺 → 5.3.4 的父是 5、深度 2），也适配
+                       无"章/节/条"原生层级的文档（曾名 level，2026-06-14 改名 + 改语义）。
+        parent_id / children_ids   树形边（存被引节点的 node_path；粒度视图 + small-to-big 全靠它）。
         title / content   content 仅自身正文文本（确有副本，作检索载荷），不含子节点；
                        与 provenance 只存指针**并行不悖**（指针用于回指版面/被丢信息）。
+                       （注：无独立 page 字段——展示页 = ``provenance.page[0]``，由索引/展示处
+                       按需派生；未接地空骨架 provenance.page 为空 = 无正文即无页，见 2026-06-14
+                       决策：不为无真身节点造目录页码。）
         ── 固有事实（建树时一次算定，唯一、不可多表达）──
         ancestor_titles / ancestor_paths   祖先标题链 / 路径链（沿 parent_id 上溯·去范式）。
         references(list[Reference]) / referenced_by(list[str])  引用图正反向边——**类型
-                       不对称**：正向带分型 {to,type}，反向仅裸 node_id 列表（按需自查类型）。
+                       不对称**：正向带分型 {to,type}，反向仅裸 node_path 列表（按需自查类型）。
         ── 结构层审计（编号驱动建树的溯源，见 PRD §3.1）──
-        path_source    路径来源标签：已实装 number（命中条号正则·置信 1.0）/ text_level
-                       （无编号靠标题文字兜底·0.6）/ synthesized（目录有条目但正文未抽到
-                       对应块的空骨架，建树末标定，见 tree_builder.apply）；
-                       inherited / lexicon 为枚举占位，**未实装**。
+        path_source    路径来源标签：node_path **怎么定出来的**——已实装 number（命中条号
+                       正则·置信 1.0）/ text_level（无编号靠标题文字兜底·0.6）；inherited /
+                       lexicon 为枚举占位，**未实装**。**与"是否接地"正交**：未接地空骨架
+                       （目录有条目但正文未抽到块）不在此打标，由 ``provenance.block_idx == []``
+                       判定（schema.Provenance 已声明该不变式），故空骨架仍保留 number /
+                       text_level 的真实来源、不被覆盖。
         path_confidence 低置信进 03 抽查。
         ── 溯源（回指 MinerU 原始块）──
         provenance(Provenance)  本节点由哪些原始块构成，链回阶段 0 缓存。
@@ -200,15 +213,13 @@ class Node(TypedDict, total=False):
     返回：无（TypedDict，作字典契约）。
     """
     # 标识
-    node_id: str
+    node_path: str
     standard_id: str
     # 结构（树形）
     node_type: NodeType
-    node_path: str
-    level: int
+    node_level: int
     parent_id: str | None
     children_ids: list[str]
-    page: int
     title: str
     content: str
     # 固有事实
@@ -242,29 +253,26 @@ def empty_condition() -> ConditionData:
     }
 
 
-def new_node(standard_id: str, node_path: str, node_type: str, **kw: object) -> Node:
+def new_node(standard_id: str, node_path: str, node_type: str = "", **kw: object) -> Node:
     """构造带默认值的空节点（其余字段由结构层 / 表征层逐步填）。
 
     参数：
         standard_id (str): 规范标识。
-        node_path (str): 条款号或标题路径。
-        node_type (str): 节点类型（NodeType）。
-        **kw: 覆盖默认值的字段；``node_id`` 缺省由 ``<standard_id>#<node_path>``
-            合成，``level`` 缺省由 node_path 号段数推导。
+        node_path (str): 条款号或标题路径（= 节点 id，本规范内唯一）。
+        node_type (str): 节点种类（NodeType）；缺省空串，建树末按结构判定
+            （_assign_node_type）——故创建时通常不传。
+        **kw: 覆盖默认值的字段；``node_level`` 缺省 0，由建树 _attach_ancestors
+            按真实父链深度算定。
     返回：
         Node: 填好标识/结构默认、固有事实为空、reprs 为空 dict 的节点。
     """
-    node_id = str(kw.pop("node_id", "") or "") or f"{standard_id}#{node_path}"
-    level = int(kw.pop("level", node_path.count(".") + 1))  # "5.3.1"→3 / "5"→1 / "前言"→1
     node: Node = {
-        "node_id": node_id,
+        "node_path": node_path,
         "standard_id": standard_id,
         "node_type": node_type,  # type: ignore[typeddict-item]
-        "node_path": node_path,
-        "level": level,
+        "node_level": int(kw.pop("node_level", 0)),
         "parent_id": None,
         "children_ids": [],
-        "page": 0,
         "title": "",
         "content": "",
         "ancestor_titles": [],

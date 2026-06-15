@@ -20,7 +20,7 @@ IR 适配：入参由旧「list[block dict]」改为 ``Document``——内部 ``
 直接是 ``list[Chunk]``——TreeBuilder 内部 ``_BuildNode`` 字段名即与 Chunk 对齐
 （chunk_type/level/provenance），出口 ``_BuildNode.to_chunk()`` 一步成 Chunk，**无字段改名缝**
 （2026-06-15 类型化前曾有 ``_node_to_chunk`` 做 node_type→chunk_type 改名，已消除）。中间产物
-annotated（带 catalog/catalog_source）作 debug_blocks 落 structure.json。
+annotated（带 catalog/catalog_source）作 debug_blocks 落 catalog_blocks.json。
 
 > block→node 的主干心智模型（碰到标题切一次游标、下个标题前的普通块都算当前标题正文；目录条目
 > 物化骨架、更细标题并入所属节）见下文 §3 ``TreeBuilder`` 文档。
@@ -205,7 +205,7 @@ def annotate_references(nodes: list) -> None:
 #
 # 输入：FormatAdapter.adapt() 产出的统一元素列表。
 # 输出：annotate() 返回每块带 standard_id + catalog + catalog_source 的扁平列表（不建树、
-#       不丢块）——即 ``SplitResult.debug_blocks``,由 build.run_structure 落盘为 ``structure.json``
+#       不丢块）——即 ``SplitResult.debug_blocks``,由 build.run_structure 落盘为 ``catalog_blocks.json``
 #       （切分中间态·调试快照,下游不读）。每块字段（— = FormatAdapter 透传,余为本层盖）：
 #         block_idx       int   该块在 MinerU 原始 content_list.json 里的下标（溯源用;
 #                               到 nodes.json 的 provenance.block_idx 会聚合成 list[int]）。
@@ -928,7 +928,7 @@ class TreeBuilder:
         cur: _BuildNode | None = None
         for elem in annotated:
             if elem.get("catalog") == "toc":
-                continue  # 目录页块不开节点、不并入正文（structure.json 已全量保留 + 溯源）
+                continue  # 目录页块不开节点、不并入正文（catalog_blocks.json 已全量保留 + 溯源）
 
             text = elem.get("text", "")
             is_heading = elem.get("text_level") is not None
@@ -1146,7 +1146,7 @@ class TocSplitter(Splitter):
         """目录打标 → 建树 → Chunk 树（含 parent/child + 祖先链 + 引用图）。
 
         参数 / 返回：见基类 Splitter.split（max_depth 切目录层级 / subsplit 目录层下按编号细分）。
-        debug_blocks = 目录打标后的扁平块（structure.json）。
+        debug_blocks = 目录打标后的扁平块（catalog_blocks.json）。
         """
         blocks = document.block_dicts()
         labeler = CatalogLabeler(document.standard_id)
@@ -1166,7 +1166,7 @@ class TocSplitter(Splitter):
         与 ``parser.MineruParser.run_cli`` 同构——``splitter.__main__`` 遍历注册表把声明了 ``run_cli``
         的切法挂成 ``python -m splitter <切法名>``（占位切法无 ``run_cli`` → 不出现）。读阶段0 缓存
         ``*_content_list.json``，经 parser 解析成 Document → ``self.split`` → 出 chunks.json /
-        structure.json。不依赖 Milvus / 嵌入服务，本地即可跑、专调切分深度（max_depth / subsplit）。
+        catalog_blocks.json。不依赖 Milvus / 嵌入服务，本地即可跑、专调切分深度（max_depth / subsplit）。
 
         参数：无。
         返回：
@@ -1194,7 +1194,7 @@ class TocSplitter(Splitter):
         def _cmd(input_path: Path, standard_id: str, profile_name: str, parser_strategy: str,
                  toc_max_depth: int | None, subsplit: str, structured_dir: Path,
                  preview: bool) -> None:
-            """只跑切分（阶段 0→1）：解析 → 切分建树 → 出 chunks.json / structure.json。"""
+            """只跑切分（阶段 0→1）：解析 → 切分建树 → 出 chunks.json / catalog_blocks.json。"""
             from parser import factory as parser_factory  # 延迟引入，避免切分层模块级依赖解析层
 
             standard_id = standard_id or input_path.stem.replace("_content_list", "")
@@ -1224,7 +1224,7 @@ class TocSplitter(Splitter):
             out = structured_dir / safe / profile_name
             out.mkdir(parents=True, exist_ok=True)
             if result.debug_blocks is not None:
-                _write_json(result.debug_blocks, out / "structure.json")
+                _write_json(result.debug_blocks, out / "catalog_blocks.json")
             _write_json([c.to_dict() for c in chunks], out / "chunks.json")
 
         return _cmd

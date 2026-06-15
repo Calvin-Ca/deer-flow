@@ -4,7 +4,7 @@
 按 structure → reprs → index 顺序逐个执行（后一阶段读前一阶段产出的 chunks.json）：
 
   structure  入 *_content_list.json（阶段 0 缓存）→ parser 解析成 Document → splitter 切分成 Chunk 树
-             → 出 chunks.json（单一真值）+ structure.json（调试块）。
+             → 出 chunks.json（单一真值）+ catalog_blocks.json（调试块）。
   reprs      读 chunks.json → feature.enrich 挂表征（免费 4 项）→ 原地重写 chunks.json（带表征）。
   index      读带表征 chunks.json → index.view 选粒度 → index.build_index 建索引 → 出 BM25 + Milvus 双索引。
 
@@ -105,7 +105,7 @@ def run_build(
 def _run_structure(
     input_path: Path, standard_id: str, profile: ParseProfile, structured_out: Path,
 ) -> None:
-    """阶段 structure：*_content_list.json → 解析 → 切分建树 → 落 chunks.json + structure.json。"""
+    """阶段 structure：*_content_list.json → 解析 → 切分建树 → 落 chunks.json + catalog_blocks.json。"""
     # provenance.source_file：尽量记为相对 data/parsed 的路径
     try:
         source_file = str(input_path.resolve().relative_to(ROOT / "data" / "parsed"))
@@ -126,7 +126,7 @@ def _run_structure(
                        subsplit=profile.subsplit)
     chunks = result.chunks
     if result.debug_blocks is not None:
-        _write_json(result.debug_blocks, structured_out / "structure.json")
+        _write_json(result.debug_blocks, structured_out / "catalog_blocks.json")
     _write_json([c.to_dict() for c in chunks], structured_out / "chunks.json")
     console.print("[bold green]✓ 结构层完成（stage=structure）[/bold green]")
 

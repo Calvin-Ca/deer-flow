@@ -183,13 +183,13 @@ curl -s -X POST http://172.19.2.2:8000/file_parse -F "files=@data/raw/<文件名
 
 > 留一个 `--input` 的代价是 reprs/index 不需要 content_list，只为对齐 `standard_id` / 产物目录；不想传可改用 `--standard-id` 显式指定（二者取其一对齐到 `data/structured/<standard>/<profile>/`）。
 
-**阶段 ① structure**（解析 → 切分建树 → 落 `chunks.json` + `structure.json`，看节点树）：
+**阶段 ① structure**（解析 → 切分建树 → 落 `chunks.json` + `catalog_blocks.json`，看节点树）：
 
 ```bash
 uv run python build.py --input "data/parsed/<basename>/auto/<basename>_content_list.json" --profile-name default --stage structure --structure-strategy toc
 ```
 
-按 `--structure-strategy`（缺省 `toc`，基于 PDF 原生目录的多层级切分）选 splitter，输出落在 `data/structured/<standard>/<profile>/chunks.json`（Chunk 树·单一真值）+ `structure.json`（调试）。可选 `--parser-strategy`（缺省 `mineru`）、切分深度 `--toc-max-depth` / `--subsplit`。只想快速预览不落盘用 `--preview`（打印前 20 条节点）。
+按 `--structure-strategy`（缺省 `toc`，基于 PDF 原生目录的多层级切分）选 splitter，输出落在 `data/structured/<standard>/<profile>/chunks.json`（Chunk 树·单一真值）+ `catalog_blocks.json`（调试）。可选 `--parser-strategy`（缺省 `mineru`）、切分深度 `--toc-max-depth` / `--subsplit`。只想快速预览不落盘用 `--preview`（打印前 20 条节点）。
 
 **阶段 ② reprs**（读 `chunks.json` → `feature.enrich` 挂免费 4 项 → 原地重写带表征的 `chunks.json`，无外部服务依赖）：
 

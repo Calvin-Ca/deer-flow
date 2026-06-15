@@ -6,7 +6,7 @@
 实现 ``split`` + ``run_cli`` 并 ``register``，本入口零改动；占位切法（无 ``run_cli``）不出现在 CLI。
 
 切分只到结构层：读阶段0 缓存 ``data/parsed/<std>/auto/*_content_list.json`` → parser 解析成
-Document → splitter 切分 → 出 ``chunks.json`` / ``structure.json``。不碰表征 / 索引（那是根
+Document → splitter 切分 → 出 ``chunks.json`` / ``catalog_blocks.json``。不碰表征 / 索引（那是根
 ``build.py`` / ``service/build_service.py`` 的事），故不依赖 Milvus / 嵌入服务。
 
 用法（从 ce-code 根，单行命令）：

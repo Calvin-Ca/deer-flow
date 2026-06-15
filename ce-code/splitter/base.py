@@ -28,7 +28,7 @@ class SplitResult:
 
     字段：
         chunks (list[Chunk]): Chunk 树（落 ``chunks.json`` 单一真值）。
-        debug_blocks (list[dict] | None): 切分中间产物（落 ``structure.json`` 调试用），
+        debug_blocks (list[dict] | None): 切分中间产物（落 ``catalog_blocks.json`` 调试用），
             无中间形态的切法填 None。
     """
 

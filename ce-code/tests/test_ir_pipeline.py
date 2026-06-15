@@ -79,7 +79,9 @@ _ITEMS = [
 
 def _build_tree():
     doc = parser.factory.select("mineru").adapt(_ITEMS, standard_id="GB 50016", source_file="GB/auto/x.json")
-    chunks = splitter.factory.select("toc").split(doc, profile=ParseProfile()).chunks
+    prof = ParseProfile()
+    chunks = splitter.factory.select("toc").split(
+        doc, max_depth=prof.toc_max_depth, subsplit=prof.subsplit).chunks
     feature.enrich(chunks, list(ParseProfile().features))
     return chunks
 

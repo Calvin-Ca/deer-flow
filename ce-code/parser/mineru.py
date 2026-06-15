@@ -142,37 +142,46 @@ def _html_table_to_rows(html: str) -> list[list[str]]:
 
 
 class FormatAdapter:
-    """MinerU v1 格式适配器：纯格式转换，无结构语义。
+    """MinerU v1 格式适配器：纯格式转换，无结构语义（逐步动作见 adapt 方法）。
 
-    功能：
-        page_number 跳过；page 归一（0-base → 1-base）；HTML 表格解析；
-        text_level 原样透传（MinerU 标题层级，仅标题块有此键）；
-        list 条目保留整体（不展开、不做目录过滤，由目录打标器处理）。
+    本适配器是 MinerU v1 content_list schema 专用，复用维度是「任意基于 mineru 的 parser」，
+    与切分层（splitter）无关——它只产统一块，切分/建树（条文号 / 目录标签 / 树边）由 splitter 消费。
 
-    参数：无（调用静态方法 adapt(items) 传入原始列表）。
-    返回：
-        adapt(items) 返回 list[dict]，schema：
-            type       元素类型（text / list / table / equation / footer）
-            text       文本内容（list 为空字符串，table 为 caption）
-            page       页码（从 1 起）
-            text_level MinerU 标题层级（原样透传；仅标题块有此键，缺则非标题）
-            block_idx  原始 content_list 中的下标（供节点 provenance 溯源回 data/parsed）
-            list_items list 条目列表（仅 list）
-            body       矩形二维表体（仅 table）
-            img_path   裁切图路径（仅 table）
-
-    说明：本适配器是 MinerU v1 content_list schema 专用，复用维度是「任意基于 mineru 的 parser」，
-    与切分层（splitter）无关——它只产统一块，切分/建树由 splitter 消费。
+    adapt(items) 返回的统一元素 schema：
+        type       元素类型（text / list / table / equation / footer）
+        text       文本内容（list 为空字符串，table 为 caption）
+        page       页码（从 1 起）
+        text_level MinerU 标题层级（原样透传；仅标题块有此键，缺则非标题）
+        block_idx  原始 content_list 中的下标（供节点 provenance 溯源回 data/parsed）
+        list_items list 条目列表（仅 list）
+        body       矩形二维表体（仅 table）
+        img_path   裁切图路径（仅 table）
     """
 
     @staticmethod
     def adapt(items: list[dict]) -> list[dict]:
-        """MinerU v1 原始列表 → 统一元素列表。
+        """MinerU v1 原始列表 → 统一元素列表（格式归一，不解析结构语义）。
+
+        逐元素把 MinerU 私有 schema 削成项目统一 IR，只做版面/内容层面的转换，
+        **不碰结构语义**（条文号 / 目录标签 / 树边都留给下游 splitter 算）。具体动作：
+          · 页码归一    ：page_idx（0-base）→ page（1-base）。
+          · 丢页码块    ：type == "page_number" 直接跳过。
+          · 丢空文本    ：text.strip() 为空的块跳过。
+          · 表格 caption：table_caption（数组）→ 拼成单个 text 字符串。
+          · 表格展开    ：table_body（HTML 串）→ body（矩形二维数组），展开
+                          colspan/rowspan 防串列（唯一的重逻辑转换）。
+          · list 清洗   ：list_items 去空白、丢空条目；整条 list 为空则丢弃。
+          · 加溯源下标  ：注入 block_idx（原 content_list 下标），供 Chunk 溯源回阶段0 缓存。
+          · text_level  ：标题层级原样透传，仅标题块带此键。
+          · 字段裁剪    ：只留 type/text/page/block_idx/text_level/list_items/body/img_path，
+                          其余（bbox、score 等版面元数据）全丢。
+        整体是「内容保真、结构不动、字段精简」：元素顺序/数量基本不变（仅删 page_number 与
+        空块），文本一字不改，最大实质转换是表格 HTML → 二维数组。
 
         参数：
             items (list[dict]): MinerU v1 输出的扁平元素 list。
         返回：
-            list[dict]: 统一元素列表。
+            list[dict]: 统一元素列表（schema 见类 docstring）。
         """
         out: list[dict] = []
         for idx, it in enumerate(items):

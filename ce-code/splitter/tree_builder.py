@@ -27,7 +27,7 @@
 
 归属（2026-06-13 迁入新框架）：本模块是切分策略 ``TocSplitter``（splitter/toc.py，基于
 原生目录的多层级切分）的**内部实现件**，与目录打标 ``catalog_labeler.py``、引用图分型
-``references.py`` 同在 splitter/ 包内；格式适配 ``format_adapter.py``（parser/）是切分前的
+``references.py`` 同在 splitter/ 包内；格式适配 ``FormatAdapter``（parser/mineru.py）是切分前的
 通用适配，不随本切法内聚。命名（承 2026-06-13 术语统一）：旧名 ``GranularityAxis`` 失准——
 「granularity」已专指索引期树上视图（``index.manager.view``），与建树无关，故更名 ``TreeBuilder``。
 

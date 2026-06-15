@@ -44,11 +44,10 @@ ce-code/
 │  ── ① 解析层（多解析模型可插拔）──
 ├── parser/                         # 原始文档 → Document IR
 │   ├── base.py / factory.py        #   Parser 基类 + 工厂（profile.parser_strategy 选）
-│   ├── mineru.py                   #   ★ MineruParser（content_list.json → Document）
+│   ├── mineru.py                   #   ★ MinerU 工具（单文件）：门面 MineruParser + 适配 FormatAdapter
+│   │                               #     + 阶段0 引擎 parse_via_api + CLI run_command
 │   ├── unstructured.py             #   ◌ 占位
-│   ├── format_adapter.py           #   MinerU v1 → 统一块（MineruParser 复用）
-│   ├── __main__.py                 #   阶段 0 包级入口：python -m parser single / split
-│   └── mineru_client / pdf_parser / split_parse.py   #   阶段 0 实跑 PDF→json
+│   └── __main__.py                 #   阶段 0 启动脚本（registry 驱动）：python -m parser <工具>
 │
 │  ── ② 切分层（多切法可插拔）──
 ├── splitter/                       # Document → Chunk 树
@@ -99,7 +98,7 @@ ce-code/
 ```
 
 > **运行模型**：ce-code 不安装为包（`packages=[]`），**从 ce-code 根运行**。构建 `python build.py …`；
-> 阶段 0 解析与服务/工具用模块式 `python -m parser single …` / `python -m service.knowledge_api` /
+> 阶段 0 解析与服务/工具用模块式 `python -m parser mineru …` / `python -m service.knowledge_api` /
 > `python -m tools.eval …`。各层绝对 import（`from core import Chunk` / `import splitter`），无 sys.path hack。
 > ★=本轮实现、◌=占位（未实装抛 NotImplementedError）。
 
@@ -125,7 +124,7 @@ ce-code/
 ### Step 1 — 服务器一次性环境准备
 
 ```bash
-bash pipeline/setup_server.sh
+bash tools/setup_server.sh
 ```
 
 ### Step 2 — 放 PDF
@@ -134,24 +133,20 @@ bash pipeline/setup_server.sh
 
 ### Step 3 — PDF 解析
 
-`01_parse_pdf.py` **默认走远程 MinerU API**（`172.19.2.2:8000`，热服务 + `hybrid-auto-engine` 现成可用），加 `--local` 才用本地 CLI。两条路径是同一套 MinerU，同 backend 输出逐字一致；选型与环境差异详见 `DEV.md`「MinerU 两种解析方式」。
+`python -m parser mineru` **走远程 MinerU API**（`172.19.2.2:8000`，热服务 + `hybrid-auto-engine` 现成可用，无需本地 GPU/MinerU 环境）。环境差异详见 `DEV.md`「MinerU 解析」。
 
 > backend 选择：定额/造价类含密集表格的文档用 `hybrid-auto-engine`（表格逐列对位，默认）；`--backend pipeline` 更快但密集表格会列错位。
 
-> 本地 CLI（`--local`）跑 hybrid 需先修好 venv 的 vllm（见 `DEV.md`），否则只能用 pipeline。
-
-#### 默认 — 远程 API（推荐，无需本地 GPU/MinerU 环境）
-
-整本一次解析（API 主机资源充足，无本地 OOM 问题，无需分块）：
+整本一次解析（API 主机资源充足，无本地 OOM 问题）：
 
 ```bash
-uv run python -m parser single --pdf data/raw/<文件名>.pdf
+uv run python -m parser mineru --pdf data/raw/<文件名>.pdf
 ```
 
 换 backend / 指定 API 地址：
 
 ```bash
-uv run python -m parser single --pdf data/raw/<文件名>.pdf --backend pipeline --server-url http://172.19.2.2:8000
+uv run python -m parser mineru --pdf data/raw/<文件名>.pdf --backend pipeline --server-url http://172.19.2.2:8000
 ```
 
 也可直接 curl（同步返回 JSON，`results.<文件名>.md_content` / `.content_list`；调试单页用 `start_page_id`/`end_page_id`）：
@@ -160,23 +155,7 @@ uv run python -m parser single --pdf data/raw/<文件名>.pdf --backend pipeline
 curl -s -X POST http://172.19.2.2:8000/file_parse -F "files=@data/raw/<文件名>.pdf;type=application/pdf" -F "backend=hybrid-auto-engine" -F "lang_list=ch" -F "table_enable=true" -F "return_md=true" -F "return_content_list=true"
 ```
 
-> API 每次调用都重传整个 PDF，分段解析会重复上传；省带宽走 `--local`。
-
-#### `--local` — 本地 CLI（离线 / 省带宽大批量）
-
-小 PDF（≤100 页）整本一次解析：
-
-```bash
-CUDA_VISIBLE_DEVICES=2 HF_ENDPOINT=https://hf-mirror.com uv run python -m parser single --pdf data/raw/<文件名>.pdf --local --backend pipeline
-```
-
-大 PDF（>100 页）分块解析，规避本地显存 OOM（GB 50016 共 464 页，用 80 页/块）：
-
-```bash
-CUDA_VISIBLE_DEVICES=2 HF_ENDPOINT=https://hf-mirror.com uv run python -m parser split --pdf data/raw/<文件名>.pdf --chunk-size 80
-```
-
-无论哪种方式，输出都落在 `data/parsed/<basename>/auto/`，含 `.md` 和 `_content_list.json`，直接传给 Step 4。
+输出落在 `data/parsed/<basename>/auto/`，含 `.md` 和 `_content_list.json`，直接传给 Step 4。
 
 #### 解析产物说明（`.md` vs `_content_list.json` vs `images/`）
 
@@ -190,12 +169,12 @@ CUDA_VISIBLE_DEVICES=2 HF_ENDPOINT=https://hf-mirror.com uv run python -m parser
 
 > 切分层必须用 json 而非 md：建节点树要知道「几级标题 / 第几页 / 是表格还是正文」，这些 md 拿不到。
 
-**图片/表格在 json 里怎么体现（MinerU v1，字段均在顶层；由 `parser/format_adapter.py` 处理）**：
+**图片/表格在 json 里怎么体现（MinerU v1，字段均在顶层；由 `parser/mineru.py` 的 `FormatAdapter` 处理）**：
 
 - **插图**：`type=image`，顶层 `img_path` + `image_caption`。md 里对应 `![](images/..)`。
 - **表格**：`type=table`，**三存**——表格裁切图 + 结构化 `<table>` HTML（带 colspan/rowspan）+ 表题。字段：顶层 `table_body`(HTML 串) / `img_path` / `table_caption`(list[str])。md 只把 HTML 渲染成表格文字内联、**不引用**裁切图，所以「md 里看不到表格图路径、表格变成了文字」是正常现象。
 
-> ✅ **表体提取（已实现）**：`parser/format_adapter.py` 从 `table_body` 取出表格 HTML，经 `_HTMLTableParser` + `_expand_spans` 解析为**矩形**二维表（展开 colspan/rowspan 防串列），随块落入 `body`，建树时挂到所属节点的 `tables[]`。
+> ✅ **表体提取（已实现）**：`parser/mineru.py` 的 `FormatAdapter` 从 `table_body` 取出表格 HTML，经 `_HTMLTableParser` + `_expand_spans` 解析为**矩形**二维表（展开 colspan/rowspan 防串列），随块落入 `body`，建树时挂到所属节点的 `tables[]`。
 
 ### Step 4 — 知识库构建（切分 →（reprs）→ 索引，单一入口）
 

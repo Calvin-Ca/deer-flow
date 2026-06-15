@@ -82,12 +82,12 @@ PDF（清单/计量规范）
 
 ### 2.1 解析（Parsing）
 
-- **工具与版本**：MinerU **3.2.0**（本地 venv）/ **3.2.1**（远程 API）；同输入产出 md 逐字一致。配套 mineru-vl-utils **1.0.2**。
+- **工具与版本**：MinerU **3.2.1**（远程 API）。配套 mineru-vl-utils **1.0.2**。
 - **处理的格式**：PDF（清单/计量规范）。版面/标题/表格/公式抽取。
-- **部署方式**：默认走**远程 API**（`172.19.2.2:8000`，常驻热服务，单页 ~1.8s）；`--local` 才本地 CLI。远程 API 每次重传整个 PDF，大 PDF 用分块脚本（80 页/块）。
+- **部署方式**：阶段0 **只走远程 MinerU API**（`172.19.2.2:8000`，常驻热服务，单页 ~1.8s，整本一次解析无本地 OOM，调用方零 GPU/MinerU 依赖）。本地 CLI 路径已移除（理由见下）。
 - ★ **已知问题与 workaround**：
   - **清单/计量/定额类 PDF 必须用 `hybrid-auto-engine`**：密集多列表格，默认 pipeline backend 会列错位。
-  - **本地 venv 的 vllm 当前损坏**：`vllm/_C.abi3.so: undefined symbol`，编译时链接的 libtorch 与 PyTorch 2.5.1+cu121 ABI 不匹配；`hybrid-auto-engine` 的 VLM 部分依赖 vllm-async-engine，vllm 一坏整个 hybrid fail。**修复前走远程 API（默认）**；修复方法是 `uv add` pin vllm 到匹配版本，**勿 `uv pip install`**。
+  - **为何只走远程 API（移除本地 CLI）**：本地 venv 的 vllm 损坏（`vllm/_C.abi3.so: undefined symbol`，编译链接的 libtorch 与 PyTorch 2.5.1+cu121 ABI 不匹配），而 `hybrid-auto-engine` 的 VLM 部分依赖 vllm-async-engine，vllm 一坏整个 hybrid fail；加之 API 主机资源充足、调用方无需本地 GPU——故阶段0 统一走远程 API，不再保留本地 CLI / 分块路径。
   - **mineru_api 输出目录误定位**（已修）：原从历史产物 rglob 取目录，改为从本次 ZIP namelist 取。
   - 表格解析：HTML 表格串由 `_HTMLTableParser` + `_expand_spans` 展开 colspan/rowspan 解析成矩形二维表（防串列）——清单/计量规范的大量计算规则在表格里，这步是算量取数的关键。
 
@@ -110,7 +110,7 @@ PDF（清单/计量规范）
   底线：带目录的规范 PDF 首选 toc；定额电子表（无目录、表格为主）走结构化
         入库（§3.3），不套 toc——切法可插拔，按数据形态选
   ```
-- **可插拔设计**：切分做成「基类 + factory 注册表」（`splitter/base.py` 的 `Splitter` 基类 + `splitter/factory.py` 的 `REGISTRY`/`create`），`profile.structure_strategy` 决定本次切法（缺省 `toc`）。换切法 = 换 splitter = 不同 profile = 隔离索引，可直接 ablation 对比召回。（parser / feature / index / retrieval 各层同构：base + factory，见各层 `factory.py` / `feature/pipeline.py` 的 REGISTRY。）
+- **可插拔设计**：切分做成「基类 + factory 注册表」（`splitter/base.py` 的 `Splitter` 基类 + `splitter/factory.py` 的 `REGISTRY`/`select`），`profile.structure_strategy` 决定本次切法（缺省 `toc`）。换切法 = 换 splitter = 不同 profile = 隔离索引，可直接 ablation 对比召回。（parser / feature / index / retrieval 各层同构：base + factory，见各层 `factory.py` / `feature/pipeline.py` 的 REGISTRY。）
 
 ### 2.3 元数据设计
 

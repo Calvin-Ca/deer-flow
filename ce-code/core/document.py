@@ -5,7 +5,7 @@
 （MinerU 等任意解析模型归一后的最小单位）。切分层（splitter/）吃 ``Document.blocks``
 建树，**不关心上游用的是哪种解析模型**——这是「多解析模型可插拔」的边界。
 
-Block 字段与 MinerU v1 适配产物对齐（见 parser/format_adapter.py）：纯版面/内容事实，
+Block 字段与 MinerU v1 适配产物对齐（见 parser/mineru.py 的 FormatAdapter）：纯版面/内容事实，
 **不含结构语义**（条文号 / 目录标签 / 树边在切分层算）。``text_level`` 为 None 即非标题。
 """
 from __future__ import annotations

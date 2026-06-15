@@ -21,19 +21,40 @@ from retrieval.dense_retriever import DenseRetriever
 from retrieval.rrf import expand_references, merge_results
 
 
-def rerank(query: str, results: list[dict], top_k: int) -> list[dict]:
-    """cross-encoder 精排（承旧 engine.rerank）；不可用时 fallback 到 RRF 顺序。"""
+# cross-encoder rerank 模型进程内单例（DEV §1：rerank 模型只在检索栈加载一份，唯一 owner）。
+# 旧 engine.rerank 每次检索都 new FlagReranker（重复加载模型权重，极慢）——本轮收口为单例。
+_RERANKER = None
+_RERANKER_FAILED = False
+
+
+def _get_reranker():
+    """惰性加载并缓存 rerank 模型（进程内一份）；加载失败缓存为「不可用」，后续不再重试。"""
+    global _RERANKER, _RERANKER_FAILED
+    if _RERANKER is not None or _RERANKER_FAILED:
+        return _RERANKER
     from config import RERANK_MODEL
     try:
         from FlagEmbedding import FlagReranker
-        reranker = FlagReranker(RERANK_MODEL, use_fp16=True)
+        _RERANKER = FlagReranker(RERANK_MODEL, use_fp16=True)
+    except Exception as e:
+        print(f"[retrieval] Rerank 模型加载失败（{e}），后续统一 fallback 到 RRF 排序")
+        _RERANKER_FAILED = True
+    return _RERANKER
+
+
+def rerank(query: str, results: list[dict], top_k: int) -> list[dict]:
+    """cross-encoder 精排（进程内单例模型）；不可用时 fallback 到 RRF 顺序。"""
+    reranker = _get_reranker()
+    if reranker is None:
+        return results[:top_k]
+    try:
         pairs = [[query, r.get("content", "")] for r in results]
         scores = reranker.compute_score(pairs, normalize=True)
         for item, score in zip(results, scores):
             item["_rerank_score"] = float(score)
         results_sorted = sorted(results, key=lambda x: x.get("_rerank_score", 0), reverse=True)
     except Exception as e:
-        print(f"[retrieval] Rerank 不可用（{e}），使用 RRF 排序")
+        print(f"[retrieval] Rerank 打分失败（{e}），使用 RRF 排序")
         results_sorted = results
     return results_sorted[:top_k]
 
@@ -68,8 +89,7 @@ class HybridRetriever(Retriever):
         vector_rows = self.dense.search_rows(query.text, fanout)
 
         merged = merge_results(bm25_rows, vector_rows)
-        metadata = self.bm25._metadata  # bm25.search_rows 已惰性加载 metadata
-        expanded = expand_references(merged, metadata)
+        expanded = expand_references(merged, self.bm25.metadata)  # 公开访问器（已惰性加载）
 
         if query.skip_rerank:
             final = expanded[:top_k]

@@ -96,7 +96,7 @@ PDF（清单/计量规范）
 > 切分策略直接影响检索效果，是最重要的决策点之一，务必记录依据。
 > **本项目语境下"切分"= 建节点树**，而非传统的定长切块——见决策依据。
 
-- **切分策略**：**以 PDF 文档原生目录（TOC）为骨架还原成节点树**（`splitter/toc.py` 的 `TocSplitter`，当前默认/唯一）。目录条目先**物化为骨架节点**（恒存在），正文块再按条文号号段 / 目录归属挂载到骨架下。**建树与建条解耦（2026-06-14）**：阶段 1 只产**目录镜像树**——目录没列的更细标题（条 5.3.4 / 款 / 表）**不建节点**，其正文 + 原始块（`provenance.block_idx`）并入所属目录叶节点；条级切分下沉到 **Stage 2 ClauseSplitter**（`profile.clause_strategy`，缺省 `none`·**接口预留未实装**），因条款不一定有编号、可能整个是表，切分规则**按规范配置**，届时据 block_idx 回查原块细拆、只往树里加子节点。过渡期：条级 `referenced_by`/引用扩展暂落空（节级正常），Stage 2 落地恢复。**层级用 `node_level`（还原出的目录树深度，1-base）表达，不绑定固定档名**（2026-06-14：不再假定文档一定有"章/节/条"，造价定额表等套不上）；`node_type` 改为与深度正交的**种类**（`container` 容器 / `leaf` 叶检索单元，建树末纯按"有无子节点"判定；"是否附录"等语义按需读 node_path 前缀，不进 node_type）。**深度自适应**（目录列到哪深就到哪），中间层级缺节点时 node_level 按真实父链算。无目录页时退化为复用 MinerU 标题层级 best-effort。
+- **切分策略**：**以 PDF 文档原生目录（TOC）为骨架还原成节点树**（`splitter/toc_splitter.py` 的 `TocSplitter`，当前默认/唯一）。目录条目先**物化为骨架节点**（恒存在），正文块再按条文号号段 / 目录归属挂载到骨架下。**建树与建条解耦（2026-06-14）**：阶段 1 只产**目录镜像树**——目录没列的更细标题（条 5.3.4 / 款 / 表）**不建节点**，其正文 + 原始块（`provenance.block_idx`）并入所属目录叶节点；条级切分下沉到 **Stage 2 ClauseSplitter**（`profile.clause_strategy`，缺省 `none`·**接口预留未实装**），因条款不一定有编号、可能整个是表，切分规则**按规范配置**，届时据 block_idx 回查原块细拆、只往树里加子节点。过渡期：条级 `referenced_by`/引用扩展暂落空（节级正常），Stage 2 落地恢复。**层级用 `node_level`（还原出的目录树深度，1-base）表达，不绑定固定档名**（2026-06-14：不再假定文档一定有"章/节/条"，造价定额表等套不上）；`node_type` 改为与深度正交的**种类**（`container` 容器 / `leaf` 叶检索单元，建树末纯按"有无子节点"判定；"是否附录"等语义按需读 node_path 前缀，不进 node_type）。**深度自适应**（目录列到哪深就到哪），中间层级缺节点时 node_level 按真实父链算。无目录页时退化为复用 MinerU 标题层级 best-effort。
 - **chunk 大小 / overlap**：**不适用固定长度**。粒度是索引期在树上选的视图（`view(tree, level)`），当前仅 `clause` 层已实现；small-to-big 检索期靠 `parent_id` 上探回补整条/整节上下文。
 - **决策依据**：
   ```
@@ -110,16 +110,16 @@ PDF（清单/计量规范）
   底线：带目录的规范 PDF 首选 toc；定额电子表（无目录、表格为主）走结构化
         入库（§3.3），不套 toc——切法可插拔，按数据形态选
   ```
-- **可插拔设计**：切分做成注册表（`splitter/base.py` 的 `Splitter` 基类 + `splitter/__init__.py` 的 `REGISTRY`），`parse_profile.structure_strategy` 决定本次切法（缺省 `toc`）。换切法 = 换 splitter = 不同 profile = 隔离索引，可直接 ablation 对比召回。
+- **可插拔设计**：切分做成「基类 + factory 注册表」（`splitter/base.py` 的 `Splitter` 基类 + `splitter/factory.py` 的 `REGISTRY`/`create`），`profile.structure_strategy` 决定本次切法（缺省 `toc`）。换切法 = 换 splitter = 不同 profile = 隔离索引，可直接 ablation 对比召回。（parser / feature / index / retrieval 各层同构：base + factory，见各层 `factory.py` / `feature/pipeline.py` 的 REGISTRY。）
 
 ### 2.3 元数据设计
 
 > 每个节点携带的元数据，直接支撑 PRD 的可溯源红线与检索过滤。
-> 完整 schema 见 `core/schema.py` 的 `Node`。
+> 完整 schema 见 `core/chunk.py` 的 `Chunk`（旧 `core/schema.py` 的 `Node` TypedDict 已废，重构为 `@dataclass`）。
 
 | 字段 | 类型 | 用途 | 是否支撑业务规则 |
 |---|---|---|---|
-| `node_id` | string | 稳定 id：条文号有则用（`GB50500#1.0.3`），无则标题路径 | 去重键 / 引用图锚点 |
+| `node_path` | string | 节点稳定 id（`chunk_id ≡ node_path`）：条文号路径（`1.0.3`），无编号则标题路径（`附录E`/`前言`） | 去重键 / 引用图锚点 / `/clause` 直取（旧 `node_id` 已废，全层以 node_path 为键） |
 | `doc_id` | string | **知识库内部稳定标识**（`GB-50500`/`SZ-SJG171`），入库/检索/溯源以此为准，与 `standard_id` 解耦 | 标准编号可改版 / 待补号时锚点不变（PRD §4） |
 | `standard_id` | string | 标准编号（`GB/T 50500-2024`/`SJG 171-2024`，可能"待补号"） | 支撑多规范召回、溯源展示 |
 | `region` | string | 适用地区（`深圳`） | **地区强隔离的硬过滤键**（深圳 ≠ 省内其它城市） |
@@ -127,13 +127,13 @@ PDF（清单/计量规范）
 | `effective_priority` | int (1~4) | **效力优先级**：深圳本地=1（最高）→ 国标=4（最低，越具体越优先） | **口径冲突时取值排序**（PRD §4 元数据治理） |
 | `is_dynamic` / `update_freq` | bool / string | 是否动态数据 + 更新频率（信息价月更） | 动态数据走独立更新管道，不参与口径优先级排序 |
 | `version` / `effective_date` / `status` | string | 节点级版本 / 实施日期 / 时效状态 | 库内恒为现行有效（入库即校验）；`status` 仅作溯源标注，**检索侧不做废止过滤** |
-| `node_path` | string | 条文号路径（`1.0.3`） | 支撑溯源、`/clause` 直取 |
+| `level` | int | 还原出的目录树深度（1-base，根=1；行字段名 `node_level`） | 溯源展示、层级语义 |
 | `parent_id` / `children_ids` | string / list | 树形结构 | **粒度视图 + small-to-big 全靠它** |
 | `ancestor_titles` / `ancestor_paths` | list | 祖先链（建树时一次算定） | 支撑溯源、context_aug 拼接 |
 | `references` / `referenced_by` | list | 引用边分型（strong/weak/exclude/cross_standard）+ 反向边 | **引用图扩展核心**（GraphRAG 底座） |
 | `provenance` | dict | 回指 MinerU 原始块（source_file / block_idx / page） | **可溯源底线（PRD 核心原则）** |
 | `node_path_source` / `node_path_confidence` | string / float | 路径来源审计（number/text_level/inherited/synthesized） | 低置信进抽查 |
-| `reprs` | dict | 多表征投影（见 2.4 + §4） | 多通道召回 |
+| `features` | dict | 多表征投影（`dict[kind, ChunkFeature]`，见 2.4 + §4；旧 `reprs` 已改名） | 多通道召回 |
 
 > **可溯源是底线**：任何节点都必须能回指其 MinerU 原始块（`provenance.block_idx → data/parsed/` 不可变缓存）。原始内容只读、不可变，派生物只持轻量指针。**不得因任何检索/表征优化被牺牲。**
 
@@ -142,7 +142,7 @@ PDF（清单/计量规范）
 - **模型与版本**：**当前用 bge-large-zh-v1.5**（POC 已部署，沿用至清单/计量规范入库）。
 - **维度**：dim=1024，max_len=512。
 - **部署位置**：服务器 `http://localhost:8097`，model_id `/model`，OpenAI 兼容接口。
-- **向量归属约定**：表征层（`reprs/`）只产**待嵌入文本**（`dense` = title+content，`context_aug` = 祖先链‖正文）；**向量由索引期 `retrieval/indexer` 用 embedding 模型统一算**——模型唯一 owner 在检索栈，表征层不加载模型（故仍属"免费"表征）。
+- **向量归属约定**：表征层（`feature/`，旧 `reprs/`）只产**待嵌入文本**（`dense` = title+content，`context_aug` = 祖先链‖正文）；**向量由索引期 `index/`（`index/vector_index.py`，旧 `retrieval/indexer`）用 embedding 模型统一算**——模型唯一 owner 在检索栈，表征层不加载模型（故仍属"免费"表征）。
 - ★ **选型理由 / 待评估**：
   ```
   现状：沿用 bge-large-zh-v1.5（中文通用召回稳定，POC 已验证）
@@ -160,13 +160,13 @@ PDF（清单/计量规范）
 
 - **选型**：Milvus（`http://localhost:19530`，MilvusClient API）。
 - **client 版本**：pymilvus **3.0.0**（MilvusClient API；ORM-style 已弃用）。
-- **Collection / 索引结构**：按 `{standard}/{profile}` 隔离，collection 名由 `config.collection_name(store_dir.name)` 推断（`tools.eval`/`server`/`indexer` 共享同一推断，零改动对齐）。⚠️ 多规范并存时 profile 名须含规范区分，避免 collection 相撞。
-- **输出字段**（`engine.MILVUS_OUTPUT_FIELDS`）：含 `node_id` / `parent_id`（small-to-big 锚点）/ `granularity` / `references_to` 等。
+- **Collection / 索引结构**：按 `{standard}/{profile}` 隔离，collection 名由 `config.collection_name(store_dir.name)` 推断（`tools/eval.py`、`service/knowledge_api.py`、`index/` 共享同一推断，零改动对齐）。⚠️ 多规范并存时 profile 名须含规范区分，避免 collection 相撞。
+- **索引行字段**（`index/manager.py` 的 `chunk_to_row`，Milvus/BM25/metadata 共用）：含 `node_path`（去重键 / 直取锚点）/ `parent_id`（small-to-big 锚点）/ `granularity` / `references_to` 等（字段名逐字保持旧契约，`ce-services` 经 /search 读这些名）。
 - ★ **索引结构选型**：
   ```
-  决策：节点级版本/效力字段（status/version）+ node_id 建 INVERTED 索引
+  决策：节点级版本/效力字段（status/version）+ node_path 建 INVERTED 索引
   依据：元数据过滤优先于向量排序（先按 standard/version/region filter 再 rank），
-        故过滤字段需可高效命中；node_id 作去重键与直取锚点亦需 INVERTED
+        故过滤字段需可高效命中；node_path 作去重键与直取锚点亦需 INVERTED
   备注：向量索引类型（HNSW vs IVF）按数据量与延迟权衡，规模尚小，
         单规范约百~千条量级（GB/T 50500-2024 ~561 条），延迟非瓶颈
   ```
@@ -174,7 +174,7 @@ PDF（清单/计量规范）
 ### 3.2 关键词索引
 
 - **方案**：BM25（rank-bm25 库）。
-- **语料来源**：`reprs.sparse` 表征 = node_path + title + content 词项拼接。
+- **语料来源**：`feature` 层的 `sparse` 表征（`feature/bm25.py`，旧 `reprs.sparse`）= node_path + title + content 词项拼接。
 - **用途**：补充向量检索的**精确匹配能力**——条文号（"1.0.3"）/ 清单编码 / 专业术语精确召回，这是纯向量召回的短板。
 
 ### 3.3 关系/图谱 + 结构化造价数据（组价核心，待建）
@@ -182,7 +182,7 @@ PDF（清单/计量规范）
 > 规范类知识解决"算什么/如何算"；组价取数靠结构化造价数据 + 关系约束，**能算的不交给模型猜**（PRD 核心原则）。关系库为单一事实来源，KG 由其派生，向量库为语义补充。
 > **实现顺序**：关系库建表 → 数据入库 → 跑通取数路径 → 加向量召回 → 加 KG 多跳。
 
-- **引用图（规范类，已实现）**：不另起图库，引用边作为**节点固有事实**落 `nodes.json`（`references` 分型 + `referenced_by` 反向边，建树期 `splitter/references.py` 一次算定）。检索期沿 strong 边强制扩展。引用图即规范的知识图谱、GraphRAG 底座。
+- **引用图（规范类，已实现）**：不另起图库，引用边作为**节点固有事实**落 `chunks.json`（旧 `nodes.json`；`references` 分型 + `referenced_by` 反向边，建树期 `splitter/references.py` 一次算定）。检索期沿 strong 边强制扩展。引用图即规范的知识图谱、GraphRAG 底座。
 - **关系库 PostgreSQL（单一事实源）**：`bill_spec`（清单规范，9 位统一编码 + calc_rule + feature_schema + spec_version）/ `quota_item`（定额子目，region + base_price + 人材机费；MVP 取**深圳市建筑工程消耗量标准 SJG 171-2024**，非省定额）/ `quota_resource`（定额→资源含量）/ `resource` + `resource_price`（资源价格，带 `effective_period` 时效）/ `hist_bill`（历史工程，脱敏 + 质量标注）。**所有表强制 `version` + `region` + `effective_priority`**（深圳本地=1）。**动态数据（信息价月更，`SZ-JGXX-PRICE`）走独立更新管道**：`resource_price` 带 `effective_period`，按 region+时效取价，不参与口径优先级排序。DDL 详见 `cost_agent_tech.md`。
 - **知识图谱**：**P0 用 PG 关联表模拟**（`component_bill_map` MAPS_TO / `bill_quota_map` APPLIES / `quota_resource_detail` CONSUMES），数据量小时 PG join 够用，**P1 再迁 Neo4j** 评估多跳遍历性能。
 - **造价向量库**：新建 `bill_spec_kb` collection（评估 BGE-M3 dense+sparse），复用同一 Milvus 实例；向量化内容 = 清单条目名称 + 特征描述 + 工程做法说明。
@@ -195,7 +195,7 @@ PDF（清单/计量规范）
 
 ## 4. 检索策略 ★
 
-> `retrieval/engine.py` 实现混合检索，`retrieval/config.py` 管权重与超参。
+> `retrieval/hybrid_retriever.py` 实现混合检索（BM25 + 向量 + RRF + 引用扩展 + rerank；旧 `retrieval/engine.py`），单路 `bm25_retriever.py` / `dense_retriever.py`，RRF 与引用扩展纯函数在 `retrieval/rrf.py`；权重与超参（依赖地址 / 模型 / top_k）在根 `config.py`（旧 `retrieval/config.py`）。
 
 ### 4.1 召回方式
 
@@ -205,7 +205,7 @@ PDF（清单/计量规范）
     → BM25（条文号/清单编码/术语精确匹配）
     → 向量（bge-large-zh-v1.5 语义召回）
     → 元数据过滤（region 硬隔离 + standard/discipline，先圈范围再排序）
-    → RRF 合并去重（按 node_id）
+    → RRF 合并去重（按 node_path）
     → 引用图扩展（strong 边强制拉取；weak 可选；exclude 禁止扩展）
     → rerank（cross-encoder 精排）
     → 口径冲突按 effective_priority 取值（深圳本地=1 优先于国标=4；动态价格不参与）
@@ -239,12 +239,12 @@ PDF（清单/计量规范）
 |---|---|
 | 可溯源 | 每个返回节点带 `provenance`（source_file/block_idx/page）回指 MinerU 原始块；条款/页码出处随结果返回 |
 | 无结果不能编 | 向量未命中 → BM25 兜底；仍无 → 返回父级章节而非杜撰 |
-| 引用扩展默认开启 | 命中节点的 `references` 中 `type=strong/cross_standard` 边无条件拉取（`engine.expand_references`），weak 可选，exclude 禁止正向扩展 |
+| 引用扩展默认开启 | 命中节点的 `references` 中 `type=strong/cross_standard` 边无条件拉取（`retrieval/rrf.py` 的 `expand_references`），weak 可选，exclude 禁止正向扩展 |
 | 元数据过滤优先于向量排序 | 先按 `region`(硬隔离)/`standard`/`discipline` filter 圈定范围，再在范围内 RRF/rerank |
 | 地区不串库 | `region` 为入库即标注的硬过滤键；查询声明地区 → 只召回同地区单元，跨地区单元（省内其它城市定额）零混入 |
 | 版本/时效 | 库内只保留现行有效单元（入库即校验，旧版本/废止不入库）；节点级 `status`/`version`/`effective_date` 仅作溯源标注，**检索侧不做废止/过渡期过滤** |
 | 口径冲突取值 | 同一类知识多源命中时按 `effective_priority`(1~4) 排序：深圳本地=1 优先于国标=4；动态价格走独立管道不参与 |
-| small-to-big 上探 | 细粒度命中后靠 `parent_id` 上探返回整条/整节（**去重键已切 node_id ✅，上探回补待做**） |
+| small-to-big 上探 | 细粒度命中后靠 `parent_id` 上探返回整条/整节（**去重键已切 node_path ✅，上探回补待做**） |
 | 能算的不交给模型猜 | 数值走业务层确定性公式；LLM 仅在检索 + KG 限定的候选内择优（清单匹配/组价取数） |
 
 ---
@@ -261,7 +261,7 @@ PDF（清单/计量规范）
   - 待建：清单/计量规范评测集；清单编码匹配 `match_gold.jsonl`（构件→编码标注，指标 Top-1 ≥ 85% / Top-3 ≥ 95%）。
   - 单条格式：`{ "query": "...", "expected": ["GB 50500-2024 1.0.3", ...], "intent": "clause_lookup" }`。金标由业务层参与定义（"做成我的任务，你必须捞出这些"）。
 - **评估工具**：自建脚本 `python -m tools.eval`。`--store-dir data/vector_store/<std>/<profile>`，每个 profile/intent 跑同一评测集，指标记一张表对比。**一次只动一个变量。**
-- **判命中口径**：⚠️ **按包含关系判命中**——返回块**包含或等于**目标条即算命中（非严格 `node_id` 相等），否则只到结构/粗粒度的 profile 会被系统性低估，ablation 结论失真。clause 粒度下现有精确集合判命中与包含关系等价。
+- **判命中口径**：⚠️ **按包含关系判命中**——返回块**包含或等于**目标条即算命中（非严格 `node_path` 相等），否则只到结构/粗粒度的 profile 会被系统性低估，ablation 结论失真。clause 粒度下现有精确集合判命中与包含关系等价。
 
 ### 5.2 指标与目标
 
@@ -277,7 +277,7 @@ PDF（清单/计量规范）
 
 > **业务层端到端红线**（知识层需支撑，非自身指标）：编码 Top-1 ≥ 85%、组价准确率达标；红线内只建议不定稿，必须经 HITL 人工确认（在业务层）。
 
-> ⚠️ **当前护栏现状**：流水线后半段曾与 `nodes.json` 脱钩，`tools.eval` 一度打的是陈旧索引。**新树端到端可建索引、可被 eval 与基线对比** 是当前阻塞里程碑（见 `TODO.md`）。此步打通前"每步过护栏"的纪律无所附丽。
+> ⚠️ **当前护栏现状**：流水线后半段曾与 `chunks.json`（旧 `nodes.json`）脱钩，`tools/eval.py` 一度打的是陈旧索引。**新树端到端可建索引、可被 eval 与基线对比** 是当前阻塞里程碑（见 `TODO.md`）。此步打通前"每步过护栏"的纪律无所附丽。
 
 ---
 
@@ -317,10 +317,10 @@ PDF（清单/计量规范）
 | 粒度模型 | 索引期在树上选视图（`view`），非切树 | 三件正交（结构/表征/粒度），换粒度只重跑阶段 3，不重跑最贵的 MinerU |
 | embedding 模型 | 现 bge-large-zh-v1.5；造价语料评估 BGE-M3 | POC 已验证沿用；造价术语分布不同，BGE-M3 混检待评估 |
 | 向量索引归属 | 向量由索引期 `indexer` 统一算，表征层只产待嵌入文本 | embedding 模型唯一 owner 在检索栈，表征层不加载模型 |
-| 引用图存储 | 落 `nodes.json` 作固有事实，不另起图库 | 引用图即规范知识图谱/GraphRAG 底座，建树期一次算定 |
+| 引用图存储 | 落 `chunks.json` 作固有事实，不另起图库 | 引用图即规范知识图谱/GraphRAG 底座，建树期一次算定 |
 | 组价数据底座 | 关系库（PG）单一事实源 + KG 派生 + 向量补充 | 能算的不交给模型猜；清单↔定额多对多，纯向量不够，需关系约束 |
 | KG 落地 | P0 用 PG 关联表，P1 迁 Neo4j | 数据量小时 PG join 够用，先跑通取数路径再上图库 |
-| 判命中口径 | 按包含关系（非严格 node_id 相等） | 否则粗粒度 profile 被系统性低估，ablation 失真 |
+| 判命中口径 | 按包含关系（非严格 node_path 相等） | 否则粗粒度 profile 被系统性低估，ablation 失真 |
 | 可溯源 | 每节点 `provenance` 回指 MinerU 原始块，不可牺牲 | 改算法重派生/人工核对/PDF 高亮/出处可查全靠它（PRD 核心原则） |
 | 时效性 | 入库即校验，旧版本/废止不入库；检索侧不做废止过滤 | 库内恒现行有效，`status` 仅作溯源标注，省掉检索期过渡期/废止过滤复杂度 |
 | 地区隔离 | `region` 作硬过滤键，只收只召深圳本地 | 深圳有独立 2024 消耗量标准，最易串库；隔离失败=召回错误（PRD §5 红线） |

@@ -48,6 +48,13 @@ class Bm25Retriever(Retriever):
             self._bm25, self._node_paths = bm25_index.load(self.store_dir)
             self._metadata = metadata_index.load(self.store_dir)
 
+    @property
+    def metadata(self) -> list[dict]:
+        """已加载的 metadata 行（公开访问器，惰性加载）—— 供 hybrid 引用扩展复用，
+        避免外部碰私有 ``_metadata`` 与惰性加载副作用。"""
+        self.load()
+        return self._metadata
+
     def search_rows(self, text: str, top_k: int) -> list[dict]:
         """返回索引行 dict（供 hybrid RRF 合并）。"""
         self.load()

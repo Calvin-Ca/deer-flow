@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 # 服务器一次性环境准备脚本。
-# 在远程 Linux GPU 服务器上执行：bash pipeline/setup_server.sh
+# 在远程 Linux 服务器上执行：bash tools/setup_server.sh
 #
 # 前置：
 #   - 服务器已有 Python 3.12+（用 uv 自动管理也行）
-#   - 服务器已有 CUDA 11.8 / 12.x（具体看 MinerU 当前版本要求）
 #   - 服务器已配好 GitHub SSH key
+#
+# 注：阶段0 PDF 解析只调远程 MinerU API（见 DEV.md），本机不装 MinerU CLI。
 
 set -euo pipefail
 
@@ -25,34 +26,11 @@ echo "[setup] uv 版本：$(uv --version)"
 echo "[setup] 创建 .venv 并同步 pyproject.toml 依赖..."
 uv sync
 
-# ---------- 3. 装 MinerU ----------
-# MinerU 是 PDF 解析的核心。版本名/包名近 1 年内变化过两次，
-# 这里给两条候选命令，先试新的（mineru），失败再试旧的（magic-pdf）。
-# 装完后跑一次 mineru --help 验证。
-echo "[setup] 安装 MinerU..."
-if uv pip install -U "mineru[core]" 2>/dev/null; then
-  echo "[setup]   → 使用新版包名 mineru"
-elif uv pip install -U "magic-pdf[full]" 2>/dev/null; then
-  echo "[setup]   → 使用旧版包名 magic-pdf"
-else
-  echo "[setup] ✗ MinerU 安装失败，请手动确认当前包名："
-  echo "         https://github.com/opendatalab/MinerU"
-  exit 1
-fi
-
-# ---------- 4. 验证 ----------
+# ---------- 3. 验证 ----------
 echo "[setup] 验证 Python 环境..."
 uv run python -c "import sys; print(f'Python {sys.version}')"
-
-# 验证 GPU 可见
-uv run python -c "
-import subprocess
-r = subprocess.run(['nvidia-smi', '-L'], capture_output=True, text=True)
-print('--- GPU ---')
-print(r.stdout if r.returncode == 0 else 'nvidia-smi 不可用（无 GPU 或未装驱动）')
-" || true
 
 echo
 echo "[setup] ✓ 完成。下一步："
 echo "  1. 把规范 PDF 放到 data/raw/"
-echo "  2. 跑：uv run python parse.py single --pdf data/raw/<your.pdf>"
+echo "  2. 跑：uv run python -m parser mineru --pdf data/raw/<your.pdf>"

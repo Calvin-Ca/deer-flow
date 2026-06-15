@@ -4,8 +4,15 @@
 选）。当前/默认成员 ``toc``（``TocSplitter``，基于原生目录的多层级切分，核心设计原则 1）；
 ``semantic`` / ``tree`` 为占位扩展点。
 
-内部件（随 TOC 法内聚，可独立单测）：``catalog_labeler``（目录打标）/ ``tree_builder``（建树 +
-固有事实）/ ``references``（引用图分型）。
+TOC 法的全部内部实现（目录打标 / 建树 + 固有事实 / 引用图分型）2026-06-15 已合并进单一
+``toc_splitter`` 模块（按 §1 引用 / §2 目录打标 / §3 建树 / §4 切分策略 分段），外部无消费方、
+随 TOC 法内聚，纯函数仍可独立单测（见 ``tests/test_splitter_pure.py``）。
+
+启动（与 parser 同构·registry 驱动）：包级入口 ``__main__.py`` 遍历注册表，把声明了 ``run_cli``
+的切法挂成 ``python -m splitter <切法名>``（如 ``python -m splitter toc --input … --subsplit number``）；
+占位切法无 ``run_cli`` → 不出现在 CLI。切分只到结构层（出 chunks.json / structure.json），不碰
+表征 / 索引（那是 ``service/build_service.py`` 的事）。``run_cli`` 是切法私有能力（不进 Splitter ABC，
+鸭子类型），与 ``parser`` 层的 ``run_cli`` 约定一致。
 """
 from __future__ import annotations
 

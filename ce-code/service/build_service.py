@@ -78,7 +78,8 @@ def run_build(
     spl = splitter_factory.select(profile.structure_strategy)
     console.print(f"[bold cyan]切分[/bold cyan]（strategy={profile.structure_strategy}）→ "
                   f"{structured_out / 'chunks.json'}")
-    result = spl.split(document, profile=profile)
+    result = spl.split(document, max_depth=profile.toc_max_depth,
+                       subsplit=profile.subsplit)
     chunks = result.chunks
     if result.debug_blocks is not None:
         _write_json(result.debug_blocks, structured_out / "structure.json")
@@ -123,6 +124,11 @@ def run_build(
               help="解析模型（parser/ factory 键；缺省 mineru）。")
 @click.option("--structure-strategy", default="toc", show_default=True,
               help="切分策略（splitter/ factory 键；缺省 toc=原生目录多层级）。")
+@click.option("--toc-max-depth", type=int, default=None,
+              help="切到第几级目录（号段层级，1=章/2=节/3=条…）；不传=全目录深度。")
+@click.option("--subsplit", type=click.Choice(["none", "number"]),
+              default="none", show_default=True,
+              help="目录层下按编号细分：none=镜像目录不细分 / number=按编号号段再切出更细的编号子节点。")
 @click.option("--index-granularity", type=click.Choice(["section", "clause", "paragraph"]),
               default="clause", show_default=True, help="索引粒度视图（view 选哪层 emit；当前仅 clause）。")
 @click.option("--structured-dir", type=click.Path(file_okay=False, path_type=Path),
@@ -138,7 +144,8 @@ def run_build(
 @click.option("--preview", is_flag=True, help="只打印前 20 条节点，不写文件。")
 def main(
     input_path: Path, standard_id: str, profile_name: str, terminal_stage: str,
-    parser_strategy: str, structure_strategy: str, index_granularity: str,
+    parser_strategy: str, structure_strategy: str, toc_max_depth: int | None,
+    subsplit: str, index_granularity: str,
     structured_dir: Path, store_dir: Path | None, milvus_host: str, milvus_port: int,
     embed_url: str, embed_model_id: str, batch_size: int, bm25_only: bool, preview: bool,
 ) -> None:
@@ -146,6 +153,7 @@ def main(
     profile = ParseProfile(
         name=profile_name, terminal_stage=terminal_stage,
         parser_strategy=parser_strategy, structure_strategy=structure_strategy,
+        toc_max_depth=toc_max_depth, subsplit=subsplit,
         index_granularity=index_granularity,
     )
 
@@ -156,7 +164,8 @@ def main(
             items = json.load(f)
         document = parser_factory.select(profile.parser_strategy).adapt(
             items, standard_id=sid, source_file=input_path.name)
-        result = splitter_factory.select(profile.structure_strategy).split(document, profile=profile)
+        result = splitter_factory.select(profile.structure_strategy).split(
+            document, max_depth=profile.toc_max_depth, subsplit=profile.subsplit)
         chunks = result.chunks
         n_blk = len(result.debug_blocks) if result.debug_blocks is not None else 0
         console.print(f"[green]✓ 切分（{profile.structure_strategy}）：{n_blk} 块 → {len(chunks)} 个节点[/green]")

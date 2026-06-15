@@ -3,9 +3,11 @@
 覆盖 splitter 包里**无状态纯函数**（建树/引用/目录解析的解析逻辑），它们是 node_path
 识别、引用图分型、目录条目解析的核心，正则边界多、最易回归：
 
-  - tree_builder.classify_heading / _parent_path / _resolve_parent  —— 条款号 → 路径/父链
-  - references.extract_references                                   —— 散文 → 分型引用边（含精度闸）
-  - catalog_labeler._split_catalog_line / _is_catalog_list / _norm —— 目录条目解析
+  - toc_splitter.classify_heading / _parent_path / _resolve_parent —— 条款号 → 路径/父链
+  - toc_splitter.extract_references                                —— 散文 → 分型引用边（含精度闸）
+  - toc_splitter._split_catalog_line / _is_catalog_list / _norm   —— 目录条目解析
+
+  （§1 引用 / §2 目录打标 / §3 建树 三段 2026-06-15 已合并入单一 toc_splitter.py）
 
 运行（从 ce-code 根，单行）：
   uv run python tests/test_splitter_pure.py        # 独立跑（无需 pytest，stdlib assert）
@@ -13,9 +15,11 @@
 """
 from __future__ import annotations
 
-from splitter.tree_builder import classify_heading, _parent_path, _resolve_parent
-from splitter import references
-from splitter.catalog_labeler import _split_catalog_line, _is_catalog_list, _norm
+from splitter import toc_splitter as references  # §1 引用纯函数沿用 references.* 命名空间访问
+from splitter.toc_splitter import (
+    classify_heading, _parent_path, _resolve_parent, _path_depth,  # §3 建树纯函数
+    _split_catalog_line, _is_catalog_list, _norm,                 # §2 目录解析纯函数
+)
 
 
 # ── classify_heading：标题文字 → node_path / 来源 / 置信 ──────────────────────────
@@ -62,6 +66,17 @@ def test_parent_path():
     assert _parent_path("E.1") == "附录E"
     assert _parent_path("附录E") is None
     assert _parent_path("前言") is None
+
+
+def test_path_depth():
+    """号段层级（max_depth 切分深度闸用）：1=章 / 2=节 / 3=条；附录与无编号标题亦正确。"""
+    assert _path_depth("5") == 1
+    assert _path_depth("5.3") == 2
+    assert _path_depth("5.3.4") == 3
+    assert _path_depth("附录E") == 1
+    assert _path_depth("E.1") == 2
+    assert _path_depth("E.1.1") == 3
+    assert _path_depth("前言") == 1  # 无编号标题 = 顶层
 
 
 def test_resolve_parent_skips_missing_levels():

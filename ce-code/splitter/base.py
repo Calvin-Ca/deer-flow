@@ -20,7 +20,6 @@ from dataclasses import dataclass, field
 
 from core.chunk import Chunk
 from core.document import Document
-from core.profile import ParseProfile
 
 
 @dataclass
@@ -42,18 +41,28 @@ class Splitter(ABC):
 
     子类约定：
         类属性 ``name`` (str)：策略名，注册表键（= profile.structure_strategy 取值）。
-        方法 ``split(document, *, profile)``：产 SplitResult。
+        方法 ``split(document, *, max_depth, subsplit)``：产 SplitResult。
+
+    **切分深度 vs 索引粒度（勿混）**：``max_depth`` / ``subsplit`` 是**切分期**参数，决定树里
+    **存在到哪一层**（结构）；索引期的 ``index_granularity``（``view(chunks, granularity)``）则在
+    已建好的树上**选哪层 emit**（视图）。二者互补：先用 max_depth/subsplit 决定建多深，再用粒度
+    视图选取其中一层入索引——换切分深度只重跑切分，换粒度只重跑索引。
     """
 
     name: str
 
     @abstractmethod
-    def split(self, document: Document, *, profile: ParseProfile) -> SplitResult:
+    def split(self, document: Document, *, max_depth: int | None = None,
+              subsplit: str = "none") -> SplitResult:
         """把 Document 切分成 Chunk 树结构。
 
         参数：
             document (Document): 解析层产物（统一元素流；含 standard_id / source_file / blocks）。
-            profile (ParseProfile): 解析配置（切法可按需读其字段）。
+            max_depth (int | None): 切分深度上限（按 node_path 号段层级，1=章/2=节/3=条…）；超过
+                该层级的目录条目/标题不单独建节点，正文并入最近祖先。None=不限（全目录深度）。
+            subsplit (str): 目录层**之下**按编号细分的策略——"none"（不细分，树严格镜像目录）/
+                "number"（按编号号段再切出更细的编号子节点，节/条/款/项皆可，不专指条）。
+                子类可只支持其中部分取值并校验。
         返回：
             SplitResult: chunks（Chunk 列表）+ debug_blocks（可选中间产物）。
         """

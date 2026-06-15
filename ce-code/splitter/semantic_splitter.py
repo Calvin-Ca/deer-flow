@@ -7,7 +7,6 @@
 from __future__ import annotations
 
 from core.document import Document
-from core.profile import ParseProfile
 from splitter.base import Splitter, SplitResult
 
 
@@ -16,7 +15,8 @@ class SemanticSplitter(Splitter):
 
     name = "semantic"
 
-    def split(self, document: Document, *, profile: ParseProfile) -> SplitResult:
+    def split(self, document: Document, *, max_depth: int | None = None,
+              subsplit: str = "none") -> SplitResult:
         raise NotImplementedError(
             "SemanticSplitter 未实装（占位）。当前仅 toc 可用；实装时按语义边界产 list[Chunk]。"
         )

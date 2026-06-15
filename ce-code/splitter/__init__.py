@@ -9,10 +9,9 @@
 """
 from __future__ import annotations
 
+from splitter import factory  # import 即触发切法注册，并暴露 splitter.factory
 from splitter.base import Splitter, SplitResult
-from splitter.factory import DEFAULT_STRATEGY, REGISTRY, create, register
 
-# 兼容别名：旧调用方用 splitter.get(name)
-get = create
-
-__all__ = ["Splitter", "SplitResult", "create", "get", "register", "REGISTRY", "DEFAULT_STRATEGY"]
+# 取切法走工厂：splitter.factory.select(profile.structure_strategy)（不在包级 re-export select——
+# 「选切法」是工厂的职责，调用方显式走 factory，与 parser 层一致）。
+__all__ = ["Splitter", "SplitResult", "factory"]

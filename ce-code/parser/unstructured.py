@@ -16,7 +16,7 @@ class UnstructuredParser(Parser):
 
     name = "unstructured"
 
-    def parse(self, raw: object, *, standard_id: str = "", source_file: str = "") -> Document:
+    def adapt(self, raw: object, *, standard_id: str = "", source_file: str = "") -> Document:
         raise NotImplementedError(
             "UnstructuredParser 未实装（占位）。当前仅 mineru 可用；接入时实现 raw → Document。"
         )

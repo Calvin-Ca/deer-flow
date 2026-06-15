@@ -1,6 +1,6 @@
 """切分层工厂 —— 按 ``profile.structure_strategy`` 取切分策略（可插拔注册表）。
 
-``REGISTRY`` 按 ``name`` 登记各 ``Splitter`` 实例，``create(name)`` 取用。新增切法 = new 一个
+``REGISTRY`` 按 ``name`` 登记各 ``Splitter`` 实例，``select(name)`` 取用。新增切法 = new 一个
 Splitter 子类并 ``register``，下游粒度/表征/检索零改动（不同 splitter = 不同 profile = 隔离索引，
 tools/eval 直接对比召回）。当前成员：toc（实装）、semantic / tree（占位）。
 """
@@ -23,8 +23,8 @@ def register(splitter: Splitter) -> None:
     REGISTRY[splitter.name] = splitter
 
 
-def create(name: str) -> Splitter:
-    """按名取切分策略；未注册则报错并列出可选项。"""
+def select(name: str) -> Splitter:
+    """按名从注册表取已登记的切分策略单例；未注册则报错并列出可选项。"""
     try:
         return REGISTRY[name]
     except KeyError:

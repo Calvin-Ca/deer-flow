@@ -1,6 +1,6 @@
 """解析层工厂 —— 按 ``profile.parser_strategy`` 取解析模型（可插拔注册表）。
 
-``REGISTRY`` 按 ``name`` 登记各 ``Parser`` 实例，``create(name)`` 取用。新增解析模型 = new 一个
+``REGISTRY`` 按 ``name`` 登记各 ``Parser`` 实例，``select(name)`` 取用。新增解析模型 = new 一个
 Parser 子类并 ``register``，下游切分/表征/索引/检索零改动。当前成员：mineru（实装）、
 unstructured（占位）。
 """
@@ -22,8 +22,8 @@ def register(parser: Parser) -> None:
     REGISTRY[parser.name] = parser
 
 
-def create(name: str) -> Parser:
-    """按名取解析模型；未注册则报错并列出可选项。"""
+def select(name: str) -> Parser:
+    """按名从注册表取已登记的解析工具单例；未注册则报错并列出可选项。"""
     try:
         return REGISTRY[name]
     except KeyError:

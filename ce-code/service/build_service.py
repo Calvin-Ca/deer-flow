@@ -19,8 +19,8 @@ import click
 from rich.console import Console
 
 import feature
-import parser as parser_pkg
-import splitter
+from parser import factory as parser_factory
+from splitter import factory as splitter_factory
 from config import collection_name as build_collection_name
 from core.profile import ParseProfile
 from index import build_index, view
@@ -68,14 +68,14 @@ def run_build(
     # ── 阶段 0→1：解析成 Document ──
     with open(input_path, encoding="utf-8") as f:
         items = json.load(f)
-    document = parser_pkg.create(profile.parser_strategy).parse(
+    document = parser_factory.select(profile.parser_strategy).adapt(
         items, standard_id=standard_id, source_file=source_file)
     console.print(f"共 {len(document.blocks)} 个原始元素（{profile.parser_strategy} 解析）")
 
     # ── 阶段 1：切分建树 ──
     structured_out = structured_dir / _safe(standard_id) / profile.name
     structured_out.mkdir(parents=True, exist_ok=True)
-    spl = splitter.create(profile.structure_strategy)
+    spl = splitter_factory.select(profile.structure_strategy)
     console.print(f"[bold cyan]切分[/bold cyan]（strategy={profile.structure_strategy}）→ "
                   f"{structured_out / 'chunks.json'}")
     result = spl.split(document, profile=profile)
@@ -154,9 +154,9 @@ def main(
         sid = standard_id or base
         with open(input_path, encoding="utf-8") as f:
             items = json.load(f)
-        document = parser_pkg.create(profile.parser_strategy).parse(
+        document = parser_factory.select(profile.parser_strategy).adapt(
             items, standard_id=sid, source_file=input_path.name)
-        result = splitter.create(profile.structure_strategy).split(document, profile=profile)
+        result = splitter_factory.select(profile.structure_strategy).split(document, profile=profile)
         chunks = result.chunks
         n_blk = len(result.debug_blocks) if result.debug_blocks is not None else 0
         console.print(f"[green]✓ 切分（{profile.structure_strategy}）：{n_blk} 块 → {len(chunks)} 个节点[/green]")

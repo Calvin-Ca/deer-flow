@@ -76,7 +76,7 @@ MinerU 解析 + 条款树提取 + 质量审核，在 GB 50378-2006 和 GB 50016 
 
 - **IR（core/）**：`document`(Document/Block) / `chunk`(Chunk/Reference/Provenance) / `feature`(ChunkFeature) / `query`(RetrievalQuery) / `retrieval`(RetrievedChunk) / `context`(KnowledgeContext) / `profile`(ParseProfile)。`Chunk` 替代旧 `schema.Node`，**保留 `node_path` 作 id**（`chunk_id ≡ node_path`，旧 `node_id` 全层废除）。
 - **解析层 parser/**：`base`+`factory` + ★`mineru`(包 format_adapter，产 Document) + ◌`unstructured`。
-- **切分层 splitter/**：`base`(`split(Document)->list[Chunk]`)+`factory` + ★`toc_splitter`(承旧 toc，内部 `catalog_labeler`/`tree_builder`/`references` 保持 dict 管道、出口转 Chunk) + ◌`semantic`/`tree`。
+- **切分层 splitter/**：`base`(`split(Document)->SplitResult`)+`factory` + ★`toc_splitter`(承旧 toc) + ◌`semantic`/`tree`。（本批 toc 内部仍 `catalog_labeler`/`tree_builder`/`references` 三件分文件 + dict 管道、出口转 Chunk；三件 2026-06-15 后续合并入单一 `toc_splitter.py`，见下条。）
 - **表征层 feature/**（承旧 `reprs/`）：`base`+`pipeline` + ★`raw`/`bm25`(=旧 sparse)/`dense`/`context_aug` + ◌`keyword`/`graph`。
 - **索引层 index/**（拆旧 `indexer.py`+`view.py`）：★`manager`(view 选粒度 + **空骨架过滤** + 行准备 + 编排) / `bm25_index` / `vector_index` / `metadata_index` + ◌`graph_index`。
 - **检索层 retrieval/**（拆旧 `engine.py`）：`base` + ★`dense_retriever`/`bm25_retriever`/`hybrid_retriever`(RRF+引用扩展+rerank，逐字保持旧召回)/`rrf`/`service`(RetrievalService) + ◌`graph_retriever`。
@@ -84,6 +84,16 @@ MinerU 解析 + 条款树提取 + 质量审核，在 GB 50378-2006 和 GB 50016 
 - **utils/**：`tokenizer`(字符级分词，建/检索共用) / `text_cleaner` / `logger`；**根 `config.py`**：服务地址/别名/collection 命名（承旧 `retrieval/config.py`）。
 - **删除**：旧 `core/{schema,parse_profile,view}.py`、`reprs/`、`retrieval/{engine,indexer,config,server}.py`。产物 `nodes.json`→`chunks.json`。
 - **验证**：全 65 文件 `py_compile` 通过；各层从根 import 无 sys.path hack；`tests/test_splitter_pure.py` 14/14 + 新 `tests/test_ir_pipeline.py` 7/7（IR 往返 / 合成 Document→Chunk→feature→view 全链路 / 空骨架过滤 / RetrievedChunk 契约 / RRF·引用扩展）。⚠️ Milvus/embedding 真链路仍待服务器（同 🏁 里程碑）。
+
+### parser/splitter 类型化 + splitter 收口（✅ 2026-06-15）
+
+承上条分层重构，进一步消改名缝、收口 splitter 内部件、放开切分深度：
+
+- **无类型 node dict → 类型化**：内部不再有平行字段词汇表（`node_type` vs `chunk_type`），统一 `chunk_type`；出口无改名映射，魔法键 `_catalog`/`_skeleton` 改为有类型的声明字段；字段拼错从「静默 `.get` 返回 None」变成「dataclass 属性错误立即报」。
+- **splitter 三内部件合并**：`catalog_labeler.py` / `tree_builder.py` / `references.py` 合并进单一 `splitter/toc_splitter.py`（按 §1 引用 / §2 目录打标 / §3 建树 / §4 切分策略 分段）——外部无消费方、随 TOC 法内聚，纯函数仍可独立单测（`tests/test_splitter_pure.py` 从 `toc_splitter` 导入）。
+- **切分深度可控**：`Splitter.split` 接 `max_depth`+`subsplit` 切分期参数（profile 透传 `toc_max_depth`/`subsplit`），决定树建到哪一层 / 目录层下是否按编号细分；与索引期 `index_granularity` 视图选层正交（替代旧未实装 `clause_strategy`/ClauseSplitter 过渡设计）。
+- **registry 驱动启动**：`parser/__main__.py` 与 `splitter/__main__.py` 不再硬编码工具名，遍历 factory `REGISTRY` 把声明了 `run_cli` 的工具/切法挂成 `python -m parser <工具>` / `python -m splitter <切法>`（占位工具/切法无 `run_cli` → 不出现在 CLI）。
+- **同步**：`tests/test_ir_pipeline.py` 改掉删除的 `split(..., profile=)` 调法（改 `max_depth`/`subsplit`）；README 目录树去三件幽灵文件、DEV §2.2 字段名/切分深度描述对齐。
 
 ---
 

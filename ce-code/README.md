@@ -52,12 +52,11 @@ ce-code/
 │  ── ② 切分层（多切法可插拔）──
 ├── splitter/                       # Document → Chunk 树
 │   ├── base.py / factory.py        #   Splitter 基类 + 工厂（profile.structure_strategy 选）
-│   ├── toc_splitter.py             #   ★ TocSplitter：基于原生目录的多层级切分
+│   ├── toc_splitter.py             #   ★ TocSplitter：基于原生目录的多层级切分（切分深度 toc_max_depth/subsplit 可控）
+│   │                               #     三内部件（目录打标/建树/引用图分型）2026-06-15 已合并入此单文件，按 §1/§2/§3 分段
 │   ├── semantic_splitter.py        #   ◌ 占位（语义切）
 │   ├── tree_splitter.py            #   ◌ 占位（标题层级树）
-│   ├── catalog_labeler.py          #   ↳ 目录打标器（TocSplitter 内部件）
-│   ├── tree_builder.py             #   ↳ 建树器（目录骨架建树 + 固有事实；内部 dict，出口转 Chunk）
-│   └── references.py               #   ↳ 引用图分型 + 反向边（建树期固有事实）
+│   └── __main__.py                 #   阶段 1 启动脚本（registry 驱动）：python -m splitter <切法>
 │
 │  ── ③ 表征层（多表征可插拔）──
 ├── feature/                        # Chunk → 多表征（挂 chunk.features）

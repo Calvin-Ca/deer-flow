@@ -94,13 +94,18 @@ def extract_references(text: str, self_path: str = "") -> list[dict]:
     return found
 
 
-def build_referenced_by(nodes: list[dict]) -> None:
-    """全量扫描 references,原地回填每个节点 ``referenced_by``(仅本规范内边)。"""
-    paths = {c["node_path"] for c in nodes}
+def build_referenced_by(nodes: list) -> None:
+    """全量扫描 references,原地回填每个节点 ``referenced_by``(仅本规范内边)。
+
+    入参为带 ``node_path`` / ``references`` / ``referenced_by`` 属性的节点对象
+    (建树期 ``tree_builder._BuildNode``;鸭子类型,不强依赖具体类)。``references`` 元素仍是
+    ``{to,type}`` dict。
+    """
+    paths = {c.node_path for c in nodes}
     reverse: dict[str, list[str]] = {}
     for c in nodes:
-        src = c["node_path"]
-        for ref in c.get("references", []):
+        src = c.node_path
+        for ref in c.references:
             tgt = ref["to"]
             if ref["type"] == "cross_standard" or tgt not in paths:
                 continue
@@ -108,16 +113,17 @@ def build_referenced_by(nodes: list[dict]) -> None:
             if src not in reverse[tgt]:
                 reverse[tgt].append(src)
     for c in nodes:
-        c["referenced_by"] = reverse.get(c["node_path"], [])
+        c.referenced_by = reverse.get(c.node_path, [])
 
 
-def annotate_references(nodes: list[dict]) -> None:
-    """原地富化:为每个节点写 ``references``(分型)+ ``referenced_by``(反向)。
+def annotate_references(nodes: list) -> None:
+    """原地富化:为每个节点(带 ``content`` / ``node_path`` / ``references`` / ``referenced_by``
+    属性,见 ``tree_builder._BuildNode``)写 ``references``(分型)+ ``referenced_by``(反向)。
 
     只产 typed ``references``/``referenced_by``;检索期扩展用的扁平 ``references_to``
     由 ``retrieval/indexer._expandable_refs`` 在建索引时从 typed 边派生(strong/cross_standard
     才入),不在本层落字段。
     """
     for c in nodes:
-        c["references"] = extract_references(c.get("content", ""), c.get("node_path", ""))
+        c.references = extract_references(c.content, c.node_path)
     build_referenced_by(nodes)

@@ -8,36 +8,23 @@
      （根治父链断裂），正文按条文号号段 / 目录归属挂载，连边后算定固有事实（祖先链 / 引用图分型
      + 反向边）；无目录页时退化为复用 MinerU 标题层级 best-effort。
 
-IR 适配（本轮重构）：入参由旧「list[block dict]」改为 ``Document``——内部 ``document.block_dicts()``
-还原成 CatalogLabeler/TreeBuilder 期望的 block dict（复用其成熟的 dict 管道，零改动），出参由旧
-「list[node dict]」经 ``_node_to_chunk`` 映射为 ``list[Chunk]``（node_type→chunk_type、node_level→level、
-reprs→features[空]，其余同名）。中间产物 annotated（带 catalog/catalog_source）作 debug_blocks
-落 structure.json。
+IR 适配：入参由旧「list[block dict]」改为 ``Document``——内部 ``document.block_dicts()``
+还原成 CatalogLabeler/TreeBuilder 期望的 block dict（复用其成熟的 dict 管道，零改动）。出参
+直接是 ``list[Chunk]``——TreeBuilder 内部 ``_BuildNode`` 字段名即与 Chunk 对齐
+（chunk_type/level/provenance），出口 ``_BuildNode.to_chunk()`` 一步成 Chunk，**无字段改名缝**
+（2026-06-15 类型化前曾有 ``_node_to_chunk`` 做 node_type→chunk_type 改名，已消除）。中间产物
+annotated（带 catalog/catalog_source）作 debug_blocks 落 structure.json。
 
 > block→node 的主干心智模型（碰到标题切一次游标、下个标题前的普通块都算当前标题正文；目录条目
 > 物化骨架、更细标题并入所属节）见 ``tree_builder.py`` 的 TreeBuilder 文档，此处不重述。
 """
 from __future__ import annotations
 
-from core.chunk import Chunk
 from core.document import Document
 from core.profile import ParseProfile
 from splitter.base import Splitter, SplitResult
 from splitter.catalog_labeler import CatalogLabeler
 from splitter.tree_builder import TreeBuilder
-
-
-def _node_to_chunk(node: dict) -> Chunk:
-    """建树器产出的 node dict → Chunk IR（字段改名 + 丢空 reprs）。
-
-    node_type→chunk_type、node_level→level、reprs→features（切分阶段为空，由表征层挂）；
-    references / provenance 由 Chunk.from_dict 内部转成 Reference / Provenance。
-    """
-    d = dict(node)
-    d["chunk_type"] = d.pop("node_type", "leaf")
-    d["level"] = d.pop("node_level", 0)
-    d.pop("reprs", None)  # 切分阶段无表征；features 由 feature 层 enrich 挂
-    return Chunk.from_dict(d)
 
 
 class TocSplitter(Splitter):
@@ -55,10 +42,9 @@ class TocSplitter(Splitter):
         annotated = labeler.annotate(blocks)
         labeler.print_stats(annotated)  # 观测：catalog_source 来源分解（方案 5 可见）
 
-        nodes = TreeBuilder(profile).apply(
+        chunks = TreeBuilder(profile).apply(
             annotated,
             entries=labeler.entries,
             source_file=document.source_file,
         )
-        chunks = [_node_to_chunk(n) for n in nodes]
         return SplitResult(chunks=chunks, debug_blocks=annotated)

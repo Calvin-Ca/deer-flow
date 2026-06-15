@@ -25,7 +25,7 @@ from rich.console import Console
 from rich.table import Table
 
 from config import collection_name as build_collection_name
-from core.query import RetrievalQuery
+from ir.query import RetrievalQuery
 from retrieval.hybrid_retriever import HybridRetriever
 
 ROOT = Path(__file__).resolve().parent.parent

@@ -50,7 +50,7 @@ PDF（清单/计量规范）
 
 > **关键设计**：节点树（阶段 1）一次建好，**粒度是索引期（阶段 3）在树上选的视图，不是切树**。换粒度/换表征只重跑下游，不重跑 MinerU（最贵，约 60% 耗时）。结构（建树）/ 表征（多投影）/ 粒度（树上视图）三件事正交分离。
 
-> **分层重构（2026-06-15）**：各阶段数据统一为显式 IR（`core/` 的 `@dataclass` + `to_dict/from_dict`：Document / Chunk / ChunkFeature / RetrievalQuery / RetrievedChunk / KnowledgeContext），各层做成「基类 + factory + 多策略」可插拔（★实装/◌占位）：解析 mineru★·unstructured◌；切分 toc★·semantic◌·tree◌；表征 raw·bm25·dense·context_aug★·keyword◌·graph◌；索引 bm25·vector·metadata★·graph◌；检索 dense·bm25·hybrid★·graph◌。`nodes.json`→`chunks.json`；旧 `reprs/`→`feature/`、`retrieval/{engine,indexer,config,server}` 拆入 `index/`+`retrieval/`+`service/`+根 `config.py`；旧 `node_id` 废除，全层以 `node_path` 为键。对外 :8100 契约逐字不变。
+> **分层重构（2026-06-15）**：各阶段数据统一为显式 IR（`ir/` 的 `@dataclass` + `to_dict/from_dict`：Document / Chunk / ChunkFeature / RetrievalQuery / RetrievedChunk / KnowledgeContext），各层做成「基类 + factory + 多策略」可插拔（★实装/◌占位）：解析 mineru★·unstructured◌；切分 toc★·semantic◌·tree◌；表征 raw·bm25·dense·context_aug★·keyword◌·graph◌；索引 bm25·vector·metadata★·graph◌；检索 dense·bm25·hybrid★·graph◌。`nodes.json`→`chunks.json`；旧 `reprs/`→`feature/`、`retrieval/{engine,indexer,config,server}` 拆入 `index/`+`retrieval/`+`service/`+根 `config.py`；旧 `node_id` 废除，全层以 `node_path` 为键。对外 :8100 契约逐字不变。
 
 **对外接口契约**（上游模块依赖的唯一边界）：
 
@@ -107,7 +107,7 @@ PDF（清单/计量规范）
 ### 2.3 元数据设计
 
 > 每个节点携带的元数据，直接支撑 PRD 的可溯源红线与检索过滤。
-> 完整 schema 见 `core/chunk.py` 的 `Chunk`（旧 `core/schema.py` 的 `Node` TypedDict 已废，重构为 `@dataclass`）。
+> 完整 schema 见 `ir/chunk.py` 的 `Chunk`（旧 `core/schema.py` 的 `Node` TypedDict 已废，重构为 `@dataclass`）。
 
 | 字段 | 类型 | 用途 | 是否支撑业务规则 |
 |---|---|---|---|

@@ -1,13 +1,11 @@
-"""splitter 纯函数单元测试 —— 无 IO、无外部服务，锁住 regex 重灾区的边界行为。
+"""解析/切分纯函数单元测试 —— 无 IO、无外部服务，锁住 regex 重灾区的边界行为。
 
-覆盖 splitter 包里**无状态纯函数**（建树/引用/目录解析的解析逻辑），它们是 node_path
-识别、引用图分型、目录条目解析的核心，正则边界多、最易回归：
+覆盖**无状态纯函数**（建树/引用/目录解析的解析逻辑），它们是 node_path 识别、引用图分型、
+目录条目解析的核心，正则边界多、最易回归：
 
-  - toc_splitter.classify_heading / _parent_path / _resolve_parent —— 条款号 → 路径/父链
-  - toc_splitter.extract_references                                —— 散文 → 分型引用边（含精度闸）
-  - toc_splitter._split_catalog_line / _is_catalog_list / _norm   —— 目录条目解析
-
-  （§1 引用 / §2 目录打标 / §3 建树 三段 2026-06-15 已合并入单一 toc_splitter.py）
+  - splitter.toc_splitter.classify_heading / _parent_path / _resolve_parent —— 条款号 → 路径/父链
+  - splitter.toc_splitter.extract_references                                —— 散文 → 分型引用边（含精度闸）
+  - splitter.toc_splitter._split_catalog_line / _is_catalog_list / _norm    —— 目录条目解析
 
 运行（从 ce-code 根，单行）：
   uv run python tests/test_splitter_pure.py        # 独立跑（无需 pytest，stdlib assert）
@@ -17,9 +15,9 @@ from __future__ import annotations
 
 from splitter import toc_splitter as references  # §1 引用纯函数沿用 references.* 命名空间访问
 from splitter.toc_splitter import (
-    classify_heading, _parent_path, _resolve_parent, _path_depth,  # §3 建树纯函数
-    _split_catalog_line, _is_catalog_list, _norm,                 # §2 目录解析纯函数
+    classify_heading, _parent_path, _resolve_parent, _path_depth,  # §2 建树纯函数
 )
+from splitter.toc_splitter import _split_catalog_line, _is_catalog_list, _norm  # 目录解析纯函数（§0 目录打标）
 
 
 # ── classify_heading：标题文字 → node_path / 来源 / 置信 ──────────────────────────

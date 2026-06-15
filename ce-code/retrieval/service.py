@@ -12,9 +12,9 @@ from __future__ import annotations
 from pathlib import Path
 
 from config import DEFAULTS, collection_name, resolve_store_dir
-from core.context import KnowledgeContext
-from core.query import RetrievalQuery
-from core.retrieval import RetrievedChunk
+from ir.context import KnowledgeContext
+from ir.query import RetrievalQuery
+from ir.retrieval import RetrievedChunk
 from index import metadata_index
 from retrieval.hybrid_retriever import HybridRetriever
 from retrieval.rrf import expand_references

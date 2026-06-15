@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
-from core.document import Document
+from ir.document import Document
 
 
 class Parser(ABC):

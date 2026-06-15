@@ -11,8 +11,8 @@ from pathlib import Path
 
 from rich.console import Console
 
-from core.chunk import Chunk
-from core.feature import FeatureSidecar, feature_text
+from ir.chunk import Chunk
+from ir.feature import FeatureSidecar, feature_text
 from utils.tokenizer import tokenize
 
 console = Console()

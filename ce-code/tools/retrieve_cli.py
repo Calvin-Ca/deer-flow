@@ -18,8 +18,8 @@ from rich.console import Console
 from rich.table import Table
 
 from config import collection_name
-from core.query import RetrievalQuery
-from core.retrieval import RetrievedChunk
+from ir.query import RetrievalQuery
+from ir.retrieval import RetrievedChunk
 from retrieval.hybrid_retriever import HybridRetriever
 
 console = Console()

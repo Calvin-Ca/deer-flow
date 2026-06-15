@@ -5,8 +5,8 @@ PRD §3.1：raw 载体=存储，作用=返回展示用的字面原文，成本=�
 """
 from __future__ import annotations
 
-from core.chunk import Chunk
-from core.feature import ChunkFeature
+from ir.chunk import Chunk
+from ir.feature import ChunkFeature
 from feature.base import Feature
 
 

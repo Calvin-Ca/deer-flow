@@ -1,7 +1,7 @@
 """检索层基类 —— Retriever（RetrievalQuery → list[RetrievedChunk]）。
 
 一个 Retriever 子类 = **一路召回策略**（dense 向量 / bm25 关键词 / graph 图 / hybrid 混合）。
-统一契约：吃 ``RetrievalQuery``（core.query），吐已排序的 ``RetrievedChunk``（core.retrieval）列表。
+统一契约：吃 ``RetrievalQuery``（ir.query），吐已排序的 ``RetrievedChunk``（ir.retrieval）列表。
 
 > 单路 retriever（dense/bm25）内部以「索引行 dict」做召回（复用旧 engine 的数值逻辑，行为逐字
 > 保持），在 ``retrieve`` 出口转 RetrievedChunk；hybrid 在行 dict 层做 RRF 合并 + 引用扩展 + rerank，
@@ -11,8 +11,8 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
-from core.query import RetrievalQuery
-from core.retrieval import RetrievedChunk
+from ir.query import RetrievalQuery
+from ir.retrieval import RetrievedChunk
 
 
 class Retriever(ABC):

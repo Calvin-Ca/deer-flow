@@ -12,8 +12,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from core.query import RetrievalQuery
-from core.retrieval import RetrievedChunk
+from ir.query import RetrievalQuery
+from ir.retrieval import RetrievedChunk
 from index import metadata_index
 from retrieval.base import Retriever
 from retrieval.bm25_retriever import Bm25Retriever

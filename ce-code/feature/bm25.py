@@ -5,12 +5,12 @@ PRD §3.1：sparse 载体=BM25，作用=条文号 / 术语精确召回，成本=
 建倒排。向量化不在此（那是 dense）。
 
 > 文件名 ``bm25``（按消费方 BM25 索引命名），表征 ``kind`` 仍为 ``"sparse"``（语义投影名，与 dense
-> 对偶；core.feature.FeatureKind 与 profile.DEFAULT_FEATURES 均用此）。
+> 对偶；ir.feature.FeatureKind 与 profile.DEFAULT_FEATURES 均用此）。
 """
 from __future__ import annotations
 
-from core.chunk import Chunk
-from core.feature import ChunkFeature
+from ir.chunk import Chunk
+from ir.feature import ChunkFeature
 from feature.base import Feature
 
 

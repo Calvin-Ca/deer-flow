@@ -72,9 +72,9 @@ MinerU 解析 + 条款树提取 + 质量审核，在 GB 50378-2006 和 GB 50016 
 
 ### 分层重构：统一 IR + 各层基类/factory/多策略（✅ 2026-06-15）
 
-把各阶段数据统一为**显式 IR**（`core/` 全 `@dataclass` + `to_dict/from_dict`），各层做成「基类 + factory + 可插拔多策略」，当前实装一条链路、其余占位（抛 `NotImplementedError`）：
+把各阶段数据统一为**显式 IR**（`ir/` 全 `@dataclass` + `to_dict/from_dict`），各层做成「基类 + factory + 可插拔多策略」，当前实装一条链路、其余占位（抛 `NotImplementedError`）：
 
-- **IR（core/）**：`document`(Document/Block) / `chunk`(Chunk/Reference/Provenance) / `feature`(ChunkFeature) / `query`(RetrievalQuery) / `retrieval`(RetrievedChunk) / `context`(KnowledgeContext) / `profile`(ParseProfile)。`Chunk` 替代旧 `schema.Node`，**保留 `node_path` 作 id**（`chunk_id ≡ node_path`，旧 `node_id` 全层废除）。
+- **IR（ir/）**：`document`(Document/Block) / `chunk`(Chunk/Reference/Provenance) / `feature`(ChunkFeature) / `query`(RetrievalQuery) / `retrieval`(RetrievedChunk) / `context`(KnowledgeContext) / `profile`(ParseProfile)。`Chunk` 替代旧 `schema.Node`，**保留 `node_path` 作文档内结构地址 / HTTP 契约键**，**新增 `chunk_id`**（= `standard_id#node_path`，全局唯一定位键，缺省由 `__post_init__` 派生、落盘；旧 `node_id` 全层废除）。
 - **解析层 parser/**：`base`+`factory` + ★`mineru`(包 format_adapter，产 Document) + ◌`unstructured`。
 - **切分层 splitter/**：`base`(`split(Document)->SplitResult`)+`factory` + ★`toc_splitter`(承旧 toc) + ◌`semantic`/`tree`。（本批 toc 内部仍 `catalog_labeler`/`tree_builder`/`references` 三件分文件 + dict 管道、出口转 Chunk；三件 2026-06-15 后续合并入单一 `toc_splitter.py`，见下条。）
 - **表征层 feature/**（承旧 `reprs/`）：`base`+`pipeline` + ★`raw`/`bm25`(=旧 sparse)/`dense`/`context_aug` + ◌`keyword`/`graph`。

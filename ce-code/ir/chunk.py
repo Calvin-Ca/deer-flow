@@ -4,15 +4,19 @@
 结构（parent/child）、建树时一次算定的「固有事实」（引用图 / 祖先链）、溯源指针
 （provenance）。**粒度视图与各检索索引都是它的派生**（index 层 ``view(chunks, granularity)``
 选层 emit，不切树）。表征（``features``）**不挂 Chunk**——结构真值与语义投影分离，由表征层产成
-sidecar（``node_path → {kind: ChunkFeature}``）于索引期现算、不落 chunks.json（见 core.feature）。
+sidecar（``node_path → {kind: ChunkFeature}``）于索引期现算、不落 chunks.json（见 ir.feature）。
 
-身份约定（承旧设计）：``node_path`` 即 chunk 身份（``chunk_id ≡ node_path``，见 ``chunk_id``
-属性别名）——本集合（单规范）内唯一，直接作树边 / 引用边的引用键；**保留 node_path 字段名**
-以维持对外 HTTP 契约（``/clause/{standard}/{path}``、``/search`` 返回字段）与「结构地址 = id」
-语义，不重命名为 chunk_id。消费方**勿假定恒为数字号**（亦可为「附录E」/「前言」等标题路径）。
+身份约定（2026-06-15 修订）：双键并存——``node_path`` 是**文档内**结构地址（树边/引用边的引用
+键，单文档内唯一），保留字段名以维持对外 HTTP 契约（``/clause/{standard}/{path}``、``/search``
+返回字段）与「结构地址 = id」语义；``chunk_id`` 是**全局**唯一定位键 = ``f"{standard_id}#{node_path}"``
+（``standard_id`` 即文档名 document_name），跨文档混入同一索引/集合时靠它消歧（node_path 跨规范
+会撞——两规范都可有「5.2.1」/「前言」）。``chunk_id`` 落盘（``to_dict``）、缺省由 ``__post_init__``
+派生；若日后把一个节点切成多个更细 chunk（>1 chunk 共享 node_path），由切分层在此键追加 ``#{seq}``
+区分、本 IR 不动（单一改点）。消费方**勿假定 node_path 恒为数字号**（亦可为「附录E」/「前言」等
+标题路径）。
 
 设计转向（2026-06-12）：**无强条 / 法律强制机制**——语气（应/宜/可/严禁）降级为 ``modal``
-表征（core.feature），只作可选召回通道，不做全局置顶排序。
+表征（ir.feature），只作可选召回通道，不做全局置顶排序。
 
 溯源：MinerU 原始内容留在阶段 0 缓存 ``data/parsed/<std>/auto/*_content_list.json``（不可变），
 本 Chunk 靠 ``provenance.block_idx`` 回指原始块；``block_idx == []`` 即「未接地空骨架」
@@ -90,37 +94,45 @@ class Provenance:
 
 @dataclass
 class Chunk:
-    """规范语义树的一个节点（单一真值）。字段分组见模块 docstring。"""
+    """规范语义树的一个节点（单一真值）。
 
-    # ── 标识 ──
-    node_path: str
-    standard_id: str = ""
-    # ── 结构（树形）──
-    # 种类（容器/叶）与深度均不落字段，为纯派生：容器 ⟺ children_ids 非空；深度 = len(ancestor_paths)+1。
-    parent_id: str | None = None
-    children_ids: list[str] = field(default_factory=list)
+    字段按**重要性 / 类别**自上而下分组：标识 → 检索载荷 → 结构 → 引用图 → 溯源 → 表格图示 →
+    审计（最低优先）。``to_dict`` / ``from_dict`` 同序。种类（容器/叶）与树深度均**不落字段**，
+    为纯派生：容器 ⟺ children_ids 非空；深度 = len(ancestor_paths)+1（消费方现推，勿存冗余）。
+    """
+
+    # ── 标识（identity）──
+    node_path: str                    # 文档内结构地址 = 文档内唯一键 + HTTP 契约键（勿改名）
+    chunk_id: str = ""                # 全局唯一定位键 = f"{standard_id}#{node_path}"；空则 __post_init__ 补
+    standard_id: str = ""             # 所属文档（规范）唯一标识，即 document_name
+    # ── 检索载荷（payload）──
     title: str = ""
     content: str = ""                 # 仅自身正文（不含子节点），作检索载荷
-    # ── 固有事实（建树时一次算定）──
+    # ── 结构（树形）──
+    parent_id: str | None = None
+    children_ids: list[str] = field(default_factory=list)
     ancestor_titles: list[str] = field(default_factory=list)
     ancestor_paths: list[str] = field(default_factory=list)
+    # ── 引用图（固有事实，建树时一次算定）──
     references: list[Reference] = field(default_factory=list)
     referenced_by: list[str] = field(default_factory=list)
-    # ── 结构层审计 ──
-    node_path_source: str = ""        # number / text_level / inherited / lexicon（后两者占位）
-    node_path_confidence: float = 1.0
     # ── 溯源 ──
     provenance: Provenance = field(default_factory=Provenance)
     # ── 表格/图示（过渡：待表征层转 table_struct 等）──
     tables: list[dict] = field(default_factory=list)
     images: list[dict] = field(default_factory=list)
+    # ── 结构层审计（最低优先）──
+    node_path_source: str = ""        # number / text_level / inherited / lexicon（后两者占位）
+    node_path_confidence: float = 1.0
+
+    def __post_init__(self) -> None:
+        # 全局定位键：缺省由 standard_id#node_path 派生；无 standard_id 时退化为 node_path。
+        if not self.chunk_id:
+            self.chunk_id = (
+                f"{self.standard_id}#{self.node_path}" if self.standard_id else self.node_path
+            )
 
     # -- 派生 --------------------------------------------------------------
-
-    @property
-    def chunk_id(self) -> str:
-        """chunk 身份别名（``chunk_id ≡ node_path``）。"""
-        return self.node_path
 
     def is_grounded(self) -> bool:
         """是否「已接地」= provenance 有原始块（block_idx 非空）。
@@ -140,21 +152,22 @@ class Chunk:
     def to_dict(self) -> dict:
         """JSON 友好 dict（落 chunks.json）。references/provenance 递归展开（表征不落盘）。"""
         return {
+            "chunk_id": self.chunk_id,
             "node_path": self.node_path,
             "standard_id": self.standard_id,
-            "parent_id": self.parent_id,
-            "children_ids": self.children_ids,
             "title": self.title,
             "content": self.content,
+            "parent_id": self.parent_id,
+            "children_ids": self.children_ids,
             "ancestor_titles": self.ancestor_titles,
             "ancestor_paths": self.ancestor_paths,
             "references": [r.to_dict() for r in self.references],
             "referenced_by": self.referenced_by,
-            "node_path_source": self.node_path_source,
-            "node_path_confidence": self.node_path_confidence,
             "provenance": self.provenance.to_dict(),
             "tables": self.tables,
             "images": self.images,
+            "node_path_source": self.node_path_source,
+            "node_path_confidence": self.node_path_confidence,
         }
 
     @classmethod
@@ -162,18 +175,19 @@ class Chunk:
         """从 chunks.json 的一条还原 Chunk（缺字段取默认）。"""
         return cls(
             node_path=d.get("node_path", ""),
+            chunk_id=d.get("chunk_id", ""),   # 空则 __post_init__ 由 standard_id#node_path 补
             standard_id=d.get("standard_id", ""),
-            parent_id=d.get("parent_id"),
-            children_ids=list(d.get("children_ids") or []),
             title=d.get("title", ""),
             content=d.get("content", ""),
+            parent_id=d.get("parent_id"),
+            children_ids=list(d.get("children_ids") or []),
             ancestor_titles=list(d.get("ancestor_titles") or []),
             ancestor_paths=list(d.get("ancestor_paths") or []),
             references=[Reference.from_dict(r) for r in (d.get("references") or [])],
             referenced_by=list(d.get("referenced_by") or []),
-            node_path_source=d.get("node_path_source", ""),
-            node_path_confidence=float(d.get("node_path_confidence", 1.0)),
             provenance=Provenance.from_dict(d.get("provenance") or {}),
             tables=list(d.get("tables") or []),
             images=list(d.get("images") or []),
+            node_path_source=d.get("node_path_source", ""),
+            node_path_confidence=float(d.get("node_path_confidence", 1.0)),
         )

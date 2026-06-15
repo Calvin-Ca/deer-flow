@@ -8,8 +8,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from core.query import RetrievalQuery
-from core.retrieval import RetrievedChunk
+from ir.query import RetrievalQuery
+from ir.retrieval import RetrievedChunk
 from index import bm25_index, metadata_index
 from retrieval.base import Retriever
 from utils.tokenizer import tokenize

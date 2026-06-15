@@ -23,7 +23,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
 from config import DEFAULTS, STANDARD_ALIASES
-from core.query import RetrievalQuery
+from ir.query import RetrievalQuery
 from service.retrieve_service import KnowledgeRetrieveService
 
 # data/ 路径由本文件位置推出（service/knowledge_api.py → 上两级即 ce-code 根），与 cwd 无关

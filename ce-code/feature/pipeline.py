@@ -10,13 +10,13 @@
 
 入口：``build_features(chunks, enabled)`` 产 **sidecar**（``node_path → {kind: ChunkFeature}``）——
 表征**不挂 Chunk**（结构真值与语义投影分离、不落 chunks.json），由编排层于索引期对检索单元现算、
-沿索引链路传给各索引器消费（见 ``core.feature.feature_text`` / ``index.manager.build_index``）。
+沿索引链路传给各索引器消费（见 ``ir.feature.feature_text`` / ``index.manager.build_index``）。
 """
 from __future__ import annotations
 
-from core.chunk import Chunk
-from core.feature import FeatureMap, FeatureSidecar
-from core.profile import DEFAULT_FEATURES
+from ir.chunk import Chunk
+from ir.feature import FeatureMap, FeatureSidecar
+from ir.profile import DEFAULT_FEATURES
 from feature.base import Feature
 from feature.bm25 import Bm25Feature
 from feature.context_aug import ContextAugFeature

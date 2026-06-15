@@ -1,38 +1,26 @@
 """TocSplitter —— 基于 PDF 原生目录(TOC)的多层级切分（核心设计原则 1，当前默认实现）。
 
-承旧 ``splitter/toc.py``。**TOC 法的全部实现收口在本文件**（2026-06-15 由 catalog_labeler.py
-/ tree_builder.py / references.py 三件合并而来）：目录打标、建树、引用图分型本就只随 TOC 法
-内聚、外部无消费方（除纯函数单测），故并为单一切法模块，按职责分四段排布：
+吃解析层**格式归一**的 ``Document``（blocks 为纯版面块、**未打标**），本层先**目录打标**
+（CatalogLabeler，§0）给每块打目录归属标签 + 解析有序目录条目表，再以目录条目为骨架建保留
+parent/child 的语义树。按职责分四段排布：
 
+  §0 目录打标（``CatalogLabeler`` / ``print_catalog_stats``）——格式归一块 → 带目录标签的块 + 条目表。
   §1 引用图分型（``extract_references`` / ``annotate_references``）——散文 → 分型引用边 + 反向边。
-  §2 目录打标（``CatalogLabeler``）——给每块打 ``catalog`` 归属 + 解析有序目录条目表（骨架真值）。
-  §3 建树（``_BuildNode`` / ``classify_heading`` / ``TreeBuilder``）——目录条目骨架 + 正文挂载 → Chunk 树。
-  §4 切分策略（``TocSplitter``）——把 §2 + §3 收口成 Splitter 契约。
+  §2 建树（``_BuildNode`` / ``classify_heading`` / ``TreeBuilder``）——目录条目骨架 + 正文挂载 → Chunk 树。
+  §3 切分策略（``TocSplitter``）——把 §0→§2 收口成 Splitter 契约。
 
-切分主链（``TocSplitter.split``）：
-  ① CatalogLabeler.annotate：给每块打 ``catalog`` 标签 + 解析出**有序目录条目表**（骨架真值）；
-  ② TreeBuilder.apply：以目录条目为骨架建**保留 parent/child 的语义树**——条目物化为骨架节点
-     （根治父链断裂），正文按条文号号段 / 目录归属挂载，连边后算定固有事实（祖先链 / 引用图分型
-     + 反向边）；无目录页时退化为复用 MinerU 标题层级 best-effort。
+切分主链（``TocSplitter.split`` → ``TreeBuilder.apply``）：以目录条目为骨架建树——条目物化为骨架
+节点（根治父链断裂），正文按条文号号段 / 目录归属挂载，连边后算定固有事实（祖先链 / 引用图分型 +
+反向边）；无目录页时退化为复用 MinerU 标题层级 best-effort。``_BuildNode`` 字段名即与 Chunk 对齐，
+出口 ``to_chunk()`` 一步成 Chunk，无字段改名缝。
 
-IR 适配：入参由旧「list[block dict]」改为 ``Document``——内部 ``document.block_dicts()``
-还原成 CatalogLabeler/TreeBuilder 期望的 block dict（复用其成熟的 dict 管道，零改动）。出参
-直接是 ``list[Chunk]``——TreeBuilder 内部 ``_BuildNode`` 字段名即与 Chunk 对齐
-（provenance 等结构字段），出口 ``_BuildNode.to_chunk()`` 一步成 Chunk，**无字段改名缝**
-（2026-06-15 类型化前曾有 ``_node_to_chunk`` 做 node_type→chunk_type 改名，已消除）。中间产物
-annotated（带 catalog/catalog_source）作 debug_blocks 落 catalog_blocks.json。
-
-> block→node 的主干心智模型（碰到标题切一次游标、下个标题前的普通块都算当前标题正文；目录条目
-> 物化骨架、更细标题并入所属节）见下文 §3 ``TreeBuilder`` 文档。
-
-切分深度可控（2026-06-15，``split`` 不再吃整个 profile，只收两个**会被读取**的参数）：
+切分深度两把闸（``split`` 只收两个会被读取的参数）：
   · ``max_depth: int | None`` —— 切到第几级**目录**（按 node_path 号段层级，1=章/2=节/3=条…）；
     超过的目录条目/标题不单独建节点，正文并入最近祖先。None=全目录深度。
   · ``subsplit: str`` —— ``"none"``（镜像目录，不细分）/ ``"number"``（在目录骨架之下按编号号段
     再切出更细的编号子节点，节/条/款/项皆可、不专指条）。二者正交，组合即「控制切到哪一层」。
 
-依赖：``core.chunk``（出口 IR）、``core.document``（入口 IR）——均绝对 import，从 ce-code 根运行即
-解析（无 sys.path hack）。仅 stdlib + rich，无外部服务。
+依赖：``ir.chunk`` / ``ir.document``（IR，绝对 import）。仅 stdlib + rich，无外部服务。
 """
 
 from __future__ import annotations
@@ -48,18 +36,249 @@ import click
 from rich.console import Console
 from rich.table import Table
 
-from core.chunk import Chunk, Provenance, Reference  # 出口 IR + 溯源/引用边
-from core.document import Document
+from ir.chunk import Chunk, Provenance, Reference  # 出口 IR + 溯源/引用边
+from ir.document import Document
 from splitter.base import Splitter, SplitResult
 
 console = Console()
 
 
 def _write_json(data: list, path: Path) -> None:
-    """落盘 JSON（UTF-8、缩进、不转义中文），供 ``TocSplitter.run_cli`` 写 chunks/structure。"""
+    """落盘 JSON（UTF-8、缩进、不转义中文），供 ``TocSplitter.run_cli`` 写 chunks/catalog_blocks。"""
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
     console.print(f"[green]✓ 写入 {path}（{len(data)} 条）[/green]")
+
+
+# ===========================================================================
+# §0 目录打标 —— CatalogLabeler（建树前第一步：给每块打目录归属标签 + 解析条目表）
+# ===========================================================================
+#
+# 格式归一（parser FormatAdapter）之后、建树（§2）之前的一步：给每块打一个可靠的「目录归属」标签，
+# 并解析出**有序目录条目表**（骨架真值）供 §2 建树。本步只产目录标签、不建树（条文号 / 树边是 §2
+# 的事），对 MinerU 不做减法（目录页只标不删，目录判定采区域判据，不据单行启发式丢正文块）。
+#
+# 定位（方案 5 混合）：目录页解析成有序条目表作骨架，正文按文档序扫描、归一化匹配条目切换「当前
+# 条目」，未命中的块归属最近命中条目（条 x.x.x 归到其节 x.x）；无目录页时退化为以 MinerU 标题块
+# 自身标题作边界。
+#
+# 输入：解析层格式归一产出的统一元素列表（``Document.block_dicts()``）。输出：annotate() 返回每块带
+# catalog + catalog_source 的扁平列表（list 块逐条展开、不丢块），喂给 §2 TreeBuilder；``self.entries``
+# 存有序条目表（骨架真值）。每块字段：
+#     block_idx       int   该块在 MinerU 原始 content_list.json 里的下标（溯源用）。
+#     type/text/page  —     原始内容（text 对 list 为空、对 table 为 caption）。
+#     text_level      int?  MinerU 标题层级，仅标题块有（本层只读用于匹配）。
+#     standard_id     str   规范标识。
+#     catalog         值    目录归属："toc" / 条目标题 / None。
+#     catalog_source  str   catalog 来源审计，五取值：
+#                             toc_page         本块是目录页（区域判据命中）。
+#                             toc_match        正文块命中目录条目，确认为标题边界。
+#                             inherited        未命中，继承最近命中条目。
+#                             heading_fallback 无目录页退化，用 text_level 标题块自身标题作边界。
+#                             front_matter     封面/扉页/前言等前置内容（首个条目命中前，catalog=None）。
+#
+# 目录打标快照 catalog_blocks.json（调试，下游不读）由 ``TocSplitter.split`` 经 ``SplitResult.catalog_blocks``
+# 顺带返回，``print_catalog_stats`` 打按来源分解的统计。仅 stdlib + rich，无外部服务。
+
+
+# 目录页块判定 / 条目页码剥离用：匹配「行尾页码引用」的三种形态。
+#   （23）/(23)            括号页码
+#   …… 23 / .... 23        点 / 省略号导引 + 页码
+#   标题   23              仅尾随空白 + 页码（靠区域判据兜住误伤，见 _mark_toc）
+_CATALOG_TAIL_RE = re.compile(
+    r"(?:[（(]\s*\d{1,4}\s*[）)]"
+    r"|[.．·•…\s]{2,}\d{1,4}"
+    r"|\s+\d{1,4})\s*$"
+)
+
+# 归一化匹配用：全角数字/点 → 半角，便于正文标题与目录条目对齐。
+_FULLWIDTH_DIGITS = str.maketrans("０１２３４５６７８９．", "0123456789.")
+
+# 目录区域：连续 entry_like 文本行需达此长度才判为目录（避开 2~3 行误伤）。
+MIN_TOC_RUN = 4
+# 目录定位：正文块向后匹配目录条目的前瞻窗口（容忍若干条目在正文无对应块）。
+TOC_LOOKAHEAD = 8
+
+
+def _norm(text: str) -> str:
+    """归一化文本用于匹配：全角数字/点转半角、去所有空白（含全角空格）。"""
+    return re.sub(r"\s+", "", text.translate(_FULLWIDTH_DIGITS))
+
+
+def _split_catalog_line(text: str) -> tuple[str, int | None]:
+    """目录条目行 → (干净标题, 页码)。剥掉尾部页码引用与导引点。
+
+    如 "5.3 防火分区 …… 23" → ("5.3 防火分区", 23)；无尾页码时页码 None、标题为整行去空白。
+    """
+    m = _CATALOG_TAIL_RE.search(text)
+    page: int | None = None
+    if m:
+        pm = re.search(r"\d{1,4}", m.group(0))
+        page = int(pm.group()) if pm else None
+        title = text[: m.start()]
+    else:
+        title = text
+    return title.rstrip(" .．·•…　\t").strip(), page
+
+
+def _is_catalog_list(items: list[str], thresh: float = 0.5) -> bool:
+    """目录页列表判定：过半条目以「页码」结尾则整列为目录页（识别 MinerU 把整个目录抽成单个 list）。"""
+    if not items:
+        return False
+    hits = sum(1 for x in items if _CATALOG_TAIL_RE.search(x.strip()))
+    return hits >= max(1, len(items)) * thresh
+
+
+class CatalogLabeler:
+    """目录打标器：给每块打 `catalog`（"toc" / 所属目录条目标题 / None）+ catalog_source 审计。
+
+    流程（方案 5 混合）：① 展平 + 盖章 standard_id（list 条目逐条展开，不丢块）；② 目录页识别
+    （区域判据）：整列目录或连续成行 entry_like（run ≥ MIN_TOC_RUN）→ catalog="toc"；③ 解析有序
+    目录条目表（骨架真值，存 self.entries）；④ 目录定位：正文按文档序扫描、归一化匹配条目切换
+    「当前条目」（无目录页时退化为以 text_level 标题块自身标题作边界）。text_level 由解析层格式归一
+    原样透传，本层只读用于匹配、不重打。
+    """
+
+    def __init__(self, standard_id: str) -> None:
+        self.standard_id = standard_id
+        self.entries: list[dict] = []  # annotate() 后填：有序目录条目表（骨架真值，供建树器取）
+
+    def annotate(self, elements: list[dict]) -> list[dict]:
+        """展平 → 目录打标 → 目录定位，逐块写 standard_id + catalog + catalog_source。
+
+        副作用：把解析出的有序目录条目表存到 ``self.entries``（``{title, norm, page}``），供
+        TreeBuilder 物化骨架（无目录页时为空列表）。
+        """
+        blocks = self._flatten(elements)
+        self._mark_toc(blocks)
+        self.entries = self._parse_entries(blocks)
+        self._locate(blocks, self.entries)
+        return blocks
+
+    def _flatten(self, elements: list[dict]) -> list[dict]:
+        """展平为块列表、盖章 standard_id；整列目录的 list 条目直接标 catalog="toc"。
+
+        list 块逐条展开成块（展开后丢弃 list_items，不逐块冗余保留）。
+        """
+        out: list[dict] = []
+        for elem in elements:
+            base = {**elem, "standard_id": self.standard_id}
+            if elem["type"] == "list":
+                items = base.pop("list_items", [])
+                toc = _is_catalog_list(items)  # 整列目录页 → 每条盖 catalog="toc"
+                for sub in items:
+                    b = {**base, "text": sub}
+                    if toc:
+                        b["catalog"] = "toc"
+                    out.append(b)
+            else:
+                out.append(base)
+        return out
+
+    @staticmethod
+    def _entry_like(block: dict) -> bool:
+        """单块是否「像一条目录行」：text/list 短行且行尾带页码引用（区域判据的逐块信号）。"""
+        if block.get("catalog") == "toc":
+            return True
+        text = block.get("text", "")
+        return (
+            block.get("type") in ("text", "list")
+            and len(text) < 80
+            and bool(_CATALOG_TAIL_RE.search(text))
+        )
+
+    def _mark_toc(self, blocks: list[dict]) -> None:
+        """区域判据标目录页：连续 entry_like 成行（run ≥ MIN_TOC_RUN）整段标 catalog="toc"。
+
+        只把**成片**的目录行判为目录，孤立的「行尾带数字」正文短行不误判、不丢弃（守「不做减法」）。
+        整列目录已在 _flatten 直接盖章，本步补「逐行排版的目录」。
+        """
+        n = len(blocks)
+        i = 0
+        while i < n:
+            if not self._entry_like(blocks[i]):
+                i += 1
+                continue
+            j = i
+            while j < n and self._entry_like(blocks[j]):
+                j += 1
+            if j - i >= MIN_TOC_RUN:
+                for k in range(i, j):
+                    blocks[k]["catalog"] = "toc"
+            i = j
+
+    @staticmethod
+    def _parse_entries(blocks: list[dict]) -> list[dict]:
+        """从 catalog="toc" 的块解析有序目录条目表，每条 {title, norm, page}（norm 供定位匹配）。"""
+        entries: list[dict] = []
+        for b in blocks:
+            if b.get("catalog") != "toc":
+                continue
+            title, page = _split_catalog_line(b.get("text", ""))
+            if title:
+                entries.append({"title": title, "norm": _norm(title), "page": page})
+        return entries
+
+    @staticmethod
+    def _locate(blocks: list[dict], entries: list[dict]) -> None:
+        """目录定位：给每块写 catalog（所属条目标题）+ catalog_source（来源审计）。
+
+        目录页块 source=toc_page。有目录条目时维护单调前瞻指针，正文块归一化文本命中
+        entries[ptr:ptr+W] 中某条（精确相等，或 text_level 标题块前缀相等）即切换「当前条目」、
+        指针前移（source=toc_match）；未命中则继承当前条目（source=inherited，首个命中前
+        catalog=None、source=front_matter）。无目录条目时退化：text_level 标题块自身标题作边界
+        （source=heading_fallback），其余继承。
+        """
+        cur: str | None = None
+        ptr = 0
+        for b in blocks:
+            if b.get("catalog") == "toc":
+                b["catalog_source"] = "toc_page"
+                continue
+            if entries:
+                nb = _norm(b.get("text", ""))
+                hit = None
+                for j in range(ptr, min(ptr + TOC_LOOKAHEAD, len(entries))):
+                    en = entries[j]["norm"]
+                    if len(en) < 2:
+                        continue
+                    if nb == en or (b.get("text_level") is not None and nb.startswith(en)):
+                        hit = j
+                        break
+                if hit is not None:
+                    ptr = hit + 1
+                    cur = entries[hit]["title"]
+                    b["catalog"], b["catalog_source"] = cur, "toc_match"
+                else:
+                    b["catalog"] = cur
+                    b["catalog_source"] = "inherited" if cur is not None else "front_matter"
+            elif b.get("text_level") is not None and b.get("text"):  # 退化：标题块自身作边界
+                cur = b["text"]
+                b["catalog"], b["catalog_source"] = cur, "heading_fallback"
+            else:
+                b["catalog"] = cur
+                b["catalog_source"] = "inherited" if cur is not None else "front_matter"
+
+
+def print_catalog_stats(rows: list[dict]) -> None:
+    """打印目录打标统计：总块/标题数 + 按 catalog_source 分解各来源占比。"""
+    total = len(rows)
+    headings = sum(1 for e in rows if e.get("text_level") is not None)
+    src = Counter(e.get("catalog_source") for e in rows)
+    located = src["toc_match"] + src["inherited"] + src["heading_fallback"]
+
+    t = Table(title="目录打标统计（目录打标 + 定位）")
+    t.add_column("指标")
+    t.add_column("数量", justify="right")
+    t.add_row("总块数", str(total))
+    t.add_row("  标题块(text_level)", str(headings))
+    t.add_row("  目录页块(toc_page)", str(src["toc_page"]))
+    t.add_row("  已定位块(归属某条目)", str(located))
+    t.add_row("    命中目录条目(toc_match)", str(src["toc_match"]))
+    t.add_row("    继承(inherited)", str(src["inherited"]))
+    t.add_row("    无目录退化(heading_fallback)", str(src["heading_fallback"]))
+    t.add_row("  前置内容块(front_matter：封面/扉页/前言，首个目录条目命中前)", str(src["front_matter"]))
+    console.print(t)
 
 
 # ===========================================================================
@@ -191,365 +410,40 @@ def annotate_references(nodes: list) -> None:
 
 
 # ===========================================================================
-# §2 目录打标 —— CatalogLabeler（仅 stdlib + rich）
+# §2 建树 —— TreeBuilder（目录条目骨架 + 正文挂载 → Chunk 树）
 # ===========================================================================
 #
-# 只产「目录归属」一个可靠标签：每块打 ``catalog``（目录页一行→``"toc"`` / 所属目录条目
-# 标题 / 无归属→``None``）+ ``catalog_source`` 来源审计。不解析条文号 / node_type / 层级 /
-# 建树——那些是 §3 TreeBuilder 的事。对 MinerU 不做减法：目录页只标不删,目录判定采区域判据
-# （连续成行 / 整列）,不据单行启发式丢正文块。
+# 读 §0 目录打标产出的块（带 catalog/catalog_source）+ 有序目录条目表（entries），以**目录条目
+# 为骨架**还原成保留 parent/child 的语义树（``chunks.json``，单一真值）。建树策略：
 #
-# 定位（混合）：目录页解析成有序条目表作骨架,正文按文档序扫描、归一化匹配条目切换
-# 「当前条目」,未命中的块归属最近命中条目（条 x.x.x 归到其节 x.x）;无目录页时退化为以
-# MinerU 标题块自身标题作边界。
-#
-# 输入：FormatAdapter.adapt() 产出的统一元素列表。
-# 输出：annotate() 返回每块带 standard_id + catalog + catalog_source 的扁平列表（不建树、
-#       不丢块）——即 ``SplitResult.debug_blocks``,由 build.run_structure 落盘为 ``catalog_blocks.json``
-#       （切分中间态·调试快照,下游不读）。每块字段（— = FormatAdapter 透传,余为本层盖）：
-#         block_idx       int   该块在 MinerU 原始 content_list.json 里的下标（溯源用;
-#                               到 nodes.json 的 provenance.block_idx 会聚合成 list[int]）。
-#         type/text/page  —     原始内容（text 对 list 为空、对 table 为 caption）。
-#         text_level      int?  MinerU 标题层级,仅标题块有（本层只读用于匹配）。
-#         standard_id     str   规范标识。
-#         catalog         值    目录归属："toc" / 条目标题 / None。
-#         catalog_source  str   catalog 的来源审计,五取值：
-#                                 toc_page         本块是目录页（区域判据命中）。
-#                                 toc_match        正文块命中目录条目,确认为标题边界。
-#                                 inherited        未命中,继承最近命中条目。
-#                                 heading_fallback 无目录页退化,用 text_level 标题块自身标题作边界。
-#                                 front_matter     封面/扉页/前言等前置内容（首个条目命中前,catalog=None）。
-#       list 块展平后不留 list_items;raw 已删（需原件靠 block_idx 回查 data/parsed）。
-
-# 目录页块判定 / 条目页码剥离用：匹配「行尾页码引用」的三种形态。
-#   （23）/(23)            括号页码
-#   …… 23 / .... 23        点 / 省略号导引 + 页码
-#   标题   23              仅尾随空白 + 页码（靠区域判据兜住误伤，见 _mark_toc）
-_CATALOG_TAIL_RE = re.compile(
-    r"(?:[（(]\s*\d{1,4}\s*[）)]"
-    r"|[.．·•…\s]{2,}\d{1,4}"
-    r"|\s+\d{1,4})\s*$"
-)
-
-# 归一化匹配用：全角数字/点 → 半角，便于正文标题与目录条目对齐。
-_FULLWIDTH_DIGITS = str.maketrans("０１２３４５６７８９．", "0123456789.")
-
-# 目录区域：连续 entry_like 文本行需达此长度才判为目录（避开 2~3 行误伤）。
-MIN_TOC_RUN = 4
-# 目录定位：正文块向后匹配目录条目的前瞻窗口（容忍若干条目在正文无对应块）。
-TOC_LOOKAHEAD = 8
-
-
-def _norm(text: str) -> str:
-    """归一化文本用于匹配：全角数字/点转半角、去所有空白（含全角空格）。
-
-    参数：
-        text (str): 原始文本。
-    返回：
-        str: 归一化串（仅供内部匹配，不回写块）。
-    """
-    return re.sub(r"\s+", "", text.translate(_FULLWIDTH_DIGITS))
-
-
-def _split_catalog_line(text: str) -> tuple[str, int | None]:
-    """目录条目行 → (干净标题, 页码)。剥掉尾部页码引用与导引点。
-
-    参数：
-        text (str): 一条目录行，如 "5.3 防火分区 …… 23" / "1 总则（1）"。
-    返回：
-        tuple[str, int | None]: (标题, 页码)；无尾页码时页码为 None、标题为整行去空白。
-    """
-    m = _CATALOG_TAIL_RE.search(text)
-    page: int | None = None
-    if m:
-        pm = re.search(r"\d{1,4}", m.group(0))
-        page = int(pm.group()) if pm else None
-        title = text[: m.start()]
-    else:
-        title = text
-    return title.rstrip(" .．·•…　\t").strip(), page
-
-
-def _is_catalog_list(items: list[str], thresh: float = 0.5) -> bool:
-    """目录页列表判定：过半条目以「页码」结尾则整列为目录页（强信号，整列盖章）。
-
-    功能：识别 MinerU 把整个目录解析成单个 list 元素的情形。**不做减法**——据此把
-        整列条目标 ``catalog="toc"`` 保留（含无尾页码的章名续行）。
-
-    参数：
-        items (list[str]): list 元素的 list_items。
-        thresh (float): 命中比例阈值，默认 0.5。
-    返回：
-        bool: True = 整列为目录页。
-    """
-    if not items:
-        return False
-    hits = sum(1 for x in items if _CATALOG_TAIL_RE.search(x.strip()))
-    return hits >= max(1, len(items)) * thresh
-
-
-class CatalogLabeler:
-    """目录打标器：给每块打 `catalog`（"toc" / 所属目录条目标题 / None）。
-
-    功能（方案 5 混合）：
-        ① 展平 + 盖章 standard_id（list 条目逐条展开，不丢块）；
-        ② 目录页识别（区域判据）：整列目录（_is_catalog_list）或连续成行的
-           entry_like 文本（run ≥ MIN_TOC_RUN）→ catalog="toc"；
-        ③ 解析目录条目表（有序，骨架真值）；
-        ④ 目录定位：正文按文档序顺序扫描，归一化匹配目录条目切换「当前条目」，
-           每块 catalog = 最近命中条目标题（条等深层块归属其节的条目）；无目录页时
-           退化为以 text_level 标题块自身标题作边界。每块同时记 catalog_source 审计该
-           catalog 由哪条子机制得来（toc_page/toc_match/inherited/heading_fallback/front_matter）。
-        text_level（MinerU 标题层级）由 FormatAdapter 原样透传，本层只读用于匹配、不重打，
-        不解析条文号/层级（那是建树层的事）。
-
-    参数：
-        standard_id (str): 规范唯一标识，逐块盖章。
-    返回：
-        调用 annotate(elements) 返回 list[dict]，每块带 standard_id + catalog。
-    """
-
-    def __init__(self, standard_id: str) -> None:
-        """初始化目录打标器。
-
-        参数：
-            standard_id (str): 规范唯一标识。
-        返回：
-            无。
-        """
-        self.standard_id = standard_id
-        self.entries: list[dict] = []  # annotate() 后填：有序目录条目表（骨架真值，供建树器取）
-
-    def annotate(self, elements: list[dict]) -> list[dict]:
-        """展平 → 目录打标 → 目录定位，逐块写 standard_id + catalog。
-
-        副作用：把解析出的有序目录条目表存到 ``self.entries``（``{title, norm, page}``，
-        骨架真值），供建树器 TreeBuilder 以目录条目为骨架建树（无目录页时为空列表）。
-
-        参数：
-            elements (list[dict]): FormatAdapter.adapt() 产出的统一元素列表。
-        返回：
-            list[dict]: 每块带 standard_id + catalog 的扁平列表（不建树、不丢块）。
-        """
-        blocks = self._flatten(elements)
-        self._mark_toc(blocks)
-        self.entries = self._parse_entries(blocks)
-        self._locate(blocks, self.entries)
-        return blocks
-
-    def _flatten(self, elements: list[dict]) -> list[dict]:
-        """展平为块列表，盖章 standard_id；整列目录的 list 条目直接标 catalog="toc"。
-
-        list 块逐条展开成块（展开后丢弃 list_items 字段，不逐块冗余保留）。
-
-        参数：
-            elements (list[dict]): FormatAdapter 元素列表。
-        返回：
-            list[dict]: 块列表（list 已逐条展开；每块含 standard_id，catalog 暂未补全）。
-        """
-        out: list[dict] = []
-        for elem in elements:
-            base = {**elem, "standard_id": self.standard_id}
-            if elem["type"] == "list":
-                items = base.pop("list_items", [])  # 展开后不再逐块保留 list_items（去冗余）
-                toc = _is_catalog_list(items)  # 整列目录页 → 每条盖 catalog="toc"
-                for sub in items:
-                    b = {**base, "text": sub}
-                    if toc:
-                        b["catalog"] = "toc"
-                    out.append(b)
-            else:
-                out.append(base)
-        return out
-
-    @staticmethod
-    def _entry_like(block: dict) -> bool:
-        """单块是否「像一条目录行」：text/list 短行且行尾带页码引用。
-
-        参数：
-            block (dict): 展平后的块。
-        返回：
-            bool: True = 形似目录条目（仅作区域判据的逐块信号）。
-        """
-        if block.get("catalog") == "toc":
-            return True
-        text = block.get("text", "")
-        return (
-            block.get("type") in ("text", "list")
-            and len(text) < 80
-            and bool(_CATALOG_TAIL_RE.search(text))
-        )
-
-    def _mark_toc(self, blocks: list[dict]) -> None:
-        """区域判据标目录页：连续 entry_like 成行（run ≥ MIN_TOC_RUN）整段标 catalog="toc"。
-
-        功能：只把**成片**的目录行判为目录，孤立的「行尾带数字」正文短行不误判、不丢弃
-            （承「不做减法」）。整列目录已在 _flatten 直接盖章，本步补「逐行排版的目录」。
-
-        参数：
-            blocks (list[dict]): _flatten 产出的块列表（原地写 catalog）。
-        返回：
-            无。
-        """
-        n = len(blocks)
-        i = 0
-        while i < n:
-            if not self._entry_like(blocks[i]):
-                i += 1
-                continue
-            j = i
-            while j < n and self._entry_like(blocks[j]):
-                j += 1
-            if j - i >= MIN_TOC_RUN:
-                for k in range(i, j):
-                    blocks[k]["catalog"] = "toc"
-            i = j
-
-    @staticmethod
-    def _parse_entries(blocks: list[dict]) -> list[dict]:
-        """从 catalog="toc" 的块解析有序目录条目表（骨架真值）。
-
-        参数：
-            blocks (list[dict]): 已标目录的块列表（文档序）。
-        返回：
-            list[dict]: 条目列表，每条 {title, norm, page}；norm 供定位匹配，page 供调试。
-        """
-        entries: list[dict] = []
-        for b in blocks:
-            if b.get("catalog") != "toc":
-                continue
-            title, page = _split_catalog_line(b.get("text", ""))
-            if title:
-                entries.append({"title": title, "norm": _norm(title), "page": page})
-        return entries
-
-    @staticmethod
-    def _locate(blocks: list[dict], entries: list[dict]) -> None:
-        """目录定位：给每块写 catalog（所属条目标题）+ catalog_source（来源审计，方案 5）。
-
-        功能：
-            目录页块——catalog 已为 "toc"，catalog_source = toc_page。
-            有目录条目时——维护单调前瞻指针，正文块归一化文本命中 entries[ptr:ptr+W]
-            中某条（精确相等，或 text_level 标题块前缀相等）即切换「当前条目」、指针前移，
-            该块 source = toc_match；未命中则 catalog = 当前条目（条等深层块自然归属其
-            节），source = inherited（首个命中前 catalog=None、source=front_matter）。
-            无目录条目时——退化：text_level 标题块自身标题作边界（source=heading_fallback），
-            其余继承（source=inherited / front_matter）。
-
-        参数：
-            blocks (list[dict]): 块列表（文档序，原地写 catalog / catalog_source）。
-            entries (list[dict]): _parse_entries 产出的有序条目表。
-        返回：
-            无。
-        """
-        cur: str | None = None
-        ptr = 0
-        for b in blocks:
-            if b.get("catalog") == "toc":
-                b["catalog_source"] = "toc_page"
-                continue
-            if entries:
-                nb = _norm(b.get("text", ""))
-                hit = None
-                for j in range(ptr, min(ptr + TOC_LOOKAHEAD, len(entries))):
-                    en = entries[j]["norm"]
-                    if len(en) < 2:
-                        continue
-                    if nb == en or (b.get("text_level") is not None and nb.startswith(en)):
-                        hit = j
-                        break
-                if hit is not None:
-                    ptr = hit + 1
-                    cur = entries[hit]["title"]
-                    b["catalog"], b["catalog_source"] = cur, "toc_match"
-                else:
-                    b["catalog"] = cur
-                    b["catalog_source"] = "inherited" if cur is not None else "front_matter"
-            elif b.get("text_level") is not None and b.get("text"):  # 退化：标题块自身作边界
-                cur = b["text"]
-                b["catalog"], b["catalog_source"] = cur, "heading_fallback"
-            else:
-                b["catalog"] = cur
-                b["catalog_source"] = "inherited" if cur is not None else "front_matter"
-
-    def print_stats(self, annotated: list[dict]) -> None:
-        """打印目录打标统计：标题数 + 按 catalog_source 分解各来源占比（方案 5 可见）。
-
-        参数：
-            annotated (list[dict]): annotate() 产出的标注列表。
-        返回：
-            无（打印到终端）。
-        """
-        total = len(annotated)
-        headings = sum(1 for e in annotated if e.get("text_level") is not None)
-        src = Counter(e.get("catalog_source") for e in annotated)
-        located = src["toc_match"] + src["inherited"] + src["heading_fallback"]
-
-        t = Table(title="目录打标统计（目录打标 + 定位）")
-        t.add_column("指标")
-        t.add_column("数量", justify="right")
-        t.add_row("总块数", str(total))
-        t.add_row("  标题块(text_level)", str(headings))
-        t.add_row("  目录页块(toc_page)", str(src["toc_page"]))
-        t.add_row("  已定位块(归属某条目)", str(located))
-        t.add_row("    命中目录条目(toc_match)", str(src["toc_match"]))
-        t.add_row("    继承(inherited)", str(src["inherited"]))
-        t.add_row("    无目录退化(heading_fallback)", str(src["heading_fallback"]))
-        t.add_row("  前置内容块(front_matter：封面/扉页/前言，首个目录条目命中前)", str(src["front_matter"]))
-        console.print(t)
-
-
-# ===========================================================================
-# §3 建树 —— TreeBuilder（目录条目骨架 + 正文挂载 → Chunk 树）
-# ===========================================================================
-#
-# 读 §2 目录打标产出的标注块 **与有序目录条目表（entries）**，以**目录条目为骨架**还原成
-# 保留 parent/child 的语义树（``chunks.json``，单一真值）。
-#
-# 建树策略（PRD §3.1「按文档原生目录层级建树」；2026-06-13 改用 catalog 建树，解决父链断裂）：
-#
-#   ① **目录条目物化骨架**：每个 TOC 条目 → 一个骨架节点（**恒存在**，即使正文里没有
-#      对应正文块 / 被 MinerU 漏抽），条目标题跑 ``classify_heading`` 取 node_path（种类/深度
-#      不落字段，由消费方按 children_ids / ancestor_paths 派生）。这是「父链断裂」的根治——上层章/节
-#      不再因「只有标题没正文」被丢。
-#   ② **条目按号段嵌套**：目录只给有序扁平条目，「5.3 属于 5」仍靠 node_path 号段
-#      （``_resolve_parent``）；号段失效（无编号散文）则回退到 catalog 归属。
-#   ③ **正文挂载 + 两把切分深度闸**（``max_depth`` / ``subsplit``，2026-06-15）：正文标题块
-#      若 node_path 命中骨架节点 → **接地**（补 provenance / 正文 / 表格）。不命中时：
-#        · ``subsplit=="none"``（默认，树严格镜像目录）→ 目录没列的更细标题（5.3.4 / 款 /
-#          表小标题）**不建节点**，归入其所属骨架节点（号段最近祖先）的正文，原始块
-#          （block_idx）完整留在该节点 provenance 下。
-#        · ``subsplit=="number"`` → 把「以编号号段开头」的标题/正文块（号段含小数点、排除交叉
-#          引用）**另起编号子节点**，号段自动挂到最近祖先骨架，block_idx 精确随块带入——即原先
-#          「下沉 Stage 2」的目录层下细分，已收回本切法（按编号号段，条文号正则识别，无需重跑 MinerU）。
-#      ``max_depth`` 另限**目录骨架**的号段层级（章/节/条…）：超过者不建骨架、正文并入最近祖先。
-#      两闸正交：max_depth 限目录树深度，number 在其下补更细单元——编号子节点不受 max_depth 限。
-#   ④ **固有事实一次算定**：祖先链（``_attach_ancestors``）、引用图分型 + 反向边
-#      （§1 ``annotate_references``）。
+#   ① **目录条目物化骨架**：每个 TOC 条目 → 一个骨架节点（**恒存在**，即使正文里没有对应正文块），
+#      条目标题跑 ``classify_heading`` 取 node_path。这是「父链断裂」的根治——上层章/节不再因
+#      「只有标题没正文」被丢。
+#   ② **条目按号段嵌套**：「5.3 属于 5」靠 node_path 号段（``_resolve_parent``）；号段失效
+#      （无编号散文）则回退到 catalog 归属。
+#   ③ **正文挂载 + 两把切分深度闸**（``max_depth`` / ``subsplit``）：正文标题块若 node_path 命中
+#      骨架节点 → **接地**（补 provenance / 正文 / 表格）。不命中时：
+#        · ``subsplit=="none"``（默认，树严格镜像目录）→ 目录没列的更细标题不建节点，归入其所属
+#          骨架节点（号段最近祖先）的正文，block_idx 完整留在该节点 provenance 下。
+#        · ``subsplit=="number"`` → 把「以编号号段开头」的标题/正文块（号段含小数点、排除交叉引用）
+#          另起编号子节点，号段自动挂到最近祖先骨架，block_idx 随块带入。
+#      ``max_depth`` 另限**目录骨架**的号段层级：超过者不建骨架、正文并入最近祖先。两闸正交：
+#      max_depth 限目录树深度，number 在其下补更细单元（编号子节点不受 max_depth 限）。
+#   ④ **固有事实一次算定**：祖先链（``_attach_ancestors``）、引用图分型 + 反向边（§1）。
 #
 #   无目录页时（entries 为空）退化为「号段建树」best-effort：正文标题块按号段连边、空骨架不丢。
+#   **限制**：``subsplit=="none"`` 时目录没列的更细单元（如 5.3.4）不是独立节点 → 对**该层**目标的
+#   ``referenced_by`` / 引用扩展会落空（节级正常）；置 ``subsplit=="number"`` 即建子节点恢复。
 #
-#   **限制**：``subsplit=="none"`` 时目录没列的更细单元（如 5.3.4）不是独立节点 → 对**该层**目标
-#   的 ``referenced_by`` / 引用扩展会落空（节级正常）；置 ``subsplit=="number"`` 即建子节点恢复。
-#   number 仅切「以编号号段开头成块」的单元；整段是一张表 / 完全无编号的单元仍留在所属节正文（已知边界）。
-#
-# 命名（承 2026-06-13 术语统一）：旧名 ``GranularityAxis`` 失准——「granularity」已专指索引期
-# 树上视图（``index.manager.view``），与建树无关，故更名 ``TreeBuilder``。
-#
-# 内部 IR（2026-06-15 类型化）：建树期节点用 ``_BuildNode`` dataclass（字段名即与 ``core.chunk.Chunk``
-# 对齐：``provenance:Provenance`` 等结构字段，消灭旧「node dict → Chunk」的改名缝），
-# 另带两个建树期临时字段 ``catalog`` / ``skeleton``（``to_chunk()`` 时丢弃、不进 chunks.json）。
-# ``apply`` 直接出 ``list[Chunk]``，``TocSplitter`` 不再做字段改名映射。
-#
-# 输入：① §2 CatalogLabeler.annotate() 产出的标注块列表（每块带 text_level / catalog /
-#       catalog_source / standard_id / block_idx 溯源）；② CatalogLabeler.entries（有序
-#       目录条目表，骨架真值）。
-# 输出：Chunk 树 list[core.chunk.Chunk]（含 parent_id/children_ids + 祖先链 + 引用图）。
+# 内部 IR：建树期节点用 ``_BuildNode`` dataclass（字段名即与 ``ir.chunk.Chunk`` 对齐，消灭出口
+# 改名缝），另带两个建树期临时字段 ``catalog`` / ``skeleton``（``to_chunk()`` 时丢弃）。
+# 输入：① 目录打标块列表（带 text_level / catalog / catalog_source / block_idx 溯源）；② entries
+# （有序目录条目表，骨架真值）。输出：Chunk 树（含 parent_id/children_ids + 祖先链 + 引用图）。
 
 
 @dataclass
 class _BuildNode:
-    """建树期节点（结构层内部 IR）——字段名即与 ``core.chunk.Chunk`` 对齐，消灭出口改名缝。
+    """建树期节点（结构层内部 IR）——字段名即与 ``ir.chunk.Chunk`` 对齐，消灭出口改名缝。
 
     与 Chunk 同名同义的结构字段（parent_id / ancestor_paths / provenance:Provenance …）建树末算定；
     另带两个**建树期临时字段** ``catalog`` / ``skeleton``，仅供连边/剪枝用，``to_chunk()`` 时
@@ -557,21 +451,23 @@ class _BuildNode:
     产物），``to_chunk()`` 时转 ``Reference``。
     """
 
+    # 字段顺序镜像 ir.chunk.Chunk（标识→载荷→结构→引用图→溯源→表格图示→审计）；chunk_id 不落
+    # 建树期，由 Chunk.__post_init__ 派生（standard_id#node_path）。
     node_path: str
     standard_id: str = ""
-    parent_id: str | None = None
-    children_ids: list[str] = field(default_factory=list)
     title: str = ""
     content: str = ""
+    parent_id: str | None = None
+    children_ids: list[str] = field(default_factory=list)
     ancestor_titles: list[str] = field(default_factory=list)
     ancestor_paths: list[str] = field(default_factory=list)
     references: list[dict] = field(default_factory=list)   # {to,type}；to_chunk() 转 Reference
     referenced_by: list[str] = field(default_factory=list)
-    node_path_source: str = ""        # number / text_level（来自 classify_heading）
-    node_path_confidence: float = 1.0
     provenance: Provenance = field(default_factory=Provenance)
     tables: list[dict] = field(default_factory=list)
     images: list[dict] = field(default_factory=list)
+    node_path_source: str = ""        # number / text_level（来自 classify_heading）
+    node_path_confidence: float = 1.0
     # ── 建树期临时（不进 Chunk）──
     catalog: str | None = None        # 本节点对应/所属目录条目标题（catalog 兜底连边用）
     skeleton: bool = False            # 目录条目物化的骨架节点，恒保留（压过空正文剪枝）
@@ -587,19 +483,19 @@ class _BuildNode:
         return Chunk(
             node_path=self.node_path,
             standard_id=self.standard_id,
-            parent_id=self.parent_id,
-            children_ids=self.children_ids,
             title=self.title,
             content=self.content,
+            parent_id=self.parent_id,
+            children_ids=self.children_ids,
             ancestor_titles=self.ancestor_titles,
             ancestor_paths=self.ancestor_paths,
             references=[Reference.from_dict(r) for r in self.references],
             referenced_by=self.referenced_by,
-            node_path_source=self.node_path_source,
-            node_path_confidence=self.node_path_confidence,
             provenance=self.provenance,
             tables=self.tables,
             images=self.images,
+            node_path_source=self.node_path_source,
+            node_path_confidence=self.node_path_confidence,
         )
 
 
@@ -801,19 +697,20 @@ class TreeBuilder:
         annotated: list[dict],
         *,
         entries: list[dict] | None = None,
+        std: str = "",
         source_file: str = "",
     ) -> list[Chunk]:
         """目录条目骨架 + 正文挂载 → Chunk 树（含 parent/child + 引用图 + 祖先链）。
 
         参数：
-            annotated (list[dict]): CatalogLabeler.annotate() 产出的标注块列表。
-            entries (list[dict] | None): CatalogLabeler.entries（有序目录条目表，骨架真值）；
-                None / 空 → 退化为「保留骨架 + 号段建树」（无目录页 best-effort）。
+            annotated (list[dict]): §0 目录打标产出的块列表（带 catalog/catalog_source/block_idx）。
+            entries (list[dict] | None): 有序目录条目表（骨架真值）；None / 空 → 退化为
+                「保留骨架 + 号段建树」（无目录页 best-effort）。
+            std (str): 规范标识（写入每个节点）。
             source_file (str): 原始 content_list.json 路径（写入 provenance 溯源）。
         返回：
-            list[Chunk]: Chunk 树（core.chunk.Chunk 形态，features 待表征层挂）。
+            list[Chunk]: Chunk 树（ir.chunk.Chunk 形态，features 待表征层挂）。
         """
-        std = next((b.get("standard_id", "") for b in annotated if b.get("standard_id")), "")
         meta = {"source_file": source_file}
 
         by_path: dict[str, _BuildNode] = {}  # node_path → 节点（骨架 + 正文，先现先占）
@@ -1086,7 +983,7 @@ class TreeBuilder:
         祖先链取**真实父链**而非 node_path 号段：中间层级缺节点时按实际父链算
         （5.3 缺 → 5.3.4 的父是 5），也适配无"章/节/条"原生层级的文档。树**深度**与
         节点**种类**（容器/叶）均为纯派生事实，不在此落字段——消费方按 len(ancestor_paths)+1
-        取深度、按 children_ids 空否判种类（见 core.chunk 模块 docstring / index.manager.view）。
+        取深度、按 children_ids 空否判种类（见 ir.chunk 模块 docstring / index.manager.view）。
 
         参数：
             nodes (list[_BuildNode]): 已连边（含 parent_id）的节点列表。
@@ -1109,41 +1006,42 @@ class TreeBuilder:
 
 
 # ===========================================================================
-# §4 切分策略 —— TocSplitter（把 §2 目录打标 + §3 建树收口成 Splitter 契约）
+# §3 切分策略 —— TocSplitter（把 §2 建树收口成 Splitter 契约）
 # ===========================================================================
 
 
 class TocSplitter(Splitter):
-    """以 PDF 原生目录为骨架的多层级切分（CatalogLabeler + TreeBuilder）。"""
+    """以 PDF 原生目录为骨架的多层级切分（吃解析层目录打标产物 → TreeBuilder 建树）。"""
 
     name = "toc"
 
     def split(self, document: Document, *, max_depth: int | None = None,
               subsplit: str = "none") -> SplitResult:
-        """目录打标 → 建树 → Chunk 树（含 parent/child + 祖先链 + 引用图）。
+        """目录打标（§0）→ 建树（§2）→ Chunk 树（含 parent/child + 祖先链 + 引用图）。
 
-        参数 / 返回：见基类 Splitter.split（max_depth 切目录层级 / subsplit 目录层下按编号细分）。
-        debug_blocks = 目录打标后的扁平块（catalog_blocks.json）。
+        入参 ``document`` 为解析层**格式归一**产物（blocks 为纯版面块、未打标）；本层先 ``CatalogLabeler``
+        打标得到带 catalog/catalog_source 的块 + 有序目录条目表（骨架真值），再 ``TreeBuilder`` 建树。
+        参数 / 返回：见基类 Splitter.split（max_depth 切目录层级 / subsplit 目录层下按编号细分）；
+        ``SplitResult.catalog_blocks`` 顺带返回目录打标快照（调试，catalog_blocks.json）。
         """
-        blocks = document.block_dicts()
         labeler = CatalogLabeler(document.standard_id)
-        annotated = labeler.annotate(blocks)
-        labeler.print_stats(annotated)  # 观测：catalog_source 来源分解（方案 5 可见）
-
+        annotated = labeler.annotate(document.block_dicts())
         chunks = TreeBuilder(max_depth, subsplit).apply(
             annotated,
             entries=labeler.entries,
+            std=document.standard_id,
             source_file=document.source_file,
         )
-        return SplitResult(chunks=chunks, debug_blocks=annotated)
+        return SplitResult(chunks=chunks, catalog_blocks=annotated)
 
     def run_cli(self) -> click.Command:
         """阶段1 实跑入口：返回「解析 → 切分 → 写盘」的 click 命令（只到结构层，不碰表征/索引）。
 
         与 ``parser.MineruParser.run_cli`` 同构——``splitter.__main__`` 遍历注册表把声明了 ``run_cli``
         的切法挂成 ``python -m splitter <切法名>``（占位切法无 ``run_cli`` → 不出现）。读阶段0 缓存
-        ``*_content_list.json``，经 parser 解析成 Document → ``self.split`` → 出 chunks.json /
-        catalog_blocks.json。不依赖 Milvus / 嵌入服务，本地即可跑、专调切分深度（max_depth / subsplit）。
+        ``*_content_list.json``，经 parser 解析（格式归一）成 Document → ``self.split``（目录打标 + 建树）
+        → 出 chunks.json / catalog_blocks.json。不依赖 Milvus / 嵌入服务，本地即可跑、专调切分深度
+        （max_depth / subsplit）。
 
         参数：无。
         返回：
@@ -1171,8 +1069,9 @@ class TocSplitter(Splitter):
         def _cmd(input_path: Path, standard_id: str, profile_name: str, parser_strategy: str,
                  toc_max_depth: int | None, subsplit: str, structured_dir: Path,
                  preview: bool) -> None:
-            """只跑切分（阶段 0→1）：解析 → 切分建树 → 出 chunks.json / catalog_blocks.json。"""
-            from parser import factory as parser_factory  # 延迟引入，避免切分层模块级依赖解析层
+            """只跑切分（阶段 0→1）：解析（格式归一）→ 切分（目录打标 + 建树）→ 出 catalog_blocks.json / chunks.json。"""
+            # 延迟引入，避免切分层模块级依赖解析层
+            from parser import factory as parser_factory
 
             standard_id = standard_id or input_path.stem.replace("_content_list", "")
             console.rule(f"[bold]切分（{self.name}）：{standard_id}[/bold]")
@@ -1186,6 +1085,8 @@ class TocSplitter(Splitter):
 
             result = split(document, max_depth=toc_max_depth, subsplit=subsplit)
             chunks = result.chunks
+            catalog_blocks = result.catalog_blocks
+            print_catalog_stats(catalog_blocks)  # 观测：catalog_source 来源分解
             console.print(f"[green]✓ {len(chunks)} 个 Chunk 节点[/green]")
 
             if preview:
@@ -1202,8 +1103,7 @@ class TocSplitter(Splitter):
             safe = re.sub(r"[^\w]", "_", standard_id).strip("_")
             out = structured_dir / safe / profile_name
             out.mkdir(parents=True, exist_ok=True)
-            if result.debug_blocks is not None:
-                _write_json(result.debug_blocks, out / "catalog_blocks.json")
+            _write_json(catalog_blocks, out / "catalog_blocks.json")
             _write_json([c.to_dict() for c in chunks], out / "chunks.json")
 
         return _cmd

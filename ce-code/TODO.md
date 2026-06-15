@@ -113,7 +113,9 @@ MinerU 解析 + 条款树提取 + 质量审核，在 GB 50378-2006 和 GB 50016 
 
 ### 待办 — 按新模型组织（节点树 / 多表征 / 粒度视图）
 
-> 新流水线（见 PRD §3.2）：阶段 1 结构层（建节点树 `nodes.json`）→ 阶段 2 表征层（挂 `reprs`）→ 阶段 3 索引（按 `index_granularity` 选粒度视图）。代码任务编号 T1–T10，依赖关系见下。**一次只动一个变量，每步过 `07_eval` 护栏。**
+> 新流水线（见 PRD §3.2）：阶段 1 结构层（建节点树 `chunks.json`）→ 阶段 2 表征层（`feature/` 挂表征）→ 阶段 3 索引（按 `index_granularity` 选粒度视图）。代码任务编号 T1–T10，依赖关系见下。**一次只动一个变量，每步过 `tools.eval` 护栏。**
+
+> **⚠️ 下方「核心现状（2026-06-13 评估）」块为历史快照（旧名 `nodes.json`/`02`/`04`/`engine`/`server`/`07_eval`），其描述的脱钩问题在 2026-06-15 分层重构后路径已全部更名（见上「分层重构」条目）；保留存真，开放待办以新模块名为准。**
 
 > **⚠️ 核心现状（2026-06-13 评估）：流水线后半段已与 `nodes.json` 脱钩，护栏事实上失效。**
 > - **生产者已迁移**：`02` 现在只产 `nodes.json` + `structure.json`，**不再产 `*_clauses.json`**。
@@ -147,16 +149,16 @@ MinerU 解析 + 条款树提取 + 质量审核，在 GB 50378-2006 和 GB 50016 
 
 **第 3 步 — T9 small-to-big + T6 服务层**（依赖第 1 步索引带 `parent_id`）：
 
-- [ ] **T9 small-to-big 检索**（`retrieval/engine.py`）：细粒度命中后靠 `parent_id` 上探返回整条/整节；`modal` 作可选 filter 通道（query 带强制意图时启用，依赖第 4 步 modal 表征）。
+- [ ] **T9 small-to-big 检索**（`retrieval/hybrid_retriever.py` + `retrieval/service.py`，承旧 `engine.py`）：细粒度命中后靠 `parent_id` 上探返回整条/整节；`modal` 作可选 filter 通道（query 带强制意图时启用，依赖第 4 步 modal 表征）。
   - [x] **去重键 node_path → node_id**（✅ 2026-06-13，small-to-big 前置）：`merge_results`/`expand_references` 改按 `node_id` 去重（clause 粒度下与 node_path 1:1 等价、行为保持；section/paragraph 粒度下 node_path 不唯一时唯 node_id 恒唯一）。`references_to` 仍存 node_path，故引用解析按 node_path 查 meta、去重按 node_id；跨规范引用查不到自动跳过。合成数据烟测通过。`get_clause` 保持 node_path 匹配（`/clause/{std}/{path}` 路径直取端点，契约即按路径）。`MILVUS_OUTPUT_FIELDS`/stats 的 `is_mandatory`/`mandatory` 残留已在 T4 清掉，本次同步清 `search` docstring 残留。
   - [ ] **small-to-big 上探**（待做）：命中单元靠 `parent_id` 回补父节点整条/整节上下文。
 - [x] **T6 服务层清理**（✅ 2026-06-13，`service/server.py`）：删 `mandatory_clauses_count` 响应字段、`★强条`/`n_mandatory` 日志与 `强条=%s` 观测行。`/search` 返回挂 small-to-big 父节点上下文部分留 T9（依赖上探实现）。
 
 **第 4 步 — 波2 表征补全 + 波3 LLM 表征 / 评测改造**（依赖前三步 + Qwen3）：
 
-- [ ] **T8 表征补全**：`table_struct`（接管现表格 HTML 解析）/`modal`（复用 `strength.parse_modal_strength` 正则，删 `is_mandatory` 法律逻辑，产出 `reprs.modal`）/`condition` 谓词（`reprs/condition.py`，抽不准标 `scope_status:unknown`）。
-- [ ] **T10 评测换指标**（`07_eval.py`）：删"强条召回率"首要指标，改 Recall@k / 引用召回 / MRR / 金标秩；按**包含关系**判命中（配合 small-to-big）。`03_review_quality.py` 同步：删强条统计/误标检测，改节点树健康（孤儿节点 / 空内容 / 表格归属 / 悬空引用）。
-- [ ] **LLM 表征**（`reprs/summary.py`、`reprs/questions.py`）：调 Qwen3 生成摘要 / 假设问题表征，入 `dense` 多通道。
+- [ ] **T8 表征补全**：`table_struct`（接管现表格 HTML 解析）/`modal`（复用旧 `strength.parse_modal_strength` 正则，删 `is_mandatory` 法律逻辑，产出 `feature` 的 `modal` 投影）/`condition` 谓词（`feature/condition.py`，抽不准标 `scope_status:unknown`）。
+- [ ] **T10 评测换指标**（`tools/eval.py`）：删"强条召回率"首要指标，改 Recall@k / 引用召回 / MRR / 金标秩；按**包含关系**判命中（配合 small-to-big）。`tools/review_quality.py` 同步：删强条统计/误标检测，改节点树健康（孤儿节点 / 空内容 / 表格归属 / 悬空引用）。
+- [ ] **LLM 表征**（`feature/summary.py`、`feature/questions.py`）：调 Qwen3 生成摘要 / 假设问题表征，入 `dense` 多通道。
 
 **多规范扩展**：GB 50116（火灾自动报警系统）待收录。
 

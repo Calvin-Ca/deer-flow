@@ -1,12 +1,12 @@
 """Document IR —— 解析层（parser/）产物 = 一篇文档的统一元素流（结构层上游）。
 
-替代旧「``FormatAdapter.adapt`` 返回 list[dict]」为显式 ``@dataclass``：
-``Document`` = 规范标识 + 溯源文件 + **有序 Block 列表**；``Block`` = 一个统一元素
-（MinerU 等任意解析模型归一后的最小单位）。切分层（splitter/）吃 ``Document.blocks``
-建树，**不关心上游用的是哪种解析模型**——这是「多解析模型可插拔」的边界。
+``Document`` = 规范标识 + 溯源文件 + **有序 Block 列表**；``Block`` = 一个统一元素（MinerU 等任意
+解析模型归一后的最小单位，纯版面/内容事实）。切分层（splitter/）吃 ``Document.blocks`` 建树，
+**不关心上游用的是哪种解析模型**——这是「多解析模型可插拔」的边界。
 
-Block 字段与 MinerU v1 适配产物对齐（见 parser/mineru.py 的 FormatAdapter）：纯版面/内容事实，
-**不含结构语义**（条文号 / 目录标签 / 树边在切分层算）。``text_level`` 为 None 即非标题。
+解析层产物 = 格式归一（FormatAdapter）：Block 只带纯版面/内容事实（type/text/page/block_idx/
+text_level/list_items/body/img_path），``text_level`` 为 None 即非标题。目录打标（catalog 标签 +
+目录条目表）、条文号、树边等结构语义全在切分层算（``splitter.toc_splitter``）——解析层不碰。
 """
 from __future__ import annotations
 
@@ -39,10 +39,9 @@ class Block:
     img_path: str = ""
 
     def to_dict(self) -> dict:
-        """切分层内部消费的 block dict（与旧 FormatAdapter 输出键一致；省略空值）。
+        """切分层内部消费的 block dict（省略空值）。
 
-        ``text_level`` 仅在标题块写键（与旧「仅标题块有此键」语义一致，
-        消费方靠 ``"text_level" in block`` 判是否标题）。
+        ``text_level`` 仅在标题块写键（消费方靠 ``"text_level" in block`` 判是否标题）。
         """
         out: dict = {"type": self.type, "text": self.text,
                      "page": self.page, "block_idx": self.block_idx}
@@ -77,7 +76,7 @@ class Document:
     字段：
         standard_id 规范唯一标识（逐块继承到 Chunk）。
         source_file 原始解析产物路径（相对 data/parsed/），写入 Chunk.provenance。
-        blocks      有序统一元素列表。
+        blocks      有序统一元素列表（纯版面块，未打标）。
     """
 
     standard_id: str = ""
@@ -85,7 +84,7 @@ class Document:
     blocks: list[Block] = field(default_factory=list)
 
     def block_dicts(self) -> list[dict]:
-        """切分层内部消费格式：list[block dict]（复用既有 CatalogLabeler/TreeBuilder 的 dict 管道）。"""
+        """切分层内部消费格式：list[block dict]（目录打标 / TreeBuilder 的 dict 管道入口）。"""
         return [b.to_dict() for b in self.blocks]
 
     def to_dict(self) -> dict:

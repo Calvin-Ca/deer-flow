@@ -5,6 +5,4 @@
                  ⚠️ 强条口径已清，T10 待换 Recall@k / 引用召回 / MRR。
   review_quality 节点库质量审核。⚠️ 仍 v1 口径（读旧 _clauses.json、统计强条），未适配
                  chunks.json，T10 待改为节点树健康检查（孤儿 / 空内容 / 表格归属 / 悬空引用）。
-
-另含运维脚本：setup_server.sh（服务器一次性环境准备）、rename_raw_files.sh（原始 PDF 重命名）。
 """

@@ -1,4 +1,4 @@
-"""core —— 贯穿全层的 **IR 契约包**（不含编排，不依赖任何业务层）。
+"""ir —— 贯穿全层的 **IR（中间表示）契约包**（不含编排，不依赖任何业务层）。
 
 各层只认这里的中间表示（IR，全部 ``@dataclass`` + ``to_dict/from_dict``）：
   document  Document / Block —— 解析层产物（统一元素流）。
@@ -11,13 +11,13 @@
 """
 from __future__ import annotations
 
-from core.chunk import Chunk, Provenance, Reference, EXPANDABLE_REF_TYPES
-from core.context import KnowledgeContext
-from core.document import Block, Document
-from core.feature import ChunkFeature
-from core.profile import ParseProfile
-from core.query import RetrievalQuery
-from core.retrieval import RetrievedChunk
+from ir.chunk import Chunk, Provenance, Reference, EXPANDABLE_REF_TYPES
+from ir.context import KnowledgeContext
+from ir.document import Block, Document
+from ir.feature import ChunkFeature
+from ir.profile import ParseProfile
+from ir.query import RetrievalQuery
+from ir.retrieval import RetrievedChunk
 
 __all__ = [
     "Document", "Block",

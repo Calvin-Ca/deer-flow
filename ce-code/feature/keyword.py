@@ -6,8 +6,8 @@
 """
 from __future__ import annotations
 
-from core.chunk import Chunk
-from core.feature import ChunkFeature
+from ir.chunk import Chunk
+from ir.feature import ChunkFeature
 from feature.base import Feature
 
 

@@ -31,8 +31,8 @@ ce-code/
 ├── build.py                        # 构建入口（薄壳，转 service/build_service.main）
 ├── config.py                       # 共享运行配置：服务地址 / 规范别名 / collection 命名
 │
-│  ── core：统一 IR 契约（@dataclass + to_dict/from_dict）──
-├── core/                           # 各阶段中间表示（IR），全层只认这里
+│  ── ir：统一 IR 契约（@dataclass + to_dict/from_dict）──
+├── ir/                             # 各阶段中间表示（IR），全层只认这里
 │   ├── document.py                 #   Document / Block（解析层产物）
 │   ├── chunk.py                    #   Chunk / Reference / Provenance（切分层产物·单一真值）
 │   ├── feature.py                  #   ChunkFeature（表征层产物）
@@ -98,7 +98,7 @@ ce-code/
 
 > **运行模型**：ce-code 不安装为包（`packages=[]`），**从 ce-code 根运行**。构建 `python build.py …`；
 > 阶段 0 解析与服务/工具用模块式 `python -m parser mineru …` / `python -m service.knowledge_api` /
-> `python -m tools.eval …`。各层绝对 import（`from core import Chunk` / `import splitter`），无 sys.path hack。
+> `python -m tools.eval …`。各层绝对 import（`from ir import Chunk` / `import splitter`），无 sys.path hack。
 > ★=本轮实现、◌=占位（未实装抛 NotImplementedError）。
 
 ---
@@ -183,12 +183,12 @@ curl -s -X POST http://172.19.2.2:8000/file_parse -F "files=@data/raw/<文件名
 uv run python build.py --input "data/parsed/<basename>/auto/<basename>_content_list.json" --profile-name default --index-granularity clause --embed-url http://localhost:8097 --embed-model-id /model
 ```
 
-中间产物：切分落 `data/structured/<standard>/<profile>/chunks.json`（Chunk 树·单一真值）+ `catalog_blocks.json`（每块目录标签·调试）；`feature.enrich` 挂免费 4 项后重写 `chunks.json`；`index.view` 选粒度（当前仅 `clause`）emit，索引按 profile 隔离落 `data/vector_store/<standard>/<profile>/`，Milvus collection 名由 profile 推断（与 service/eval 一致）。可选 `--parser-strategy`（缺省 `mineru`）、`--structure-strategy`（缺省 `toc`）、切分深度 `--toc-max-depth` / `--subsplit`。无 Milvus 时加 `--bm25-only`（只建 BM25 + metadata）。
+中间产物：解析（格式归一 + 目录打标）落 `data/structured/<standard>/<profile>/catalog_blocks.json`（每块目录标签·调试），切分落同目录 `chunks.json`（Chunk 树·单一真值）；`feature.enrich` 挂免费 4 项后重写 `chunks.json`；`index.view` 选粒度（当前仅 `clause`）emit，索引按 profile 隔离落 `data/vector_store/<standard>/<profile>/`，Milvus collection 名由 profile 推断（与 service/eval 一致）。可选 `--parser-strategy`（缺省 `mineru`）、`--structure-strategy`（缺省 `toc`）、切分深度 `--toc-max-depth` / `--subsplit`。无 Milvus 时加 `--bm25-only`（只建 BM25 + metadata）。
 
 **只跑到前面某步**（不必动 build）：阶段 0 解析单独跑见 Step 3 的 `python -m parser`；**只切分建树、看节点树**（本地无需 Milvus）用切分层入口或预览：
 
 ```bash
-uv run python -m splitter toc --input "data/parsed/<basename>/auto/<basename>_content_list.json"   # 切分落 chunks.json + catalog_blocks.json
+uv run python -m splitter toc --input "data/parsed/<basename>/auto/<basename>_content_list.json"   # 解析+切分落 catalog_blocks.json + chunks.json
 uv run python build.py --input "data/parsed/<basename>/auto/<basename>_content_list.json" --preview  # 只打印前 20 条节点，不落盘
 ```
 

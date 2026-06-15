@@ -1,6 +1,6 @@
 """轻量文本归一 —— 占位（按需扩展）。
 
-当前知识层文本归一由各层就近处理（FormatAdapter 的 strip / catalog_labeler 的 _norm /
+当前知识层文本归一由各层就近处理（FormatAdapter 的 strip / splitter.toc_splitter 的 _norm /
 references 的空白压缩）。本模块预留为「跨层共享的文本清洗」收口点，暂只放最小工具，
 真正需要时（如造价电子表清洗）再充实。
 """

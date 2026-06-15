@@ -6,8 +6,8 @@
 """
 from __future__ import annotations
 
-from core.query import RetrievalQuery
-from core.retrieval import RetrievedChunk
+from ir.query import RetrievalQuery
+from ir.retrieval import RetrievedChunk
 from retrieval.base import Retriever
 
 

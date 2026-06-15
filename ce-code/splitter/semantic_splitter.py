@@ -6,7 +6,7 @@
 """
 from __future__ import annotations
 
-from core.document import Document
+from ir.document import Document
 from splitter.base import Splitter, SplitResult
 
 

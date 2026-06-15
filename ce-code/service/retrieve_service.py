@@ -10,7 +10,7 @@ import time
 import uuid
 from pathlib import Path
 
-from core.query import RetrievalQuery
+from ir.query import RetrievalQuery
 from retrieval.service import RetrievalService
 from utils.logger import get_logger
 

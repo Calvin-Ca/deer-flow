@@ -22,8 +22,8 @@ from pathlib import Path
 
 from rich.console import Console
 
-from core.chunk import Chunk
-from core.feature import FeatureMap, FeatureSidecar, feature_text
+from ir.chunk import Chunk
+from ir.feature import FeatureMap, FeatureSidecar, feature_text
 
 console = Console()
 

@@ -7,7 +7,7 @@
 """
 from __future__ import annotations
 
-from core.document import Document
+from ir.document import Document
 from parser.base import Parser
 
 

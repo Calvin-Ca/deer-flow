@@ -9,8 +9,8 @@ PRD §3.1：context_aug 载体=向量 + BM25，作用=拼祖先链的语境增�
 """
 from __future__ import annotations
 
-from core.chunk import Chunk
-from core.feature import ChunkFeature
+from ir.chunk import Chunk
+from ir.feature import ChunkFeature
 from feature.base import Feature
 
 _PATH_SEP = " / "   # 祖先标题之间

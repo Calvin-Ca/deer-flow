@@ -9,8 +9,8 @@ content 的干净正文），**向量本身在索引期由 index/ 用 embedding 
 """
 from __future__ import annotations
 
-from core.chunk import Chunk
-from core.feature import ChunkFeature
+from ir.chunk import Chunk
+from ir.feature import ChunkFeature
 from feature.base import Feature
 
 

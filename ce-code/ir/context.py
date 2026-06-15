@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from core.retrieval import RetrievedChunk
+from ir.retrieval import RetrievedChunk
 
 
 @dataclass

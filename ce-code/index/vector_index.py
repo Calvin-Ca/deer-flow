@@ -13,8 +13,8 @@ from rich.console import Console
 from tqdm import tqdm
 
 from config import EMBED_DIM
-from core.chunk import Chunk
-from core.feature import FeatureSidecar, feature_text
+from ir.chunk import Chunk
+from ir.feature import FeatureSidecar, feature_text
 
 console = Console()
 

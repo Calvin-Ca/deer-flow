@@ -10,8 +10,8 @@ from __future__ import annotations
 
 import json
 
-from core.query import RetrievalQuery
-from core.retrieval import RetrievedChunk
+from ir.query import RetrievalQuery
+from ir.retrieval import RetrievedChunk
 from retrieval.base import Retriever
 
 # 与建索引期 Milvus schema 对齐的输出标量字段（无 is_mandatory，含 small-to-big 锚点 parent_id）。

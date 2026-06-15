@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from core.chunk import Chunk
+from ir.chunk import Chunk
 
 
 def build(units: list[Chunk], store_dir: Path) -> None:

@@ -1,10 +1,11 @@
 """MinerU 解析工具 —— 一个文件 = 一个工具（适配器 + 门面）。
 
 单文件聚齐 MinerU 的全生命周期：
-  ① FormatAdapter   阶段1 适配的纯逻辑：MinerU v1 content_list → 统一块（page 归一、HTML 表格
+  ① FormatAdapter   阶段1 格式适配的纯逻辑：MinerU v1 content_list → 统一块（page 归一、HTML 表格
                     展开 colspan/rowspan、text_level 透传、block_idx 溯源）。独立类，可单独单测。
   ② MineruParser    门面（factory 注册的工具实体），对外两个对称动词 + 一个 CLI 薄壳：
-                      · ``adapt(raw)``  阶段1：content_list → ``Document``（统一契约，调 ①）。
+                      · ``adapt(raw)``  阶段1：content_list → ``Document``（统一契约，调 ① 格式
+                        归一出纯版面块；目录打标 / 建树是下游切分层的事，本层不碰结构语义）。
                       · ``run(pdf)``    阶段0：调远程 MinerU API 把 PDF 跑成标准布局（无 click，
                         可程序化调用，返回 auto 目录 / 抛 RuntimeError）。
                       · ``run_cli()``   阶段0 的 click 命令（``run`` 的薄壳，含终端呈现）。
@@ -28,7 +29,7 @@ import click
 import requests
 from rich.console import Console
 
-from core.document import Block, Document
+from ir.document import Block, Document
 from parser.base import Parser
 
 console = Console()
@@ -144,8 +145,9 @@ def _html_table_to_rows(html: str) -> list[list[str]]:
 class FormatAdapter:
     """MinerU v1 格式适配器：纯格式转换，无结构语义（逐步动作见 adapt 方法）。
 
-    本适配器是 MinerU v1 content_list schema 专用，复用维度是「任意基于 mineru 的 parser」，
-    与切分层（splitter）无关——它只产统一块，切分/建树（条文号 / 目录标签 / 树边）由 splitter 消费。
+    本适配器是 MinerU v1 content_list schema 专用，复用维度是「任意基于 mineru 的 parser」。
+    它只产统一块（纯格式）；目录打标 / 条文号 / 树边等结构语义全由下游 splitter
+    （``splitter.toc_splitter``）消费——本类不碰结构语义。
 
     adapt(items) 返回的统一元素 schema：
         type       元素类型（text / list / table / equation / footer）
@@ -163,7 +165,7 @@ class FormatAdapter:
         """MinerU v1 原始列表 → 统一元素列表（格式归一，不解析结构语义）。
 
         逐元素把 MinerU 私有 schema 削成项目统一 IR，只做版面/内容层面的转换，
-        **不碰结构语义**（条文号 / 目录标签 / 树边都留给下游 splitter 算）。具体动作：
+        **不碰结构语义**（目录标签 / 条文号 / 树边全留给下游 splitter）。具体动作：
           · 页码归一    ：page_idx（0-base）→ page（1-base）。
           · 丢页码块    ：type == "page_number" 直接跳过。
           · 丢空文本    ：text.strip() 为空的块跳过。
@@ -240,16 +242,19 @@ class MineruParser(Parser):
 
     name = "mineru"
 
-    # ── 阶段1：content_list → Document（统一契约，调 FormatAdapter）──
+    # ── 阶段1：content_list → Document（格式归一，不碰结构语义）──
     def adapt(self, raw: object, *, standard_id: str = "", source_file: str = "") -> Document:
-        """MinerU content_list 列表 → Document（阶段1）。
+        """MinerU content_list 列表 → Document（阶段1）：仅格式归一（FormatAdapter）。
+
+        blocks 为纯版面块（type/text/page/block_idx/text_level/list_items/body/img_path）；目录打标 /
+        条文号 / 树边等结构语义由下游切分层（``splitter.toc_splitter``）消费——本层不碰。
 
         参数：
             raw (list[dict]): MinerU v1 content_list.json 反序列化产物。
             standard_id (str): 规范标识。
             source_file (str): content_list.json 路径（相对 data/parsed/）。
         返回：
-            Document: blocks 为统一元素（FormatAdapter 归一产物）。
+            Document: blocks（纯版面块，未打标）。
         """
         items = raw if isinstance(raw, list) else []
         blocks = [Block.from_dict(d) for d in FormatAdapter.adapt(items)]

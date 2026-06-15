@@ -21,7 +21,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # 从 ce-code �
 import parser
 import splitter
 import feature
-from core import (
+from ir import (
     Block, Chunk, ChunkFeature, Document, ParseProfile, Provenance, Reference, RetrievedChunk,
 )
 from index.manager import chunk_to_row, view
@@ -36,7 +36,7 @@ def test_chunk_round_trip():
               references=[Reference("5.2.1", "strong"), Reference("9.9", "weak")],
               provenance=Provenance(source_file="x.json", block_idx=[12], page=[40]))
     assert Chunk.from_dict(c.to_dict()).to_dict() == c.to_dict()  # 表征已移出 Chunk，不进往返
-    assert c.chunk_id == "5.3.4" and c.is_grounded()
+    assert c.chunk_id == "GB#5.3.4" and c.is_grounded()  # 全局键 = standard_id#node_path
     assert c.expandable_refs() == ["5.2.1"]  # 仅 strong 入扩展
 
 

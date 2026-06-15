@@ -14,8 +14,8 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
-from core.chunk import Chunk
-from core.feature import ChunkFeature
+from ir.chunk import Chunk
+from ir.feature import ChunkFeature
 
 
 class Feature(ABC):

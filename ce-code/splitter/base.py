@@ -18,22 +18,21 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
-from core.chunk import Chunk
-from core.document import Document
+from ir.chunk import Chunk
+from ir.document import Document
 
 
 @dataclass
 class SplitResult:
-    """切分结果。
+    """切分结果：chunks = Chunk 树（落 ``chunks.json`` 单一真值）+ 目录打标快照（调试）。
 
-    字段：
-        chunks (list[Chunk]): Chunk 树（落 ``chunks.json`` 单一真值）。
-        debug_blocks (list[dict] | None): 切分中间产物（落 ``catalog_blocks.json`` 调试用），
-            无中间形态的切法填 None。
+    ``catalog_blocks`` 是切分层目录打标（``toc_splitter.CatalogLabeler``）的逐块快照（落
+    ``catalog_blocks.json``，下游不读，仅供调试 / ``print_catalog_stats`` 统计）；仅做目录打标的
+    切法（toc）填充，其余切法留空列表。
     """
 
     chunks: list[Chunk] = field(default_factory=list)
-    debug_blocks: list[dict] | None = None
+    catalog_blocks: list[dict] = field(default_factory=list)
 
 
 class Splitter(ABC):
@@ -64,6 +63,6 @@ class Splitter(ABC):
                 "number"（按编号号段再切出更细的编号子节点，节/条/款/项皆可，不专指条）。
                 子类可只支持其中部分取值并校验。
         返回：
-            SplitResult: chunks（Chunk 列表）+ debug_blocks（可选中间产物）。
+            SplitResult: chunks（Chunk 列表）。
         """
         raise NotImplementedError

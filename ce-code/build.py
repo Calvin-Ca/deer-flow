@@ -2,8 +2,8 @@
 
 入 *_content_list.json（阶段 0 缓存），单趟内存里跑完：
 
-  ① 解析+切分  parser 解析成 Document → splitter 切分成 Chunk 树
-               → 出 chunks.json（单一真值）+ catalog_blocks.json（每块目录标签·调试）。
+  ① 解析+切分  parser 解析成 Document（仅格式归一，出纯版面块）→ splitter 切分（先目录打标·出
+               catalog_blocks.json 每块目录标签·调试，再建树）成 Chunk 树 → 出 chunks.json（单一真值）。
   ② 选粒度     index.view 在 Chunk 树上选检索单元（clause = 已接地的无子节点·叶）。
   ③ 表征+索引  feature.build_features 对检索单元现算表征 sidecar（不挂 Chunk、不落 chunks.json）
                → index.build_index 建 BM25 + Milvus 双索引。
@@ -27,11 +27,12 @@ import click
 from rich.console import Console
 
 from config import collection_name as build_collection_name
-from core.profile import ParseProfile
+from ir.profile import ParseProfile
 from feature import build_features
 from index import build_index, view
 from parser import factory as parser_factory
 from splitter import factory as splitter_factory
+from splitter.toc_splitter import print_catalog_stats
 
 console = Console()
 
@@ -77,24 +78,25 @@ def run_build(
     except ValueError:
         source_file = input_path.name
 
-    # ── ① 解析成 Document ──
+    # ── ① 解析成 Document（仅格式归一，出纯版面块）──
     with open(input_path, encoding="utf-8") as f:
         items = json.load(f)
     document = parser_factory.select(profile.parser_strategy).adapt(
         items, standard_id=standard_id, source_file=source_file)
-    console.print(f"共 {len(document.blocks)} 个原始元素（{profile.parser_strategy} 解析）")
+    console.print(f"共 {len(document.blocks)} 个原始元素（{profile.parser_strategy} 解析·格式归一）")
 
-    # ── ① 切分建树 → chunks.json（终态，无表征）+ catalog_blocks.json ──
     structured_out = structured_dir / _safe(standard_id) / profile.name
     structured_out.mkdir(parents=True, exist_ok=True)
+
+    # ── ① 切分（目录打标 + 建树）→ catalog_blocks.json（调试快照）+ chunks.json（终态，无表征）──
     spl = splitter_factory.select(profile.structure_strategy)
     console.print(f"[bold cyan]切分[/bold cyan]（strategy={profile.structure_strategy}）→ "
                   f"{structured_out / 'chunks.json'}")
-    result = spl.split(document, max_depth=profile.toc_max_depth,
-                       subsplit=profile.subsplit)
+    result = spl.split(document, max_depth=profile.toc_max_depth, subsplit=profile.subsplit)
     chunks = result.chunks
-    if result.debug_blocks is not None:
-        _write_json(result.debug_blocks, structured_out / "catalog_blocks.json")
+    if result.catalog_blocks:  # toc 法目录打标快照（其余切法留空 → 不落盘）
+        print_catalog_stats(result.catalog_blocks)  # 观测：catalog_source 来源分解
+        _write_json(result.catalog_blocks, structured_out / "catalog_blocks.json")
     _write_json([c.to_dict() for c in chunks], structured_out / "chunks.json")
 
     # ── ② 选粒度 ──
@@ -167,11 +169,10 @@ def main(
             items = json.load(f)
         document = parser_factory.select(profile.parser_strategy).adapt(
             items, standard_id=sid, source_file=input_path.name)
-        result = splitter_factory.select(profile.structure_strategy).split(
-            document, max_depth=profile.toc_max_depth, subsplit=profile.subsplit)
-        chunks = result.chunks
-        n_blk = len(result.debug_blocks) if result.debug_blocks is not None else 0
-        console.print(f"[green]✓ 切分（{profile.structure_strategy}）：{n_blk} 块 → {len(chunks)} 个节点[/green]")
+        chunks = splitter_factory.select(profile.structure_strategy).split(
+            document, max_depth=profile.toc_max_depth, subsplit=profile.subsplit).chunks
+        console.print(f"[green]✓ 切分（{profile.structure_strategy}）："
+                      f"{len(document.blocks)} 块 → {len(chunks)} 个节点[/green]")
         console.print("\n[bold]--- 前 20 条节点预览 ---[/bold]")
         for c in chunks[:20]:
             tables = f"  [{len(c.tables)}表]" if c.tables else ""

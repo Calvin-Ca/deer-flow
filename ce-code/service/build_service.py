@@ -1,16 +1,16 @@
-"""知识库构建编排 —— 三阶段**单独执行**（承旧根 ``build.py``，改走 IR + 四层 factory）。
+"""知识库构建编排 —— 一条命令跑完整流水线（承旧根 ``build.py``，改走 IR + 四层 factory）。
 
-阶段间靠 ``chunks.json`` 落盘解耦，各跑各的、不再级联。``--stage`` 选**只跑哪一阶段**，
-按 structure → reprs → index 顺序逐个执行（后一阶段读前一阶段产出的 chunks.json）：
+入 *_content_list.json（阶段 0 缓存），单趟内存里跑完三步、不分阶段落盘解耦：
 
-  structure  入 *_content_list.json（阶段 0 缓存）→ parser 解析成 Document → splitter 切分成 Chunk 树
-             → 出 chunks.json（单一真值）+ catalog_blocks.json（调试块）。
-  reprs      读 chunks.json → feature.enrich 挂表征（免费 4 项）→ 原地重写 chunks.json（带表征）。
-  index      读带表征 chunks.json → index.view 选粒度 → index.build_index 建索引 → 出 BM25 + Milvus 双索引。
+  ① 解析+切分  parser 解析成 Document → splitter 切分成 Chunk 树
+               → 出 chunks.json（单一真值）+ catalog_blocks.json（每块目录标签·调试）。
+  ② 表征       feature.enrich 挂表征（免费 4 项）→ 重写 chunks.json（带表征）。
+  ③ 索引       index.view 选粒度 → index.build_index 建 BM25 + Milvus 双索引。
 
-各层经 factory 选策略（parser_strategy / structure_strategy / features / index_granularity 均来自
-profile），换解析模型/切法/表征/粒度只改 profile，不改本编排。从 ce-code 根运行：``python build.py …``
-（根 build.py 是本模块 main 的薄壳）。
+只想跑到前面某步不必动本编排：阶段 0 解析用 ``python -m parser``、只切分建树（本地无需
+Milvus）用 ``python -m splitter`` 或 ``--preview``。各层经 factory 选策略（parser_strategy /
+structure_strategy / features / index_granularity 均来自 profile），换解析模型/切法/表征/粒度
+只改 profile，不改本编排。从 ce-code 根运行：``python build.py …``（根 build.py 是本模块 main 薄壳）。
 """
 from __future__ import annotations
 
@@ -25,7 +25,6 @@ import feature
 from parser import factory as parser_factory
 from splitter import factory as splitter_factory
 from config import collection_name as build_collection_name
-from core.chunk import Chunk
 from core.profile import ParseProfile
 from index import build_index, view
 
@@ -47,23 +46,6 @@ def _write_json(data: list, path: Path) -> None:
     console.print(f"[green]✓ 写入 {path}（{len(data)} 条）[/green]")
 
 
-def _load_chunks(chunks_path: Path) -> list[Chunk]:
-    """读前一阶段落盘的 chunks.json 还原 Chunk 树（reprs/index 阶段入口）。
-
-    参数：
-        chunks_path (Path): structured/<std>/<profile>/chunks.json 路径。
-    返回：
-        list[Chunk]: 还原的节点列表。
-    异常：
-        click.ClickException: 文件不存在（提示先跑 --stage structure）。
-    """
-    if not chunks_path.exists():
-        raise click.ClickException(
-            f"未找到 {chunks_path}；阶段间靠落盘解耦，请先跑 --stage structure 产出 chunks.json")
-    with open(chunks_path, encoding="utf-8") as f:
-        return [Chunk.from_dict(d) for d in json.load(f)]
-
-
 def run_build(
     input_path: Path, *, standard_id: str = "", profile: ParseProfile | None = None,
     structured_dir: Path = DEFAULT_STRUCTURED, store_dir: Path | None = None,
@@ -71,53 +53,34 @@ def run_build(
     embed_url: str = "http://localhost:8097", embed_model_id: str = "/model",
     batch_size: int = 64, bm25_only: bool = False,
 ) -> None:
-    """按 ``profile.stage`` 执行**单个**阶段（库函数；CLI 见 main）。preview 不在此（CLI 专用）。
+    """一趟跑完整流水线：解析 → 切分 → 表征 → 索引（库函数；CLI 见 main）。preview 不在此。
 
-    三阶段靠 chunks.json 落盘解耦、各跑各的：structure 从 *_content_list.json 起、产出 chunks.json；
-    reprs / index 读 ``structured/<std>/<profile>/chunks.json`` 续跑。standard_id 缺省取输入文件名
-    basename（三阶段传同一 --input 即可对齐到同一产物目录）。
+    standard_id 缺省取输入文件名 basename；产物按 profile 隔离落
+    ``structured/<std>/<profile>/`` 与 ``vector_store/<std>/<profile>/``。无 Milvus 时
+    ``bm25_only=True`` 只建 BM25 + metadata。
     """
     profile = profile or ParseProfile()
     base = input_path.stem.replace("_content_list", "")
     standard_id = standard_id or base
-    structured_out = structured_dir / _safe(standard_id) / profile.name
-    chunks_path = structured_out / "chunks.json"
 
     console.print(f"[bold]规范：[/bold]{standard_id}")
-    console.print(f"[bold]Profile：[/bold]{profile.name}  stage={profile.stage}  "
-                  f"粒度={profile.index_granularity}")
+    console.print(f"[bold]Profile：[/bold]{profile.name}  粒度={profile.index_granularity}")
 
-    if profile.stage == "structure":
-        _run_structure(input_path, standard_id, profile, structured_out)
-    elif profile.stage == "reprs":
-        _run_reprs(chunks_path, profile)
-    elif profile.stage == "index":
-        _run_index(
-            chunks_path, standard_id, profile, store_dir,
-            milvus_host=milvus_host, milvus_port=milvus_port,
-            embed_url=embed_url, embed_model_id=embed_model_id,
-            batch_size=batch_size, bm25_only=bm25_only)
-    else:
-        raise click.ClickException(
-            f"未知 stage={profile.stage!r}（应为 structure | reprs | index）")
-
-
-def _run_structure(
-    input_path: Path, standard_id: str, profile: ParseProfile, structured_out: Path,
-) -> None:
-    """阶段 structure：*_content_list.json → 解析 → 切分建树 → 落 chunks.json + catalog_blocks.json。"""
     # provenance.source_file：尽量记为相对 data/parsed 的路径
     try:
         source_file = str(input_path.resolve().relative_to(ROOT / "data" / "parsed"))
     except ValueError:
         source_file = input_path.name
 
+    # ── ① 解析成 Document ──
     with open(input_path, encoding="utf-8") as f:
         items = json.load(f)
     document = parser_factory.select(profile.parser_strategy).adapt(
         items, standard_id=standard_id, source_file=source_file)
     console.print(f"共 {len(document.blocks)} 个原始元素（{profile.parser_strategy} 解析）")
 
+    # ── ① 切分建树 → chunks.json + catalog_blocks.json ──
+    structured_out = structured_dir / _safe(standard_id) / profile.name
     structured_out.mkdir(parents=True, exist_ok=True)
     spl = splitter_factory.select(profile.structure_strategy)
     console.print(f"[bold cyan]切分[/bold cyan]（strategy={profile.structure_strategy}）→ "
@@ -128,29 +91,13 @@ def _run_structure(
     if result.debug_blocks is not None:
         _write_json(result.debug_blocks, structured_out / "catalog_blocks.json")
     _write_json([c.to_dict() for c in chunks], structured_out / "chunks.json")
-    console.print("[bold green]✓ 结构层完成（stage=structure）[/bold green]")
 
-
-def _run_reprs(chunks_path: Path, profile: ParseProfile) -> None:
-    """阶段 reprs：读 chunks.json → 挂表征（全树；免费 4 项，向量待索引期算）→ 原地重写。"""
-    chunks = _load_chunks(chunks_path)
+    # ── ② 挂表征（全树；免费 4 项，向量待索引期算）→ 重写 chunks.json ──
     feature.enrich(chunks, list(profile.features))
-    _write_json([c.to_dict() for c in chunks], chunks_path)  # 重写为带表征
+    _write_json([c.to_dict() for c in chunks], structured_out / "chunks.json")  # 重写为带表征
     console.print(f"[cyan]表征[/cyan] 已挂 {profile.features} 到 {len(chunks)} 个节点")
-    console.print("[bold green]✓ 表征层完成（stage=reprs）[/bold green]")
 
-
-def _run_index(
-    chunks_path: Path, standard_id: str, profile: ParseProfile, store_dir: Path | None, *,
-    milvus_host: str, milvus_port: int, embed_url: str, embed_model_id: str,
-    batch_size: int, bm25_only: bool,
-) -> None:
-    """阶段 index：读带表征 chunks.json → 选粒度视图 → 建 BM25 + Milvus 双索引。"""
-    chunks = _load_chunks(chunks_path)
-    if not any(c.features for c in chunks):
-        raise click.ClickException(
-            f"{chunks_path} 中节点未挂表征；index 阶段消费 sparse/dense 表征，请先跑 --stage reprs")
-
+    # ── ③ 选粒度 + 建索引 ──
     if store_dir is None:
         store_dir = DEFAULT_VECTOR_STORE / _safe(standard_id) / profile.name
     store_dir = Path(store_dir)
@@ -172,9 +119,6 @@ def _run_index(
               help="MinerU 输出的 *_content_list.json（阶段 0 缓存）路径。")
 @click.option("--standard-id", default="", help="规范标识；不传则取输入文件名 basename。")
 @click.option("--profile-name", default="default", show_default=True, help="parse_profile 名（产物子目录）。")
-@click.option("--stage", type=click.Choice(["structure", "reprs", "index"]),
-              default="structure", show_default=True,
-              help="只跑哪一阶段（阶段间靠 chunks.json 落盘解耦，依次跑 structure→reprs→index）。")
 @click.option("--parser-strategy", default="mineru", show_default=True,
               help="解析模型（parser/ factory 键；缺省 mineru）。")
 @click.option("--structure-strategy", default="toc", show_default=True,
@@ -198,15 +142,15 @@ def _run_index(
 @click.option("--bm25-only", is_flag=True, help="索引阶段只建 BM25，跳过向量索引。")
 @click.option("--preview", is_flag=True, help="只打印前 20 条节点，不写文件。")
 def main(
-    input_path: Path, standard_id: str, profile_name: str, stage: str,
+    input_path: Path, standard_id: str, profile_name: str,
     parser_strategy: str, structure_strategy: str, toc_max_depth: int | None,
     subsplit: str, index_granularity: str,
     structured_dir: Path, store_dir: Path | None, milvus_host: str, milvus_port: int,
     embed_url: str, embed_model_id: str, batch_size: int, bm25_only: bool, preview: bool,
 ) -> None:
-    """知识库构建（单阶段执行）：--stage 选 structure / reprs / index，依次跑。"""
+    """知识库构建：一条命令跑完 解析 → 切分建树 → 表征 → 索引。"""
     profile = ParseProfile(
-        name=profile_name, stage=stage,
+        name=profile_name,
         parser_strategy=parser_strategy, structure_strategy=structure_strategy,
         toc_max_depth=toc_max_depth, subsplit=subsplit,
         index_granularity=index_granularity,

@@ -27,10 +27,6 @@ class ParseProfile:
 
     字段：
         name              配置名 = 产物子目录（同一规范多 profile 隔离做 A/B）。
-        stage             本次**单独执行**的阶段（阶段间靠落盘解耦，各跑各的，不再级联）：
-                          structure（解析+切分，产 chunks.json）/ reprs（读 chunks.json 挂表征
-                          后重写）/ index（读带表征 chunks.json 选粒度建向量 + BM25）。
-                          依赖顺序 structure → reprs → index：后一阶段读前一阶段的 chunks.json。
         parser_strategy   解析模型名（parser/ factory 键；缺省 mineru）。
         structure_strategy 切分策略名（splitter/ factory 键；缺省 toc=原生目录多层级）。
         toc_max_depth     切到第几级目录（号段层级，1=章/2=节/3=条…）；缺省 None=全目录深度。
@@ -45,7 +41,6 @@ class ParseProfile:
     """
 
     name: str = "default"
-    stage: Literal["structure", "reprs", "index"] = "structure"
     parser_strategy: str = "mineru"
     structure_strategy: str = "toc"
     toc_max_depth: int | None = None

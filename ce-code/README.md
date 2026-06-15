@@ -175,35 +175,22 @@ curl -s -X POST http://172.19.2.2:8000/file_parse -F "files=@data/raw/<文件名
 
 > ✅ **表体提取（已实现）**：`parser/mineru.py` 的 `FormatAdapter` 从 `table_body` 取出表格 HTML，经 `_HTMLTableParser` + `_expand_spans` 解析为**矩形**二维表（展开 colspan/rowspan 防串列），随块落入 `body`，建树时挂到所属节点的 `tables[]`。
 
-### Step 4 — 知识库构建（三阶段单独执行）
+### Step 4 — 知识库构建（一条命令跑完）
 
-`build.py` 不再一条命令串到底，改用 **`--stage` 选只跑哪一阶段**：`structure`（解析+切分）→ `reprs`（挂表征）→ `index`（建索引）。**阶段间靠 `chunks.json` 落盘解耦**——后一阶段读前一阶段产出的 `data/structured/<standard>/<profile>/chunks.json` 续跑，可分别重跑、互不重算。
-
-三阶段都传**同一个 `--input`**（content_list 路径）与**同一个 `--profile-name`**，`standard_id` 默认取输入 basename（三阶段据此对齐到同一产物目录）；可加 `--standard-id "GB 50016-2014(2018)"` 固定。依赖顺序：structure → reprs → index（缺前一阶段产物会报错提示先跑）。
-
-> 留一个 `--input` 的代价是 reprs/index 不需要 content_list，只为对齐 `standard_id` / 产物目录；不想传可改用 `--standard-id` 显式指定（二者取其一对齐到 `data/structured/<standard>/<profile>/`）。
-
-**阶段 ① structure**（解析 → 切分建树 → 落 `chunks.json` + `catalog_blocks.json`，看节点树）：
+`build.py` 一趟跑完 **解析 → 切分建树 → 挂表征 → 建索引**，无需分阶段。`standard_id` 默认取输入 basename；可加 `--standard-id "GB 50016-2014(2018)"` 固定。需 Milvus + embedding 服务：
 
 ```bash
-uv run python build.py --input "data/parsed/<basename>/auto/<basename>_content_list.json" --profile-name default --stage structure --structure-strategy toc
+uv run python build.py --input "data/parsed/<basename>/auto/<basename>_content_list.json" --profile-name default --index-granularity clause --embed-url http://localhost:8097 --embed-model-id /model
 ```
 
-按 `--structure-strategy`（缺省 `toc`，基于 PDF 原生目录的多层级切分）选 splitter，输出落在 `data/structured/<standard>/<profile>/chunks.json`（Chunk 树·单一真值）+ `catalog_blocks.json`（调试）。可选 `--parser-strategy`（缺省 `mineru`）、切分深度 `--toc-max-depth` / `--subsplit`。只想快速预览不落盘用 `--preview`（打印前 20 条节点）。
+中间产物：切分落 `data/structured/<standard>/<profile>/chunks.json`（Chunk 树·单一真值）+ `catalog_blocks.json`（每块目录标签·调试）；`feature.enrich` 挂免费 4 项后重写 `chunks.json`；`index.view` 选粒度（当前仅 `clause`）emit，索引按 profile 隔离落 `data/vector_store/<standard>/<profile>/`，Milvus collection 名由 profile 推断（与 service/eval 一致）。可选 `--parser-strategy`（缺省 `mineru`）、`--structure-strategy`（缺省 `toc`）、切分深度 `--toc-max-depth` / `--subsplit`。无 Milvus 时加 `--bm25-only`（只建 BM25 + metadata）。
 
-**阶段 ② reprs**（读 `chunks.json` → `feature.enrich` 挂免费 4 项 → 原地重写带表征的 `chunks.json`，无外部服务依赖）：
+**只跑到前面某步**（不必动 build）：阶段 0 解析单独跑见 Step 3 的 `python -m parser`；**只切分建树、看节点树**（本地无需 Milvus）用切分层入口或预览：
 
 ```bash
-uv run python build.py --input "data/parsed/<basename>/auto/<basename>_content_list.json" --profile-name default --stage reprs
+uv run python -m splitter toc --input "data/parsed/<basename>/auto/<basename>_content_list.json"   # 切分落 chunks.json + catalog_blocks.json
+uv run python build.py --input "data/parsed/<basename>/auto/<basename>_content_list.json" --preview  # 只打印前 20 条节点，不落盘
 ```
-
-**阶段 ③ index**（读带表征 `chunks.json` → `index.view` 选粒度 emit → BM25 + 向量；需 Milvus + embedding 服务）：
-
-```bash
-uv run python build.py --input "data/parsed/<basename>/auto/<basename>_content_list.json" --profile-name default --stage index --index-granularity clause --embed-url http://localhost:8097 --embed-model-id /model
-```
-
-`index.view` 选粒度（当前仅 `clause`）→ emit；输出按 profile 隔离落 `data/vector_store/<standard>/<profile>/`，Milvus collection 名由 profile 推断（与 service/eval 一致）。无 Milvus 时加 `--bm25-only`（只建 BM25 + metadata）。index 阶段消费 reprs 挂的 `sparse`/`dense` 表征，未先跑 reprs 会报错提示。
 
 ### Step 5 — 质量审核
 

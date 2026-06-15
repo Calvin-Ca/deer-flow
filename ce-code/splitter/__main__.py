@@ -7,7 +7,7 @@
 
 切分只到结构层：读阶段0 缓存 ``data/parsed/<std>/auto/*_content_list.json`` → parser 解析成
 Document → splitter 切分 → 出 ``chunks.json`` / ``catalog_blocks.json``。不碰表征 / 索引（那是根
-``build.py`` / ``service/build_service.py`` 的事），故不依赖 Milvus / 嵌入服务。
+``build.py`` 的事），故不依赖 Milvus / 嵌入服务。
 
 用法（从 ce-code 根，单行命令）：
   python -m splitter toc --input data/parsed/<std>/auto/xxx_content_list.json --subsplit number

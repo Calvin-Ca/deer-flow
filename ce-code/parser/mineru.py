@@ -10,7 +10,7 @@
                       · ``run_cli()``   阶段0 的 click 命令（``run`` 的薄壳，含终端呈现）。
 
 MinerU 是**一个解析工具的两个阶段**：阶段0（``run``）最贵、只跑一次，产物缓存于
-``data/parsed/<std>/auto/``（不可变）；阶段1（``adapt``）把缓存转成 IR，被 ``service/build_service.py``
+``data/parsed/<std>/auto/``（不可变）；阶段1（``adapt``）把缓存转成 IR，被根 ``build.py``
 消费。``adapt`` 是所有解析工具的统一契约（``Parser.adapt``）；``run`` / ``run_cli`` 是工具私有的阶段0
 能力（不进 ABC，鸭子类型），``parser.__main__`` 遍历注册表把有 ``run_cli`` 的工具挂成
 ``python -m parser <工具>``（占位工具无 ``run_cli`` → 不出现）。

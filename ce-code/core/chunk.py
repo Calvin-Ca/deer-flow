@@ -2,8 +2,9 @@
 
 替代旧 ``schema.Node``（TypedDict）为显式 ``@dataclass``。承载文档原生目录还原出的层级
 结构（parent/child）、建树时一次算定的「固有事实」（引用图 / 祖先链）、溯源指针
-（provenance），以及表征层挂的多种「语义投影」（``features``）。**粒度视图与各检索索引
-都是它的派生**（index 层 ``view(chunks, granularity)`` 选层 emit，不切树）。
+（provenance）。**粒度视图与各检索索引都是它的派生**（index 层 ``view(chunks, granularity)``
+选层 emit，不切树）。表征（``features``）**不挂 Chunk**——结构真值与语义投影分离，由表征层产成
+sidecar（``node_path → {kind: ChunkFeature}``）于索引期现算、不落 chunks.json（见 core.feature）。
 
 身份约定（承旧设计）：``node_path`` 即 chunk 身份（``chunk_id ≡ node_path``，见 ``chunk_id``
 属性别名）——本集合（单规范）内唯一，直接作树边 / 引用边的引用键；**保留 node_path 字段名**
@@ -22,17 +23,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Literal
 
-from core.feature import ChunkFeature
-
-# 节点**种类**（kind），**与深度正交**：层级深度由 level 单独承载，chunk_type 不编码"第几层"，
-# 也不由 node_path 派生。建树末按**树结构**二分（纯看"有无子节点"）：
-#   container  有子节点的容器（章 / 节 / 附录根；不单独 emit 检索单元，靠 small-to-big 回补）
-#   leaf       叶·检索单元（条款 / 总则 / 无编号正文段 / 附录条款；粒度视图 emit 这层）
-# 其余为契约占位（建树阶段未产出）。
-ChunkType = Literal[
-    "container", "leaf",
-    "document", "paragraph", "table", "figure", "formula",
-]
+# 节点**种类**（kind）不落字段：容器/叶是纯派生事实——「有子节点（children_ids 非空）= 容器，
+# 不单独 emit 检索单元、靠 small-to-big 回补；无子 = 叶·检索单元，粒度视图 emit 这层」。
+# 消费方直接判 children_ids 空否（见 index.manager.view），勿存冗余 chunk_type 字段。
+# 树**深度**同理派生（= len(ancestor_paths)+1），亦不落字段。
 RefType = Literal["strong", "weak", "exclude", "cross_standard"]
 
 # 引用图正向扩展白名单：strong / cross_standard 才参与「命中 A 自动拉 B」；weak 可选、
@@ -102,8 +96,7 @@ class Chunk:
     node_path: str
     standard_id: str = ""
     # ── 结构（树形）──
-    chunk_type: str = "leaf"          # ChunkType：container（有子）/ leaf（无子·检索单元）
-    level: int = 0                    # 还原出的目录树深度（1-base，根=1；沿 parent 上溯算定）
+    # 种类（容器/叶）与深度均不落字段，为纯派生：容器 ⟺ children_ids 非空；深度 = len(ancestor_paths)+1。
     parent_id: str | None = None
     children_ids: list[str] = field(default_factory=list)
     title: str = ""
@@ -121,8 +114,6 @@ class Chunk:
     # ── 表格/图示（过渡：待表征层转 table_struct 等）──
     tables: list[dict] = field(default_factory=list)
     images: list[dict] = field(default_factory=list)
-    # ── 表征层 ──
-    features: dict[str, ChunkFeature] = field(default_factory=dict)
 
     # -- 派生 --------------------------------------------------------------
 
@@ -135,14 +126,9 @@ class Chunk:
         """是否「已接地」= provenance 有原始块（block_idx 非空）。
 
         未接地空骨架（目录列了条目但正文从未抽到块）content 空、对检索是死单元；
-        index 层 view 据此剔除「未接地 leaf」（见 index/manager）。
+        index 层 view 据此剔除「未接地的无子节点（叶）」（见 index/manager）。
         """
         return bool(self.provenance.block_idx)
-
-    def feature_text(self, kind: str, fallback: str = "") -> str:
-        """取某表征的文本（缺失回退）。"""
-        f = self.features.get(kind)
-        return f.text if (f is not None and f.text) else fallback
 
     def expandable_refs(self) -> list[str]:
         """可正向扩展的目标 path 列表（strong / cross_standard）。"""
@@ -152,12 +138,10 @@ class Chunk:
     # -- 序列化 ------------------------------------------------------------
 
     def to_dict(self) -> dict:
-        """JSON 友好 dict（落 chunks.json）。features/references/provenance 递归展开。"""
+        """JSON 友好 dict（落 chunks.json）。references/provenance 递归展开（表征不落盘）。"""
         return {
             "node_path": self.node_path,
             "standard_id": self.standard_id,
-            "chunk_type": self.chunk_type,
-            "level": self.level,
             "parent_id": self.parent_id,
             "children_ids": self.children_ids,
             "title": self.title,
@@ -171,7 +155,6 @@ class Chunk:
             "provenance": self.provenance.to_dict(),
             "tables": self.tables,
             "images": self.images,
-            "features": {k: v.to_dict() for k, v in self.features.items()},
         }
 
     @classmethod
@@ -180,8 +163,6 @@ class Chunk:
         return cls(
             node_path=d.get("node_path", ""),
             standard_id=d.get("standard_id", ""),
-            chunk_type=d.get("chunk_type", "leaf"),
-            level=int(d.get("level", 0)),
             parent_id=d.get("parent_id"),
             children_ids=list(d.get("children_ids") or []),
             title=d.get("title", ""),
@@ -195,6 +176,4 @@ class Chunk:
             provenance=Provenance.from_dict(d.get("provenance") or {}),
             tables=list(d.get("tables") or []),
             images=list(d.get("images") or []),
-            features={k: ChunkFeature.from_dict(v)
-                      for k, v in (d.get("features") or {}).items()},
         )

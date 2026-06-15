@@ -12,7 +12,7 @@
 取工具走工厂：``parser.factory.select(profile.parser_strategy)``（不在包级 re-export ``select``——
 「取 parser」是工厂的职责，调用方显式走 ``factory``）。编排见包级入口 ``__main__.py``
 （``python -m parser mineru``）。解析工具产出的 Document 喂给切分层 ``splitter``（见
-``service/build_service.py``）。
+根 ``build.py``）。
 """
 from __future__ import annotations
 

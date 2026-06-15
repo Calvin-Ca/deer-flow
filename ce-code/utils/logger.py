@@ -1,7 +1,7 @@
 """统一日志配置 —— 服务/编排共用（承旧 server.py 的 logging.basicConfig）。
 
 提供 ``get_logger(name)``：首次调用时按统一格式初始化 root logger（幂等），返回命名 logger。
-知识服务（service/knowledge_api）与构建编排（service/build_service）共用，避免各处重复
+知识服务（service/knowledge_api）与构建命令行（build.py）共用，避免各处重复
 basicConfig 导致格式漂移。
 """
 from __future__ import annotations

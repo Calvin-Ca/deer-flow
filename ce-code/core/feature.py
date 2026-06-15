@@ -2,12 +2,14 @@
 
 替代旧 ``schema.Representation``（dict/TypedDict）为显式 ``@dataclass``。一个 ChunkFeature =
 一个语义投影面（原文 / 向量 / 稀疏词项 / 摘要 / 语气 / 条件 …）；检索是多投影的可组合并集。
-表征层（``feature/``）逐个产出并原地挂到 ``Chunk.features``（键为 ``FeatureKind``）。
+表征**不挂 Chunk**（结构真值与语义投影分离，不落 chunks.json）——表征层逐个产出，汇成
+**sidecar** ``FeatureSidecar``（``node_path → {kind: ChunkFeature}``），由编排层对检索单元现算、
+沿索引链路传递给各索引器消费（见 ``feature.pipeline.build_features`` / ``feature_text``）。
 
 向量归属：``dense`` / ``context_aug`` 只产**待嵌入文本**（``text``），向量（``vector``）由索引期
 （``index/``）用 embedding 模型统一计算——模型唯一 owner 在检索栈，表征层不加载模型。
 
-本模块**不 import chunk**（避免循环；``chunk.py`` 反向 import 本模块的 ``ChunkFeature``）。
+本模块**不 import chunk**（避免循环）。
 """
 from __future__ import annotations
 
@@ -32,7 +34,7 @@ class ChunkFeature:
     """一个 Chunk 的单个表征（语义投影）。
 
     字段（按 ``kind`` 取用，未用字段留默认）：
-        kind   表征类型（FeatureKind）；与 ``Chunk.features`` 的键一致，冗余存便于审计。
+        kind   表征类型（FeatureKind）；与 sidecar 的内层键一致，冗余存便于审计。
         text   进 embedding / BM25 的文本形态（raw / sparse / context_aug / summary / questions）。
         vector dense 向量（dense / context_aug / summary / questions；索引期填）。
         data   结构化载荷（table_struct→表体、condition→谓词、modal→{"all":[...]}）。
@@ -68,3 +70,26 @@ class ChunkFeature:
             data=dict(d.get("data") or {}),
             meta=dict(d.get("meta") or {}),
         )
+
+
+# 表征 sidecar（表征不挂 Chunk，独立成图沿索引链路传递）：
+#   FeatureMap     单节点表征：kind → ChunkFeature
+#   FeatureSidecar 全量：node_path → FeatureMap
+FeatureMap = dict[str, ChunkFeature]
+FeatureSidecar = dict[str, FeatureMap]
+
+
+def feature_text(feats: FeatureMap, kind: str, fallback: str = "") -> str:
+    """从单节点表征字典取某表征文本（缺失 / 空文本则回退 fallback）。
+
+    承旧 ``Chunk.feature_text``——表征移出 Chunk 后，改作用于 sidecar 的单节点 FeatureMap。
+
+    参数：
+        feats (FeatureMap): 单节点表征字典（kind → ChunkFeature）。
+        kind (str): 要取的表征种类。
+        fallback (str): 缺失或文本为空时的回退值。
+    返回：
+        str: 该表征文本，或 fallback。
+    """
+    f = feats.get(kind)
+    return f.text if (f is not None and f.text) else fallback

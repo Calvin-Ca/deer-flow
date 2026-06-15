@@ -12,24 +12,26 @@ from pathlib import Path
 from rich.console import Console
 
 from core.chunk import Chunk
+from core.feature import FeatureSidecar, feature_text
 from utils.tokenizer import tokenize
 
 console = Console()
 
 
-def build(units: list[Chunk], store_dir: Path) -> None:
+def build(units: list[Chunk], store_dir: Path, features: FeatureSidecar) -> None:
     """建 BM25 索引并落 store_dir/bm25.pkl。
 
     参数：
-        units (list[Chunk]): 检索单元（已挂 sparse 表征）。
+        units (list[Chunk]): 检索单元。
         store_dir (Path): 输出目录。
+        features (FeatureSidecar): 表征 sidecar（node_path → {kind: ChunkFeature}），取 sparse 文本。
     返回：
         无。
     """
     from rank_bm25 import BM25Okapi
 
     console.print("构建 BM25 索引…")
-    corpus = [tokenize(u.feature_text("sparse")) for u in units]
+    corpus = [tokenize(feature_text(features.get(u.node_path, {}), "sparse")) for u in units]
     bm25 = BM25Okapi(corpus)
 
     out = store_dir / "bm25.pkl"

@@ -11,7 +11,7 @@ TOC 法的全部内部实现（目录打标 / 建树 + 固有事实 / 引用图�
 启动（与 parser 同构·registry 驱动）：包级入口 ``__main__.py`` 遍历注册表，把声明了 ``run_cli``
 的切法挂成 ``python -m splitter <切法名>``（如 ``python -m splitter toc --input … --subsplit number``）；
 占位切法无 ``run_cli`` → 不出现在 CLI。切分只到结构层（出 chunks.json / catalog_blocks.json），不碰
-表征 / 索引（那是 ``service/build_service.py`` 的事）。``run_cli`` 是切法私有能力（不进 Splitter ABC，
+表征 / 索引（那是 ``build.py`` 的事）。``run_cli`` 是切法私有能力（不进 Splitter ABC，
 鸭子类型），与 ``parser`` 层的 ``run_cli`` 约定一致。
 """
 from __future__ import annotations

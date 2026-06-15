@@ -8,11 +8,14 @@
 显式 NotImplementedError）；table_struct / modal / condition / summary / questions 未建文件，
 未注册的 kind 在 ``attach`` 里被安全跳过（前向兼容）。
 
-入口：``enrich(chunks, enabled)`` 原地给每个 Chunk 挂 ``features``（``dict[kind, ChunkFeature]``）。
+入口：``build_features(chunks, enabled)`` 产 **sidecar**（``node_path → {kind: ChunkFeature}``）——
+表征**不挂 Chunk**（结构真值与语义投影分离、不落 chunks.json），由编排层于索引期对检索单元现算、
+沿索引链路传给各索引器消费（见 ``core.feature.feature_text`` / ``index.manager.build_index``）。
 """
 from __future__ import annotations
 
 from core.chunk import Chunk
+from core.feature import FeatureMap, FeatureSidecar
 from core.profile import DEFAULT_FEATURES
 from feature.base import Feature
 from feature.bm25 import Bm25Feature
@@ -42,33 +45,34 @@ for _f in (RawFeature(), Bm25Feature(), DenseFeature(), ContextAugFeature(),
 DEFAULT_ENABLED: tuple[str, ...] = tuple(DEFAULT_FEATURES)
 
 
-def attach(chunk: Chunk, enabled: list[str] | tuple[str, ...] | None = None) -> Chunk:
-    """原地给单个 Chunk 挂 features（按 enabled 选启用的表征；未注册 kind 跳过）。
+def build_one(chunk: Chunk, enabled: list[str] | tuple[str, ...] | None = None) -> FeatureMap:
+    """产单个 Chunk 的表征字典（按 enabled 选启用的表征；未注册 kind 跳过）——**不挂 Chunk**。
 
     参数：
         chunk (Chunk): 节点。
         enabled: 启用的 FeatureKind 列表；None → DEFAULT_ENABLED（免费 4 项）。
     返回：
-        Chunk: 同一 chunk（features 已填，便于链式）。
+        FeatureMap: kind → ChunkFeature（该节点的所有表征）。
     """
     enabled = enabled if enabled is not None else DEFAULT_ENABLED
+    feats: FeatureMap = {}
     for kind in enabled:
         feat = REGISTRY.get(kind)
         if feat is None:
             continue  # table_struct/modal/condition/summary/questions 等未注册 → 后续批次补
-        chunk.features[kind] = feat.build(chunk)
-    return chunk
+        feats[kind] = feat.build(chunk)
+    return feats
 
 
-def enrich(chunks: list[Chunk], enabled: list[str] | tuple[str, ...] | None = None) -> list[Chunk]:
-    """原地给 Chunk 树每个节点挂 features（阶段 2 运行核心）。
+def build_features(
+    chunks: list[Chunk], enabled: list[str] | tuple[str, ...] | None = None
+) -> FeatureSidecar:
+    """产表征 sidecar（阶段 2 运行核心）：node_path → {kind: ChunkFeature}，**不挂 Chunk**。
 
     参数：
-        chunks (list[Chunk]): 节点树（chunks.json 读出）。
+        chunks (list[Chunk]): 节点列表（通常已是 view 选出的检索单元，按需算）。
         enabled: 启用的 FeatureKind 列表；None → DEFAULT_ENABLED。
     返回：
-        list[Chunk]: 同一 chunks（各节点 features 已填）。
+        FeatureSidecar: node_path → FeatureMap（各节点表征），供索引器消费。
     """
-    for c in chunks:
-        attach(c, enabled)
-    return chunks
+    return {c.node_path: build_one(c, enabled) for c in chunks}

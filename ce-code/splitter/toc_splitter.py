@@ -18,7 +18,7 @@
 IR 适配：入参由旧「list[block dict]」改为 ``Document``——内部 ``document.block_dicts()``
 还原成 CatalogLabeler/TreeBuilder 期望的 block dict（复用其成熟的 dict 管道，零改动）。出参
 直接是 ``list[Chunk]``——TreeBuilder 内部 ``_BuildNode`` 字段名即与 Chunk 对齐
-（chunk_type/level/provenance），出口 ``_BuildNode.to_chunk()`` 一步成 Chunk，**无字段改名缝**
+（provenance 等结构字段），出口 ``_BuildNode.to_chunk()`` 一步成 Chunk，**无字段改名缝**
 （2026-06-15 类型化前曾有 ``_node_to_chunk`` 做 node_type→chunk_type 改名，已消除）。中间产物
 annotated（带 catalog/catalog_source）作 debug_blocks 落 catalog_blocks.json。
 
@@ -509,8 +509,8 @@ class CatalogLabeler:
 # 建树策略（PRD §3.1「按文档原生目录层级建树」；2026-06-13 改用 catalog 建树，解决父链断裂）：
 #
 #   ① **目录条目物化骨架**：每个 TOC 条目 → 一个骨架节点（**恒存在**，即使正文里没有
-#      对应正文块 / 被 MinerU 漏抽），条目标题跑 ``classify_heading`` 取 node_path（种类
-#      chunk_type / 深度 level 建树末统一算定）。这是「父链断裂」的根治——上层章/节
+#      对应正文块 / 被 MinerU 漏抽），条目标题跑 ``classify_heading`` 取 node_path（种类/深度
+#      不落字段，由消费方按 children_ids / ancestor_paths 派生）。这是「父链断裂」的根治——上层章/节
 #      不再因「只有标题没正文」被丢。
 #   ② **条目按号段嵌套**：目录只给有序扁平条目，「5.3 属于 5」仍靠 node_path 号段
 #      （``_resolve_parent``）；号段失效（无编号散文）则回退到 catalog 归属。
@@ -537,7 +537,7 @@ class CatalogLabeler:
 # 树上视图（``index.manager.view``），与建树无关，故更名 ``TreeBuilder``。
 #
 # 内部 IR（2026-06-15 类型化）：建树期节点用 ``_BuildNode`` dataclass（字段名即与 ``core.chunk.Chunk``
-# 对齐：``chunk_type`` / ``level`` / ``provenance:Provenance``，消灭旧「node dict → Chunk」的改名缝），
+# 对齐：``provenance:Provenance`` 等结构字段，消灭旧「node dict → Chunk」的改名缝），
 # 另带两个建树期临时字段 ``catalog`` / ``skeleton``（``to_chunk()`` 时丢弃、不进 chunks.json）。
 # ``apply`` 直接出 ``list[Chunk]``，``TocSplitter`` 不再做字段改名映射。
 #
@@ -551,7 +551,7 @@ class CatalogLabeler:
 class _BuildNode:
     """建树期节点（结构层内部 IR）——字段名即与 ``core.chunk.Chunk`` 对齐，消灭出口改名缝。
 
-    与 Chunk 同名同义的结构字段（chunk_type / level / provenance:Provenance …）建树末算定；
+    与 Chunk 同名同义的结构字段（parent_id / ancestor_paths / provenance:Provenance …）建树末算定；
     另带两个**建树期临时字段** ``catalog`` / ``skeleton``，仅供连边/剪枝用，``to_chunk()`` 时
     丢弃、不进 chunks.json。``references`` 建树期内持 ``{to,type}`` dict（``extract_references``
     产物），``to_chunk()`` 时转 ``Reference``。
@@ -559,8 +559,6 @@ class _BuildNode:
 
     node_path: str
     standard_id: str = ""
-    chunk_type: str = ""              # 建树末 _assign_node_type 赋（container / leaf）
-    level: int = 0                    # 建树末 _attach_ancestors 按真实父链算（1-base）
     parent_id: str | None = None
     children_ids: list[str] = field(default_factory=list)
     title: str = ""
@@ -589,8 +587,6 @@ class _BuildNode:
         return Chunk(
             node_path=self.node_path,
             standard_id=self.standard_id,
-            chunk_type=self.chunk_type or "leaf",
-            level=self.level,
             parent_id=self.parent_id,
             children_ids=self.children_ids,
             title=self.title,
@@ -631,9 +627,8 @@ def classify_heading(text: str) -> dict | None:
     """从一行标题文字识别条款号 / 路径来源 / 置信度 —— **无状态纯函数**（建树器调用）。
 
     功能：把「这行标题对应哪个条款号、路径来源置信几何」这件纯文本判定独立出来，便于
-        单测与复用。**只定 node_path**——节点种类（chunk_type）建树末按结构判定
-        （_assign_node_type），深度（level）按真实父链算（_attach_ancestors），
-        二者均不在此推。
+        单测与复用。**只定 node_path**——节点种类（容器/叶）与深度均为纯派生事实
+        （消费方按 children_ids / ancestor_paths 推），不落字段、更不在此推。
 
         判定顺序（**四级短路**，命中即返回；只看本行文字，不依赖上下文/父节点/页码）：
           ① 「附录X」开头（附录E 钢筋计算）         → node_path="附录"+字母（附录E），number/1.0
@@ -835,8 +830,7 @@ class TreeBuilder:
         self._wire_tree(order, by_path)
         # ④ 剪空正文节点（骨架恒留），算祖先链 + 深度 + 种类 + 引用图
         nodes = self._prune(order)
-        self._attach_ancestors(nodes)      # ancestor_titles/paths + level（真实树深度）
-        self._assign_node_type(nodes)      # chunk_type 种类：有子→container / 无子→leaf
+        self._attach_ancestors(nodes)      # ancestor_titles / ancestor_paths（树深度/种类由消费方派生）
         annotate_references(nodes)         # 固有事实：引用图分型 + referenced_by 反向边（§1）
 
         # page 累积时按块追加,同页多块会重复;去重升序后 page[0]=首页(展示页)。未接地空骨架不额外
@@ -1056,9 +1050,9 @@ class TreeBuilder:
             父变空叶，故循环到稳定。删除时从父 children_ids 摘除，保证树一致。
 
             ⚠ **未接地空骨架的叶子会留下**（``skeleton`` 恒留压过空正文）：容器骨架留作父链
-            是对的，但 ``provenance.block_idx==[]`` 且无子的 **leaf** 骨架（目录列了、正文从未
+            是对的，但 ``provenance.block_idx==[]`` 且无子的骨架（目录列了、正文从未
             抽到块）``content`` 为空，对检索是死单元。**契约**：下游 view / index 须跳过
-            「``block_idx==[]`` 且 chunk_type==leaf」的空骨架，勿 emit 成空检索单元
+            「``block_idx==[]`` 且无子节点（叶）」的空骨架，勿 emit 成空检索单元
             （见 Chunk.is_grounded / index.manager.view）。
 
         参数：
@@ -1087,16 +1081,17 @@ class TreeBuilder:
 
     @staticmethod
     def _attach_ancestors(nodes: list[_BuildNode]) -> None:
-        """原地算定祖先链 + 树深度：沿 parent_id 上溯写 ancestor_titles / ancestor_paths
-        （不含自身）+ level（= 祖先数 +1，1-base，根=1）。
+        """原地算定祖先链：沿 parent_id 上溯写 ancestor_titles / ancestor_paths（不含自身）。
 
-        level 取**真实父链深度**而非 node_path 号段数：中间层级缺节点时按实际父链算
-        （5.3 缺 → 5.3.4 的父是 5、深度 2），也适配无"章/节/条"原生层级的文档。
+        祖先链取**真实父链**而非 node_path 号段：中间层级缺节点时按实际父链算
+        （5.3 缺 → 5.3.4 的父是 5），也适配无"章/节/条"原生层级的文档。树**深度**与
+        节点**种类**（容器/叶）均为纯派生事实，不在此落字段——消费方按 len(ancestor_paths)+1
+        取深度、按 children_ids 空否判种类（见 core.chunk 模块 docstring / index.manager.view）。
 
         参数：
             nodes (list[_BuildNode]): 已连边（含 parent_id）的节点列表。
         返回：
-            无（原地写 ancestor_titles / ancestor_paths / level）。
+            无（原地写 ancestor_titles / ancestor_paths）。
         """
         by_path = {n.node_path: n for n in nodes}
         for n in nodes:
@@ -1111,24 +1106,6 @@ class TreeBuilder:
                 cur = by_path.get(cur.parent_id) if cur.parent_id else None
             n.ancestor_titles = titles[::-1]
             n.ancestor_paths = paths[::-1]
-            n.level = len(paths) + 1
-
-    @staticmethod
-    def _assign_node_type(nodes: list[_BuildNode]) -> None:
-        """原地判定节点**种类**（kind，与深度正交）：容器 / 叶，纯由"有无子节点"定。
-
-        功能：建树末（children_ids 已定型）按**树结构**二分赋 chunk_type，与 node_path 无关：
-            · 有存活子节点 → ``container``（章/节/附录根等目录骨架，不单独 emit，small-to-big 回补）；
-            · 无子节点     → ``leaf``（条款/总则/无编号正文段/附录条款·粒度视图 emit 这层）。
-        "是不是附录"等语义不进 chunk_type，消费方按需读 node_path 前缀（"附录X"），避免与 node_path 冗余。
-
-        参数：
-            nodes (list[_BuildNode]): 已连边 + 剪枝后的节点列表（children_ids 反映存活子）。
-        返回：
-            无（原地写 chunk_type）。
-        """
-        for n in nodes:
-            n.chunk_type = "container" if n.children_ids else "leaf"
 
 
 # ===========================================================================
@@ -1216,7 +1193,9 @@ class TocSplitter(Splitter):
                 for c in chunks[:20]:
                     tables = f"  [{len(c.tables)}表]" if c.tables else ""
                     pg = c.provenance.page[0] if c.provenance.page else 0
-                    console.print(f"  [cyan]{c.node_path}[/cyan] [{c.chunk_type}] L{c.level} "
+                    kind = "container" if c.children_ids else "leaf"
+                    lvl = len(c.ancestor_paths) + 1
+                    console.print(f"  [cyan]{c.node_path}[/cyan] [{kind}] L{lvl} "
                                   f"(p{pg}) {c.title[:50]}{tables}")
                 return
 

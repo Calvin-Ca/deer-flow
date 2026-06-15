@@ -14,6 +14,7 @@ from tqdm import tqdm
 
 from config import EMBED_DIM
 from core.chunk import Chunk
+from core.feature import FeatureSidecar, feature_text
 
 console = Console()
 
@@ -48,13 +49,15 @@ def build(
     embed_url: str,
     embed_model_id: str,
     batch_size: int,
+    features: FeatureSidecar,
 ) -> None:
     """建/重建 Milvus collection：嵌入 dense 文本 + 插入标量行。
 
     参数：
-        units (list[Chunk]): 检索单元（取 dense 表征文本嵌入）。
+        units (list[Chunk]): 检索单元。
         rows (list[dict]): 与 units 同序的标量行（index.manager.chunk_to_row 产，references_to 为 JSON 串）。
         collection_name (str): collection 名（config.collection_name 推断）。
+        features (FeatureSidecar): 表征 sidecar，取 dense 待嵌入文本（缺失回退 content）。
         其余：Milvus 地址 / 嵌入服务 / 批大小。
     返回：
         无。
@@ -91,7 +94,7 @@ def build(
                              schema=schema_, index_params=index_params)
     console.print(f"集合 {collection_name} 已创建")
 
-    texts = [u.feature_text("dense", u.content) for u in units]
+    texts = [feature_text(features.get(u.node_path, {}), "dense", u.content) for u in units]
     console.print(f"调用嵌入服务 {embed_url}，model={embed_model_id}…")
     total_batches = (len(units) + batch_size - 1) // batch_size
     for i in tqdm(range(0, len(units), batch_size), total=total_batches, desc="嵌入并插入"):

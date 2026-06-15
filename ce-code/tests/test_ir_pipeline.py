@@ -1,10 +1,10 @@
 """IR + 流水线行为单测 —— 无 IO、无外部服务，锁住分层重构后的契约与端到端行为。
 
 覆盖：
-  - IR JSON 往返（Document / Chunk / ChunkFeature；含嵌套 references/provenance/features）；
+  - IR JSON 往返（Document / Chunk 含嵌套 references/provenance；ChunkFeature 独立往返）；
   - RetrievedChunk 对外契约（from_row ↔ to_response 字段名逐字保持）；
-  - 合成 Document → toc 切分 → 表征 → 粒度视图 全链路（解析模型/切法/表征经 factory）；
-  - index.view 空骨架过滤（未接地 leaf 不 emit）；
+  - 合成 Document → toc 切分 → 表征 sidecar → 粒度视图 全链路（解析模型/切法/表征经 factory）；
+  - index.view 空骨架过滤（未接地·无子节点不 emit）；
   - RRF 合并 + 引用扩展数值行为（行为保持）。
 
 运行（从 ce-code 根，单行）：
@@ -22,7 +22,7 @@ import parser
 import splitter
 import feature
 from core import (
-    Block, Chunk, Document, ParseProfile, Provenance, Reference, RetrievedChunk,
+    Block, Chunk, ChunkFeature, Document, ParseProfile, Provenance, Reference, RetrievedChunk,
 )
 from index.manager import chunk_to_row, view
 from retrieval.rrf import expand_references, merge_results
@@ -31,12 +31,11 @@ from retrieval.rrf import expand_references, merge_results
 # ── IR 往返 ──────────────────────────────────────────────────────────────────
 
 def test_chunk_round_trip():
-    c = Chunk(node_path="5.3.4", standard_id="GB", chunk_type="leaf", level=3, parent_id="5.3",
+    c = Chunk(node_path="5.3.4", standard_id="GB", parent_id="5.3",
               title="燃气", content="应符合 5.2.1",
               references=[Reference("5.2.1", "strong"), Reference("9.9", "weak")],
               provenance=Provenance(source_file="x.json", block_idx=[12], page=[40]))
-    feature.attach(c)
-    assert Chunk.from_dict(c.to_dict()).to_dict() == c.to_dict()
+    assert Chunk.from_dict(c.to_dict()).to_dict() == c.to_dict()  # 表征已移出 Chunk，不进往返
     assert c.chunk_id == "5.3.4" and c.is_grounded()
     assert c.expandable_refs() == ["5.2.1"]  # 仅 strong 入扩展
 
@@ -82,18 +81,21 @@ def _build_tree():
     prof = ParseProfile()
     chunks = splitter.factory.select("toc").split(
         doc, max_depth=prof.toc_max_depth, subsplit=prof.subsplit).chunks
-    feature.enrich(chunks, list(ParseProfile().features))
-    return chunks
+    return chunks  # 表征不再挂 Chunk；需要表征的测试自行 feature.build_features(units)
 
 
 def test_pipeline_tree_and_decoupled_clause():
     by = {c.node_path: c for c in _build_tree()}
     # 目录镜像树：1 / 5 / 5.3；建条解耦 → 1.0.1 并入 '1' 正文（非独立节点）
     assert set(by) == {"1", "5", "5.3"}
-    assert by["5"].chunk_type == "container" and by["1"].chunk_type == "leaf"
+    assert by["5"].children_ids and not by["1"].children_ids  # 容器有子 / 叶无子（种类派生）
     assert "1.0.1" in by["1"].content
     assert by["5.3"].ancestor_paths == ["5"]
-    assert "防火分区" in by["5.3"].features["context_aug"].text
+    # 表征 sidecar（不挂 Chunk）：context_aug 拼祖先标题；顺带验 ChunkFeature 往返
+    feats = feature.build_features(list(by.values()), list(ParseProfile().features))
+    ca = feats["5.3"]["context_aug"]
+    assert "防火分区" in ca.text
+    assert ChunkFeature.from_dict(ca.to_dict()).to_dict() == ca.to_dict()
 
 
 def test_view_clause_and_row():
@@ -101,14 +103,15 @@ def test_view_clause_and_row():
     units = view(chunks, "clause")
     # 接地 leaf = 1 与 5.3（container 5 不 emit）
     assert {u.node_path for u in units} == {"1", "5.3"}
-    r53 = [chunk_to_row(u, "clause") for u in units if u.node_path == "5.3"][0]
+    feats = feature.build_features(units, list(ParseProfile().features))
+    r53 = [chunk_to_row(u, "clause", feats[u.node_path]) for u in units if u.node_path == "5.3"][0]
     assert r53["has_tables"] is True and r53["node_level"] == 2
 
 
 def test_view_skips_ungrounded_skeleton():
-    grounded = Chunk(node_path="5.3.4", chunk_type="leaf", provenance=Provenance(block_idx=[1]))
-    skeleton = Chunk(node_path="7.1.1", chunk_type="leaf", provenance=Provenance(block_idx=[]))
-    container = Chunk(node_path="5", chunk_type="container", provenance=Provenance(block_idx=[0]))
+    grounded = Chunk(node_path="5.3.4", provenance=Provenance(block_idx=[1]))
+    skeleton = Chunk(node_path="7.1.1", provenance=Provenance(block_idx=[]))
+    container = Chunk(node_path="5", children_ids=["5.3.4"], provenance=Provenance(block_idx=[0]))
     units = view([grounded, skeleton, container], "clause")
     assert [u.node_path for u in units] == ["5.3.4"]  # 空骨架 + 容器均不 emit
 

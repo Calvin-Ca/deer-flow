@@ -200,7 +200,11 @@ MinerU 解析 + 条款树提取 + 质量审核，在 GB 50378-2006 和 GB 50016 
 
 ### 数据资产（关系库优先）
 
-> **进度对齐（2026-06-16，按 committed 产物核对）**：解析/结构化抽取层已不是瓶颈——全造价语料 `chunks.json`（50500/50854/50856/SJG 建筑/SJG 土方/费率/信息价）+ `bill_spec`/`aux`/`price_composition`/`quota_item`/`resource`/`quota_resource` 产物**均已生成入 git**（commit `9f76f713`/`75c0ec8d`）。**两处产物缺口已补齐（2026-06-16）**：`bill_spec.jsonl`/`aux_tables.jsonl` 重跑带上 `doc_id=GB-50854`+canonical `spec_version=GB/T 50854-2024`，`bill_quota_map.jsonl`（114 边）已落盘入 git。真正剩余且 **git 不可证**（PG 状态不进库）的是 **`load_pg` 实际灌库**。上服务器先 `\dt` + 各表 `count(*)` 盘点 PG，再按依赖序一把灌（详见各子条 ⚠️）。
+> **进度对齐（2026-06-16，按 committed 产物核对）**：解析/结构化抽取层已不是瓶颈——全造价语料 `chunks.json`（50500/50854/50856/SJG 建筑/SJG 土方/费率/信息价）+ `bill_spec`/`aux`/`price_composition`/`quota_item`/`resource`/`quota_resource` 产物**均已生成入 git**（commit `9f76f713`/`75c0ec8d`）。**两处产物缺口已补齐（2026-06-16）**：`bill_spec.jsonl`/`aux_tables.jsonl` 重跑带上 `doc_id=GB-50854`+canonical `spec_version=GB/T 50854-2024`，`bill_quota_map.jsonl`（114 边）已落盘入 git。真正剩余且 **git 不可证**（PG 状态不进库）的是 **`load_pg` 实际灌库**。
+>
+> **⏸ 服务器灌库（BLOCKED：2026-06-16 服务器暂不可达，待恢复后跑）**：先 `git pull` 取 commit `81d142d2`，再 `uv add 'psycopg[binary]'`，然后一把灌（依赖序在 loader 内已排）——
+> `uv run python -m cost.load_pg --init-schema --bill-spec data/structured/bill_spec.jsonl --aux data/structured/aux_tables.jsonl --price-composition data/structured/price_composition.jsonl --resource data/structured/resource.jsonl --quota-item data/structured/quota_item.jsonl --quota-resource data/structured/quota_resource.jsonl --bill-quota-map data/structured/bill_quota_map.jsonl`
+> 预期：bill_spec 472 / aux 5 / price_composition 10 / resource 407 / quota_item 640 / quota_resource 4173（跳过 0）/ bill_quota_map 114。灌后 `docker exec ce-postgres psql -U cost -d ce_cost` 逐表 `count(*)` + 跑 README C3 取数 demo（清单 `010401002 实心砖墙` → 4 定额子目 → 工料机）。`--init-schema` 幂等 ALTER 把手敲版 `bill_spec` 缺的治理字段补齐。
 
 - [ ] 关系库 PostgreSQL 建表：`bill_spec` / `quota_item` / `quota_resource` / `resource` / `resource_price` / `hist_bill`，**强制带 `doc_id` + `version` + `region`(深圳) + `effective_priority`(深圳本地=1)**，价格带 `effective_period`
   - [x] **PostgreSQL 16 已部署**（✅ 2026-06-16，服务器 stone）：因系统共用 docker 与满盘 `/` 不可动，**用 rootless docker 起独立 daemon**（caic 用户名下，data-root=`/mnt/nvme/calvin/docker/data`，与共用 daemon 零交集），`postgres:16` 容器 `ce-postgres`（端口 **5433**，库 `ce_cost`，用户 `cost`，卷 `ce_pgdata` 落 nvme，对内网开放）。部署细节见 DEV §6。`bill_spec` 表已建（code/name/unit/feature_schema JSONB/calc_rule/work_content JSONB/chapter/spec_version/provenance JSONB）**并已导入 GB/T 50854 的 472 条**。
@@ -218,7 +222,8 @@ MinerU 解析 + 条款树提取 + 质量审核，在 GB 50378-2006 和 GB 50016 
   - [x] **schema + load_pg loader**（✅ 2026-06-16）：`quota_item` 加 `work_content` 列、`resource` 唯一键改 `NULLS NOT DISTINCT`（spec=NULL 也幂等）；`load_pg` 加 `--resource`/`--quota-item`/`--quota-resource`（依赖序入库，`quota_resource` 按 (doc_id,quota_code)+(category,name,spec,unit) 解析 FK）。本地纯逻辑模拟：4173 含量 100% 解析、quota_item 主键零重复。
   - [x] **`build split` + `quota.py` 全量产物已生成并同步**（✅ 2026-06-16，commit `9f76f713`+`75c0ec8d`）：SJG 建筑 chunks.json（MinerU 解析，服务器跑）+ `quota_item.jsonl`(640) / `resource.jsonl`(407) / `quota_resource.jsonl`(4173) 三表全量产物入 git，字段含 `doc_id`/`region`/`effective_priority` 全治理列。即原"待 build split 出 SJG chunks → quota.py 抽取"已完成（不止本地模拟）。
   - [ ] **load_pg 实际入 PG + 抽查**（git 不可证，PG 状态不进库）：服务器 `python -m cost.load_pg --resource ... --quota-item ... --quota-resource ...` 灌库后 `SELECT count(*)` 核对三表。⚠️ SJG 无规整目录，`chapter`/`ancestor_titles` 偏弱，入库后抽查。
-  - [ ] **精修**：`见表`(26) 引用单位、三层子目名称中间「墙厚」行未贴回（quota_code 仍唯一）；SJG 170 同结构后续。
+  - [ ] **精修**：`见表`(26) 引用单位、三层子目名称中间「墙厚」行未贴回（quota_code 仍唯一）；SJG 170 同结构后续（见下「多规范累积」）。
+  - [ ] **⚠️ 多规范累积阻塞（2026-06-16 发现，本地可解）**：`quota.py`/`bill_spec.py` 当前**写死固定文件名到固定目录**（`quota_item.jsonl` 等 / `bill_spec.jsonl`），跑第二份规范会**整体覆盖**第一份——故 SJG 171 与 SJG 170、GB 50854 与 GB 50856 无法并存。**dry-run 已验抽取可用**：SJG 170 土方 = 618 子目 / 584 资源 / 4105 含量 / 15 aux（14 子目缺人材机费待精修）；GB 50856 安装 = 1189→去重 1184 清单（**5 个重复编码待查**：031003010/031201003/031202002~004）/ 216 缺单位（编码 03 开头，与建筑 01 不撞）。**待做（本地，无需服务器）**：①抽取层改按 `doc_id` 分目录输出（如 `data/structured/<doc_id>/quota_item.jsonl`，与 chunks.json 已有的 per-std 子目录布局一致）→ ②`load_pg` 各 loader 改扫多目录/接多路径 → ③跑 SJG 170 + GB 50856 落盘入 git。安装编码重复需在 ① 之前定去重口径。
 - [ ] 价格库导入 `resource_price`（深圳信息价 SZ-JGXX-PRICE，带 `effective_period` 时效，**走动态独立更新管道**）
 - [ ] 费率标准（SZ-FLBZ-2023）入费用计算表（企业管理费/利润/安文费/规费/税金）
 - [ ] 历史工程库 `hist_bill`（脱敏 + 质量标注，供相似案例对标；[可缓]）

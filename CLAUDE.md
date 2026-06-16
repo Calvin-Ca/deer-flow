@@ -43,7 +43,7 @@
 - POC 代码放项目根下（`ce-code/` 知识层 + `ce-services/` 任务层 + `ce-bim/` BIM 底座层 + 未来 `ce-cost/` 算量计价，均与 `backend/` 平级），正常 commit 同步。端口约定：:8100 知识 / :8101 任务 / :8102 BIM 底座
 - **BIM 是横切共享底座，不是 CostAgent 私有输入**：BIM 模型的取数底座（IfcOpenShell + IFC 原件 + 原语）落 `ce-bim/`（单一 owner，类比 `ce-code`），查看/操作做成共享前端包 `ce-bim-viewer`（web-ifc），算量计价/审图/FM 均为消费方做 HTTP 客户端复用——别把共享能力埋进单个产品
 - 各层 `PRD/DEV/TODO/README` 随 git 同步到服务器（项目文档跟着代码走）；**本文档 `CLAUDE.md` 也随 git 同步**（项目级共享上下文跟着代码走，与各层文档一致）——含服务器路径/内网 IP/端口等环境细节，仅内网可达、非公网机密，可入 git/push
-- 数据文件 `ce-code/data/` 下（不进 git，PDF 版权敏感）：`raw/`（PDF）、`parsed/`（MinerU 输出）、`structured/`（条款库 JSON）、`vector_store/`（BM25 + Milvus 索引）、`eval_set/`（评测集，入 git）
+- 数据文件 `ce-code/data/`：**入 git 同步** `parsed/`（MinerU 输出）、`structured/`（chunk 树 / bill_spec.jsonl 等结构化产物）、`eval_set/`（评测集）——派生数据走 git 在 Mac/服务器间同步（2026-06-16 起）；**仍不进 git** `raw/`（PDF 原件，版权敏感）、`vector_store/`（BM25 + Milvus 索引，大体积二进制、可重新生成）
 
 ### 2.3 服务器环境
 

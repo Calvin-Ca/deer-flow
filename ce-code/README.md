@@ -17,13 +17,13 @@ ce-code/
 ├── README.md                       # 本文件（操作手册）
 ├── PRD.md / DEV.md / TODO.md        # 需求设计 / 开发环境 / 进度
 ├── pyproject.toml                  # uv 管理依赖
-├── .gitignore                      # 忽略 data/ 下大文件与解析产物
-├── data/                           # 数据资产（除 eval_set 外均不入 git）
-│   ├── raw/                        #   原始 PDF（手动放入）
-│   ├── parsed/                     #   MinerU 解析输出（python -m parser 产物，阶段 0 缓存）
-│   ├── structured/                 #   Chunk 树 chunks.json（build 结构层产物）
-│   ├── vector_store/               #   BM25 + Milvus 索引（build 索引层产物）
-│   ├── eval_set/                   #   评测集（入 git）
+├── .gitignore                      # 仅忽略 raw/ (PDF) + vector_store/ (大体积索引)
+├── data/                           # 数据资产（parsed/structured/eval_set 入 git；raw/vector_store 不入）
+│   ├── raw/                        #   原始 PDF（手动放入；⛔不入 git，版权敏感）
+│   ├── parsed/                     #   MinerU 解析输出（python -m parser 产物，阶段 0 缓存；✅入 git）
+│   ├── structured/                 #   Chunk 树 chunks.json + bill_spec.jsonl（build/cost 产物；✅入 git）
+│   ├── vector_store/               #   BM25 + Milvus 索引（build 索引层产物；⛔不入 git，大体积可重生）
+│   ├── eval_set/                   #   评测集（✅入 git）
 │   │   └── gb50016_eval.json       #     GB 50016 的 45 条评测用例
 │   └── quality_reports/            #   质量审核报告（tools/review_quality 输出）
 │

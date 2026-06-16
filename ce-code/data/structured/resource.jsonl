@@ -1,0 +1,407 @@
+{"category": "人工", "name": "普工人工费", "spec": null, "unit": "元", "doc_id": "SZ-SJG171"}
+{"category": "人工", "name": "技工人工费", "spec": null, "unit": "元", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "普通混凝土实心砖 240×115×53 (10.0MPa)", "spec": null, "unit": "千块", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "湿拌砌筑砂浆 M7.5", "spec": null, "unit": "m³", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "干混砌筑砂浆 M7.5", "spec": null, "unit": "t", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "水", "spec": null, "unit": "m³", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "其他材料费", "spec": null, "unit": "%", "doc_id": "SZ-SJG171"}
+{"category": "机械", "name": "灰浆搅拌机 拌筒容量 V(L)V=200", "spec": null, "unit": "台班", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "普通混凝土空心砌块390×190×90(5.0MPa)", "spec": null, "unit": "千块", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "普通混凝土空心砌块390×190×140(5.0MPa)", "spec": null, "unit": "千块", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "普通混凝土实心砖240×115×53(10.0MPa)", "spec": null, "unit": "千块", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "干混砌筑砂浆M7.5", "spec": null, "unit": "t", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "湿拌砌筑砂浆M7.5", "spec": null, "unit": "m³", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "松杂枋板材周转材", "spec": null, "unit": "m³", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "铁钉(综合)", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "机械", "name": "灰浆搅拌机拌筒容量V(L)V=200", "spec": null, "unit": "台班", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "普通混凝土空心砌块390×190×190(5.0MPa)", "spec": null, "unit": "千块", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "料石", "spec": null, "unit": "m³", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "毛石", "spec": null, "unit": "m³", "doc_id": "SZ-SJG171"}
+{"category": "机械", "name": "灰浆搅拌机 搅筒容量 V(L)V=200", "spec": null, "unit": "台班", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "泵送预拌混凝土C10,骨料最大粒径31.5", "spec": null, "unit": "m³", "doc_id": "SZ-SJG171"}
+{"category": "机械", "name": "插入式", "spec": null, "unit": "台班", "doc_id": "SZ-SJG171"}
+{"category": "机械", "name": "输送量Q(m³/h)", "spec": null, "unit": "台班", "doc_id": "SZ-SJG171"}
+{"category": "机械", "name": "混凝土布料机", "spec": null, "unit": "台班", "doc_id": "SZ-SJG171"}
+{"category": "机械", "name": "Q=30", "spec": null, "unit": "台班", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "泵送预拌混凝土C25,骨料最大粒径31.5", "spec": null, "unit": "m³", "doc_id": "SZ-SJG171"}
+{"category": "机械", "name": "混凝土输送泵车输送量Q(m³/h)Q=60", "spec": null, "unit": "台班", "doc_id": "SZ-SJG171"}
+{"category": "机械", "name": "混凝土输送泵输送量Q(m³/h)Q=30", "spec": null, "unit": "台班", "doc_id": "SZ-SJG171"}
+{"category": "机械", "name": "混凝土振动器插入式", "spec": null, "unit": "台班", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "泵送预拌混凝土C30,骨料最大粒径31.5", "spec": null, "unit": "m³", "doc_id": "SZ-SJG171"}
+{"category": "机械", "name": "混凝土高压输送泵 大型", "spec": null, "unit": "台班", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "热轧光圆钢筋HPB300 φ8~φ10盘卷", "spec": null, "unit": "t", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "镀锌铁丝(综合)", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "机械", "name": "钢筋切断机 直径D(mm) D=40", "spec": null, "unit": "台班", "doc_id": "SZ-SJG171"}
+{"category": "机械", "name": "钢筋弯曲机 直径D(mm) D=40", "spec": null, "unit": "台班", "doc_id": "SZ-SJG171"}
+{"category": "机械", "name": "钢筋调直机 直径D(mm) D=14", "spec": null, "unit": "台班", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "热轧光圆钢筋HPB300 φ>10", "spec": null, "unit": "t", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "电焊条E4303 φ3.2", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "机械", "name": "交流电焊机 容量E(kV·A) E=30", "spec": null, "unit": "台班", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "电焊条 E4303 φ3.2", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "热轧光圆钢筋 HPB300 φ>10", "spec": null, "unit": "t", "doc_id": "SZ-SJG171"}
+{"category": "机械", "name": "交流电焊机 容量E(kV·A)E=30", "spec": null, "unit": "台班", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "热轧带肋钢筋HRB400E φ8~φ10盘卷", "spec": null, "unit": "t", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "热轧带肋钢筋 HRB400E φ10~φ25", "spec": null, "unit": "t", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "热轧带肋钢筋HRB400E φ28~φ32", "spec": null, "unit": "t", "doc_id": "SZ-SJG171"}
+{"category": "机械", "name": "交流电焊机容量E(kV·A)E=30", "spec": null, "unit": "台班", "doc_id": "SZ-SJG171"}
+{"category": "机械", "name": "钢筋切断机直径D(mm)D=40", "spec": null, "unit": "台班", "doc_id": "SZ-SJG171"}
+{"category": "机械", "name": "钢筋弯曲机直径D(mm)D=40", "spec": null, "unit": "台班", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "镀锌铁丝（综合）", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "冷轧带肋钢筋 定长12m", "spec": null, "unit": "t", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "冷轧带肋钢筋定长12m", "spec": null, "unit": "t", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "钢筋网片(成品)φ6@200×200", "spec": null, "unit": "t", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "热轧光圆钢筋 HPB300 φ8~φ10 盘卷", "spec": null, "unit": "t", "doc_id": "SZ-SJG171"}
+{"category": "机械", "name": "钢筋切断机 直径D(mm)D=40", "spec": null, "unit": "台班", "doc_id": "SZ-SJG171"}
+{"category": "机械", "name": "钢筋弯曲机 直径D(mm)D=40", "spec": null, "unit": "台班", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "镀锌铁皮δ=0.5", "spec": null, "unit": "m²", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "瓦垄铁皮δ=0.5", "spec": null, "unit": "m²", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "铁钉(综合)", "spec": null, "unit": "Kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "弹性体改性沥青防水卷材(SBS)聚酯胎PY-聚乙烯膜PE-I型δ=3", "spec": null, "unit": "m²", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "单组分聚氨酯建筑密封膏", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "石油液化气", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "石油沥青冷底子油", "spec": null, "unit": "t", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "自粘聚合物改性沥青防水卷材 聚酯胎PY-聚乙烯膜 PE-I型 δ=3", "spec": null, "unit": "m²", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "种植屋面用耐根穿刺防水卷材聚酯胎PY-聚乙烯膜PE(化学阻根剂)-II型δ=4", "spec": null, "unit": "m²", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "湿铺防水卷材高分子P-聚乙烯膜PE(进口膜)-I型δ=1.5", "spec": null, "unit": "m²", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "108胶", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "素水泥浆", "spec": null, "unit": "m³", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "种植屋面用耐根穿刺防水卷材 聚酯胎 PY-聚乙烯膜 PE(化学阻根剂)-II型 δ=4", "spec": null, "unit": "m²", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "湿铺防水卷材 高分子P-聚乙烯膜PE(进口膜)-I型 δ=1.5", "spec": null, "unit": "m²", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "双组分聚氨酯建筑密封膏", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "聚苯乙烯泡沫塑料板(EPS)", "spec": null, "unit": "m³", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "石油沥青 进口 AH-70 号", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "环氧树脂底漆", "spec": null, "unit": "m³", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "改性沥青嵌缝油膏", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "耐酸石油沥青混凝土(细粒式)", "spec": null, "unit": "m³", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "水玻璃混凝土", "spec": null, "unit": "m³", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "耐酸沥青胶泥(隔离层用)", "spec": null, "unit": "m³", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "水玻璃稀胶泥", "spec": null, "unit": "m³", "doc_id": "SZ-SJG171"}
+{"category": "机械", "name": "滚筒式混凝土搅拌机(电动)出料容量V(L)V=400", "spec": null, "unit": "台班", "doc_id": "SZ-SJG171"}
+{"category": "机械", "name": "混凝土振动器平板式", "spec": null, "unit": "台班", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "耐酸沥青砂浆", "spec": null, "unit": "m³", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "硫黄混凝土", "spec": null, "unit": "m³", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "硫黄砂浆", "spec": null, "unit": "m³", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "铁屑水泥砂浆", "spec": null, "unit": "m³", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "环氧树脂砂浆", "spec": null, "unit": "m³", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "重晶石砂浆", "spec": null, "unit": "m³", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "不发火沥青砂浆", "spec": null, "unit": "m³", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "碎石5~25", "spec": null, "unit": "m³", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "硫酸", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "环氧酚醛胶泥", "spec": null, "unit": "m³", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "汽油", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "软聚氯乙烯地板δ=3", "spec": null, "unit": "m²", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "环氧树脂", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "聚氯乙烯稀释剂", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "石英粉", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "丙酮", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "铁砂布", "spec": null, "unit": "张", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "乙二胺", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "聚氯乙烯焊条", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "耐碱玻璃纤维网格布", "spec": null, "unit": "m²", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "防腐油", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "XY401粘结剂", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "机械", "name": "轴流通风机功率P(kW)P=75", "spec": null, "unit": "台班", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "加气混凝土砌块(5.0MPa)", "spec": null, "unit": "m³", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "泡沫混凝土400kg/m³", "spec": null, "unit": "m³", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "挤塑聚苯乙烯泡沫塑料板(XPS)δ=40", "spec": null, "unit": "m²", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "膨胀珍珠岩粉", "spec": null, "unit": "m³", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "聚氨酯硬泡组合料", "spec": null, "unit": "m³", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "聚氨酯防水涂料 单组分-I型", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "玻化微珠保温砂浆", "spec": null, "unit": "m³", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "抗裂砂浆", "spec": null, "unit": "m³", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "界面剂", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "钢模板", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "涂胶建筑模板(红板)1830×915×15", "spec": null, "unit": "张", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "支撑钢管及扣件(模板支撑专用)", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "脱模剂", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "零星卡具", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "机械", "name": "木工圆锯机 直径D(mm) D=500", "spec": null, "unit": "台班", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "涂胶建筑模板(红板)1 830×915×15", "spec": null, "unit": "张", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "松杂枋板材 周转材", "spec": null, "unit": "m³", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "对拉螺栓", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "机械", "name": "木工圆锯机 直径D(mm)D=500", "spec": null, "unit": "台班", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "铁件(综合)", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "机械", "name": "木工圆锯机直径D(mm)D=500", "spec": null, "unit": "台班", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "钢丝绳", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "工字钢(综合)", "spec": null, "unit": "t", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "防锈漆红色", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "油漆溶剂油", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "底座(租赁 10天)", "spec": null, "unit": "个", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "脚手架钢管 φ48×3.4mm×1~6m(租赁 10天)", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "扣件(含转扣接头、十字)(租赁 10天)", "spec": null, "unit": "个", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "钢笆子(钢筋网脚手板)(租赁 10天)", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "松杂直边板(租赁 10天)", "spec": null, "unit": "m³", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "脚手架钢管 φ48×3.4mm×1m~6m(租赁 10天)", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "电焊条E4303φ3.2", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "松木胶合板18mm 1号胶", "spec": null, "unit": "m²", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "脚手架钢管", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "脚手架扣件(综合)含对接口、直角扣、活动扣等", "spec": null, "unit": "个", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "底座", "spec": null, "unit": "个", "doc_id": "SZ-SJG171"}
+{"category": "机械", "name": "灰浆搅拌机 拌筒容量 V(L) V=200", "spec": null, "unit": "台班", "doc_id": "SZ-SJG171"}
+{"category": "机械", "name": "灰浆搅拌机 搅筒容量 V(L) V=200", "spec": null, "unit": "台班", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "方整石", "spec": null, "unit": "m³", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "普通预拌混凝土C10,骨料最大粒径31.5", "spec": null, "unit": "m³", "doc_id": "SZ-SJG171"}
+{"category": "机械", "name": "机动翻斗车 装载质量M(t)M=1", "spec": null, "unit": "台班", "doc_id": "SZ-SJG171"}
+{"category": "机械", "name": "混凝土振动器 插入式", "spec": null, "unit": "台班", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "普通预拌混凝土C20,骨料最大粒径31.5", "spec": null, "unit": "m³", "doc_id": "SZ-SJG171"}
+{"category": "机械", "name": "机动翻斗车装载质量M(t)M=1", "spec": null, "unit": "台班", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "细石混凝土C20", "spec": null, "unit": "m³", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "GZ高强塑料管D200", "spec": null, "unit": "m", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "GZ高强塑料管D300", "spec": null, "unit": "m", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "普通预拌混凝土C30,骨料最大粒径31.5", "spec": null, "unit": "m³", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "钢绞线 φ15.24", "spec": null, "unit": "t", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "钢绞线涂包费", "spec": null, "unit": "元", "doc_id": "SZ-SJG171"}
+{"category": "机械", "name": "立式油压千斤顶 起重量 Gn(t)Gn=200", "spec": null, "unit": "台班", "doc_id": "SZ-SJG171"}
+{"category": "机械", "name": "高压油泵 压力P(MPa) P=80", "spec": null, "unit": "台班", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "钢绞线群锚(3孔)", "spec": null, "unit": "套", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "钢绞线锚具(单孔,包括夹片)", "spec": null, "unit": "套", "doc_id": "SZ-SJG171"}
+{"category": "机械", "name": "预应力拉伸机 拉伸力F(kN)F=650", "spec": null, "unit": "台班", "doc_id": "SZ-SJG171"}
+{"category": "机械", "name": "预应力拉伸机 拉伸力F(kN)F=900", "spec": null, "unit": "台班", "doc_id": "SZ-SJG171"}
+{"category": "机械", "name": "半自动切割机 厚度T(mm)T=100", "spec": null, "unit": "台班", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "金属波纹管dn50", "spec": null, "unit": "m", "doc_id": "SZ-SJG171"}
+{"category": "机械", "name": "挤压式灰浆输送泵输送量Q(m³/h)Q=3", "spec": null, "unit": "台班", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "琉璃瓦片 230×230", "spec": null, "unit": "块", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "玻纤胎沥青脊瓦", "spec": null, "unit": "块", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "琉璃瓦片筒 220×115", "spec": null, "unit": "块", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "玻纤胎沥青瓦", "spec": null, "unit": "m²", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "镀锌低碳钢丝网", "spec": null, "unit": "m²", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "湿拌砌筑砂浆 M10", "spec": null, "unit": "m³", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "湿拌地面砂浆 M15", "spec": null, "unit": "m³", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "S盾瓦 250×90", "spec": null, "unit": "块", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "琉璃满面瓦(滴水)", "spec": null, "unit": "块", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "琉璃脊瓦 225×180", "spec": null, "unit": "块", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "琉璃瓦片筒220×115", "spec": null, "unit": "块", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "琉璃满面瓦筒(勾头)", "spec": null, "unit": "块", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "湿拌砌筑砂浆 M10", "spec": null, "unit": "$m^3$", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "水", "spec": null, "unit": "$m^3$", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "西班牙瓦 310×310×15", "spec": null, "unit": "块", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "西班牙脊瓦 285×180×15", "spec": null, "unit": "块", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "三元乙丙橡胶防水卷材 δ=1.5", "spec": null, "unit": "m²", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "氯丁橡胶粘剂", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "高分子自粘胶膜防水卷材 非沥青基 δ=1.5", "spec": null, "unit": "m²", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "单组分聚氨酯建筑密封膏", "spec": null, "unit": "Kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "热塑性聚烯烃防水卷材 δ=1.5", "spec": null, "unit": "m²", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "铝合金压条 30×3", "spec": null, "unit": "m", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "镀锌钢板垫片 椭圆形40×82", "spec": null, "unit": "个", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "钢板 Q235B δ=3", "spec": null, "unit": "t", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "紫铜板 δ=2", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "651型橡胶止水带", "spec": null, "unit": "m", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "铜焊条", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "甲苯", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "机械", "name": "剪板机 厚度 T (mm) / 宽度 B (mm) T=20/B=2 500", "spec": null, "unit": "台班", "doc_id": "SZ-SJG171"}
+{"category": "机械", "name": "剪板机 厚度 T (mm) / 宽度 B (mm) T=40/B=3 100", "spec": null, "unit": "台班", "doc_id": "SZ-SJG171"}
+{"category": "机械", "name": "直流电焊机 功率 P (kW) P=32", "spec": null, "unit": "台班", "doc_id": "SZ-SJG171"}
+{"category": "机械", "name": "交流弧焊机 容量 E (kV·A) E=32", "spec": null, "unit": "台班", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "遇水膨胀止水条30×20", "spec": null, "unit": "m", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "氯丁橡胶片δ=2", "spec": null, "unit": "m²", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "木模板", "spec": null, "unit": "m³", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "氯丁橡胶浆", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "普通硅酸盐水泥P.O 42.5R散装", "spec": null, "unit": "t", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "乙酸乙酯", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "三异氰酸酯", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "石油沥青防水油毡 1m×20m", "spec": null, "unit": "m²", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "耐酸沥青胶泥（隔离层用）", "spec": null, "unit": "m³", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "耐酸沥青胶泥（结合层用）", "spec": null, "unit": "m³", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "水泥珍珠岩块300×300×65", "spec": null, "unit": "千块", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "轻质陶粒块330×330×90", "spec": null, "unit": "千块", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "钢筋混凝土平板490×490×40", "spec": null, "unit": "千块", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "湿拌砌筑砂浆M5", "spec": null, "unit": "m³", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "湿拌抹灰砂浆M15", "spec": null, "unit": "m³", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "涂胶建筑模板（红板）1 830×915×15", "spec": null, "unit": "张", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "铁钉（综合）", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "铁件（综合）", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "承插型盘扣式钢管脚手架(成套)(租赁10天)", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "承插型盘扣式钢管脚手架(成套)(租赁 10天)", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "金属安全网 周转材", "spec": null, "unit": "m²", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "密目式阻燃安全网", "spec": null, "unit": "m²", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "蒸压加气混凝土高精砌块", "spec": null, "unit": "m³", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "高精砌块专用砌筑砂浆", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "聚合物水泥砂浆", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "连接件", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "PE棒", "spec": null, "unit": "m", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "PU发泡剂", "spec": null, "unit": "L", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "硅酮结构密封胶", "spec": null, "unit": "L", "doc_id": "SZ-SJG171"}
+{"category": "机械", "name": "电动多级离心清水泵 扬程H(m)/出口直径D(mm) H>120/D=100", "spec": null, "unit": "台班", "doc_id": "SZ-SJG171"}
+{"category": "机械", "name": "电动多级离心清水泵扬程H(m)/出口直径D(mm)H>120/D=100", "spec": null, "unit": "台班", "doc_id": "SZ-SJG171"}
+{"category": "机械", "name": "电动多级离心清水泵扬程H(m)/出口直径D(mm)H>180/D=150", "spec": null, "unit": "台班", "doc_id": "SZ-SJG171"}
+{"category": "机械", "name": "电动多级离心清水泵 扬程H(m)/出口直径D(mm) H>180/D=150", "spec": null, "unit": "台班", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "螺栓带帽(预埋)", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "彩钢板δ=0.5", "spec": null, "unit": "m²", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "彩钢脊瓦", "spec": null, "unit": "m", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "塑料堵头", "spec": null, "unit": "个", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "S/C钢檩条", "spec": null, "unit": "t", "doc_id": "SZ-SJG171"}
+{"category": "机械", "name": "汽车式起重机起重量Gn(t)Gn=5", "spec": null, "unit": "台班", "doc_id": "SZ-SJG171"}
+{"category": "机械", "name": "直流电焊机功率P(kW)P=32", "spec": null, "unit": "台班", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "屋面成品盖板型铝合金盖板缝宽B(mm)0<B≤100", "spec": null, "unit": "m", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "屋面成品盖板型铝合金盖板缝宽B(mm)100<B≤200", "spec": null, "unit": "m", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "屋面成品盖板型铝合金盖板缝宽B(mm)B>200", "spec": null, "unit": "m", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "外墙成品盖板型铝合金盖板缝宽B(mm)0<B≤100", "spec": null, "unit": "m", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "外墙成品盖板型铝合金盖板缝宽B(mm)100<B≤200", "spec": null, "unit": "m", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "外墙成品盖板型铝合金盖板缝宽B(mm)B>200", "spec": null, "unit": "m", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "内墙成品盖板型铝合金盖板缝宽B(mm)0<B≤100", "spec": null, "unit": "m", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "内墙成品盖板型铝合金盖板缝宽B(mm)100<B≤200", "spec": null, "unit": "m", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "内墙成品盖板型铝合金盖板缝宽B(mm)B>200", "spec": null, "unit": "m", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "楼面、地面成品盖板型铝合金盖板缝宽B(mm)0<B≤100", "spec": null, "unit": "m", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "楼面、地面成品盖板型铝合金盖板缝宽B(mm)100<B≤200", "spec": null, "unit": "m", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "楼面、地面成品盖板型铝合金盖板缝宽B(mm)B>200", "spec": null, "unit": "m", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "天棚成品盖板型铝合金盖板缝宽B(mm)0<B≤100", "spec": null, "unit": "m", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "天棚成品盖板型铝合金盖板缝宽B(mm)100<B≤200", "spec": null, "unit": "m", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "天棚成品盖板型铝合金盖板缝宽B(mm)B>200", "spec": null, "unit": "m", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "陶板150×150×20", "spec": null, "unit": "m²", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "铸石板180×110×20", "spec": null, "unit": "m²", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "瓷砖230×113×30", "spec": null, "unit": "m²", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "环氧树脂胶泥", "spec": null, "unit": "m³", "doc_id": "SZ-SJG171"}
+{"category": "机械", "name": "轴流通风机功率P(kW)P=7.5", "spec": null, "unit": "台班", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "耐酸沥青胶泥(砌筑用)", "spec": null, "unit": "m³", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "花岗岩板500×400×60", "spec": null, "unit": "m²", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "水玻璃砂浆", "spec": null, "unit": "m³", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "酚醛树脂胶泥", "spec": null, "unit": "m³", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "耐酸沥青胶泥(结合层用)", "spec": null, "unit": "m³", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "模板嵌缝料", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "润滑油", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "脚手架型钢架体(租赁 10天)", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "机械", "name": "脚手架提升系统", "spec": null, "unit": "台班", "doc_id": "SZ-SJG171"}
+{"category": "机械", "name": "脚手架电气控制系统", "spec": null, "unit": "台班", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "直螺纹连接套筒φ≤25", "spec": null, "unit": "个", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "直螺纹连接套筒φ≤32", "spec": null, "unit": "个", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "锥型螺纹连接套筒φ≤32", "spec": null, "unit": "个", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "锥型螺纹连接套筒32<φ≤45", "spec": null, "unit": "个", "doc_id": "SZ-SJG171"}
+{"category": "机械", "name": "锥型螺纹车丝机", "spec": null, "unit": "台班", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "热轧光圆钢筋HPB300 φ8~φ10盘卷", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "冷挤压套筒 φ≤45", "spec": null, "unit": "套", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "焊剂", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "石棉垫", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "机械", "name": "冷挤压机 直径D(mm) D=45", "spec": null, "unit": "台班", "doc_id": "SZ-SJG171"}
+{"category": "机械", "name": "电渣焊机 电流I(A) I=1000", "spec": null, "unit": "台班", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "PTFE建筑膜材", "spec": null, "unit": "m²", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "PVC阳光板δ=10", "spec": null, "unit": "m²", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "膜材料附件", "spec": null, "unit": "m²", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "不锈钢方钢50×50", "spec": null, "unit": "m", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "铝合金压条30×3", "spec": null, "unit": "m", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "锚头φ26", "spec": null, "unit": "套", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "瓷板180×110×20", "spec": null, "unit": "m²", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "钢滑模摊销量", "spec": null, "unit": "t", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "杂麻绳", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "钢丝网 20# 10×10", "spec": null, "unit": "m²", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "防锈漆 红色", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "松节油", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "氧气(工业用)", "spec": null, "unit": "m³", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "乙炔气", "spec": null, "unit": "m³", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "平台组装费", "spec": null, "unit": "元", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "起重机具摊销费", "spec": null, "unit": "元", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "液压设备摊销费", "spec": null, "unit": "元", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "激光测量导向费", "spec": null, "unit": "元", "doc_id": "SZ-SJG171"}
+{"category": "机械", "name": "木工圆锯机 直径D(mm) D=600", "spec": null, "unit": "台班", "doc_id": "SZ-SJG171"}
+{"category": "机械", "name": "直流电焊机功率P(kW) P=32", "spec": null, "unit": "台班", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "钢丝网20# 10×10", "spec": null, "unit": "m²", "doc_id": "SZ-SJG171"}
+{"category": "机械", "name": "直流电焊机 功率P(kW) P=32", "spec": null, "unit": "台班", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "钢吊笼支架", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "混凝土基座(水塔滑模基座)", "spec": null, "unit": "m³", "doc_id": "SZ-SJG171"}
+{"category": "机械", "name": "木工压刨床创削宽度B(mm)/面数B=600/单面", "spec": null, "unit": "台班", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "电", "spec": null, "unit": "kW·h", "doc_id": "SZ-SJG171"}
+{"category": "机械", "name": "电动吊篮租赁费", "spec": null, "unit": "台·天", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "低碳钢焊条 J422(综合)", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "机械", "name": "交流电焊机 容量E(kV·A) E=32", "spec": null, "unit": "台班", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "直螺纹连接套筒 32<φ≤45", "spec": null, "unit": "个", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "直螺纹连接套筒 φ≤32", "spec": null, "unit": "个", "doc_id": "SZ-SJG171"}
+{"category": "机械", "name": "交流电焊机 容量E(kV·A)E=32", "spec": null, "unit": "台班", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "过氯乙烯清漆", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "过氯乙烯磁漆", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "过氯乙烯底漆", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "过氯乙烯漆稀释剂", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "机械", "name": "电动空气压缩机 排气量Q(m³/min) Q=0.6", "spec": null, "unit": "台班", "doc_id": "SZ-SJG171"}
+{"category": "机械", "name": "轴流通风机 功率P(kW) P=7.5", "spec": null, "unit": "台班", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "漆酚树脂漆", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "沥青清漆", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "石油沥青进口AH-70号", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "酚醛树脂漆", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "苯磺酰氯", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "酒精", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "机械", "name": "轴流通风机 功率 P (kW) P=7.5", "spec": null, "unit": "台班", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "氯磺化聚乙烯漆", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "氯磺化聚乙烯中间漆", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "氯磺化聚乙烯面漆", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "聚氨酯磁漆", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "聚氨酯清漆", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "聚氨酯底漆", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "二甲苯", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "扁钢(综合)", "spec": null, "unit": "t", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "槽钢(综合)", "spec": null, "unit": "t", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "角钢(综合)", "spec": null, "unit": "t", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "钢板 Q235B δ=8", "spec": null, "unit": "t", "doc_id": "SZ-SJG171"}
+{"category": "机械", "name": "木工圆锯机 直径D(mm)D=600", "spec": null, "unit": "台班", "doc_id": "SZ-SJG171"}
+{"category": "机械", "name": "剪板机 厚度T/宽度B(mm)T=20/B=2 500", "spec": null, "unit": "台班", "doc_id": "SZ-SJG171"}
+{"category": "机械", "name": "点焊机长臂 容量E(kV·A)E=75", "spec": null, "unit": "台班", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "热轧带肋钢筋HRB400E φ12", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "热轧带肋钢筋HRB400E φ10", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "热轧带肋钢筋HRB400E φ8~φ10盘卷", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "电锤钻头(综合)", "spec": null, "unit": "个", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "植筋结构胶", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "机械", "name": "电动空气压缩机排气量Q(m³/min) Q=0.3", "spec": null, "unit": "台班", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "热轧带肋钢筋HRB400E φ14", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "热轧带肋钢筋HRB400E φ16", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "热轧带肋钢筋HRB400E φ18", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "热轧带肋钢筋HRB400E φ20", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "热轧带肋钢筋HRB400E φ22", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "热轧带肋钢筋HRB400E φ25", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "热轧带肋钢筋HRB400E φ28~φ32", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "热轧带肋钢筋HRB400E φ36~φ40", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "瓷釉涂料", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "双飞粉", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "快易收口网", "spec": null, "unit": "m²", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "摊销材料费", "spec": null, "unit": "元", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "方木屋架", "spec": null, "unit": "m³", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "圆木屋架", "spec": null, "unit": "m³", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "杉木板方材", "spec": null, "unit": "m³", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "普通预拌混凝土C15,骨料最大粒径31.5", "spec": null, "unit": "m³", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "方木钢屋架", "spec": null, "unit": "m³", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "圆木钢屋架", "spec": null, "unit": "m³", "doc_id": "SZ-SJG171"}
+{"category": "机械", "name": "汽车式起重机 起重量 Gn(t)Gn=5", "spec": null, "unit": "台班", "doc_id": "SZ-SJG171"}
+{"category": "机械", "name": "交流电焊机 容量E(kV·A)E=40", "spec": null, "unit": "台班", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "松原木", "spec": null, "unit": "m³", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "旋转木楼梯", "spec": null, "unit": "m²", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "连接铁件", "spec": null, "unit": "Kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "白乳胶", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "弧形木楼梯", "spec": null, "unit": "m²", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "直形木楼梯", "spec": null, "unit": "m²", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "弧形钢木楼梯", "spec": null, "unit": "m²", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "连接铁件", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "直形钢木楼梯", "spec": null, "unit": "m²", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "旋转钢木楼梯", "spec": null, "unit": "m²", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "屋面木板", "spec": null, "unit": "m²", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "板条", "spec": null, "unit": "百根", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "木檐板、博风板", "spec": null, "unit": "m³", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "木椽子", "spec": null, "unit": "m³", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "聚合物水泥防水涂料Ⅰ型", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "水泥基渗透结晶型防水涂料", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "非固化橡胶沥青防水涂料", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "高分子益胶泥 干混类 - I 型", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "聚合物防水砂浆", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "水泥基渗透结晶型防水剂", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "细石混凝土 C20", "spec": null, "unit": "m³", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "防水混凝土 C25 P8", "spec": null, "unit": "m³", "doc_id": "SZ-SJG171"}
+{"category": "机械", "name": "混凝土振动器 平板式", "spec": null, "unit": "台班", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "无纺布 200g/m²", "spec": null, "unit": "m²", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "基层处理剂（防水专用）", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "挤塑聚苯乙烯泡沫塑料板(XPS)δ=30", "spec": null, "unit": "m²", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "苯板泡沫胶", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "遇水膨胀止水条10×10", "spec": null, "unit": "m", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "承插型盘扣式钢管支架(租赁10天)", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "安全兜网", "spec": null, "unit": "m²", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "高强胶合板", "spec": null, "unit": "张", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "直面模板", "spec": null, "unit": "m²", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "爬升架体", "spec": null, "unit": "m²", "doc_id": "SZ-SJG171"}
+{"category": "机械", "name": "液压系统及电气控制系统", "spec": null, "unit": "台班", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "冲压钢脚手板", "spec": null, "unit": "m²", "doc_id": "SZ-SJG171"}
+{"category": "人工", "name": "高级技工人工费", "spec": null, "unit": "元", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "承插型盘扣式钢管脚手架(成套)", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "水平架(脚手架专用)", "spec": null, "unit": "m²", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "交叉支撑(脚手架专用)", "spec": null, "unit": "副", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "连接棒", "spec": null, "unit": "个", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "钢管架", "spec": null, "unit": "m²", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "挡脚板(钢笆网)", "spec": null, "unit": "m²", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "松杂直边板", "spec": null, "unit": "m³", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "钢笆子(钢架板)", "spec": null, "unit": "m²", "doc_id": "SZ-SJG171"}
+{"category": "材料", "name": "柴油", "spec": null, "unit": "kg", "doc_id": "SZ-SJG171"}
+{"category": "机械", "name": "起重机租赁费", "spec": null, "unit": "台·天", "doc_id": "SZ-SJG171"}
+{"category": "机械", "name": "施工电梯租赁费", "spec": null, "unit": "台·天", "doc_id": "SZ-SJG171"}

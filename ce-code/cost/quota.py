@@ -170,6 +170,23 @@ def _num(v: str) -> float | None:
     return float(v) if NUM_RE.match(v) else None
 
 
+def _forward_fill(cells: list[str]) -> list[str]:
+    """前向填充空单元（colspan 共享名展开后仅首格有值、后格空 → 继承前值）。
+
+    ["水玻璃", "", "耐酸沥青", ""] → ["水玻璃", "水玻璃", "耐酸沥青", "耐酸沥青"]。
+
+    参数：cells —— 子目编号列位上的名称单元。
+    返回：前向填充后的等长列表。
+    """
+    out, last = [], ""
+    for c in cells:
+        c = (c or "").strip()
+        if c:
+            last = c
+        out.append(last)
+    return out
+
+
 def parse_quota_table(table: dict, chapter: str, doc_id: str, spec_version: str) -> dict:
     """解析一张定额子目表 → {items, resources, links}（转置矩阵 → 三表）。
 
@@ -180,10 +197,11 @@ def parse_quota_table(table: dict, chapter: str, doc_id: str, spec_version: str)
     body = table.get("body") or []
     work_content, unit = parse_caption(caption_text(table))
 
-    # 1. 子目编号（保持列序）→ N 个 quota_item 骨架
-    codes = [c.strip() for c in body[0] if CODE_RE.match((c or "").strip())]
+    # 1. 子目编号（保持列序 + 列位）→ N 个 quota_item 骨架
+    code_cols = [i for i, c in enumerate(body[0]) if CODE_RE.match((c or "").strip())]
+    codes = [body[0][i].strip() for i in code_cols]
     n = len(codes)
-    items = {code: {"quota_code": code, "name": "", "variant": "", "unit": unit,
+    items = {code: {"quota_code": code, "name": "", "unit": unit,
                     "work_content": work_content, "base_price": None,
                     "labor_cost": None, "material_cost": None, "machine_cost": None,
                     "chapter": chapter, "doc_id": doc_id, "spec_version": spec_version,
@@ -193,7 +211,8 @@ def parse_quota_table(table: dict, chapter: str, doc_id: str, spec_version: str)
     if not n:
         return {"items": [], "resources": [], "links": []}
 
-    # 2/3. 逐行扫：子目名称/变体、费用构成、工料机
+    # 2/3. 逐行扫：子目名称（按列累积）、费用构成、工料机
+    name_parts: dict[str, list[str]] = {code: [] for code in codes}
     resources: dict[tuple, dict] = {}
     links: list[dict] = []
     in_resource = False
@@ -203,15 +222,12 @@ def parse_quota_table(table: dict, chapter: str, doc_id: str, spec_version: str)
             in_resource = True
             continue
         if head == "子目名称":
-            # 子目名称 rowspan=2 → 两行 col0 皆「子目名称」：共享名行（payload 1 项，跨子目）
-            # 与变体行（payload n 项，逐子目）按 payload 长度区分，与行序无关
-            payload = [c.strip() for c in row[1:] if c.strip() and "参考价格" not in c]
-            if len(payload) == 1:
-                for code in codes:
-                    items[code]["name"] = payload[0]
-            elif len(payload) == n:
-                for code, v in zip(codes, payload):
-                    items[code]["variant"] = v
+            # 多层名称行（如 水玻璃耐酸混凝土 / 厚度T(mm) / T=60）：按子目编号列位取值，
+            # 前向填充（处理 colspan 共享名：仅首格有值、后格空 → 继承），逐列累积成完整名
+            vals = _forward_fill([row[i] if i < len(row) else "" for i in code_cols])
+            for code, v in zip(codes, vals):
+                if v and (not name_parts[code] or name_parts[code][-1] != v):
+                    name_parts[code].append(v)
             continue
 
         parsed = _anchor(row, n)
@@ -244,10 +260,9 @@ def parse_quota_table(table: dict, chapter: str, doc_id: str, spec_version: str)
                               "resource_name": name, "resource_unit": u,
                               "consumption": amt})
 
-    # 共享名 + 变体合成最终 name（schema 仅一列 name）：实心砖基础 → 实心砖基础（干混砌筑砂浆）
-    for it in items.values():
-        if it["variant"]:
-            it["name"] = f"{it['name']}（{it['variant']}）" if it["name"] else it["variant"]
+    # 各名称行累积 → 完整 name（schema 仅一列）：实心砖基础 干混砌筑砂浆 / 水玻璃耐酸混凝土 厚度T(mm) T=60
+    for code in codes:
+        items[code]["name"] = re.sub(r"\s+", " ", " ".join(name_parts[code])).strip()
 
     return {"items": list(items.values()), "resources": list(resources.values()),
             "links": links}

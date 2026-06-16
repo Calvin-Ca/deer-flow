@@ -87,6 +87,12 @@ ce-code/
 │   ├── retrieve_service.py         #   检索编排 + 可观测性（请求级日志/计时）
 │   └── knowledge_api.py            #   知识服务 :8100（/search /expand /clause /health，契约不变）
 │
+│  ── 造价数据轨（Phase C，与 RAG 流水线解耦）──
+├── cost/                           # 结构化造价数据 → PostgreSQL（见末节「造价数据轨」）
+│   ├── bill_spec.py                #   chunks.json → bill_spec.jsonl + aux_tables.jsonl（双出口抽取）
+│   ├── schema.sql                  #   全表 DDL（bill_spec/aux_table/quota_*/resource*/hist_bill + 治理字段）
+│   └── load_pg.py                  #   JSONL → PG 幂等导入（-m cost.load_pg）
+│
 │  ── utils / tools ──
 ├── utils/                          # tokenizer（字符级分词）/ text_cleaner / logger
 └── tools/                          # 评测 / 审核 / 运维（-m tools.X 运行）
@@ -142,12 +148,6 @@ bash tools/setup_server.sh
 uv run python -m parser mineru --pdf data/raw/<文件名>.pdf
 ```
 
-换 backend / 指定 API 地址：
-
-```bash
-uv run python -m parser mineru --pdf data/raw/<文件名>.pdf --backend pipeline --server-url http://172.19.2.2:8000
-```
-
 也可直接 curl（同步返回 JSON，`results.<文件名>.md_content` / `.content_list`；调试单页用 `start_page_id`/`end_page_id`）：
 
 ```bash
@@ -175,21 +175,31 @@ curl -s -X POST http://172.19.2.2:8000/file_parse -F "files=@data/raw/<文件名
 
 > ✅ **表体提取（已实现）**：`parser/mineru.py` 的 `FormatAdapter` 从 `table_body` 取出表格 HTML，经 `_HTMLTableParser` + `_expand_spans` 解析为**矩形**二维表（展开 colspan/rowspan 防串列），随块落入 `body`，建树时挂到所属节点的 `tables[]`。
 
-### Step 4 — 知识库构建（一条命令跑完）
+### Step 4 — 知识库构建（一次跑完 / 分步跑同源）
 
-`build.py` 一趟跑完 **解析 → 切分建树 → 挂表征 → 建索引**，无需分阶段。`standard_id` 默认取输入 basename；可加 `--standard-id "GB 50016-2014(2018)"` 固定。需 Milvus + embedding 服务：
+`build.py` 是命令组：`all` 一条命令跑完 **解析 → 切分建树 → 选粒度 → 表征 → 建索引**；`parse/split/view/feature/index` 五条分步子命令逐步审核。两者共用同一批 `step_*` 步骤函数、落同一批中间产物，故**一次跑完与分步跑产出逐字一致**。`standard_id` 默认取输入 basename；可加 `--standard-id "GB 50016-2014(2018)"` 固定。需 Milvus + embedding 服务：
 
 ```bash
-uv run python build.py --input "data/parsed/<basename>/auto/<basename>_content_list.json" --profile-name default --index-granularity clause --embed-url http://localhost:8097 --embed-model-id /model
+uv run python build.py all --input "data/parsed/<basename>/auto/<basename>_content_list.json" --profile-name default --index-granularity clause --embed-url http://localhost:8097 --embed-model-id /model
 ```
 
-中间产物：解析（格式归一 + 目录打标）落 `data/structured/<standard>/<profile>/catalog_blocks.json`（每块目录标签·调试），切分落同目录 `chunks.json`（Chunk 树·单一真值）；`feature.enrich` 挂免费 4 项后重写 `chunks.json`；`index.view` 选粒度（当前仅 `clause`）emit，索引按 profile 隔离落 `data/vector_store/<standard>/<profile>/`，Milvus collection 名由 profile 推断（与 service/eval 一致）。可选 `--parser-strategy`（缺省 `mineru`）、`--structure-strategy`（缺省 `toc`）、切分深度 `--toc-max-depth` / `--subsplit`。无 Milvus 时加 `--bm25-only`（只建 BM25 + metadata）。
+中间产物按 profile 隔离落 `data/structured/<standard>/<profile>/`：① 解析 `document.json`（格式归一后的纯版面块流）→ ② 切分 `chunks.json`（Chunk 树·单一真值）+ `catalog_blocks.json`（目录打标快照·调试）→ ③ 选粒度 `units.json`（检索单元，clause=已接地叶）→ ④ 表征 `features.json`（sidecar，dense 向量留索引期填）→ ⑤ 索引落 `data/vector_store/<standard>/<profile>/`（bm25/metadata/Milvus，collection 名由 profile 推断，与 service/eval 一致）。可选 `--parser-strategy`（缺省 `mineru`）、`--structure-strategy`（缺省 `toc`）、切分深度 `--toc-max-depth` / `--subsplit`。无 Milvus 时加 `--bm25-only`（只建 BM25 + metadata）。
 
-**只跑到前面某步**（不必动 build）：阶段 0 解析单独跑见 Step 3 的 `python -m parser`；**只切分建树、看节点树**（本地无需 Milvus）用切分层入口或预览：
+**分步跑（逐步审核中间产物）**：每条子命令从盘上前一步产物起跑、只跑一步、再落盘——用 `--standard-id` + `--profile-name` 定位 `structured/<std>/<profile>/` 目录：
+
+```bash
+uv run python build.py parse --input "data/parsed/<basename>/auto/<basename>_content_list.json"   # ① → document.json
+uv run python build.py split --standard-id "<std>" --subsplit number                              # ② → chunks.json
+uv run python build.py view --standard-id "<std>"                                                 # ③ → units.json
+uv run python build.py feature --standard-id "<std>"                                              # ④ → features.json
+uv run python build.py index --standard-id "<std>" --bm25-only                                    # ⑤ → store（去掉 --bm25-only 建 Milvus 向量）
+```
+
+**只跑到前面某步**（不必动 build）：阶段 0 MinerU 解析见 Step 3 的 `python -m parser`；**只切分建树、看节点树**（本地无需 Milvus）用切分层入口或预览：
 
 ```bash
 uv run python -m splitter toc --input "data/parsed/<basename>/auto/<basename>_content_list.json"   # 解析+切分落 catalog_blocks.json + chunks.json
-uv run python build.py --input "data/parsed/<basename>/auto/<basename>_content_list.json" --preview  # 只打印前 20 条节点，不落盘
+uv run python build.py all --input "data/parsed/<basename>/auto/<basename>_content_list.json" --preview  # 只打印前 20 条节点，不落盘
 ```
 
 ### Step 5 — 质量审核
@@ -221,3 +231,44 @@ curl http://localhost:8100/health
 ```bash
 curl -s http://localhost:8101/qa -H 'Content-Type: application/json' -d '{"query":"24米高的住宅楼疏散楼梯最小净宽度是多少？","standard":"gb50016"}'
 ```
+
+---
+
+## 造价数据轨（Phase C · `cost/`）
+
+结构化造价数据（清单/定额/价格/历史）走**关系库 PostgreSQL** 作单一事实源，与上面的规范类 RAG 流水线解耦。库在服务器：容器 `ce-postgres`（端口 `5433`，库 `ce_cost`，用户 `cost`）。建表/导入已落成仓库内可复现脚本，**幂等可重跑**，不再手敲 psql。
+
+> 依赖 `psycopg`：服务器首次跑前 `uv add 'psycopg[binary]'`（写入 `pyproject.toml`，勿 `uv pip install`）。
+> 连接串带密码经环境变量传入、不写进仓库：`CE_PG_DSN='postgresql://cost:<密码>@localhost:5433/ce_cost'`（缺省回退 `postgresql://cost@localhost:5433/ce_cost`，密码走 libpq 的 `PGPASSWORD`/`.pgpass`）。
+
+### Step C1 — 从节点树抽清单项规范（`cost/bill_spec.py`）
+
+读切分层产物 `chunks.json`，按「表头含『项目编码』」双出口分流：清单项规范表 → `bill_spec.jsonl`（每行一条清单项，feature_schema / work_content 按编号拆 list）；辅助/参数表（土石分类表、工作面宽度表…）→ `aux_tables.jsonl`（列头异构不归一，原样留矩形 body 供 calc_rule 查表）。非 9 位编码的行落 `bill_spec_anomalies.jsonl` 供人工抽查、不入库。`spec_version` 由 `normalize_spec` 归一到 canonical 规范号（如 `GB/T 50854-2024`）并带 `doc_id`（如 `GB-50854`）。
+
+> `chunks.json` 按 `<规范>/<profile>/` 隔离，须用 `--input` 指到具体路径（默认值是旧扁平位置，已过时）：
+
+```bash
+uv run python -m cost.bill_spec --input "data/structured/GB_T50854_2024_房屋建筑与装饰工程工程量计算标准/default/chunks.json"
+```
+
+产物落 `data/structured/bill_spec.jsonl` + `aux_tables.jsonl`，终端打印质量 report（数量 / 编码唯一性 / 连续性 / 单位受控 / 特征空率 / 辅助表清单）。`--dry-run` 只看 report 不落盘。
+
+### Step C2 — 建表 + 幂等导入 PG（`cost/schema.sql` + `cost/load_pg.py`）
+
+`schema.sql` 一次建齐全部造价表（`bill_spec` / `aux_table` / `quota_item` / `quota_resource` / `resource` / `resource_price` / `hist_bill`），强制治理字段 `doc_id`/`spec_version`/`region`/`effective_priority`（价格 `resource_price` 带 `effective_period` 时效 + `btree_gist` EXCLUDE 防重叠）；`IF NOT EXISTS` 幂等。`load_pg.py` 读 jsonl，按主键 `ON CONFLICT DO UPDATE` upsert（`bill_spec` 按 `code`、`aux_table` 按 `doc_id+caption+chapter`），可重复执行不产生重复行。
+
+```bash
+CE_PG_DSN='postgresql://cost:<密码>@localhost:5433/ce_cost' uv run python -m cost.load_pg --init-schema --bill-spec data/structured/bill_spec.jsonl --aux data/structured/aux_tables.jsonl
+```
+
+> ⚠️ `--init-schema` 是 `CREATE TABLE IF NOT EXISTS`，**不会改已存在的表结构**。若库里有缺治理字段的旧 `bill_spec`（早期手敲建的），先删了再灌（导入幂等，删表无损）：`docker exec ce-postgres psql -U cost -d ce_cost -c "DROP TABLE IF EXISTS bill_spec"`。
+
+### Step C3 — 验收
+
+```bash
+docker exec ce-postgres psql -U cost -d ce_cost -c "SELECT doc_id, spec_version, region, effective_priority, count(*) FROM bill_spec GROUP BY 1,2,3,4"
+```
+
+GB/T 50854 当前应为 472 条、全 `GB-50854 / GB/T 50854-2024 / 全国 / 1`；`aux_table` 5 张。
+
+> 连 `ce-postgres` 须走 rootless docker（`docker context use rootless` 或设 `DOCKER_HOST`），**绝不用 `sudo docker`**（那打到共用 daemon）。部署细节见 `DEV.md §6`。

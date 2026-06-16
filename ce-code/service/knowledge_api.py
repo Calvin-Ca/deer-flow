@@ -79,7 +79,7 @@ def search_endpoint(req: SearchRequest) -> dict:
         raise HTTPException(
             status_code=503,
             detail=(f"向量索引未就绪（{exc} 不存在）。这是服务端配置问题，请在服务器上构建索引："
-                    f"python build.py --input data/parsed/.../*_content_list.json"),
+                    f"python build.py all --input data/parsed/.../*_content_list.json"),
         ) from exc
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"检索失败: {exc}") from exc

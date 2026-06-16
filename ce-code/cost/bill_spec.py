@@ -261,28 +261,91 @@ def extract(chunks: list[dict]) -> tuple[list[dict], list[dict], list[dict]]:
     return bill_specs, aux_tables, anomalies
 
 
+def _norm_name(s: str) -> str:
+    """名称归一（去全部空白）用于同名判定。"""
+    return re.sub(r"\s+", "", s or "")
+
+
+def resolve_dups(bill_specs: list[dict]) -> tuple[list[dict], list[dict], int]:
+    """按 code 收口重复：同名多单位合并；异名撞码路由到冲突。每行补 unit_options。
+
+    清单 PG 主键是 code，同码多行须收口：
+    - **同名多单位**（规范一码配多个可选计量单位，如金属结构刷油 kg/m²）→ 合并成
+      一行，`unit_options` 收全部单位、`unit` 取首个，其余字段取首个非空。
+    - **异名撞码**（不同清单项撞同一 code，多为源 PDF/MinerU 编码读错）→ 该 code 全部
+      行路由到 conflicts、**不进主表**（宁缺毋造，不猜正确编码），报告供人工核对。
+
+    无重复行也补 `unit_options`（[unit] 或 []），令下游 schema 一致。
+    参数：bill_specs —— extract 出的清单行。返回：(clean, conflicts, merged_count)。
+    """
+    groups: dict[str, list[dict]] = {}
+    for b in bill_specs:
+        groups.setdefault(b["code"], []).append(b)
+
+    clean, conflicts, merged = [], [], 0
+    for code, rows in groups.items():
+        if len(rows) == 1:
+            b = dict(rows[0])
+            b["unit_options"] = [b["unit"]] if b.get("unit") else []
+            clean.append(b)
+            continue
+        if len({_norm_name(r["name"]) for r in rows}) == 1:
+            # 同名多单位 → 合并
+            base = dict(rows[0])
+            units: list[str] = []
+            for r in rows:
+                if r.get("unit") and r["unit"] not in units:
+                    units.append(r["unit"])
+            base["unit"] = units[0] if units else base.get("unit", "")
+            base["unit_options"] = units
+            for f in ("feature_schema", "calc_rule", "work_content"):
+                if not base.get(f):
+                    base[f] = next((r[f] for r in rows if r.get(f)), base.get(f))
+            clean.append(base)
+            merged += len(rows) - 1
+        else:
+            # 异名撞码 → 冲突，全部路由出主表
+            for r in rows:
+                c = dict(r)
+                c["unit_options"] = [r["unit"]] if r.get("unit") else []
+                c["conflict_reason"] = f"同码异名撞 code={code}"
+                conflicts.append(c)
+    return clean, conflicts, merged
+
+
 # ---------------------------------------------------------------------------
 # 质量 report
 # ---------------------------------------------------------------------------
 
-def report(bill_specs: list[dict], aux_tables: list[dict], anomalies: list[dict]) -> None:
+def report(bill_specs: list[dict], aux_tables: list[dict], anomalies: list[dict],
+           merged: int = 0, conflicts: list[dict] | None = None) -> None:
     """打印质量门禁报告（数量 / 编码唯一性 / 连续性 / 单位 / 特征空率 / 辅助表清单）。
 
-    参数：bill_specs / aux_tables / anomalies —— extract 三出口。
+    参数：bill_specs / aux_tables / anomalies —— extract 三出口（bill_specs 已 resolve_dups
+    收口）；merged —— 同名多单位合并掉的行数；conflicts —— 异名撞码冲突行（不入主表）。
     返回：无（终端打印）。
     """
+    conflicts = conflicts or []
     # 总览
     t = Table(title="抽取总览", show_header=False)
     t.add_row("清单项(bill_spec)", str(len(bill_specs)))
     t.add_row("辅助表(aux_tables)", str(len(aux_tables)))
     t.add_row("异常行(丢弃)", str(len(anomalies)))
+    t.add_row("多单位合并", str(merged))
+    t.add_row("同码异名冲突(出主表)", str(len(conflicts)))
     console.print(t)
 
-    # 编码唯一性
+    # 编码唯一性（resolve_dups 后主表应无重复；冲突另行列出）
     codes = [b["code"] for b in bill_specs]
     dups = [c for c, n in Counter(codes).items() if n > 1]
-    console.print(f"[bold]编码唯一性[/]：去重前 {len(codes)}，去重后 {len(set(codes))}"
-                  + (f"，[red]重复 {len(dups)}：{dups[:10]}[/]" if dups else "，[green]无重复[/]"))
+    console.print(f"[bold]编码唯一性[/]：{len(codes)} 行"
+                  + (f"，[red]残留重复 {len(dups)}：{dups[:10]}[/]" if dups
+                     else "，[green]主表无重复[/]"))
+    if conflicts:
+        cc = sorted({c["code"] for c in conflicts})
+        console.print(f"[yellow]同码异名冲突 {len(cc)} 码（人工核对，已出主表）[/]："
+                      + "；".join(f"{c}:" + "/".join(r["name"] for r in conflicts
+                                                     if r["code"] == c) for c in cc[:6]))
 
     # 同分部编码连续性（断号告警，可能漏行）
     by_ch: dict[str, list[str]] = defaultdict(list)
@@ -352,7 +415,8 @@ def main(input_path: Path, outdir: Path, dry_run: bool) -> None:
     """chunks.json → bill_spec.jsonl + aux_tables.jsonl（双出口）+ 质量 report。"""
     chunks = load_chunks(input_path)
     bill_specs, aux_tables, anomalies = extract(chunks)
-    report(bill_specs, aux_tables, anomalies)
+    bill_specs, conflicts, merged = resolve_dups(bill_specs)  # 按 code 收口同码多行
+    report(bill_specs, aux_tables, anomalies, merged, conflicts)
 
     if dry_run:
         console.print("[dim]--dry-run：未落盘[/]")
@@ -366,9 +430,12 @@ def main(input_path: Path, outdir: Path, dry_run: bool) -> None:
     _write_jsonl(aux_tables, doc_dir / "aux_tables.jsonl")
     if anomalies:
         _write_jsonl(anomalies, doc_dir / "bill_spec_anomalies.jsonl")
+    if conflicts:  # 同码异名冲突：出主表、单独落盘供人工核（不入 PG）
+        _write_jsonl(conflicts, doc_dir / "bill_spec_conflicts.jsonl")
     console.print(f"[green]已写[/] {doc_dir}/ ：bill_spec（{len(bill_specs)}）、"
                   f"aux_tables（{len(aux_tables)}）"
-                  + (f"、anomalies（{len(anomalies)}）" if anomalies else ""))
+                  + (f"、anomalies（{len(anomalies)}）" if anomalies else "")
+                  + (f"、conflicts（{len(conflicts)}）" if conflicts else ""))
 
 
 if __name__ == "__main__":

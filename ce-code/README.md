@@ -258,7 +258,7 @@ uv run python -m cost.bill_spec --input "data/structured/GB_T50854_2024_房屋�
 
 产物按 doc_id 分目录落 `data/structured/<doc_id>/bill_spec.jsonl` + `aux_tables.jsonl`（doc_id 从记录推断，多规范不互相覆盖），终端打印质量 report（数量 / 编码唯一性 / 连续性 / 单位受控 / 特征空率 / 辅助表清单）。`--dry-run` 只看 report 不落盘。
 
-> ⚠️ **GB 50856 通用安装暂未入库**：dry-run 可抽 1184 清单，但有 5 个重复编码——4 个是「同码多计量单位」（如金属结构刷油 kg/m²，规范一码配多单位，需 unit 多值建模、动 schema）、1 个是真冲突（`031003010` 倒流防止器 vs 淋浴器，源码读错需标记）。`bill_spec` PG 主键是 `code`，直灌会 `ON CONFLICT` 丢数据，故 50856 推迟到「多单位建模 + 冲突标记」后续，不带 PK 冲突塞库（详见 TODO）。
+> **同码多行收口（`resolve_dups`）**：清单 PG 主键是 `code`，同码多行须收口——① **同名多单位**（规范一码配多个可选计量单位，如金属结构刷油 kg/m²）→ 合并成一行，`unit_options`(JSONB) 收全部单位、`unit` 取首个；② **异名撞码**（不同清单项撞同一 code，多为源 PDF/MinerU 编码读错）→ 该 code 全部行路由到 `bill_spec_conflicts.jsonl`、**不进主表**（宁缺毋造，不猜正确编码），报告供人工核对。GB 50856 通用安装已据此入库：1189 行 → 合并 4 多单位 + 出 2 冲突行（`031003010` 倒流防止器/淋浴器）→ **主表 1183（PK 零重复）** + aux 15 + anomalies 3 + conflicts 2。GB 50854 无重复，收口为 no-op。
 
 ### Step C1b — 从 50500 抽费用构成规则（`cost/price_composition.py`）
 
@@ -319,7 +319,7 @@ uv run python -m cost.fee_rate --input "data/structured/深圳市建设工程计
 CE_PG_DSN='postgresql://cost:<密码>@localhost:5433/ce_cost' uv run python -m cost.load_pg --init-schema --scan-dir data/structured
 ```
 
-> 单文件 `--bill-spec` / `--quota-item` / `--resource-price` 等选项仍在（targeted 灌某表/某规范），可与 `--scan-dir` 叠加。预期计数：bill_spec 472 / aux 5 / price_composition 10 / resource 991+（SJG171 407 + SJG170 584，再并入信息价新物料）/ quota_item 1257（640+617）/ quota_resource 8278（4173+4105，跳过 0）/ resource_price 1138（信息价 2026-05；EXCLUDE 约束按 doc_id+期先删后插、同月重跑幂等）/ fee_rate 24 / bill_quota_map 313。
+> 单文件 `--bill-spec` / `--quota-item` / `--resource-price` 等选项仍在（targeted 灌某表/某规范），可与 `--scan-dir` 叠加。预期计数：bill_spec 1655（50854 472 + 50856 1183）/ aux 20（5+15）/ price_composition 10 / resource 991+（SJG171 407 + SJG170 584，再并入信息价新物料）/ quota_item 1257（640+617）/ quota_resource 8278（4173+4105，跳过 0）/ resource_price 1138（信息价 2026-05；EXCLUDE 约束按 doc_id+期先删后插、同月重跑幂等）/ fee_rate 24 / bill_quota_map 313。
 
 > ⚠️ `--init-schema` 是 `CREATE TABLE IF NOT EXISTS`，**不会改已存在的表结构**。若库里有缺治理字段的旧 `bill_spec`（早期手敲建的），先删了再灌（导入幂等，删表无损）：`docker exec ce-postgres psql -U cost -d ce_cost -c "DROP TABLE IF EXISTS bill_spec"`。
 

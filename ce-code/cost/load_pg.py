@@ -67,6 +67,7 @@ def load_bill_spec(conn, records: list[dict]) -> int:
         doc_id, spec_version = _backfill_doc(r)
         rows.append((
             r["code"], r.get("name", ""), r.get("unit") or None,
+            Jsonb(r.get("unit_options") or []),
             r.get("calc_rule") or None,
             Jsonb(r.get("feature_schema") or []),
             Jsonb(r.get("work_content") or []),
@@ -76,11 +77,12 @@ def load_bill_spec(conn, records: list[dict]) -> int:
         ))
     sql = """
         INSERT INTO bill_spec
-            (code, name, unit, calc_rule, feature_schema, work_content,
+            (code, name, unit, unit_options, calc_rule, feature_schema, work_content,
              chapter, provenance, doc_id, spec_version)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         ON CONFLICT (code) DO UPDATE SET
             name = EXCLUDED.name, unit = EXCLUDED.unit,
+            unit_options = EXCLUDED.unit_options,
             calc_rule = EXCLUDED.calc_rule, feature_schema = EXCLUDED.feature_schema,
             work_content = EXCLUDED.work_content, chapter = EXCLUDED.chapter,
             provenance = EXCLUDED.provenance, doc_id = EXCLUDED.doc_id,

@@ -21,7 +21,8 @@ CREATE EXTENSION IF NOT EXISTS btree_gist;
 CREATE TABLE IF NOT EXISTS bill_spec (
   code            CHAR(9) PRIMARY KEY,        -- 前 9 位全国统一编码
   name            TEXT NOT NULL,              -- 清单项目名称
-  unit            TEXT,                       -- 计量单位（措施项目类可空）
+  unit            TEXT,                       -- 计量单位（首选；措施项目类可空）
+  unit_options    JSONB DEFAULT '[]'::jsonb,  -- 可选计量单位（规范一码配多单位，如刷油 kg/m²）
   calc_rule       TEXT,                       -- 工程量计算规则（GB/T 50854）
   feature_schema  JSONB DEFAULT '[]'::jsonb,  -- 项目特征项模板（已拆 list）
   work_content    JSONB DEFAULT '[]'::jsonb,  -- 工作内容（已拆 list）

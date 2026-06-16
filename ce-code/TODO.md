@@ -200,7 +200,7 @@ MinerU 解析 + 条款树提取 + 质量审核，在 GB 50378-2006 和 GB 50016 
 
 ### 数据资产（关系库优先）
 
-> **进度对齐（2026-06-16，按 committed 产物核对）**：解析/结构化抽取层已不是瓶颈——全造价语料 `chunks.json`（50500/50854/50856/SJG 建筑/SJG 土方/费率/信息价）+ `bill_spec`/`aux`/`price_composition`/`quota_item`/`resource`/`quota_resource` 产物**均已生成入 git**（commit `9f76f713`/`75c0ec8d`）。真正剩余且 **git 不可证**（PG 状态不进库）的是 **`load_pg` 实际灌库**；外加两处产物缺口：`bill_spec.jsonl`/`aux` 缺 `doc_id`（需重跑）、`bill_quota_map` 产物未落盘。上服务器先 `\dt` + 各表 `count(*)` 盘点 PG，再按缺口补跑（详见各子条 ⚠️）。
+> **进度对齐（2026-06-16，按 committed 产物核对）**：解析/结构化抽取层已不是瓶颈——全造价语料 `chunks.json`（50500/50854/50856/SJG 建筑/SJG 土方/费率/信息价）+ `bill_spec`/`aux`/`price_composition`/`quota_item`/`resource`/`quota_resource` 产物**均已生成入 git**（commit `9f76f713`/`75c0ec8d`）。**两处产物缺口已补齐（2026-06-16）**：`bill_spec.jsonl`/`aux_tables.jsonl` 重跑带上 `doc_id=GB-50854`+canonical `spec_version=GB/T 50854-2024`，`bill_quota_map.jsonl`（114 边）已落盘入 git。真正剩余且 **git 不可证**（PG 状态不进库）的是 **`load_pg` 实际灌库**。上服务器先 `\dt` + 各表 `count(*)` 盘点 PG，再按依赖序一把灌（详见各子条 ⚠️）。
 
 - [ ] 关系库 PostgreSQL 建表：`bill_spec` / `quota_item` / `quota_resource` / `resource` / `resource_price` / `hist_bill`，**强制带 `doc_id` + `version` + `region`(深圳) + `effective_priority`(深圳本地=1)**，价格带 `effective_period`
   - [x] **PostgreSQL 16 已部署**（✅ 2026-06-16，服务器 stone）：因系统共用 docker 与满盘 `/` 不可动，**用 rootless docker 起独立 daemon**（caic 用户名下，data-root=`/mnt/nvme/calvin/docker/data`，与共用 daemon 零交集），`postgres:16` 容器 `ce-postgres`（端口 **5433**，库 `ce_cost`，用户 `cost`，卷 `ce_pgdata` 落 nvme，对内网开放）。部署细节见 DEV §6。`bill_spec` 表已建（code/name/unit/feature_schema JSONB/calc_rule/work_content JSONB/chapter/spec_version/provenance JSONB）**并已导入 GB/T 50854 的 472 条**。
@@ -226,7 +226,7 @@ MinerU 解析 + 条款树提取 + 质量审核，在 GB 50378-2006 和 GB 50016 
 ### 知识图谱
 
 - [🟡] **P0**：用 PG 关联表模拟「构件→清单→定额→工料机」关系（`MAPS_TO` / `APPLIES` / `CONSUMES`），跑通组价取数
-  - [x] **`APPLIES`（清单→定额）+ 取数路径**（✅ 2026-06-16，`cost/bill_quota.py` + `bill_quota_map` 表）：清单(9位)与定额(6位+变体)编码不可互推，P0 用**名称匹配**自动种子（清单名==定额名首段→conf 0.9 / ⊂→0.6，1:N）。本地验证：212 边覆盖 42/472 清单；**取数链跑通**——清单 `010401002 实心砖墙` → 6 定额子目（墙厚×砂浆变体）→ 工料机含量（普工/技工/砖/砂浆/铁钉）。`load_pg --bill-quota-map` 入库，取数 demo SQL 见 README C3。⚠️ **产物未同步**：`data/structured/` 里没有 bill_quota_map 产物文件（212 边只在本地验证、未落盘入 git）→ 服务器（或本地）重跑 `python -m cost.bill_quota` 生成 jsonl 并 commit，再 `load_pg --bill-quota-map` 入 PG。起步映射覆盖有限+带 confidence，未覆盖/低置信待富化（语义召回/专家标注），按红线「只建议不定稿」交任务层 HITL。
+  - [x] **`APPLIES`（清单→定额）+ 取数路径**（✅ 2026-06-16，`cost/bill_quota.py` + `bill_quota_map` 表）：清单(9位)与定额(6位+变体)编码不可互推，P0 用**名称匹配**自动种子（清单名==定额名首段→conf 0.9 / ⊂→0.6，1:N）。**产物已落盘入 git**（`data/structured/bill_quota_map.jsonl`，**114 边覆盖 36/472 清单（7%）**——较早先 212 边/42 清单回落，因 commit `a2f7ae15` 定额名抽取按列累积修了多层名污染、定额名变了，名称匹配结果随之收敛，114/36 为对当前 committed `quota_item.jsonl` 的正确值）；**取数链跑通**——清单 `010401002 实心砖墙` → 4 定额子目（砂浆变体）→ 工料机含量（普工/技工/砖/砂浆/铁钉）。取数 demo SQL 见 README C3。⚠️ **load_pg 入 PG 仍待服务器跑**（git 不可证）：`python -m cost.load_pg --bill-quota-map data/structured/bill_quota_map.jsonl`。起步映射覆盖有限+带 confidence，未覆盖/低置信待富化（语义召回/专家标注），按红线「只建议不定稿」交任务层 HITL。
   - [ ] **`CONSUMES`**（定额→工料机）已由 `quota_resource` 承载，无需新表。
   - [ ] **`MAPS_TO`**（构件→清单）待 BIM 底座（`ce-bim`）接入后建。
   - [ ] 映射富化：名称匹配仅覆盖 9%，补语义召回（BGE-M3）/ 章节对齐 / 专家标注提覆盖。

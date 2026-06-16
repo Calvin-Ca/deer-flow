@@ -1,0 +1,2099 @@
+[
+    [
+        {
+            "type": "title",
+            "content": {
+                "title_content": [
+                    {
+                        "type": "text",
+                        "content": "深圳市建设工程计价费率标准（2023）"
+                    }
+                ],
+                "level": 1
+            },
+            "bbox": [
+                184,
+                93,
+                806,
+                124
+            ]
+        },
+        {
+            "type": "title",
+            "content": {
+                "title_content": [
+                    {
+                        "type": "text",
+                        "content": "一、总则"
+                    }
+                ],
+                "level": 2
+            },
+            "bbox": [
+                184,
+                191,
+                285,
+                212
+            ]
+        },
+        {
+            "type": "list",
+            "content": {
+                "list_type": "text_list",
+                "list_items": [
+                    {
+                        "item_type": "text",
+                        "item_content": [
+                            {
+                                "type": "text",
+                                "content": "（一）本费率标准根据《企业安全生产费用提取和使用管理办法》（财资〔2022〕136 号 ）、《建设工程工程量清单计价规范》（GB50500-2013）、《建设工程安全文明施工标准》（SJG46-2023）、《深圳市建设工程计价规程（2017）》等文件要求和规定编制。"
+                            }
+                        ]
+                    },
+                    {
+                        "item_type": "text",
+                        "item_content": [
+                            {
+                                "type": "text",
+                                "content": "（二）除另有规定外，招标人编制招标控制价应当依据本费率标准的推荐费率计算，部分费用项目未公布推荐费率，可根据项目实际情况及招标文件要求等因素，在费率参考范围中综合确定合理费率。"
+                            }
+                        ]
+                    }
+                ]
+            },
+            "bbox": [
+                137,
+                237,
+                870,
+                482
+            ]
+        },
+        {
+            "type": "title",
+            "content": {
+                "title_content": [
+                    {
+                        "type": "text",
+                        "content": "二、分部分项工程费"
+                    }
+                ],
+                "level": 2
+            },
+            "bbox": [
+                184,
+                506,
+                406,
+                527
+            ]
+        },
+        {
+            "type": "title",
+            "content": {
+                "title_content": [
+                    {
+                        "type": "text",
+                        "content": "（一）企业管理费"
+                    }
+                ],
+                "level": 2
+            },
+            "bbox": [
+                196,
+                552,
+                381,
+                573
+            ]
+        },
+        {
+            "type": "paragraph",
+            "content": {
+                "paragraph_content": [
+                    {
+                        "type": "text",
+                        "content": "1．综合单价构成中的企业管理费计算公式如下："
+                    }
+                ]
+            },
+            "bbox": [
+                184,
+                590,
+                684,
+                609
+            ]
+        },
+        {
+            "type": "paragraph",
+            "content": {
+                "paragraph_content": [
+                    {
+                        "type": "text",
+                        "content": "企业管理费：E＝（人工费A机械费 C×0.1）×企业管理费费率a"
+                    }
+                ]
+            },
+            "bbox": [
+                184,
+                627,
+                870,
+                646
+            ]
+        },
+        {
+            "type": "paragraph",
+            "content": {
+                "paragraph_content": [
+                    {
+                        "type": "text",
+                        "content": "2．根据目前本市建筑施工企业管理水平的实际情况，不区分专业工程，企业管理费费率参考范围为9%～25%，推荐费率为16.2%。"
+                    }
+                ]
+            },
+            "bbox": [
+                136,
+                664,
+                868,
+                722
+            ]
+        },
+        {
+            "type": "title",
+            "content": {
+                "title_content": [
+                    {
+                        "type": "text",
+                        "content": "（二）利润"
+                    }
+                ],
+                "level": 2
+            },
+            "bbox": [
+                196,
+                745,
+                310,
+                765
+            ]
+        },
+        {
+            "type": "paragraph",
+            "content": {
+                "paragraph_content": [
+                    {
+                        "type": "text",
+                        "content": "1.综合单价构成中的利润计算公式如下："
+                    }
+                ]
+            },
+            "bbox": [
+                179,
+                782,
+                589,
+                802
+            ]
+        },
+        {
+            "type": "paragraph",
+            "content": {
+                "paragraph_content": [
+                    {
+                        "type": "text",
+                        "content": "利润：F＝（人工费A＋材料费B＋机械费C＋企业管理费E）×利润率b"
+                    }
+                ]
+            },
+            "bbox": [
+                136,
+                819,
+                867,
+                875
+            ]
+        },
+        {
+            "type": "paragraph",
+            "content": {
+                "paragraph_content": [
+                    {
+                        "type": "text",
+                        "content": "2.根据国家公布的行业利润率水平和目前本市建筑施工企业的实际赢利情况，不区分专业工程，利润率参考范围为3%～7%，推荐费率为5%。"
+                    }
+                ]
+            },
+            "bbox": [
+                176,
+                892,
+                868,
+                913
+            ]
+        },
+        {
+            "type": "page_number",
+            "content": {
+                "page_number_content": [
+                    {
+                        "type": "text",
+                        "content": "1"
+                    }
+                ]
+            },
+            "bbox": [
+                497,
+                928,
+                509,
+                939
+            ]
+        }
+    ],
+    [
+        {
+            "type": "paragraph",
+            "content": {
+                "paragraph_content": []
+            },
+            "bbox": [
+                127,
+                92,
+                857,
+                148
+            ]
+        },
+        {
+            "type": "title",
+            "content": {
+                "title_content": [
+                    {
+                        "type": "text",
+                        "content": "三、措施项目费"
+                    }
+                ],
+                "level": 2
+            },
+            "bbox": [
+                174,
+                175,
+                347,
+                195
+            ]
+        },
+        {
+            "type": "title",
+            "content": {
+                "title_content": [
+                    {
+                        "type": "text",
+                        "content": "（一）安全文明施工措施费"
+                    }
+                ],
+                "level": 2
+            },
+            "bbox": [
+                186,
+                221,
+                463,
+                241
+            ]
+        },
+        {
+            "type": "paragraph",
+            "content": {
+                "paragraph_content": [
+                    {
+                        "type": "text",
+                        "content": "安全文明施工措施费计算公式如下："
+                    }
+                ]
+            },
+            "bbox": [
+                176,
+                259,
+                542,
+                278
+            ]
+        },
+        {
+            "type": "paragraph",
+            "content": {
+                "paragraph_content": [
+                    {
+                        "type": "text",
+                        "content": "安全文明施工措施费=安全文明施工措施费清单部分（a）+安全文明施工措施费费率部分（b）+产业工人职业训练专项经费（c）。"
+                    }
+                ]
+            },
+            "bbox": [
+                127,
+                296,
+                858,
+                354
+            ]
+        },
+        {
+            "type": "title",
+            "content": {
+                "title_content": [
+                    {
+                        "type": "text",
+                        "content": "（a）安全文明施工措施费清单部分"
+                    }
+                ],
+                "level": 2
+            },
+            "bbox": [
+                179,
+                370,
+                539,
+                390
+            ]
+        },
+        {
+            "type": "paragraph",
+            "content": {
+                "paragraph_content": [
+                    {
+                        "type": "text",
+                        "content": "招标人应根据政府主管部门有关规定和项目实际情况，结合本费率标准附录 A 相应清单项目进行列项，并详细填写清单项目特征、计量单位、工程量等内容。清单工程量应结合设计图纸、项目实际情况等因素综合确定，综合单价由招标人根据项目实际情况合理确定，作为不可竞争性费用。"
+                    }
+                ]
+            },
+            "bbox": [
+                127,
+                407,
+                858,
+                576
+            ]
+        },
+        {
+            "type": "title",
+            "content": {
+                "title_content": [
+                    {
+                        "type": "text",
+                        "content": "（b）安全文明施工措施费费率部分"
+                    }
+                ],
+                "level": 2
+            },
+            "bbox": [
+                179,
+                592,
+                539,
+                612
+            ]
+        },
+        {
+            "type": "paragraph",
+            "content": {
+                "paragraph_content": [
+                    {
+                        "type": "text",
+                        "content": "安全文明施工措施费费率部分包含除安全文明施工措施费清单部分及产业工人职业训练专项经费之外的临时设施费、安全施工费、文明施工费、环境保护费等所有费用。招标人在编制招标控制价时，应按本费率标准的推荐费率进行编制并作为不可竞争性费用。安全文明施工措施费费率部分包含内容详见附录B，安全文明施工措施费费率部分计算公式如下："
+                    }
+                ]
+            },
+            "bbox": [
+                127,
+                629,
+                858,
+                834
+            ]
+        },
+        {
+            "type": "paragraph",
+            "content": {
+                "paragraph_content": [
+                    {
+                        "type": "equation_inline",
+                        "content": "\\frac { 1 } { 5 } \\textcircled { < } \\frac { 1 } { 5 } \\textcircled { < } \\frac { 1 } { 1 1 } \\frac { 1 } { 1 1 } - \\frac { 1 } { 5 } \\frac { 1 } { 1 1 } \\frac { 1 } { 1 1 } \\frac { 1 } { 1 1 } \\frac { 1 } { 1 1 } \\frac { 1 } { 1 1 } \\frac { 1 } { 1 1 } \\frac { 1 } { 1 1 } \\frac { 1 } { 1 1 } \\frac { 1 } { 1 1 } \\frac { 1 } { 1 1 } \\frac { 1 } { 1 1 } \\frac { 1 } { 1 1 } \\frac { 1 } { 1 1 } \\frac { 1 } { 1 1 } \\frac { 1 } { 1 1 } \\frac { 1 } { 1 1 } \\frac { 1 } { 1 1 } \\frac { 1 } { 1 1 } \\frac { 1 } { 1 1 } \\frac { 1 } { 1 1 } \\frac { 1 } { 1 1 } \\frac { 1 } { 1 1 } \\frac { 1 } { 1 1 } \\frac { 1 } { 1 1 } \\frac { 1 } { 1 1 } \\frac { 1 } { 1 1 } \\frac { 1 } { 1 1 } \\frac { 1 } { 1 1 } \\frac { 1 } { 1 1 } \\frac { 1 } { 1 1 } \\frac { 1 } { 1 1 } \\frac { 1 } { 1 1 } \\frac { 1 } { 1 1 } \\frac { 1 } { 1 1 } \\frac { 1 } { 1 1 } \\frac { 1 } { 1 1 } \\frac { 1 } { 1 1 } \\frac { 1 } { 1 1 } \\frac { 1 } { 1 1 } \\frac { 1 } { 1 1 } \\frac { 1 } \\frac { 1 } { 1 } \\frac { 1 } { 1 1 } \\frac { 1 } { 1 } \\frac { 1 } { 1 } \\frac { 1 } \\frac { 1 } { 1 } \\frac { 1 } { 1 } \\frac { 1 } \\frac { 1 } { 1 } \\frac { 1 } { 1 } \\frac { 1 } \\frac { 1 } { 1 } \\frac { 1 } { 1 } \\frac { 1 } \\frac { 1 } { 1 } \\frac { 1 } \\frac { 1 } { 1 } \\frac { 1 } { 1 } \\frac { 1 } \\frac { 1 } { 1 } \\frac { 1 } \\frac { 1 } { 1 } \\frac { 1 } { 1 } \\frac { 1 } \\frac { 1 } { 1 } \\frac { 1 } { 1 } \\frac { 1 } \\frac "
+                    }
+                ]
+            },
+            "bbox": [
+                174,
+                851,
+                734,
+                871
+            ]
+        },
+        {
+            "type": "paragraph",
+            "content": {
+                "paragraph_content": [
+                    {
+                        "type": "text",
+                        "content": "计算基数为分部分项工程费、措施项目费中的混凝土及钢筋混凝土模板及支架费、脚手架费、垂直运输机械费、大型机械设备进出场及安拆费、其他项目费；推荐费率i详见表1。"
+                    }
+                ]
+            },
+            "bbox": [
+                174,
+                889,
+                855,
+                908
+            ]
+        },
+        {
+            "type": "page_number",
+            "content": {
+                "page_number_content": [
+                    {
+                        "type": "text",
+                        "content": "2"
+                    }
+                ]
+            },
+            "bbox": [
+                487,
+                915,
+                500,
+                927
+            ]
+        }
+    ],
+    [
+        {
+            "type": "paragraph",
+            "content": {
+                "paragraph_content": []
+            },
+            "bbox": [
+                136,
+                91,
+                865,
+                149
+            ]
+        },
+        {
+            "type": "table",
+            "content": {
+                "image_source": {
+                    "path": "images/4706e99397db601c40d1c698a94d986ae7530c6666cf9929e93ec6132f25d71d.jpg"
+                },
+                "table_caption": [
+                    {
+                        "type": "text",
+                        "content": "表 1 安全文明施工措施费费率部分费率表（单位：%）"
+                    }
+                ],
+                "table_footnote": [
+                    {
+                        "type": "text",
+                        "content": "注：1.计算安全文明施工措施费时，无论是否一同发包均按各自专业费率计取。"
+                    }
+                ],
+                "html": "<table><tr><td>专业工程 费率</td><td>参考范围</td><td>推荐费率（i）</td></tr><tr><td>土石方、基坑与边坡支护、地基处理与桩基工程</td><td>0.96~4.16</td><td>2.47</td></tr><tr><td>建筑工程</td><td>1.92~5.75</td><td>3.68</td></tr><tr><td>房屋建筑装饰、安装工程</td><td>0.53~2.24</td><td>1.73</td></tr><tr><td>园林建筑与绿化工程</td><td>0.53~3.84</td><td>1.88</td></tr><tr><td>房屋修缮工程</td><td>0.85~4.02</td><td>2.15</td></tr><tr><td>市政道路、桥梁、隧道工程</td><td>0.82~3.98</td><td>2.09</td></tr><tr><td>水处理工程</td><td>1.12~4.69</td><td>2.80</td></tr><tr><td>市政维修工程</td><td>0.71~3.06</td><td>1.63</td></tr><tr><td>市政其他工程</td><td>0.82~2.65</td><td>1.53</td></tr><tr><td>轨道交通与综合管廊土建工程</td><td>1.06~3.69</td><td>2.85</td></tr><tr><td>轨道交通与综合管廊安装工程</td><td>0.53~2.22</td><td>1.27</td></tr></table>",
+                "table_type": "simple_table",
+                "table_nest_level": 1
+            },
+            "bbox": [
+                129,
+                183,
+                860,
+                626
+            ]
+        },
+        {
+            "type": "list",
+            "content": {
+                "list_type": "text_list",
+                "list_items": [
+                    {
+                        "item_type": "text",
+                        "item_content": [
+                            {
+                                "type": "text",
+                                "content": "2.装配式建筑工程（装配式混凝土结构工程、装配式钢结构工程、模块化建筑工程）执行建筑工程费率。"
+                            }
+                        ]
+                    },
+                    {
+                        "item_type": "text",
+                        "item_content": [
+                            {
+                                "type": "text",
+                                "content": "3.跨专业借用子目时，借用子目的安全文明施工措施费费率按其所对应表 1 中专业工程的费率标准执行。"
+                            }
+                        ]
+                    }
+                ]
+            },
+            "bbox": [
+                136,
+                631,
+                865,
+                758
+            ]
+        },
+        {
+            "type": "title",
+            "content": {
+                "title_content": [
+                    {
+                        "type": "text",
+                        "content": "（c）产业工人职业训练专项经费"
+                    }
+                ],
+                "level": 2
+            },
+            "bbox": [
+                189,
+                772,
+                526,
+                793
+            ]
+        },
+        {
+            "type": "paragraph",
+            "content": {
+                "paragraph_content": [
+                    {
+                        "type": "text",
+                        "content": "根据《深圳市工程建设行业产业工人职业训练管理办法》有关规定，产业工人职业训练专项经费作为不可竞争性费用，用于产业工人职业训练，实行专款专用。产业工人职业训练专项经费推荐费率为 0.4%，计算基数为分部分项工程费、措施项目费中的混凝土及钢筋混凝土模板及支架费、脚手架费、垂直运输机械费、大型机械设备进出场及安拆费、其他项目费。"
+                    }
+                ]
+            },
+            "bbox": [
+                136,
+                810,
+                865,
+                904
+            ]
+        },
+        {
+            "type": "page_number",
+            "content": {
+                "page_number_content": [
+                    {
+                        "type": "text",
+                        "content": "3"
+                    }
+                ]
+            },
+            "bbox": [
+                497,
+                915,
+                509,
+                927
+            ]
+        }
+    ],
+    [
+        {
+            "type": "paragraph",
+            "content": {
+                "paragraph_content": []
+            },
+            "bbox": [
+                127,
+                91,
+                857,
+                185
+            ]
+        },
+        {
+            "type": "title",
+            "content": {
+                "title_content": [
+                    {
+                        "type": "text",
+                        "content": "（二）履约担保手续费"
+                    }
+                ],
+                "level": 2
+            },
+            "bbox": [
+                186,
+                210,
+                416,
+                229
+            ]
+        },
+        {
+            "type": "paragraph",
+            "content": {
+                "paragraph_content": [
+                    {
+                        "type": "text",
+                        "content": "履约担保手续费计算公式如下："
+                    }
+                ]
+            },
+            "bbox": [
+                174,
+                247,
+                495,
+                266
+            ]
+        },
+        {
+            "type": "paragraph",
+            "content": {
+                "paragraph_content": [
+                    {
+                        "type": "text",
+                        "content": "履约担保手续费＝担保金额×担保手续费费率"
+                    }
+                ]
+            },
+            "bbox": [
+                174,
+                284,
+                652,
+                304
+            ]
+        },
+        {
+            "type": "paragraph",
+            "content": {
+                "paragraph_content": [
+                    {
+                        "type": "text",
+                        "content": "担保手续费费率参考范围：2‰～6‰，推荐费率4‰。"
+                    }
+                ]
+            },
+            "bbox": [
+                174,
+                321,
+                724,
+                341
+            ]
+        },
+        {
+            "type": "paragraph",
+            "content": {
+                "paragraph_content": [
+                    {
+                        "type": "text",
+                        "content": "担保金额应按招标文件要求计算；当招标文件无具体要求时，可取发包工程总造价的10%。"
+                    }
+                ]
+            },
+            "bbox": [
+                127,
+                359,
+                858,
+                414
+            ]
+        },
+        {
+            "type": "title",
+            "content": {
+                "title_content": [
+                    {
+                        "type": "text",
+                        "content": "（三）夜间施工增加费"
+                    }
+                ],
+                "level": 2
+            },
+            "bbox": [
+                186,
+                439,
+                416,
+                458
+            ]
+        },
+        {
+            "type": "paragraph",
+            "content": {
+                "paragraph_content": [
+                    {
+                        "type": "text",
+                        "content": "符合夜间施工增加费计取条件时，其夜间施工增加费计算公式如下："
+                    }
+                ]
+            },
+            "bbox": [
+                168,
+                476,
+                853,
+                497
+            ]
+        },
+        {
+            "type": "paragraph",
+            "content": {
+                "paragraph_content": [
+                    {
+                        "type": "equation_inline",
+                        "content": "\\textcircled { 1 } \\textcircled { 1 } \\textcircled { 1 } \\textcircled { 1 } \\textcircled { 1 } \\textcircled { 1 } \\textcircled { 2 } \\textcircled { 1 } \\textcircled { 3 } \\textcircled { 2 } \\textcircled { 1 } \\textcircled { 3 } \\textcircled { 4 } \\textcircled { 2 } \\textcircled { 1 } \\textcircled { 1 } \\textcircled { 1 } \\textcircled { 2 } \\textcircled { 2 } \\textcircled { 2 } \\textcircled { 3 } \\textcircled { 4 } \\textcircled { 2 } \\textcircled { 2 } \\textcircled { 2 } \\textcircled { 2 } \\textcircled { 2 } \\textcircled { 2 } \\textcircled { 2 } \\textcircled { 3 } \\textcircled { 4 } \\textcircled { 2 } \\textcircled { 2 } \\textcircled { 2 } \\textcircled { 2 } \\textcircled { 2 } \\textcircled { 2 } \\textcircled { 2 } \\textcircled { 3 } \\textcircled { 2 } \\textcircled { 4 } \\textcircled { 2 } \\textcircled { 2 } \\textcircled { 2 } \\textcircled { 2 } \\textcircled { 2 } \\textcircled { 2 } \\textcircled { 2 } \\textcircled { 2 } \\textcircled { 2 } \\textcircled { 2 } \\textcircled { 2 } \\textcircled { 2 } \\textcircled { 2 } \\textcircled { 2 } \\textcircled { 3 } \\textcircled { 2 } \\textcircled { 2 } "
+                    }
+                ]
+            },
+            "bbox": [
+                168,
+                514,
+                658,
+                533
+            ]
+        },
+        {
+            "type": "paragraph",
+            "content": {
+                "paragraph_content": [
+                    {
+                        "type": "text",
+                        "content": "其中，夜间施工增加费计算基数中的人工费是指单位工程夜间施工部分的人工费，夜间施工增加费系数详见表2。"
+                    }
+                ]
+            },
+            "bbox": [
+                127,
+                551,
+                857,
+                608
+            ]
+        },
+        {
+            "type": "table",
+            "content": {
+                "image_source": {
+                    "path": "images/f7a0825f58b8e5f3e419c5bd4655f76eb87354956ceeec9ed066fc5300aab2ff.jpg"
+                },
+                "table_caption": [
+                    {
+                        "type": "text",
+                        "content": "表2 夜间施工增加费系数"
+                    }
+                ],
+                "table_footnote": [],
+                "html": "<table><tr><td>费用名称\\系数</td><td>参考范围</td><td>推荐系数</td></tr><tr><td>夜间施工增加费</td><td>0.20~0.30</td><td>0.25</td></tr></table>",
+                "table_type": "simple_table",
+                "table_nest_level": 1
+            },
+            "bbox": [
+                141,
+                652,
+                848,
+                750
+            ]
+        },
+        {
+            "type": "title",
+            "content": {
+                "title_content": [
+                    {
+                        "type": "text",
+                        "content": "（四）赶工措施费"
+                    }
+                ],
+                "level": 2
+            },
+            "bbox": [
+                186,
+                764,
+                369,
+                784
+            ]
+        },
+        {
+            "type": "paragraph",
+            "content": {
+                "paragraph_content": [
+                    {
+                        "type": "text",
+                        "content": "计划工期压缩超过按现行《深圳市建设工程施工工期定额》计算所得定额工期20%的，其周转材料的摊销次数缩短、人工加班费用增加等费用可按下列公式计算。需采取特殊措施以缩短工期的，可据实估算相应费用。现行《深圳市建设工程施工工期定额》缺项的专业工程，其标准工期应按相关规定确定。各专业工程赶工措施费系数参考范围和推荐系数详见表3，赶工措施费计算公式如下："
+                    }
+                ]
+            },
+            "bbox": [
+                127,
+                801,
+                858,
+                897
+            ]
+        },
+        {
+            "type": "page_number",
+            "content": {
+                "page_number_content": [
+                    {
+                        "type": "text",
+                        "content": "4"
+                    }
+                ]
+            },
+            "bbox": [
+                487,
+                915,
+                500,
+                927
+            ]
+        }
+    ],
+    [
+        {
+            "type": "paragraph",
+            "content": {
+                "paragraph_content": []
+            },
+            "bbox": [
+                136,
+                91,
+                868,
+                187
+            ]
+        },
+        {
+            "type": "paragraph",
+            "content": {
+                "paragraph_content": [
+                    {
+                        "type": "text",
+                        "content": "赶工措施费=（1－合同工期／定额工期－20%）×（人工费+措施项目费）×赶工措施费系数"
+                    }
+                ]
+            },
+            "bbox": [
+                139,
+                203,
+                867,
+                260
+            ]
+        },
+        {
+            "type": "paragraph",
+            "content": {
+                "paragraph_content": [
+                    {
+                        "type": "text",
+                        "content": "其中，赶工措施费计算基数中的人工费是指单位工程中分部分项工程人工费，措施项目费是指不包含赶工措施费的措施项目之和。"
+                    }
+                ]
+            },
+            "bbox": [
+                136,
+                277,
+                865,
+                335
+            ]
+        },
+        {
+            "type": "table",
+            "content": {
+                "image_source": {
+                    "path": "images/723757010985355d1e822ef73f1dfb70b38d5f9166d6ccc19a6c9501c16629e4.jpg"
+                },
+                "table_caption": [
+                    {
+                        "type": "text",
+                        "content": "表3 赶工措施费系数"
+                    }
+                ],
+                "table_footnote": [],
+                "html": "<table><tr><td colspan=\"2\">费用名称\\系数</td><td>参考范围</td><td>推荐系数</td></tr><tr><td rowspan=\"2\">赶工措施费</td><td>房建工程</td><td>0.8~1.8</td><td>1.2</td></tr><tr><td>市政工程</td><td>0.7~1.1</td><td>0.9</td></tr></table>",
+                "table_type": "complex_table",
+                "table_nest_level": 1
+            },
+            "bbox": [
+                139,
+                376,
+                858,
+                492
+            ]
+        },
+        {
+            "type": "title",
+            "content": {
+                "title_content": [
+                    {
+                        "type": "text",
+                        "content": "四、其他项目费"
+                    }
+                ],
+                "level": 2
+            },
+            "bbox": [
+                184,
+                508,
+                354,
+                527
+            ]
+        },
+        {
+            "type": "title",
+            "content": {
+                "title_content": [
+                    {
+                        "type": "text",
+                        "content": "（一）计日工"
+                    }
+                ],
+                "level": 2
+            },
+            "bbox": [
+                196,
+                555,
+                332,
+                574
+            ]
+        },
+        {
+            "type": "paragraph",
+            "content": {
+                "paragraph_content": [
+                    {
+                        "type": "text",
+                        "content": "计日工中人工工日综合单价可按照造价成果文件编制期相应种类的定额工日价格乘以系数1.6，不再计取企业管理费及利润。"
+                    }
+                ]
+            },
+            "bbox": [
+                136,
+                592,
+                867,
+                650
+            ]
+        },
+        {
+            "type": "paragraph",
+            "content": {
+                "paragraph_content": [
+                    {
+                        "type": "text",
+                        "content": "计日工中机械台班单价及材料价格可按照造价成果文件编制期相应种类的单价乘以系数1.1 计算，不再计取企业管理费及利润。"
+                    }
+                ]
+            },
+            "bbox": [
+                136,
+                665,
+                865,
+                722
+            ]
+        },
+        {
+            "type": "title",
+            "content": {
+                "title_content": [
+                    {
+                        "type": "text",
+                        "content": "（二）总承包服务费"
+                    }
+                ],
+                "level": 2
+            },
+            "bbox": [
+                194,
+                747,
+                403,
+                766
+            ]
+        },
+        {
+            "type": "paragraph",
+            "content": {
+                "paragraph_content": [
+                    {
+                        "type": "text",
+                        "content": "总包管理服务费及发包人供应材料（设备）保管费计算公式如下："
+                    }
+                ]
+            },
+            "bbox": [
+                184,
+                784,
+                857,
+                804
+            ]
+        },
+        {
+            "type": "paragraph",
+            "content": {
+                "paragraph_content": [
+                    {
+                        "type": "text",
+                        "content": "总包管理服务费=分包工程建安工程造价×总包管理服务费费率"
+                    }
+                ]
+            },
+            "bbox": [
+                184,
+                821,
+                838,
+                841
+            ]
+        },
+        {
+            "type": "paragraph",
+            "content": {
+                "paragraph_content": [
+                    {
+                        "type": "text",
+                        "content": "其中：分包工程建安工程造价不含生产性设备及电梯购置费。"
+                    }
+                ]
+            },
+            "bbox": [
+                184,
+                858,
+                811,
+                878
+            ]
+        },
+        {
+            "type": "page_number",
+            "content": {
+                "page_number_content": [
+                    {
+                        "type": "text",
+                        "content": "5"
+                    }
+                ]
+            },
+            "bbox": [
+                497,
+                915,
+                509,
+                926
+            ]
+        }
+    ],
+    [
+        {
+            "type": "paragraph",
+            "content": {
+                "paragraph_content": [
+                    {
+                        "type": "text",
+                        "content": "发包人供应材料（设备）保管费=材料（设备）价值×发包人供应材料（设备）保管费费率"
+                    }
+                ]
+            },
+            "bbox": [
+                127,
+                91,
+                860,
+                149
+            ]
+        },
+        {
+            "type": "paragraph",
+            "content": {
+                "paragraph_content": [
+                    {
+                        "type": "text",
+                        "content": "总包管理服务费、发包人供应材料（设备）保管费的费率参考范围和推荐费率详见表4。"
+                    }
+                ]
+            },
+            "bbox": [
+                127,
+                166,
+                860,
+                223
+            ]
+        },
+        {
+            "type": "table",
+            "content": {
+                "image_source": {
+                    "path": "images/9eb5082a5fa109d19078998dc5085000c0ddf74411a3af32139fff96726fc752.jpg"
+                },
+                "table_caption": [
+                    {
+                        "type": "text",
+                        "content": "表4 总承包服务费费率（单位：%）"
+                    }
+                ],
+                "table_footnote": [],
+                "html": "<table><tr><td colspan=\"2\">费用名称</td><td>参考范围</td><td>推荐费率</td></tr><tr><td colspan=\"2\">总包管理服务费</td><td>1.5~3.5</td><td>2.5</td></tr><tr><td rowspan=\"2\">发包人供应材料（设备）保管费</td><td>材料</td><td>1.0~2.0</td><td>1.5</td></tr><tr><td>设备</td><td>0.5~1.5</td><td>1.0</td></tr></table>",
+                "table_type": "complex_table",
+                "table_nest_level": 1
+            },
+            "bbox": [
+                144,
+                256,
+                831,
+                376
+            ]
+        },
+        {
+            "type": "title",
+            "content": {
+                "title_content": [
+                    {
+                        "type": "text",
+                        "content": "五、规费"
+                    }
+                ],
+                "level": 2
+            },
+            "bbox": [
+                176,
+                391,
+                275,
+                411
+            ]
+        },
+        {
+            "type": "list",
+            "content": {
+                "list_type": "text_list",
+                "list_items": [
+                    {
+                        "item_type": "text",
+                        "item_content": [
+                            {
+                                "type": "text",
+                                "content": "（一）规费包括社会保障费、环境保护税及其他政府规定的费用，其中社会保障费包括：失业保险费、养老保险费、工伤保险费、医疗保险费、生育保险费、住房公积金。"
+                            }
+                        ]
+                    },
+                    {
+                        "item_type": "text",
+                        "item_content": [
+                            {
+                                "type": "text",
+                                "content": "（二）根据本市现行有关规定，考虑多数施工企业的生产人员比例、深户人口比例和一般性工程特征，经综合测算，规费费率参考范围为 11%～25%，推荐费率为 18%；规费的计算基数为分部分项工程费、措施项目费和其他项目费中的人工费的合计。"
+                            }
+                        ]
+                    }
+                ]
+            },
+            "bbox": [
+                137,
+                437,
+                858,
+                681
+            ]
+        },
+        {
+            "type": "title",
+            "content": {
+                "title_content": [
+                    {
+                        "type": "text",
+                        "content": "六、应纳税费"
+                    }
+                ],
+                "level": 2
+            },
+            "bbox": [
+                174,
+                706,
+                322,
+                726
+            ]
+        },
+        {
+            "type": "paragraph",
+            "content": {
+                "paragraph_content": [
+                    {
+                        "type": "text",
+                        "content": "应纳税费计算公式如下："
+                    }
+                ]
+            },
+            "bbox": [
+                174,
+                753,
+                428,
+                772
+            ]
+        },
+        {
+            "type": "paragraph",
+            "content": {
+                "paragraph_content": [
+                    {
+                        "type": "text",
+                        "content": "应纳税费=增值税应纳税额+城市维护建设税+教育费附加+地方教育附加"
+                    }
+                ]
+            },
+            "bbox": [
+                129,
+                790,
+                858,
+                847
+            ]
+        },
+        {
+            "type": "page_number",
+            "content": {
+                "page_number_content": [
+                    {
+                        "type": "text",
+                        "content": "6"
+                    }
+                ]
+            },
+            "bbox": [
+                487,
+                915,
+                500,
+                927
+            ]
+        }
+    ],
+    [
+        {
+            "type": "paragraph",
+            "content": {
+                "paragraph_content": [
+                    {
+                        "type": "text",
+                        "content": "其中："
+                    }
+                ]
+            },
+            "bbox": [
+                184,
+                92,
+                247,
+                110
+            ]
+        },
+        {
+            "type": "paragraph",
+            "content": {
+                "paragraph_content": [
+                    {
+                        "type": "text",
+                        "content": "增值税应纳税额=不含税建安工程造价×增值税综合应纳税费率；"
+                    }
+                ]
+            },
+            "bbox": [
+                183,
+                129,
+                847,
+                149
+            ]
+        },
+        {
+            "type": "paragraph",
+            "content": {
+                "paragraph_content": [
+                    {
+                        "type": "text",
+                        "content": "增值税综合应纳税费率参考范围及推荐费率详见表5。"
+                    }
+                ]
+            },
+            "bbox": [
+                183,
+                166,
+                737,
+                185
+            ]
+        },
+        {
+            "type": "paragraph",
+            "content": {
+                "paragraph_content": [
+                    {
+                        "type": "text",
+                        "content": "发包人应在招标文件和合同中约定增值税的计税方法、结算原则，同时应考虑营改增对工程造价的影响，合理确定招标控制价。"
+                    }
+                ]
+            },
+            "bbox": [
+                136,
+                203,
+                857,
+                260
+            ]
+        },
+        {
+            "type": "paragraph",
+            "content": {
+                "paragraph_content": [
+                    {
+                        "type": "text",
+                        "content": "承包人应根据自身管理水平，材料采购及机械配备等因素，考虑实际可抵扣进项税额，合理确定增值税综合应纳税费率进行自主报价。"
+                    }
+                ]
+            },
+            "bbox": [
+                136,
+                277,
+                868,
+                334
+            ]
+        },
+        {
+            "type": "table",
+            "content": {
+                "image_source": {
+                    "path": "images/3966884d64e613d4d5aee54941b2b51a7a641bfa6ab9514405b60ce41b79b922.jpg"
+                },
+                "table_caption": [
+                    {
+                        "type": "text",
+                        "content": "表5 增值税综合应纳税费率表（单位：%）"
+                    }
+                ],
+                "table_footnote": [],
+                "html": "<table><tr><td>参考范围</td><td>推荐费率</td></tr><tr><td>0.59~6.28</td><td>3.02</td></tr></table>",
+                "table_type": "simple_table",
+                "table_nest_level": 1
+            },
+            "bbox": [
+                139,
+                369,
+                845,
+                429
+            ]
+        },
+        {
+            "type": "paragraph",
+            "content": {
+                "paragraph_content": [
+                    {
+                        "type": "text",
+                        "content": "城市维护建设税、教育费附加及地方教育附加=增值税应纳税额×税务部门公布的税（费）率，具体税（费）率详见表6。"
+                    }
+                ]
+            },
+            "bbox": [
+                136,
+                436,
+                862,
+                494
+            ]
+        },
+        {
+            "type": "table",
+            "content": {
+                "image_source": {
+                    "path": "images/f880f7f2116194951ebb0f50fa810168a24fb7ba5e03f490184a3b25e2b7d2f1.jpg"
+                },
+                "table_caption": [
+                    {
+                        "type": "text",
+                        "content": "表6. 城市维护建设税、教育费附加及地方教育附加税（费）率表（单位：%）"
+                    }
+                ],
+                "table_footnote": [],
+                "html": "<table><tr><td>项目名称</td><td>税（费）率</td></tr><tr><td>城市维护建设税</td><td>7</td></tr><tr><td>教育费附加</td><td>3</td></tr><tr><td>地方教育附加</td><td>2</td></tr></table>",
+                "table_type": "simple_table",
+                "table_nest_level": 1
+            },
+            "bbox": [
+                139,
+                527,
+                847,
+                646
+            ]
+        },
+        {
+            "type": "paragraph",
+            "content": {
+                "paragraph_content": [
+                    {
+                        "type": "text",
+                        "content": "明确为简易计税的建设项目的，承包人预算、结算的综合应纳税费率推荐值为3%。"
+                    }
+                ]
+            },
+            "bbox": [
+                136,
+                653,
+                867,
+                709
+            ]
+        },
+        {
+            "type": "title",
+            "content": {
+                "title_content": [
+                    {
+                        "type": "text",
+                        "content": "七、暂列金额"
+                    }
+                ],
+                "level": 2
+            },
+            "bbox": [
+                184,
+                736,
+                332,
+                756
+            ]
+        },
+        {
+            "type": "paragraph",
+            "content": {
+                "paragraph_content": [
+                    {
+                        "type": "text",
+                        "content": "暂列金额计算公式如下："
+                    }
+                ]
+            },
+            "bbox": [
+                184,
+                783,
+                436,
+                802
+            ]
+        },
+        {
+            "type": "paragraph",
+            "content": {
+                "paragraph_content": [
+                    {
+                        "type": "text",
+                        "content": "暂列金额=含税建安工程造价×暂列金额费率"
+                    }
+                ]
+            },
+            "bbox": [
+                184,
+                820,
+                648,
+                839
+            ]
+        },
+        {
+            "type": "paragraph",
+            "content": {
+                "paragraph_content": [
+                    {
+                        "type": "text",
+                        "content": "暂列金额费率参考范围为5%～10%"
+                    }
+                ]
+            },
+            "bbox": [
+                184,
+                857,
+                557,
+                876
+            ]
+        },
+        {
+            "type": "page_number",
+            "content": {
+                "page_number_content": [
+                    {
+                        "type": "text",
+                        "content": "7"
+                    }
+                ]
+            },
+            "bbox": [
+                497,
+                914,
+                510,
+                926
+            ]
+        }
+    ],
+    [
+        {
+            "type": "title",
+            "content": {
+                "title_content": [
+                    {
+                        "type": "text",
+                        "content": "八、优质优价奖励"
+                    }
+                ],
+                "level": 2
+            },
+            "bbox": [
+                174,
+                91,
+                371,
+                112
+            ]
+        },
+        {
+            "type": "paragraph",
+            "content": {
+                "paragraph_content": [
+                    {
+                        "type": "text",
+                        "content": "优质优价奖励费计算公式如下："
+                    }
+                ]
+            },
+            "bbox": [
+                174,
+                137,
+                495,
+                156
+            ]
+        },
+        {
+            "type": "paragraph",
+            "content": {
+                "paragraph_content": [
+                    {
+                        "type": "text",
+                        "content": "优质优价奖励费=含税建安工程造价×优质优价奖励费费率"
+                    }
+                ]
+            },
+            "bbox": [
+                174,
+                175,
+                781,
+                193
+            ]
+        },
+        {
+            "type": "paragraph",
+            "content": {
+                "paragraph_content": [
+                    {
+                        "type": "text",
+                        "content": "优质优价奖励费费率参考范围为1%～1.5%。"
+                    }
+                ]
+            },
+            "bbox": [
+                174,
+                212,
+                628,
+                231
+            ]
+        },
+        {
+            "type": "title",
+            "content": {
+                "title_content": [
+                    {
+                        "type": "text",
+                        "content": "九、工程保险费"
+                    }
+                ],
+                "level": 2
+            },
+            "bbox": [
+                174,
+                258,
+                347,
+                278
+            ]
+        },
+        {
+            "type": "paragraph",
+            "content": {
+                "paragraph_content": [
+                    {
+                        "type": "text",
+                        "content": "工程保险费计算公式如下："
+                    }
+                ]
+            },
+            "bbox": [
+                174,
+                305,
+                448,
+                324
+            ]
+        },
+        {
+            "type": "paragraph",
+            "content": {
+                "paragraph_content": [
+                    {
+                        "type": "text",
+                        "content": "工程保险费=（含税建安工程造价+设备及工器具购置费）×工程保险费费率"
+                    }
+                ]
+            },
+            "bbox": [
+                127,
+                341,
+                857,
+                399
+            ]
+        },
+        {
+            "type": "paragraph",
+            "content": {
+                "paragraph_content": [
+                    {
+                        "type": "text",
+                        "content": "工程保险费可根据相关行业主管部门要求，结合工程类别及规模、保险险种、范围、内容以及市场实际情况综合确定，参考范围详见表7。"
+                    }
+                ]
+            },
+            "bbox": [
+                127,
+                416,
+                855,
+                473
+            ]
+        },
+        {
+            "type": "table",
+            "content": {
+                "image_source": {
+                    "path": "images/b9c44480075b933b23ca3a1e7037da11a367f6706ca2eef1e1f606253bdcd75e.jpg"
+                },
+                "table_caption": [
+                    {
+                        "type": "text",
+                        "content": "表7 工程保险费费率表（单位：‰）"
+                    }
+                ],
+                "table_footnote": [],
+                "html": "<table><tr><td>工程类别</td><td>参考范围</td></tr><tr><td>房建工程</td><td>0.8~3.0</td></tr><tr><td>市政工程</td><td>1.0~7.0</td></tr><tr><td>轨道交通与综合管廊工程</td><td>1.2~9.0</td></tr></table>",
+                "table_type": "simple_table",
+                "table_nest_level": 1
+            },
+            "bbox": [
+                157,
+                507,
+                831,
+                625
+            ]
+        },
+        {
+            "type": "title",
+            "content": {
+                "title_content": [
+                    {
+                        "type": "text",
+                        "content": "十、其它"
+                    }
+                ],
+                "level": 2
+            },
+            "bbox": [
+                174,
+                668,
+                275,
+                689
+            ]
+        },
+        {
+            "type": "paragraph",
+            "content": {
+                "paragraph_content": [
+                    {
+                        "type": "text",
+                        "content": "（一）本费率标准自 2024年2月15日起实施。《深圳市建设工程计价费率标准（2018）》（深建价〔2018〕25号）及相关配套文件自本费率标准实施之日起废止。"
+                    }
+                ]
+            },
+            "bbox": [
+                127,
+                715,
+                858,
+                810
+            ]
+        },
+        {
+            "type": "paragraph",
+            "content": {
+                "paragraph_content": [
+                    {
+                        "type": "text",
+                        "content": "（二）本费率标准由深圳市建设工程造价管理站负责解释和修订。"
+                    }
+                ]
+            },
+            "bbox": [
+                184,
+                826,
+                850,
+                847
+            ]
+        },
+        {
+            "type": "page_number",
+            "content": {
+                "page_number_content": [
+                    {
+                        "type": "text",
+                        "content": "8"
+                    }
+                ]
+            },
+            "bbox": [
+                487,
+                915,
+                500,
+                927
+            ]
+        }
+    ],
+    [
+        {
+            "type": "title",
+            "content": {
+                "title_content": [
+                    {
+                        "type": "text",
+                        "content": "附录 A"
+                    }
+                ],
+                "level": 2
+            },
+            "bbox": [
+                174,
+                97,
+                263,
+                118
+            ]
+        },
+        {
+            "type": "title",
+            "content": {
+                "title_content": [
+                    {
+                        "type": "text",
+                        "content": "安全文明施工措施费清单部分"
+                    }
+                ],
+                "level": 1
+            },
+            "bbox": [
+                342,
+                153,
+                699,
+                177
+            ]
+        },
+        {
+            "type": "title",
+            "content": {
+                "title_content": [
+                    {
+                        "type": "text",
+                        "content": "说 明"
+                    }
+                ],
+                "level": 2
+            },
+            "bbox": [
+                482,
+                212,
+                559,
+                233
+            ]
+        },
+        {
+            "type": "list",
+            "content": {
+                "list_type": "text_list",
+                "list_items": [
+                    {
+                        "item_type": "text",
+                        "item_content": [
+                            {
+                                "type": "text",
+                                "content": "一、装配式钢结构围挡、PVC 围挡、铁马、水马清单项适用于施工区与外部环境隔离的临时围挡，施工区场地内、办公区、生活区、生产区使用的各类围挡、铁马、水马等已包含在安全文明施工措施费费率部分。围挡的土石方开挖、外运、回填并入围挡清单项目中。"
+                            }
+                        ]
+                    },
+                    {
+                        "item_type": "text",
+                        "item_content": [
+                            {
+                                "type": "text",
+                                "content": "二、隔音屏、声屏障清单项是指施工区与外部环境隔离的临时噪声 防治围挡，不包含永久的隔音屏、声屏障，如在装配式围挡上设置隔音 屏、声屏障的，装配式围挡和隔音屏、声屏障分别列项计算。"
+                            }
+                        ]
+                    },
+                    {
+                        "item_type": "text",
+                        "item_content": [
+                            {
+                                "type": "text",
+                                "content": "三、基坑内场地硬化清单项适用于基坑内地质情况差，为保证施工机械正常作业而进行的必要的硬化，具体以经审核的施工方案为准。基坑出土坡道的路面硬化（不含坡道的锚杆等支护措施）和基坑顶部的硬化已包含在安全文明施工措施费费率部分。"
+                            }
+                        ]
+                    },
+                    {
+                        "item_type": "text",
+                        "item_content": [
+                            {
+                                "type": "text",
+                                "content": "四、施工区临时排水沟、施工区临时集水井清单项适用于按照相关设计图纸要求在施工区设置的排水沟和集水井，排水沟和集水井的土石方开挖、外运、回填并入相应清单项目中。"
+                            }
+                        ]
+                    }
+                ]
+            },
+            "bbox": [
+                137,
+                263,
+                870,
+                765
+            ]
+        },
+        {
+            "type": "page_number",
+            "content": {
+                "page_number_content": [
+                    {
+                        "type": "text",
+                        "content": "1"
+                    }
+                ]
+            },
+            "bbox": [
+                497,
+                914,
+                510,
+                925
+            ]
+        }
+    ],
+    [
+        {
+            "type": "title",
+            "content": {
+                "title_content": [
+                    {
+                        "type": "text",
+                        "content": "安全文明施工措施费清单部分列项表"
+                    }
+                ],
+                "level": 2
+            },
+            "bbox": [
+                292,
+                90,
+                729,
+                112
+            ]
+        },
+        {
+            "type": "table",
+            "content": {
+                "image_source": {
+                    "path": "images/16c19c86e108f6d92b07cf097ebd109838d6f962d8f5151e3aece52248c8ef0a.jpg"
+                },
+                "table_caption": [],
+                "table_footnote": [],
+                "html": "<table><tr><td>序号</td><td>项目编码</td><td>项目名称</td><td>项目特征</td><td>计量单位</td><td>计算规则</td><td>工作内容</td><td>备注</td></tr><tr><td>1</td><td>14010101</td><td>施工区装配式钢结构围挡(与外部环境隔离)</td><td>1.类型2.构造(规格、材质等)3.基础形式4.除尘喷淋5.灯具及配管配线6.其他</td><td>1.项2.m</td><td>1.按项计价2.按围挡长度以米计算</td><td>1.土石方开挖、外运、回填2.基础制作、安装、拆除3.围挡、喷淋、灯具及配管配线等制作、安装、维护、拆除、运输、处置等4.补刷油漆</td><td></td></tr><tr><td>2</td><td>14010102</td><td>施工区PVC围挡(与外部环境隔离)</td><td>1.类型2.构造(规格、材质等)3.基础形式4.除尘喷淋5.灯具及配管配线6.其他</td><td>1.项2.m</td><td>1.按项计价2.按围挡长度以米计算</td><td>1.土石方开挖、外运、回填2.基础制作、安装、拆除3.围挡、喷淋、灯具及配管配线等工作、安装、维护、拆除、运输、处置等4.补刷油漆</td><td></td></tr><tr><td>3</td><td>14010103</td><td>施工区铁马(与外部环境隔离)</td><td>1.类型2.构造(规格、材质等)3.除尘喷淋4.灯具及配管配线5.其他</td><td>1.项2.m</td><td>1.按项计价2.按铁马长度以米计算</td><td>铁马、喷淋、灯具及配管配线等制作、安装、维护、拆除、运输、处置等</td><td></td></tr><tr><td>4</td><td>14010104</td><td>施工区水马(与外部环境隔离)</td><td>1.类型2.构造(规格、材质等)3.除尘喷淋4.灯具及配管配线5.其他</td><td>1.项2.m</td><td>1.按项计价2.按水马长度以米计算</td><td>水马、喷淋、灯具及配管配线等制作、安装、维护、拆除、运输、处置等</td><td></td></tr><tr><td>5</td><td>14010105</td><td>隔音屏、声屏障</td><td>1.构造(规格、材质等)2.基础形式3.其他</td><td>1.项2.m3.m2</td><td>1.按项计价2.按长度以米计算3.按面积以平方米计算</td><td>1.土石方开挖、外运、回填2.基础制作、安装、拆除3.隔音屏、声屏障的制作、安装、维护、拆除、运输、处置等</td><td></td></tr><tr><td>6</td><td>14010106</td><td>基坑内场地硬化</td><td>1.规格、尺寸2.材质、强度等级及厚度3.其他</td><td>1.项2.m23.m3</td><td>1.按项计价2.按基坑内场地硬化面积以平方米计算3.按基坑内场地硬化体积以立方米计算</td><td>1.场地准备2.铺筑养护3.维护、拆除、运输、处置等</td><td></td></tr><tr><td>7</td><td>14010107</td><td>施工区裸土覆盖</td><td>1.做法(覆盖、绿化等)2.规格、材质3.其他</td><td>1.项2.m2</td><td>1.按项计价2.按覆盖面积以平方米计算</td><td>1.覆盖、绿化等2.维护、拆除、运输、处置等</td><td></td></tr><tr><td>8</td><td>14010108</td><td>施工区临时排水沟</td><td>1.规格、尺寸2.垫层、基础材质、强度等级及厚度3.砌筑材料品种、规格、强度等级4.勾缝、抹面5.砂浆强度等级、配合比6.盖板材质、规格7.混凝土强度等级8.防渗、防水要求9.其他</td><td>1.项2.m</td><td>1.按项计价2.按设计图示长度以米计算</td><td>1.土石方开挖、外运、回填2.垫层铺筑3.模板制作、安装4.混凝土拌和、运输、浇筑、养护5.砌筑、勾缝、抹面6.防水、止水7.维护、拆除、运输、处置等</td><td></td></tr><tr><td>9</td><td>14010109</td><td>施工区临时集水井</td><td>1.规格、尺寸2.垫层、基础材质、强度等级及厚度3.砌筑材料品种、规格、强度等级4.勾缝、抹面5.砂浆强度等级、配合比6.盖板材质、规格7.混凝土强度等级8.防渗、防水要求9.其他</td><td>1.项2.座</td><td>1.按项计价2.按设计图示以座计算</td><td>1.土石方开挖、外运、回填2.垫层铺筑3.模板制作、安装4.混凝土拌和、运输、浇筑、养护5.砌筑、勾缝、抹面6.防水、止水7.维护、拆除、运输、处置等</td><td></td></tr></table>",
+                "table_type": "simple_table",
+                "table_nest_level": 1
+            },
+            "bbox": [
+                72,
+                183,
+                900,
+                885
+            ]
+        },
+        {
+            "type": "page_number",
+            "content": {
+                "page_number_content": [
+                    {
+                        "type": "text",
+                        "content": "2"
+                    }
+                ]
+            },
+            "bbox": [
+                487,
+                914,
+                500,
+                925
+            ]
+        }
+    ],
+    [
+        {
+            "type": "table",
+            "content": {
+                "image_source": {
+                    "path": "images/"
+                },
+                "table_caption": [],
+                "table_footnote": [],
+                "html": "",
+                "table_type": "simple_table",
+                "table_nest_level": 1
+            },
+            "bbox": [
+                72,
+                80,
+                900,
+                785
+            ]
+        },
+        {
+            "type": "page_number",
+            "content": {
+                "page_number_content": [
+                    {
+                        "type": "text",
+                        "content": "3"
+                    }
+                ]
+            },
+            "bbox": [
+                497,
+                914,
+                507,
+                925
+            ]
+        }
+    ],
+    [
+        {
+            "type": "title",
+            "content": {
+                "title_content": [
+                    {
+                        "type": "text",
+                        "content": "附录 B"
+                    }
+                ],
+                "level": 2
+            },
+            "bbox": [
+                139,
+                97,
+                221,
+                118
+            ]
+        },
+        {
+            "type": "table",
+            "content": {
+                "image_source": {
+                    "path": "images/4a5f786d0e0124fe58d1479803769cc71195afc9523250d621c9592ff1ebace8.jpg"
+                },
+                "table_caption": [
+                    {
+                        "type": "text",
+                        "content": "安全文明施工措施费费率部分包含内容"
+                    }
+                ],
+                "table_footnote": [
+                    {
+                        "type": "text",
+                        "content": "注：1.安全文明施工的具体做法详见《建设工程安全文明施工标准》（SJG46-2023）。"
+                    }
+                ],
+                "html": "<table><tr><td>序号</td><td>项目名称</td><td>工程内容</td></tr><tr><td>一</td><td colspan=\"2\">临时设施费</td></tr><tr><td>1</td><td>临时建筑</td><td>施工区、办公区、生活区、生产区等区域的临时建筑的安装(含基础)、维护、拆除、运输及处置等,包括大门及附属设施、临时用房、旗台等</td></tr><tr><td>2</td><td>现场临时用电设施</td><td>现场电源接入点之后的临时用电设备和设施的安装、维护、拆除、运输及处置等</td></tr><tr><td>3</td><td>现场临时用水、排水设施</td><td>现场施工供排水连接点之后的临时用水、排水及消防设备、设施和管线安装、维护、拆除、运输及处置等(施工区临时排水沟、施工区临时集水井按附录A另行列项计算)</td></tr><tr><td>4</td><td>智慧工地</td><td>1.质量安全信息化监管\n2.视频监控\n3.人员监管\n4.危险源监测\n5.建筑废弃物管理</td></tr><tr><td>二</td><td colspan=\"2\">安全施工费</td></tr><tr><td>1</td><td>安全警示牌、标语</td><td>设置警示牌、安全标语等</td></tr><tr><td>2</td><td>安全防护</td><td>1.临边防护\n2.洞口防护\n3.通道防护(不含保护施工项目外行人和行车的通道防护)\n4.防护棚(不含基坑防护棚)\n5.悬挑防护棚(楼层悬挑外挑网)\n6.临边作业安全带固定点\n7.可移动围栏</td></tr><tr><td>3</td><td>施工机械防护措施</td><td>塔式起重机、施工升降机、门式起重机、流动式起重机、起重吊装、架桥机和运梁车、隧道设备、路面设备、土方设备、电动手推车、施工机具、高处作业吊篮、幕墙作业移动吊车、叉车、混凝土输送设备等施工机械防护以及大型结构和设备整体提升、吊装防护</td></tr><tr><td>4</td><td>现场临时用电防护</td><td>外电防护、接地与防雷、配电室、发电机、配电线路、盾构隧道与矿山施工用电、配电箱与开关箱、现场照明、生活区等现场临时用电防护</td></tr><tr><td>5</td><td>脚手架防护措施</td><td>落地式脚手架、悬挑式脚手架、附着式升降脚手架、钢管脚手架悬挑卸料平台、爬架卸料平台、电梯井及竖向井道工具式钢平台等脚手架工程的防护(含脚手架与建筑物之间的水平安全兜网,不含外脚手架安全立网)</td></tr><tr><td>6</td><td>模板工程防护措施</td><td>支架基础、支架立杆、承插型盘扣式及扣件式钢管脚手架支撑架、后浇带架体、铝模、砖胎膜等模板工程的防护(不含模板支撑架水平安全兜网)</td></tr><tr><td>7</td><td>消防安全</td><td>消防总平面布局、临时消防设施与器材、防火管理、生活区消防安全、施工区消防安全等满足我市相关消防安全要求</td></tr><tr><td>8</td><td>职业健康与安全教育</td><td>劳保防护用品、食堂、茶水间、医务室、班前讲评台、安全培训等满足我市相关职业健康与安全教育要求</td></tr><tr><td>9</td><td>应急管理</td><td>应急准备、应急响应等满足我市相关应急管理要求</td></tr><tr><td>10</td><td>其他</td><td>钢结构施工、装配式结构施工、其他危大工程等施工过程中的安全防护(不含钢结构高处作业下挂式水平安全兜网)</td></tr><tr><td>三</td><td colspan=\"2\">文明施工费</td></tr><tr><td>1</td><td>标识标牌</td><td>七牌一图、导向标、安全施工标志、场内交通引导标志及围挡喷绘(宣传画)等</td></tr><tr><td>2</td><td>现场围挡</td><td>施工区场地内、办公区、生活区、生产区使用的各类围挡、铁马、水马等的制作、安装、美化、拆除、运输、处置等(施工区与外部环境隔离的装配式钢结构围挡、PVC围挡、铁马、水马按附录A另行列项计算)</td></tr><tr><td>3</td><td>材料堆放</td><td>1.保持材料堆放有序2.易燃易爆有毒有害物品分类存放</td></tr><tr><td>4</td><td>环境卫生</td><td>1.除四害消杀2.食堂卫生措施3.防暑降温措施4.施工现场垃圾的收集处理5.临时厕所卫生</td></tr><tr><td>5</td><td>生活区布置</td><td>住宿、文娱、食堂、茶水间、医务室、卫生间、淋浴等现场生活卫生设施</td></tr><tr><td>四</td><td colspan=\"2\">环境保护费</td></tr><tr><td>1</td><td>扬尘控制</td><td>1. 施工区、办公区、生活区、生产区等区域的硬化处理(基坑内场地硬化按附录A另行列项计算)\n2. 施工区、办公区、生活区、生产区等区域的绿化处理\n3. 车辆自动冲洗设备和沉淀过滤设施、洗车槽、排水沟及清淤、现场保洁等\n4. 易起尘作业湿法施工\n5. 易起尘物料全覆盖\n6. TSP在线监测</td></tr><tr><td>2</td><td>噪声控制</td><td>按照《建筑施工场界环境噪声排放标准》《建设工程施工噪声污染防治技术规范》和《深圳经济特区环境噪声污染防治条例》等相关规定和要求,设置环保公示栏,安装噪声监测设备,使用低噪声设备,采用局部降噪措施、噪声防治措施等(隔音屏、声屏障按附录A另行列项计算)</td></tr><tr><td>3</td><td>废弃物排放管控、碳排放控制</td><td>1. 按照建筑废弃物有关管理规定和我市相关主管部门要求,对施工废弃物和装修废弃物进行分类收集、运输、处置,并建立分类排放管理台账(不含建筑废弃物现场综合利用)\n2. 液体、气体、固体等废弃物及光污染管控\n3. 泥浆池、沉淀池、隔油池、化粪池等处理设施的安装、维护、管理、拆除、运输及处置\n4. 加强碳排放控制管理</td></tr><tr><td>4</td><td>水土保持管理</td><td>按我市水土保持相关规定,编制水土保持措施施工组织方案,落实好覆盖、拦挡、排水、沉砂等相关防护措施(施工区裸土覆盖、施工区临时排水沟、施工区临时集水井按附录A另行列项计算)</td></tr></table>",
+                "table_type": "complex_table",
+                "table_nest_level": 1
+            },
+            "bbox": [
+                144,
+                214,
+                862,
+                866
+            ]
+        },
+        {
+            "type": "page_number",
+            "content": {
+                "page_number_content": [
+                    {
+                        "type": "text",
+                        "content": "1"
+                    }
+                ]
+            },
+            "bbox": [
+                499,
+                914,
+                507,
+                925
+            ]
+        }
+    ],
+    [
+        {
+            "type": "table",
+            "content": {
+                "image_source": {
+                    "path": "images/"
+                },
+                "table_caption": [],
+                "table_footnote": [],
+                "html": "",
+                "table_type": "simple_table",
+                "table_nest_level": 1
+            },
+            "bbox": [
+                136,
+                82,
+                852,
+                890
+            ]
+        },
+        {
+            "type": "page_number",
+            "content": {
+                "page_number_content": [
+                    {
+                        "type": "text",
+                        "content": "2"
+                    }
+                ]
+            },
+            "bbox": [
+                489,
+                914,
+                500,
+                925
+            ]
+        }
+    ],
+    [
+        {
+            "type": "table",
+            "content": {
+                "image_source": {
+                    "path": "images/"
+                },
+                "table_caption": [],
+                "table_footnote": [],
+                "html": "",
+                "table_type": "simple_table",
+                "table_nest_level": 1
+            },
+            "bbox": [
+                144,
+                80,
+                862,
+                690
+            ]
+        },
+        {
+            "type": "list",
+            "content": {
+                "list_type": "text_list",
+                "list_items": [
+                    {
+                        "item_type": "text",
+                        "item_content": [
+                            {
+                                "type": "text",
+                                "content": "2.保护施工项目外行人和行车的通道防护、基坑防护棚、外脚手架安全立网、模板支撑架水平安全兜网、钢结构高处作业下挂式水平安全兜网、逃生管道、厂棚化施工、盾构渣土处理中心、安全体验馆、VR 虚拟安全体验馆未包含在安全文明施工措施费中，如实际发生时，相关费用列入措施费中另行计算。"
+                            }
+                        ]
+                    }
+                ]
+            },
+            "bbox": [
+                136,
+                696,
+                865,
+                822
+            ]
+        },
+        {
+            "type": "page_number",
+            "content": {
+                "page_number_content": [
+                    {
+                        "type": "text",
+                        "content": "3"
+                    }
+                ]
+            },
+            "bbox": [
+                497,
+                914,
+                507,
+                925
+            ]
+        }
+    ]
+]

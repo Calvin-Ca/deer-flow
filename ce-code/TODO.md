@@ -151,7 +151,7 @@ MinerU 解析 + 条款树提取 + 质量审核，在 GB 50378-2006 和 GB 50016 
 - [x] **T7（最小切片）粒度视图**（✅ 2026-06-13）：新增 `view.py` 的 `view(nodes, index_granularity) → 检索单元`（索引期纯函数，读 `nodes.json`），**先只做 `clause` 层 emit**（`node_type=="clause"`；section/paragraph 抛 `NotImplementedError` 留后补，bogus 值 `ValueError`）。`ParseProfile` 从 `02` 抽到可 import 的 `parse_profile.py`（数字前缀文件不可 import；命名避开 stdlib `profile`）：删 `chunk_granularity`/`enrichment`/`structure_depth`，加 `index_granularity`（section\|clause\|paragraph）+ `reprs`（list，缺省免费 4 项 `raw/sparse/dense/context_aug`）+ `small_to_big`；`terminal_stage` 改 PRD §3.2 值 `structure|reprs|index`。`02` 改 import + 同步 CLI（`--index-granularity` 替 `--chunk-granularity/--enrichment`，默认终止 `structure`）+ 删建树层对旧字段的 vestigial 引用。冒烟测试通过（default_factory 不共享、clause 选层正确、02 可加载）。待第 1 步 T8/T4 接 `view` 入索引。
 - [x] **T8（免费 4 项）表征注册表**（✅ 2026-06-13，`reprs/`）：新建 `reprs/` 包——`__init__.py` 注册表 `REGISTRY`（ReprKind→产函数）+ `enrich(nodes, enabled)`/`attach(node)` 运行核心（原地给节点挂 `reprs`，未注册 kind 安全跳过=前向兼容）；四个免费表征各一文件：`raw`（节点 content 原文，返回用）/`sparse`（node_path+title+content 词项拼接，供 BM25）/`dense`（title+content 待嵌入正文）/`context_aug`（祖先链 ‖ 正文，small-to-big 入口）。**向量归属**：dense/context_aug 只产待嵌入文本，向量留索引期 04 用 embedding 模型统一算（模型唯一 owner 在检索栈，表征层不加载模型→仍属"免费"）。`context_aug` **复用 TreeBuilder 已算定的 `ancestor_titles`、不重算**（接管 `extract/ancestors.py` 职责；ancestors.py 与 build.py v1 逻辑随 T5 退役）。`DEFAULT_ENABLED` 与 `parse_profile.DEFAULT_REPRS` 一致。合成节点验证：4 项文本形态/空骨架退化（content 空时 context_aug 退为 title）/dense 无 vector/未注册 kind 跳过。`table_struct`/`modal`/`condition`/LLM(summary/questions) 推到第 4 步。
 - [x] **T4 索引读 `nodes.json` + 去强条字段**（✅ 2026-06-13，`04_build_index.py`）：改读 `nodes.json` → `view(nodes, index_granularity)`（T7 选粒度）→ `reprs.enrich`（T8 挂表征）→ emit。**各表征明确消费方**：`sparse`→BM25 语料、`dense`→嵌入文本（向量）、`raw`→`content` 字段；引用扩展用 `references_to`（从节点 `references` 桥接出 strong/cross_standard 边的 `to`，供 engine 沿用 list[str] 口径）。行带 `node_id`/`parent_id`/`granularity`（`parent_id`=T9 small-to-big 锚点）；Milvus schema **删 `is_mandatory` 字段 + 其 INVERTED 索引**（加 `node_id` INVERTED），`metadata.json` 同步去字段。索引路径改 `data/vector_store/{standard}/{profile}/`（profile 隔离）；collection 用检索层共享 `config.collection_name(store_dir.name)` 推断，与 `07_eval`/`server` 一致→评测点 `--store-dir` 至本目录即同名零改动（⚠️ 多规范并存时 profile 名须含规范区分以免 Milvus collection 相撞）。**耦合改动**：`engine.MILVUS_OUTPUT_FIELDS` 删 `is_mandatory`、加 `node_id`/`parent_id`/`granularity`，`search` stats 去 `mandatory`（这是 T9 计划的清理，因「新 schema 删字段后 engine 仍 output 该字段会查询报错」属硬依赖故前移；T9 仍负责 small-to-big + ref-type 感知扩展）。`server.py` 的 `is_mandatory`/`mandatory` 全走 `.get` 不崩（清理留 T6）；`07_eval` 不读 hit 的 `is_mandatory`、按 `node_path` 集合判命中（clause 粒度下与包含关系等价）。合成数据验证 `node_to_row`/`_expandable_refs`/`save_metadata`（无 is_mandatory、references_to 为 list、dense 文本非空）；BM25/Milvus 路径依赖服务器服务，待里程碑跑。
-- [ ] **🏁 里程碑（护栏复活）**：用新模型重建 GB 50016（服务器从 ce-code 根单入口跑 `python build.py --input data/parsed/<std>/auto/<std>_content_list.json`），`python -m tools.eval --store-dir data/vector_store/<std>/<profile>` 与旧 v1 索引对比召回（基线口径已换，按 PRD §四**包含关系**判命中；clause 粒度下现有精确集合判命中等价）。**此步打通前，下面各步都不算有护栏。** ⚠️ 同时验 B 建树（catalog 骨架）在真规范上的树形 + `catalog_source` 分解。
+- [ ] **🏁 里程碑（护栏复活）**：用新模型重建 GB 50016（服务器从 ce-code 根单入口跑 `python build.py all --input data/parsed/<std>/auto/<std>_content_list.json`），`python -m tools.eval --store-dir data/vector_store/<std>/<profile>` 与旧 v1 索引对比召回（基线口径已换，按 PRD §四**包含关系**判命中；clause 粒度下现有精确集合判命中等价）。**此步打通前，下面各步都不算有护栏。** ⚠️ 同时验 B 建树（catalog 骨架）在真规范上的树形 + `catalog_source` 分解。
 
 **第 2 步 — T5 退役/重定位 `build.py`**（依赖第 1 步的 reprs runner 形态）：
 
@@ -186,7 +186,7 @@ MinerU 解析 + 条款树提取 + 质量审核，在 GB 50378-2006 和 GB 50016 
 | doc_id | 名称 | 必要性 | 收录 | 下一步 |
 |---|---|---|---|---|
 | GB-50500 | 建设工程工程量清单计价标准 | ⭐MVP | ✅ | 从条款树抽 `bill_spec` 入库 |
-| GB-50854 | 房屋建筑与装饰工程工程量计算标准 | ⭐MVP | ✅ | 抽 calc_rule + feature_schema 入 `bill_spec` |
+| GB-50854 | 房屋建筑与装饰工程工程量计算标准 | ⭐MVP | ✅ | **已抽 bill_spec**（472 项 + 5 辅助表 JSONL，见下）；待入 PG + 合 50500 计价口径 |
 | GB-50856 | 通用安装工程工程量计算标准 | [条件] 含机电 | ✅ | 含安装项目时入库 |
 | SZ-SJG171 | 深圳市建筑工程消耗量标准 | ⭐MVP | ✅ | 电子表清洗入 `quota_item`/`quota_resource`（组价主体） |
 | SZ-SJG170 | 深圳市土石方与地基基础工程消耗量标准 | [必收] 含基础/土方 | ✅ | 同上，土方/地基阶段 |
@@ -201,9 +201,11 @@ MinerU 解析 + 条款树提取 + 质量审核，在 GB 50378-2006 和 GB 50016 
 ### 数据资产（关系库优先）
 
 - [ ] 关系库 PostgreSQL 建表：`bill_spec` / `quota_item` / `quota_resource` / `resource` / `resource_price` / `hist_bill`，**强制带 `doc_id` + `version` + `region`(深圳) + `effective_priority`(深圳本地=1)**，价格带 `effective_period`
+  - [x] **PostgreSQL 16 已部署**（✅ 2026-06-16，服务器 stone）：因系统共用 docker 与满盘 `/` 不可动，**用 rootless docker 起独立 daemon**（caic 用户名下，data-root=`/mnt/nvme/calvin/docker/data`，与共用 daemon 零交集），`postgres:16` 容器 `ce-postgres`（端口 **5433**，库 `ce_cost`，用户 `cost`，卷 `ce_pgdata` 落 nvme，对内网开放）。部署细节见 DEV §6。`bill_spec` 表已建（code/name/unit/feature_schema JSONB/calc_rule/work_content JSONB/chapter/spec_version/provenance JSONB）。
+  - [ ] 其余表（quota_item/quota_resource/resource/resource_price/hist_bill）+ doc_id/version/region/effective_priority 治理字段待建
 - [ ] 清单计量规范结构化入 `bill_spec`（复用 MinerU 解析 + 规则，含 calc_rule + feature_schema）
   - [x] **GB/T 50500-2024 已过 02 解析**（561 条款、35 表结构化、附录条款归位），下一步从条款树抽 `bill_spec` 字段入库
-  - [ ] GB/T 50854-2024 待重新解析（前次 01 运行命中 `mineru_api` 输出目录误定位 bug，已修；需重跑确认产物正确）
+  - [x] **GB/T 50854-2024 已抽 `bill_spec`**（✅ 2026-06-16，`cost/bill_spec.py`）：chunks.json → 双出口 `data/structured/bill_spec.jsonl`（**472 清单项**，编码无重复/无断号，feature_schema + work_content 编号拆 list）+ `aux_tables.jsonl`（5 辅助表：土/岩石分类、工作面宽度等，原样留 body 供 calc_rule 查表）。判别：表头含「项目编码」→ bill_spec，否则 → aux；列名别名（措施项目「单位」/7 列「项目特征描述」）；每条带 provenance 回指原表。质量门禁留人工抽查 4 处（3 模板项源表无特征属合法 / 1 行 `010102007` 源表单位格丢失，按不杜撰未猜填）。**待办**：导入 PG `bill_spec` 表（表已建，走 staging 表 `\copy` JSONL 中转 + `INSERT ... j->>`，待服务器 pull `cost/` 后重跑生成 jsonl 再导）+ 按 code 合并 50500 计价口径 + spec_version 归一（现为原始文件名）。
 - [ ] **深圳消耗量标准**导入 `quota_item` + `quota_resource` + `resource`（SJG 171-2024 主体 + SJG 170-2024 土方/地基，电子表清洗；标注 `region=深圳`/`effective_priority=1`）
 - [ ] 价格库导入 `resource_price`（深圳信息价 SZ-JGXX-PRICE，带 `effective_period` 时效，**走动态独立更新管道**）
 - [ ] 费率标准（SZ-FLBZ-2023）入费用计算表（企业管理费/利润/安文费/规费/税金）

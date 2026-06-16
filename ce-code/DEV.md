@@ -286,13 +286,15 @@ PDF（清单/计量规范）
 | 文本推理 | Qwen3-8B | `http://localhost:8099` | 查询改写、引用图 LLM 校验（`/no_think` 禁思考链） |
 | PDF 解析 | MinerU API | `http://172.19.2.2:8000` | PDF 解析（默认远程，hybrid-auto-engine） |
 | 知识服务 | 本模块（FastAPI） | `http://localhost:8100` | 对外检索原语 `/search` `/expand` `/clause` `/health` |
+| 关系库 | PostgreSQL 16（容器 `ce-postgres`） | `localhost:5433`（库 `ce_cost`/用户 `cost`） | 清单/定额/价格/历史精确查询（单一事实源，version + region）；`bill_spec` 表已建 |
+
+> **PostgreSQL 部署注记（2026-06-16，服务器 stone）**：系统 docker 为多用户共用（`docker` 组含 hesperos/caic）、跑着 40+ 别人的容器（含本层依赖的 vllm/bge），且其 data-root 在 **100% 满的 `/`**（`/var/lib/docker` 占 247G，不可清、会回填）——故**不动系统 docker**，改用 **rootless docker**（caic 用户名下独立 daemon，`~/.config/docker/daemon.json` 设 `data-root=/mnt/nvme/calvin/docker/data` + 抄系统 `registry-mirrors` 加速器，systemd `--user` 服务 + `loginctl enable-linger` 常驻）。PG 以 `docker run` 起 `ce-postgres`（`-p 5433:5432` 对内网开放、密码弱，仅内网 dev；卷 `ce_pgdata` 落 nvme）。**操作约束**：连这套 daemon 须设 `DOCKER_HOST=unix:///run/user/$(id -u)/docker.sock` 或 `docker context use rootless`，**绝不用 `sudo docker`**（那打到共用 daemon）。治本建议：促管理员把系统 docker data-root 迁 nvme / 清失控容器日志（单容器 json-log 占 77G）。
 
 ### 待部署（结构化造价数据 / 组价）
 
 | 角色 | 服务/模型 | 地址 | 用途 |
 |---|---|---|---|
-| 关系库 | PostgreSQL | 待部署 | 清单/定额/价格/历史精确查询（单一事实源，version + region） |
-| KG（P0） | PG 关联表（P1 迁 Neo4j） | 同上 | 构件→清单→定额→工料机多跳关系 |
+| KG（P0） | PG 关联表（P1 迁 Neo4j） | 同 PG（`localhost:5433`） | 构件→清单→定额→工料机多跳关系 |
 | 造价 Embedding | BGE-M3（评估中） | 待部署 | dense+sparse 混检；是否与规范类合并单服务待定 |
 | 造价向量库 | Milvus（复用实例） | `http://localhost:19530` | 新建 `bill_spec_kb` collection |
 

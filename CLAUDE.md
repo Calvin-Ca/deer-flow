@@ -39,7 +39,7 @@
 - **commit 信息必须使用中文**
 - 每次改完代码，**先询问用户是否 commit/push，等确认后再执行**，不得自动提交
 - **本地不提交、不 push `uv.lock`**（`backend/uv.lock`、`ce-code/uv.lock`）：依赖锁文件以服务器（实际装依赖处）为准，本地 Mac 改动不入 commit。commit/push 时把 `uv.lock` 留在工作区不 `git add`
-- **文档/示例里的 shell 命令一律写成单行**，不用 `\` 多行续行——多行命令复制粘贴到服务器终端时续行常被 `>` 提示符打断，导致 `Command 'run' not found` 之类的报错
+- **给用户的任何终端命令一律写成单行**（不只文档/示例，也包括对话里直接贴给用户去服务器执行的命令）：不用 `\` 多行续行，不用 `<<EOF` 多行 heredoc，不用跨行的 `for/if/while` 块——多行内容复制粘贴到服务器终端时续行常被 `>` 提示符打断，导致 `Command 'run' not found` 之类报错。需要多步就拆成多条独立单行命令，或用 `&&`/`;` 串成一行；需要多行文件内容时改用「写好文件再执行」而非 heredoc 贴命令
 - POC 代码放项目根下（`ce-code/` 知识层 + `ce-services/` 任务层 + `ce-bim/` BIM 底座层 + 未来 `ce-cost/` 算量计价，均与 `backend/` 平级），正常 commit 同步。端口约定：:8100 知识 / :8101 任务 / :8102 BIM 底座
 - **BIM 是横切共享底座，不是 CostAgent 私有输入**：BIM 模型的取数底座（IfcOpenShell + IFC 原件 + 原语）落 `ce-bim/`（单一 owner，类比 `ce-code`），查看/操作做成共享前端包 `ce-bim-viewer`（web-ifc），算量计价/审图/FM 均为消费方做 HTTP 客户端复用——别把共享能力埋进单个产品
 - 各层 `PRD/DEV/TODO/README` 随 git 同步到服务器（项目文档跟着代码走）；**本文档 `CLAUDE.md` 也随 git 同步**（项目级共享上下文跟着代码走，与各层文档一致）——含服务器路径/内网 IP/端口等环境细节，仅内网可达、非公网机密，可入 git/push

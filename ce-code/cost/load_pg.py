@@ -241,6 +241,28 @@ def load_quota_resource(conn, links: list[dict]) -> tuple[int, int]:
     return len(rows), skipped
 
 
+def load_bill_quota_map(conn, records: list[dict]) -> int:
+    """幂等 upsert bill_quota_map（按 bill_code+quota_code+quota_doc_id 唯一键）。
+
+    参数：conn —— psycopg 连接；records —— bill_quota_map.jsonl 记录列表。
+    返回：写入行数。
+    """
+    rows = [(r["bill_code"], r["quota_code"], r["quota_doc_id"],
+             r.get("relation") or "APPLIES", r.get("confidence"),
+             r.get("source") or None, r.get("note") or None) for r in records]
+    sql = """
+        INSERT INTO bill_quota_map
+            (bill_code, quota_code, quota_doc_id, relation, confidence, source, note)
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
+        ON CONFLICT (bill_code, quota_code, quota_doc_id) DO UPDATE SET
+            relation = EXCLUDED.relation, confidence = EXCLUDED.confidence,
+            source = EXCLUDED.source, note = EXCLUDED.note
+    """
+    with conn.cursor() as cur:
+        cur.executemany(sql, rows)
+    return len(rows)
+
+
 @click.command()
 @click.option("--dsn", default="", help="PG 连接串；空=环境变量 CE_PG_DSN 或默认 localhost:5433/ce_cost。")
 @click.option("--init-schema", is_flag=True, help="先执行 schema.sql 建表（幂等）。")
@@ -256,10 +278,12 @@ def load_quota_resource(conn, links: list[dict]) -> tuple[int, int]:
               default=None, help="quota_item.jsonl 路径（定额子目）。")
 @click.option("--quota-resource", "quota_res_path", type=click.Path(exists=True, path_type=Path),
               default=None, help="quota_resource.jsonl 路径（子目×资源含量）。")
+@click.option("--bill-quota-map", "bq_map_path", type=click.Path(exists=True, path_type=Path),
+              default=None, help="bill_quota_map.jsonl 路径（清单→定额 APPLIES）。")
 def main(dsn: str, init_schema: bool, bill_spec_path: Path | None,
          aux_path: Path | None, price_comp_path: Path | None,
          resource_path: Path | None, quota_item_path: Path | None,
-         quota_res_path: Path | None) -> None:
+         quota_res_path: Path | None, bq_map_path: Path | None) -> None:
     """JSONL → PostgreSQL 幂等导入（建表 + 清单/定额/费用构成各表，单事务提交）。"""
     import psycopg
 
@@ -290,6 +314,9 @@ def main(dsn: str, init_schema: bool, bill_spec_path: Path | None,
             n, skip = load_quota_resource(conn, _read_jsonl(quota_res_path))
             console.print(f"[green]✓ quota_resource upsert {n} 条[/]"
                           + (f"，[yellow]跳过 {skip}（id 未解析）[/]" if skip else ""))
+        if bq_map_path:
+            n = load_bill_quota_map(conn, _read_jsonl(bq_map_path))
+            console.print(f"[green]✓ bill_quota_map upsert {n} 条[/]")
         conn.commit()
     console.print("[bold green]✓ 提交完成[/]")
 

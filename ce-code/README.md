@@ -92,7 +92,8 @@ ce-code/
 │   ├── bill_spec.py                #   chunks.json → bill_spec.jsonl + aux_tables.jsonl（双出口抽取）
 │   ├── price_composition.py        #   50500 chunks.json → price_composition.jsonl（费用构成规则，正则锚定原文）
 │   ├── quota.py                    #   SJG chunks.json → quota_item/resource/quota_resource.jsonl（定额转置矩阵·单位格锚定）
-│   ├── schema.sql                  #   全表 DDL（bill_spec/aux_table/price_composition/quota_*/resource*/hist_bill + 治理字段）
+│   ├── bill_quota.py               #   bill_spec + quota_item → bill_quota_map.jsonl（清单→定额 APPLIES 名称匹配·KG P0）
+│   ├── schema.sql                  #   全表 DDL（bill_spec/aux_table/price_composition/quota_*/resource*/bill_quota_map/hist_bill + 治理字段）
 │   └── load_pg.py                  #   JSONL → PG 幂等导入（-m cost.load_pg）
 │
 │  ── utils / tools ──
@@ -276,6 +277,14 @@ uv run python -m cost.quota --input "data/structured/SJG_171-2024/default/chunks
 
 产物落 `data/structured/quota_item.jsonl` / `resource.jsonl` / `quota_resource.jsonl`，终端打印总览（子目/资源/含量数、无费用子目、资源类别分布）。`--dry-run` 只看 report。
 
+### Step C1d — 清单→定额映射（KG P0，`cost/bill_quota.py`）
+
+清单（GB 50854，9 位码）与定额（SJG，6 位+变体）编码不可互推，映射是组价关键一跳。P0 用**名称匹配**自动种子：清单名==定额名首段 → conf 0.9，清单名⊂首段 → conf 0.6（1 清单 : N 定额）。产 `bill_quota_map.jsonl`（带 `relation=APPLIES`/`confidence`/`source`）。这是**起步映射**（SJG 171 建筑工程覆盖约 42/472），未覆盖/低置信项待富化（语义召回/专家标注），按红线「只建议不定稿」交任务层 HITL。
+
+```bash
+uv run python -m cost.bill_quota --bill-spec data/structured/bill_spec.jsonl --quota-item data/structured/quota_item.jsonl
+```
+
 ### Step C2 — 建表 + 幂等导入 PG（`cost/schema.sql` + `cost/load_pg.py`）
 
 `schema.sql` 一次建齐全部造价表（`bill_spec` / `aux_table` / `price_composition` / `quota_item` / `quota_resource` / `resource` / `resource_price` / `hist_bill`），强制治理字段 `doc_id`/`spec_version`/`region`/`effective_priority`（价格 `resource_price` 带 `effective_period` 时效 + `btree_gist` EXCLUDE 防重叠；`resource` 唯一键 `NULLS NOT DISTINCT` 让 `spec=NULL` 也算同行）；`IF NOT EXISTS` 幂等。`load_pg.py` 读 jsonl，按主键 `ON CONFLICT DO UPDATE` upsert（`bill_spec` 按 `code`、`aux_table` 按 `doc_id+caption+chapter`、`price_composition` 按 `doc_id+composite+seq`、`quota_item` 按 `region+quota_code+spec_version`、`resource` 按 `category+name+spec+unit`），可重复执行不产生重复行。
@@ -285,6 +294,8 @@ uv run python -m cost.quota --input "data/structured/SJG_171-2024/default/chunks
 CE_PG_DSN='postgresql://cost:<密码>@localhost:5433/ce_cost' uv run python -m cost.load_pg --init-schema --bill-spec data/structured/bill_spec.jsonl --aux data/structured/aux_tables.jsonl --price-composition data/structured/price_composition.jsonl
 # 定额三表（依赖序：resource/quota_item 先入库，quota_resource 再按 natural key 解析 FK）
 CE_PG_DSN='postgresql://cost:<密码>@localhost:5433/ce_cost' uv run python -m cost.load_pg --resource data/structured/resource.jsonl --quota-item data/structured/quota_item.jsonl --quota-resource data/structured/quota_resource.jsonl
+# 清单→定额映射（KG P0）
+CE_PG_DSN='postgresql://cost:<密码>@localhost:5433/ce_cost' uv run python -m cost.load_pg --bill-quota-map data/structured/bill_quota_map.jsonl
 ```
 
 > ⚠️ `--init-schema` 是 `CREATE TABLE IF NOT EXISTS`，**不会改已存在的表结构**。若库里有缺治理字段的旧 `bill_spec`（早期手敲建的），先删了再灌（导入幂等，删表无损）：`docker exec ce-postgres psql -U cost -d ce_cost -c "DROP TABLE IF EXISTS bill_spec"`。
@@ -294,9 +305,15 @@ CE_PG_DSN='postgresql://cost:<密码>@localhost:5433/ce_cost' uv run python -m c
 ```bash
 docker exec ce-postgres psql -U cost -d ce_cost -c "SELECT doc_id, spec_version, region, effective_priority, count(*) FROM bill_spec GROUP BY 1,2,3,4"
 docker exec ce-postgres psql -U cost -d ce_cost -c "SELECT composite, kind, string_agg(component, ' / ' ORDER BY seq) FROM price_composition GROUP BY 1,2"
-docker exec ce-postgres psql -U cost -d ce_cost -c "SELECT (SELECT count(*) FROM quota_item) AS 子目, (SELECT count(*) FROM resource) AS 资源, (SELECT count(*) FROM quota_resource) AS 含量"
+docker exec ce-postgres psql -U cost -d ce_cost -c "SELECT (SELECT count(*) FROM quota_item) AS 子目, (SELECT count(*) FROM resource) AS 资源, (SELECT count(*) FROM quota_resource) AS 含量, (SELECT count(*) FROM bill_quota_map) AS 映射边"
 ```
 
-GB/T 50854 当前应为 472 条、全 `GB-50854 / GB/T 50854-2024 / 全国 / 1`；`aux_table` 5 张；`price_composition` 2 个构成（综合单价 6 项 / 工程造价 4 部分，共 10 行）；SJG 171 建筑工程本地解析为 640 子目 / 407 资源 / 4173 含量（服务器实跑以 chunks.json 为准）。
+**组价取数路径 demo**（清单 → 定额 → 工料机含量，验证底座可用）：
+
+```bash
+docker exec ce-postgres psql -U cost -d ce_cost -c "SELECT b.code 清单, q.quota_code 定额, q.name 定额名, r.category 类, r.name 工料机, qr.consumption 含量, r.unit FROM bill_spec b JOIN bill_quota_map m ON m.bill_code=b.code JOIN quota_item q ON q.quota_code=m.quota_code AND q.doc_id=m.quota_doc_id JOIN quota_resource qr ON qr.quota_id=q.id JOIN resource r ON r.id=qr.resource_id WHERE b.code='010401002' ORDER BY q.quota_code, r.category LIMIT 20"
+```
+
+GB/T 50854 当前应为 472 条、全 `GB-50854 / GB/T 50854-2024 / 全国 / 1`；`aux_table` 5 张；`price_composition` 2 个构成（综合单价 6 项 / 工程造价 4 部分，共 10 行）；SJG 171 建筑工程本地解析为 640 子目 / 407 资源 / 4173 含量、`bill_quota_map` 约 212 边覆盖 42 清单（服务器实跑以 chunks.json 为准）。取数 demo 应返回「清单 010401002 实心砖墙 → 6 定额子目 → 各自工料机含量」。
 
 > 连 `ce-postgres` 须走 rootless docker（`docker context use rootless` 或设 `DOCKER_HOST`），**绝不用 `sudo docker`**（那打到共用 daemon）。部署细节见 `DEV.md §6`。

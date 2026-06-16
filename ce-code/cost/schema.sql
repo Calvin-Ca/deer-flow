@@ -134,6 +134,24 @@ CREATE TABLE IF NOT EXISTS resource_price (
 CREATE INDEX IF NOT EXISTS idx_resource_price_res ON resource_price (resource_id);
 
 -- ─────────────────────────────────────────────────────────────────────────────
+-- 3b. 知识图谱 P0（PG 关联表模拟）：清单 → 定额 APPLIES 边，跑通组价取数路径
+--     （构件→清单 MAPS_TO 待 BIM 接入；定额→工料机 CONSUMES 即 quota_resource）
+-- ─────────────────────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS bill_quota_map (
+  id           BIGSERIAL PRIMARY KEY,
+  bill_code    CHAR(9) NOT NULL,             -- 清单编码（GB 50854，9 位）
+  quota_code   TEXT NOT NULL,                -- 定额子目编号（SJG）
+  quota_doc_id TEXT NOT NULL,                -- 定额来源（SZ-SJG171/170），与 quota_code 共同定位
+  relation     TEXT NOT NULL DEFAULT 'APPLIES',
+  confidence   NUMERIC,                      -- 映射置信度（0~1）
+  source       TEXT,                         -- 来源：auto_name_substr / manual / …
+  note         TEXT,
+  UNIQUE (bill_code, quota_code, quota_doc_id)
+);
+CREATE INDEX IF NOT EXISTS idx_bill_quota_map_bill ON bill_quota_map (bill_code);
+CREATE INDEX IF NOT EXISTS idx_bill_quota_map_quota ON bill_quota_map (quota_code);
+
+-- ─────────────────────────────────────────────────────────────────────────────
 -- 4. 历史工程库（脱敏，供相似案例对标与异常检测；[可缓]）
 -- ─────────────────────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS hist_bill (

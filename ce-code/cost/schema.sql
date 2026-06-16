@@ -50,6 +50,25 @@ CREATE TABLE IF NOT EXISTS aux_table (
   UNIQUE (doc_id, caption, chapter)           -- 同文档同表唯一（续表 caption 不同 → 各占一行）
 );
 
+-- 计价口径：费用构成规则（GB 50500 正文锚定）。2024 版 50500 无清单项目录，故不进
+-- bill_spec；本表供组价引擎程序化读「综合单价/工程造价由什么构成」。每行一个构成项。
+CREATE TABLE IF NOT EXISTS price_composition (
+  id            BIGSERIAL PRIMARY KEY,
+  composite     TEXT NOT NULL,                 -- 被构成的费用（综合单价 / 工程造价）
+  kind          TEXT NOT NULL,                 -- unit_rate（综合单价层）/ project_cost（工程造价层）
+  seq           SMALLINT NOT NULL,             -- 构成项次序
+  component     TEXT NOT NULL,                 -- 构成项（人工费 / 材料费 / …）
+  note          TEXT,                          -- 口径补充（如 不含增值税）
+  provenance    JSONB,                         -- 溯源 {node_path, clause}
+  -- 治理字段 ──
+  doc_id        TEXT NOT NULL DEFAULT 'GB-50500',
+  spec_version  TEXT NOT NULL,
+  region        TEXT NOT NULL DEFAULT '全国',
+  effective_priority SMALLINT NOT NULL DEFAULT 1,
+  UNIQUE (doc_id, composite, seq)             -- 幂等 upsert 键
+);
+CREATE INDEX IF NOT EXISTS idx_price_composition_composite ON price_composition (composite);
+
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 2. 定额库（组价主体；MVP 取深圳市消耗量标准 SJG 171/170-2024，region=深圳 priority=1）
 -- ─────────────────────────────────────────────────────────────────────────────

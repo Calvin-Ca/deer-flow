@@ -120,6 +120,37 @@ def load_aux(conn, records: list[dict]) -> int:
     return len(rows)
 
 
+def load_price_composition(conn, records: list[dict]) -> int:
+    """幂等 upsert price_composition（按 doc_id + composite + seq 唯一键）。
+
+    参数：conn —— psycopg 连接；records —— price_composition.jsonl 记录列表。
+    返回：写入行数。
+    """
+    from psycopg.types.json import Jsonb
+
+    rows = []
+    for r in records:
+        doc_id, spec_version = _backfill_doc(r)
+        rows.append((
+            r["composite"], r["kind"], r["seq"], r["component"],
+            r.get("note") or None,
+            Jsonb(r.get("provenance")) if r.get("provenance") is not None else None,
+            doc_id, spec_version,
+        ))
+    sql = """
+        INSERT INTO price_composition
+            (composite, kind, seq, component, note, provenance, doc_id, spec_version)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        ON CONFLICT (doc_id, composite, seq) DO UPDATE SET
+            kind = EXCLUDED.kind, component = EXCLUDED.component,
+            note = EXCLUDED.note, provenance = EXCLUDED.provenance,
+            spec_version = EXCLUDED.spec_version
+    """
+    with conn.cursor() as cur:
+        cur.executemany(sql, rows)
+    return len(rows)
+
+
 @click.command()
 @click.option("--dsn", default="", help="PG 连接串；空=环境变量 CE_PG_DSN 或默认 localhost:5433/ce_cost。")
 @click.option("--init-schema", is_flag=True, help="先执行 schema.sql 建表（幂等）。")
@@ -127,9 +158,11 @@ def load_aux(conn, records: list[dict]) -> int:
               default=None, help="bill_spec.jsonl 路径。")
 @click.option("--aux", "aux_path", type=click.Path(exists=True, path_type=Path),
               default=None, help="aux_tables.jsonl 路径。")
+@click.option("--price-composition", "price_comp_path", type=click.Path(exists=True, path_type=Path),
+              default=None, help="price_composition.jsonl 路径。")
 def main(dsn: str, init_schema: bool, bill_spec_path: Path | None,
-         aux_path: Path | None) -> None:
-    """JSONL → PostgreSQL 幂等导入（建表 + bill_spec + aux_table，单事务提交）。"""
+         aux_path: Path | None, price_comp_path: Path | None) -> None:
+    """JSONL → PostgreSQL 幂等导入（建表 + bill_spec + aux_table + price_composition，单事务提交）。"""
     import psycopg
 
     dsn = dsn or os.environ.get("CE_PG_DSN") or DEFAULT_DSN
@@ -145,6 +178,9 @@ def main(dsn: str, init_schema: bool, bill_spec_path: Path | None,
         if aux_path:
             n = load_aux(conn, _read_jsonl(aux_path))
             console.print(f"[green]✓ aux_table upsert {n} 条[/]")
+        if price_comp_path:
+            n = load_price_composition(conn, _read_jsonl(price_comp_path))
+            console.print(f"[green]✓ price_composition upsert {n} 条[/]")
         conn.commit()
     console.print("[bold green]✓ 提交完成[/]")
 

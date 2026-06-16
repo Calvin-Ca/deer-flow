@@ -185,8 +185,8 @@ MinerU 解析 + 条款树提取 + 质量审核，在 GB 50378-2006 和 GB 50016 
 
 | doc_id | 名称 | 必要性 | 收录 | 下一步 |
 |---|---|---|---|---|
-| GB-50500 | 建设工程工程量清单计价标准 | ⭐MVP | ✅ | 从条款树抽 `bill_spec` 入库 |
-| GB-50854 | 房屋建筑与装饰工程工程量计算标准 | ⭐MVP | ✅ | **已抽 bill_spec**（472 项 + 5 辅助表 JSONL，见下）；待入 PG + 合 50500 计价口径 |
+| GB-50500 | 建设工程工程量清单计价标准 | ⭐MVP | ✅ | **2024 版已无清单项目录**（搬到 50854）→ 不进 bill_spec；抽「综合单价/费用构成」规则表，35 张表归报表模板 |
+| GB-50854 | 房屋建筑与装饰工程工程量计算标准 | ⭐MVP | ✅ | **已抽 bill_spec 472 项 + 5 辅助表、已入 PG**（见下）；计价口径由 50500 规则表旁挂，不并进 bill_spec |
 | GB-50856 | 通用安装工程工程量计算标准 | [条件] 含机电 | ✅ | 含安装项目时入库 |
 | SZ-SJG171 | 深圳市建筑工程消耗量标准 | ⭐MVP | ✅ | 电子表清洗入 `quota_item`/`quota_resource`（组价主体） |
 | SZ-SJG170 | 深圳市土石方与地基基础工程消耗量标准 | [必收] 含基础/土方 | ✅ | 同上，土方/地基阶段 |
@@ -205,8 +205,12 @@ MinerU 解析 + 条款树提取 + 质量审核，在 GB 50378-2006 和 GB 50016 
   - [x] **DDL 落仓库可复现**（✅ 2026-06-16，`cost/schema.sql`）：把手敲的 `bill_spec` 表 + 其余表（`quota_item`/`quota_resource`/`resource`/`resource_price`/`hist_bill` + `aux_table`）一次建齐，全部带治理字段 `doc_id`/`spec_version`/`region`/`effective_priority`（价格 `resource_price` 带 `effective_period` DATERANGE + `btree_gist` EXCLUDE 防时效重叠）；幂等 `IF NOT EXISTS` + 索引。**待办**：服务器跑一遍对齐已建 `bill_spec`（手敲版缺治理字段，DDL 已补；列差异需 ALTER 对齐）。
   - [x] **可复现导入脚本**（✅ 2026-06-16，`cost/load_pg.py`）：替代手敲 staging+`\copy`，psycopg 直连 `localhost:5433/ce_cost`，读 jsonl 按主键 `ON CONFLICT DO UPDATE` 幂等 upsert；`--init-schema` 先建表；`_backfill_doc` 兼容归一前旧 jsonl。⚠️ 服务器装 `uv add 'psycopg[binary]'` 后跑（本地 torch cu121 阻塞 sync，仅 py_compile + 纯函数验证）。
 - [ ] 清单计量规范结构化入 `bill_spec`（复用 MinerU 解析 + 规则，含 calc_rule + feature_schema）
-  - [x] **GB/T 50500-2024 已过 02 解析**（561 条款、35 表结构化、附录条款归位），下一步从条款树抽 `bill_spec` 字段入库
-  - [x] **GB/T 50854-2024 已抽 `bill_spec`**（✅ 2026-06-16，`cost/bill_spec.py`）：chunks.json → 双出口 `data/structured/bill_spec.jsonl`（**472 清单项**，编码无重复/无断号，feature_schema + work_content 编号拆 list）+ `aux_tables.jsonl`（5 辅助表：土/岩石分类、工作面宽度等，原样留 body 供 calc_rule 查表）。判别：表头含「项目编码」→ bill_spec，否则 → aux；列名别名（措施项目「单位」/7 列「项目特征描述」）；每条带 provenance 回指原表。质量门禁留人工抽查 4 处（3 模板项源表无特征属合法 / 1 行 `010102007` 源表单位格丢失，按不杜撰未猜填）。**已导入 PG**（✅ 2026-06-16，`ce_cost.bill_spec` 472 条，走 staging 表 `\copy`（控制字符当 quote/delimiter 整行读 jsonb）+ `INSERT ... j->>` 展开）。**spec_version 已归一 + 加 doc_id**（✅ 2026-06-16，`normalize_spec` 把文件名 basename → canonical `GB/T 50854-2024` + `doc_id=GB-50854`，bill_spec/aux 两出口都带）。**待办**：服务器重跑 `python -m cost.bill_spec` 让 jsonl 带新字段（或靠 `load_pg._backfill_doc` 兜旧 jsonl）→ `load_pg --aux` 把 5 张 `aux_table` 入库 → 按 code 合并 GB 50500 计价口径。
+  - [x] **GB/T 50500-2024 已解析**（chunks.json 146 节 + 35 表）。**核实结论（2026-06-16）：2024 版规范重构后 50500 已无清单项目录**——清单项+编码+计算规则整体搬到计算标准系列（50854 等），50500 只剩计价规则正文 + 附录 E/F/G 标准表格。全 35 表为**空白报表模板**（E.2 等「项目编码」列只是表单列头，无 9 位编码数据行，全表仅 1 行正文偶含编码）。故**旧「从 50500 抽 bill_spec / 按 code 合并计价口径」模型作废**（基于 2013 版假设，那时 50500 自带清单附录）。重定方向见下「GB 50500 计价口径」条。
+  - [x] **GB/T 50854-2024 已抽 `bill_spec`**（✅ 2026-06-16，`cost/bill_spec.py`）：chunks.json → 双出口 `data/structured/bill_spec.jsonl`（**472 清单项**，编码无重复/无断号，feature_schema + work_content 编号拆 list）+ `aux_tables.jsonl`（5 辅助表：土/岩石分类、工作面宽度等，原样留 body 供 calc_rule 查表）。判别：表头含「项目编码」→ bill_spec，否则 → aux；列名别名（措施项目「单位」/7 列「项目特征描述」）；每条带 provenance 回指原表。质量门禁留人工抽查 4 处（3 模板项源表无特征属合法 / 1 行 `010102007` 源表单位格丢失，按不杜撰未猜填）。**已导入 PG**（✅ 2026-06-16，`ce_cost.bill_spec` 472 条，走 staging 表 `\copy`（控制字符当 quote/delimiter 整行读 jsonb）+ `INSERT ... j->>` 展开）。**spec_version 已归一 + 加 doc_id**（✅ 2026-06-16，`normalize_spec` 把文件名 basename → canonical `GB/T 50854-2024` + `doc_id=GB-50854`，bill_spec/aux 两出口都带）。**待办**：服务器重跑 `python -m cost.bill_spec` 让 jsonl 带新字段（或靠 `load_pg._backfill_doc` 兜旧 jsonl）→ `load_pg --aux` 把 5 张 `aux_table` 入库。（注：原"按 code 合并 50500 计价口径"已作废，50500 无可 join 的 code，见上条 + 下「GB 50500 计价口径」条。）
+- [ ] **GB 50500 计价口径**（替代作废的"抽 bill_spec"，2026-06-16 重定）：
+  - [x] ① **从 50500 正文抽费用构成规则表**（✅ 2026-06-16，`cost/price_composition.py`）：声明式规则（RULES：node_path + 正则）锚定 50500 原文单句、正则抽构成项、宁缺毋造（不中即报错），产 `data/structured/price_composition.jsonl`（10 行）：**综合单价（2.0.9）= 人工费/材料费/施工机具使用费/管理费/利润/一定范围内的风险费用（不含增值税）**；**工程造价（3.1.2）= 分部分项/措施项目/其他项目/增值税**（核实：2024 版**四部分**，规费已并入、非旧 2013 的"规费+税金"五部分）。每行带 provenance（node_path+clause）+ doc_id/spec_version；`schema.sql` 加 `price_composition` 表（治理字段全 + `UNIQUE(doc_id,composite,seq)` 幂等键），`load_pg.py` 加 `--price-composition` loader。**不并进 bill_spec**。⚠️ 本地仅 py_compile + 纯函数验证（无 click/torch），服务器 `python -m cost.price_composition` + `load_pg --price-composition` 实跑入库。
+  - [ ] ② 35 张附录 E/F/G 表 = 计价/结算**报表模板**，归任务层 CostAgent 报表生成，不在知识层 `cost/` 处理。
+  - [ ] ③ 合同/计量/支付/索赔条文优先级低于组价取数，需要时走规范 RAG 条文检索管道（与防火规范同一套，不单独建库）。
 - [ ] **深圳消耗量标准**导入 `quota_item` + `quota_resource` + `resource`（SJG 171-2024 主体 + SJG 170-2024 土方/地基，电子表清洗；标注 `region=深圳`/`effective_priority=1`）
 - [ ] 价格库导入 `resource_price`（深圳信息价 SZ-JGXX-PRICE，带 `effective_period` 时效，**走动态独立更新管道**）
 - [ ] 费率标准（SZ-FLBZ-2023）入费用计算表（企业管理费/利润/安文费/规费/税金）

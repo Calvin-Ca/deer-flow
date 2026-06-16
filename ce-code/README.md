@@ -90,7 +90,8 @@ ce-code/
 │  ── 造价数据轨（Phase C，与 RAG 流水线解耦）──
 ├── cost/                           # 结构化造价数据 → PostgreSQL（见末节「造价数据轨」）
 │   ├── bill_spec.py                #   chunks.json → bill_spec.jsonl + aux_tables.jsonl（双出口抽取）
-│   ├── schema.sql                  #   全表 DDL（bill_spec/aux_table/quota_*/resource*/hist_bill + 治理字段）
+│   ├── price_composition.py        #   50500 chunks.json → price_composition.jsonl（费用构成规则，正则锚定原文）
+│   ├── schema.sql                  #   全表 DDL（bill_spec/aux_table/price_composition/quota_*/resource*/hist_bill + 治理字段）
 │   └── load_pg.py                  #   JSONL → PG 幂等导入（-m cost.load_pg）
 │
 │  ── utils / tools ──
@@ -253,12 +254,20 @@ uv run python -m cost.bill_spec --input "data/structured/GB_T50854_2024_房屋�
 
 产物落 `data/structured/bill_spec.jsonl` + `aux_tables.jsonl`，终端打印质量 report（数量 / 编码唯一性 / 连续性 / 单位受控 / 特征空率 / 辅助表清单）。`--dry-run` 只看 report 不落盘。
 
-### Step C2 — 建表 + 幂等导入 PG（`cost/schema.sql` + `cost/load_pg.py`）
+### Step C1b — 从 50500 抽费用构成规则（`cost/price_composition.py`）
 
-`schema.sql` 一次建齐全部造价表（`bill_spec` / `aux_table` / `quota_item` / `quota_resource` / `resource` / `resource_price` / `hist_bill`），强制治理字段 `doc_id`/`spec_version`/`region`/`effective_priority`（价格 `resource_price` 带 `effective_period` 时效 + `btree_gist` EXCLUDE 防重叠）；`IF NOT EXISTS` 幂等。`load_pg.py` 读 jsonl，按主键 `ON CONFLICT DO UPDATE` upsert（`bill_spec` 按 `code`、`aux_table` 按 `doc_id+caption+chapter`），可重复执行不产生重复行。
+2024 版 GB 50500 已无清单项目录（搬到 50854），只剩计价规则正文。本步抽组价要程序化读的**费用构成**：声明式规则集 `RULES`（`node_path` + 正则）锚定 50500 原文单句，正则抽出构成项列表，**不中即报错（宁缺毋造）**。产 `price_composition.jsonl`（每行一个构成项，带 provenance + `doc_id`/`spec_version`）：综合单价（2.0.9）= 人工费/材料费/施工机具使用费/管理费/利润/风险（不含增值税）；工程造价（3.1.2）= 分部分项/措施项目/其他项目/增值税（2024 版四部分）。加新构成只需在 `RULES` 追加一条。
 
 ```bash
-CE_PG_DSN='postgresql://cost:<密码>@localhost:5433/ce_cost' uv run python -m cost.load_pg --init-schema --bill-spec data/structured/bill_spec.jsonl --aux data/structured/aux_tables.jsonl
+uv run python -m cost.price_composition --input "data/structured/GB_T50500_2024_建设工程工程量清单计价标准/default/chunks.json"
+```
+
+### Step C2 — 建表 + 幂等导入 PG（`cost/schema.sql` + `cost/load_pg.py`）
+
+`schema.sql` 一次建齐全部造价表（`bill_spec` / `aux_table` / `price_composition` / `quota_item` / `quota_resource` / `resource` / `resource_price` / `hist_bill`），强制治理字段 `doc_id`/`spec_version`/`region`/`effective_priority`（价格 `resource_price` 带 `effective_period` 时效 + `btree_gist` EXCLUDE 防重叠）；`IF NOT EXISTS` 幂等。`load_pg.py` 读 jsonl，按主键 `ON CONFLICT DO UPDATE` upsert（`bill_spec` 按 `code`、`aux_table` 按 `doc_id+caption+chapter`、`price_composition` 按 `doc_id+composite+seq`），可重复执行不产生重复行。
+
+```bash
+CE_PG_DSN='postgresql://cost:<密码>@localhost:5433/ce_cost' uv run python -m cost.load_pg --init-schema --bill-spec data/structured/bill_spec.jsonl --aux data/structured/aux_tables.jsonl --price-composition data/structured/price_composition.jsonl
 ```
 
 > ⚠️ `--init-schema` 是 `CREATE TABLE IF NOT EXISTS`，**不会改已存在的表结构**。若库里有缺治理字段的旧 `bill_spec`（早期手敲建的），先删了再灌（导入幂等，删表无损）：`docker exec ce-postgres psql -U cost -d ce_cost -c "DROP TABLE IF EXISTS bill_spec"`。
@@ -267,8 +276,9 @@ CE_PG_DSN='postgresql://cost:<密码>@localhost:5433/ce_cost' uv run python -m c
 
 ```bash
 docker exec ce-postgres psql -U cost -d ce_cost -c "SELECT doc_id, spec_version, region, effective_priority, count(*) FROM bill_spec GROUP BY 1,2,3,4"
+docker exec ce-postgres psql -U cost -d ce_cost -c "SELECT composite, kind, string_agg(component, ' / ' ORDER BY seq) FROM price_composition GROUP BY 1,2"
 ```
 
-GB/T 50854 当前应为 472 条、全 `GB-50854 / GB/T 50854-2024 / 全国 / 1`；`aux_table` 5 张。
+GB/T 50854 当前应为 472 条、全 `GB-50854 / GB/T 50854-2024 / 全国 / 1`；`aux_table` 5 张；`price_composition` 2 个构成（综合单价 6 项 / 工程造价 4 部分，共 10 行）。
 
 > 连 `ce-postgres` 须走 rootless docker（`docker context use rootless` 或设 `DOCKER_HOST`），**绝不用 `sudo docker`**（那打到共用 daemon）。部署细节见 `DEV.md §6`。

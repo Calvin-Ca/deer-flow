@@ -5,6 +5,8 @@ data/raw/*
 
 # ===== 解析产物（MinerU）：入 git 同步（2026-06-16 起，省服务器重跑解析） =====
 # data/parsed/  随 git 同步
+# 但每份产物下的 images/（MinerU 切出的位图，大体积、可由原 PDF 重生）不入 git
+data/parsed/**/images/
 
 # ===== 结构化产物（chunk 树 / bill_spec.jsonl 等）：入 git 同步（2026-06-16 起） =====
 # data/structured/  随 git 同步

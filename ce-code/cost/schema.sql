@@ -166,3 +166,28 @@ CREATE TABLE IF NOT EXISTS hist_bill (
   completed_at DATE
 );
 CREATE INDEX IF NOT EXISTS idx_hist_bill_code ON hist_bill (bill_code);
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 5. 费率库（深圳市建设工程计价费率标准 2023，SZ-FLBZ-2023）
+--    安全文明施工/夜间施工/赶工/总承包服务费/增值税/附加税费/工程保险费的参考范围 + 推荐值。
+--    费率是「综合单价之上算工程造价」的乘数，与口径表同为静态、带治理字段。
+-- ─────────────────────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS fee_rate (
+  id            BIGSERIAL PRIMARY KEY,
+  fee_category  TEXT NOT NULL,                 -- 费用大类（安全文明施工措施费/增值税/工程保险费…）
+  fee_name      TEXT NOT NULL,                 -- 具体费用名（同大类或更细）
+  applicable    TEXT,                          -- 适用范围（专业工程/工程类别/材料设备/项目名称），可空
+  ref_low       NUMERIC,                       -- 参考范围下限
+  ref_high      NUMERIC,                       -- 参考范围上限
+  recommended   NUMERIC,                       -- 推荐费率/系数/税率
+  unit          TEXT NOT NULL DEFAULT '%',     -- % / ‰ / 系数
+  provenance    JSONB,                         -- 溯源 {page, caption}
+  -- 治理字段 ──
+  doc_id        TEXT NOT NULL DEFAULT 'SZ-FLBZ-2023',
+  spec_version  TEXT NOT NULL,
+  region        TEXT NOT NULL DEFAULT '深圳',
+  effective_priority SMALLINT NOT NULL DEFAULT 1,
+  -- applicable 为 NULL 也算同一行（PG15+），保证 upsert 幂等
+  UNIQUE NULLS NOT DISTINCT (doc_id, fee_category, fee_name, applicable)
+);
+CREATE INDEX IF NOT EXISTS idx_fee_rate_cat ON fee_rate (fee_category);

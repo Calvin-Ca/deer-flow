@@ -301,6 +301,36 @@ def load_resource_price(conn, records: list[dict]) -> tuple[int, int]:
     return len(rows), skipped
 
 
+def load_fee_rate(conn, records: list[dict]) -> int:
+    """幂等 upsert fee_rate（按 doc_id+fee_category+fee_name+applicable，NULLS NOT DISTINCT）。
+
+    参数：conn —— psycopg 连接；records —— fee_rate.jsonl 记录列表。
+    返回：写入行数。
+    """
+    from psycopg.types.json import Jsonb
+
+    rows = [(r["fee_category"], r["fee_name"], r.get("applicable"),
+             r.get("ref_low"), r.get("ref_high"), r.get("recommended"),
+             r.get("unit") or "%",
+             Jsonb(r.get("provenance")) if r.get("provenance") is not None else None,
+             r.get("doc_id") or "SZ-FLBZ-2023", r["spec_version"],
+             r.get("region") or "深圳", r.get("effective_priority") or 1)
+            for r in records]
+    sql = """
+        INSERT INTO fee_rate
+            (fee_category, fee_name, applicable, ref_low, ref_high, recommended,
+             unit, provenance, doc_id, spec_version, region, effective_priority)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        ON CONFLICT (doc_id, fee_category, fee_name, applicable) DO UPDATE SET
+            ref_low = EXCLUDED.ref_low, ref_high = EXCLUDED.ref_high,
+            recommended = EXCLUDED.recommended, unit = EXCLUDED.unit,
+            provenance = EXCLUDED.provenance, spec_version = EXCLUDED.spec_version
+    """
+    with conn.cursor() as cur:
+        cur.executemany(sql, rows)
+    return len(rows)
+
+
 def load_bill_quota_map(conn, records: list[dict]) -> int:
     """幂等 upsert bill_quota_map（按 bill_code+quota_code+quota_doc_id 唯一键）。
 
@@ -378,13 +408,16 @@ def _read_many(paths: list[Path]) -> list[dict]:
               default=None, help="quota_resource.jsonl 路径（子目×资源含量）。")
 @click.option("--resource-price", "resource_price_path", type=click.Path(exists=True, path_type=Path),
               default=None, help="resource_price.jsonl 路径（信息价物料月度价 + 时效）。")
+@click.option("--fee-rate", "fee_rate_path", type=click.Path(exists=True, path_type=Path),
+              default=None, help="fee_rate.jsonl 路径（计价费率标准）。")
 @click.option("--bill-quota-map", "bq_map_path", type=click.Path(exists=True, path_type=Path),
               default=None, help="bill_quota_map.jsonl 路径（清单→定额 APPLIES）。")
 def main(dsn: str, init_schema: bool, scan_dir: Path | None,
          bill_spec_path: Path | None, aux_path: Path | None,
          price_comp_path: Path | None, resource_path: Path | None,
          quota_item_path: Path | None, quota_res_path: Path | None,
-         resource_price_path: Path | None, bq_map_path: Path | None) -> None:
+         resource_price_path: Path | None, fee_rate_path: Path | None,
+         bq_map_path: Path | None) -> None:
     """JSONL → PostgreSQL 幂等导入（建表 + 清单/定额/费用构成各表，单事务提交）。
 
     ``--scan-dir`` 扫各 ``<doc_id>/`` 子目录全表（多规范累积）+ 扁平 bill_quota_map，
@@ -404,6 +437,7 @@ def main(dsn: str, init_schema: bool, scan_dir: Path | None,
     aux_paths = _collect(scan_dir, "aux_tables.jsonl", aux_path)
     price_comp_paths = _collect(scan_dir, "price_composition.jsonl", price_comp_path)
     resource_price_paths = _collect(scan_dir, "resource_price.jsonl", resource_price_path)
+    fee_rate_paths = _collect(scan_dir, "fee_rate.jsonl", fee_rate_path)
     bq_map_paths = _collect(scan_dir, "bill_quota_map.jsonl", bq_map_path, flat=True)
 
     with psycopg.connect(dsn) as conn:
@@ -435,6 +469,9 @@ def main(dsn: str, init_schema: bool, scan_dir: Path | None,
             n, skip = load_resource_price(conn, _read_many(resource_price_paths))
             console.print(f"[green]✓ resource_price 写 {n} 条[/]"
                           + (f"，[yellow]跳过 {skip}（resource 未解析）[/]" if skip else ""))
+        if fee_rate_paths:
+            n = load_fee_rate(conn, _read_many(fee_rate_paths))
+            console.print(f"[green]✓ fee_rate upsert {n} 条[/]")
         # bill_quota_map 依赖 bill_spec + quota_item 已在库，放最后
         if bq_map_paths:
             n = load_bill_quota_map(conn, _read_many(bq_map_paths))

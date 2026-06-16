@@ -77,10 +77,11 @@ CREATE TABLE IF NOT EXISTS quota_item (
   quota_code    TEXT NOT NULL,                -- 定额子目编号
   name          TEXT NOT NULL,
   unit          TEXT NOT NULL,
-  base_price    NUMERIC,                      -- 基价
+  base_price    NUMERIC,                      -- 基价（取「参考综合单价」，不含税综合单价）
   labor_cost    NUMERIC,                      -- 人工费
   material_cost NUMERIC,                      -- 材料费
   machine_cost  NUMERIC,                      -- 机械费
+  work_content  TEXT,                         -- 工作内容（定额表 caption 抽出）
   chapter       TEXT,                         -- 所属分部/章
   provenance    JSONB,
   -- 治理字段 ──
@@ -101,7 +102,8 @@ CREATE TABLE IF NOT EXISTS resource (
   category  TEXT NOT NULL,                    -- 人工 / 材料 / 机械
   unit      TEXT NOT NULL,
   doc_id    TEXT,
-  UNIQUE (category, name, spec, unit)
+  -- NULLS NOT DISTINCT（PG15+）：spec 为 NULL 时也算同一行，保证 upsert 幂等
+  UNIQUE NULLS NOT DISTINCT (category, name, spec, unit)
 );
 
 -- 工料机含量：定额子目 → 资源（多对多 + 含量）

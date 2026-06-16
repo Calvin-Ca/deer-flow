@@ -211,7 +211,11 @@ MinerU 解析 + 条款树提取 + 质量审核，在 GB 50378-2006 和 GB 50016 
   - [x] ① **从 50500 正文抽费用构成规则表**（✅ 2026-06-16，`cost/price_composition.py`）：声明式规则（RULES：node_path + 正则）锚定 50500 原文单句、正则抽构成项、宁缺毋造（不中即报错），产 `data/structured/price_composition.jsonl`（10 行）：**综合单价（2.0.9）= 人工费/材料费/施工机具使用费/管理费/利润/一定范围内的风险费用（不含增值税）**；**工程造价（3.1.2）= 分部分项/措施项目/其他项目/增值税**（核实：2024 版**四部分**，规费已并入、非旧 2013 的"规费+税金"五部分）。每行带 provenance（node_path+clause）+ doc_id/spec_version；`schema.sql` 加 `price_composition` 表（治理字段全 + `UNIQUE(doc_id,composite,seq)` 幂等键），`load_pg.py` 加 `--price-composition` loader。**不并进 bill_spec**。⚠️ 本地仅 py_compile + 纯函数验证（无 click/torch），服务器 `python -m cost.price_composition` + `load_pg --price-composition` 实跑入库。
   - [ ] ② 35 张附录 E/F/G 表 = 计价/结算**报表模板**，归任务层 CostAgent 报表生成，不在知识层 `cost/` 处理。
   - [ ] ③ 合同/计量/支付/索赔条文优先级低于组价取数，需要时走规范 RAG 条文检索管道（与防火规范同一套，不单独建库）。
-- [ ] **深圳消耗量标准**导入 `quota_item` + `quota_resource` + `resource`（SJG 171-2024 主体 + SJG 170-2024 土方/地基，电子表清洗；标注 `region=深圳`/`effective_priority=1`）
+- [🟡] **深圳消耗量标准**导入 `quota_item` + `quota_resource` + `resource`（SJG 171-2024 主体 + SJG 170-2024 土方/地基；标注 `region=深圳`/`effective_priority=1`）
+  - [x] **定额表解析器 `cost/quota.py`**（✅ 2026-06-16）：源是 MinerU 解析的 PDF（非干净 CSV），定额子目表为**转置矩阵**（列=子目，行=属性+工料机），矩形化后值列位随标签层级错位 → **单位格锚定**（每行首个数值/破折号前一格是单位、其后 N 格=N 子目值，不依赖固定列索引）。双出口三表：`quota_item`（编号/名称含变体/单位/工作内容 + 人材机费 + 综合单价 base_price）/`resource`（去重）/`quota_resource`（子目×资源含量，natural key）。`—`跳过；价格列（2023-08 参考价）按决策不取。**本地全量验证**（SJG 171 建筑 223 定额表）：640 子目费用/base_price 零缺失、407 资源、4173 含量；覆盖千分位空格数字 / LaTeX 单位 / 三层名称合成。
+  - [x] **schema + load_pg loader**（✅ 2026-06-16）：`quota_item` 加 `work_content` 列、`resource` 唯一键改 `NULLS NOT DISTINCT`（spec=NULL 也幂等）；`load_pg` 加 `--resource`/`--quota-item`/`--quota-resource`（依赖序入库，`quota_resource` 按 (doc_id,quota_code)+(category,name,spec,unit) 解析 FK）。本地纯逻辑模拟：4173 含量 100% 解析、quota_item 主键零重复。
+  - [ ] **服务器实跑入库**：`build split` 出 SJG chunks.json → `python -m cost.quota` → `load_pg` 三表。⚠️ SJG 无规整目录，`chapter`/`ancestor_titles` 偏弱，入库后抽查。
+  - [ ] **精修**：`见表`(26) 引用单位、三层子目名称中间「墙厚」行未贴回（quota_code 仍唯一）；SJG 170 同结构后续。
 - [ ] 价格库导入 `resource_price`（深圳信息价 SZ-JGXX-PRICE，带 `effective_period` 时效，**走动态独立更新管道**）
 - [ ] 费率标准（SZ-FLBZ-2023）入费用计算表（企业管理费/利润/安文费/规费/税金）
 - [ ] 历史工程库 `hist_bill`（脱敏 + 质量标注，供相似案例对标；[可缓]）

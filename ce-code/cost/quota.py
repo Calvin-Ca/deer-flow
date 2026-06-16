@@ -240,7 +240,7 @@ def parse_quota_table(table: dict, chapter: str, doc_id: str, spec_version: str)
         for code, v in zip(codes, values):
             amt = _num(v)
             if amt is not None:  # 跳过破折号（该子目不用此资源）
-                links.append({"quota_code": code, "category": category,
+                links.append({"quota_code": code, "doc_id": doc_id, "category": category,
                               "resource_name": name, "resource_unit": u,
                               "consumption": amt})
 

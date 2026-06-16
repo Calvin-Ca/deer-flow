@@ -35,6 +35,8 @@ import click
 from rich.console import Console
 from rich.table import Table
 
+from cost import resolve_doc_dir
+
 console = Console()
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -268,11 +270,40 @@ def parse_quota_table(table: dict, chapter: str, doc_id: str, spec_version: str)
             "links": links}
 
 
+def _merge_dup_items(items: list[dict]) -> tuple[list[dict], int]:
+    """同 ``(doc_id, quota_code)`` 跨页（续表/续前）合并为一行。
+
+    续表分页会把同一定额子目拆成两行——续前页的费用列（base_price 等）为 None。
+    PG 主键是 ``(doc_id, quota_code)``，直接入库会触发 ``ON CONFLICT DO UPDATE``
+    让续前页的 None 覆盖首页真值。此处按主键合并：数值字段取首个非 None，文本字段
+    （name/unit/work_content）取首个非空；provenance 保留首页。子目的工料机含量
+    （quota_resource）本就按 quota_code 关联，两页的含量行均正确指向同一子目，无需动。
+
+    参数：items —— parse_quota_table 累积出的子目行（可能含跨页重复）。
+    返回：(去重后 items, 合并掉的行数)。
+    """
+    merged: dict[tuple, dict] = {}
+    for it in items:
+        key = (it.get("doc_id"), it["quota_code"])
+        if key not in merged:
+            merged[key] = dict(it)
+            continue
+        cur = merged[key]
+        for f in ("base_price", "labor_cost", "material_cost", "machine_cost"):
+            if cur.get(f) is None and it.get(f) is not None:
+                cur[f] = it[f]
+        for f in ("name", "unit", "work_content"):
+            if not cur.get(f) and it.get(f):
+                cur[f] = it[f]
+    return list(merged.values()), len(items) - len(merged)
+
+
 def extract(chunks: list[dict]) -> dict:
     """遍历节点树，抽定额三表 + 辅助表。
 
     参数：chunks —— SJG chunks.json 节点列表。
-    返回：{"items","resources","links","aux"}（resources 全局去重）。
+    返回：{"items","resources","links","aux","merged_dups"}（resources 全局去重，
+    items 按 (doc_id,quota_code) 跨页合并）。
     """
     items: list[dict] = []
     resources: dict[tuple, dict] = {}
@@ -299,8 +330,9 @@ def extract(chunks: list[dict]) -> dict:
                             "body": table.get("body"),
                             "doc_id": doc_id, "spec_version": spec_version})
 
+    items, merged_dups = _merge_dup_items(items)
     return {"items": items, "resources": list(resources.values()),
-            "links": links, "aux": aux}
+            "links": links, "aux": aux, "merged_dups": merged_dups}
 
 
 # SJG 规范号归一
@@ -336,6 +368,10 @@ def report(data: dict) -> None:
     t.add_row("辅助表 aux", str(len(data["aux"])))
     console.print(t)
 
+    if data.get("merged_dups"):
+        console.print(f"[cyan]跨页合并（续表/续前）{data['merged_dups']} 行 → "
+                      f"quota_code 唯一[/]")
+
     miss_cost = [i["quota_code"] for i in data["items"]
                  if i["labor_cost"] is None and i["material_cost"] is None]
     if miss_cost:
@@ -370,11 +406,12 @@ def main(input_path: Path, outdir: Path, dry_run: bool) -> None:
     if dry_run:
         console.print("[dim]--dry-run：未落盘[/]")
         return
-    outdir.mkdir(parents=True, exist_ok=True)
-    _write_jsonl(data["items"], outdir / "quota_item.jsonl")
-    _write_jsonl(data["resources"], outdir / "resource.jsonl")
-    _write_jsonl(data["links"], outdir / "quota_resource.jsonl")
-    console.print(f"[green]已写[/] quota_item({len(data['items'])}) / "
+    doc_dir = resolve_doc_dir(outdir, data["items"])  # data/structured/<doc_id>/
+    doc_dir.mkdir(parents=True, exist_ok=True)
+    _write_jsonl(data["items"], doc_dir / "quota_item.jsonl")
+    _write_jsonl(data["resources"], doc_dir / "resource.jsonl")
+    _write_jsonl(data["links"], doc_dir / "quota_resource.jsonl")
+    console.print(f"[green]已写[/] {doc_dir}/ ：quota_item({len(data['items'])}) / "
                   f"resource({len(data['resources'])}) / quota_resource({len(data['links'])})")
 
 

@@ -1,0 +1,584 @@
+{"category": "人工", "name": "普工人工费", "spec": null, "unit": "元", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "抓铲挖掘机斗容量C(m³)C=1.0", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "履带式长臂单斗挖掘机挖掘半径R(m)R=13", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "履带式推土机功率P(kW)P=75", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "履带式单斗挖掘机液压斗容量C(m³)C=1.0", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "履带式长臂单斗挖掘机 挖掘半径R(m) R=25", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "履带式长臂单斗挖掘机 挖掘半径R(m) R=18", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "履带式长臂单斗挖掘机 挖掘半径R(m) R=16", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "履带式单斗挖掘机液压斗容量C(m³)C=0.5", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "履带式单斗挖掘机 液压斗容量C(m³) C=0.5", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "履带式推土机功率P(kW)\nP=75", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "履带式单斗挖掘机 液压斗容\n量C(m³) C=0.5", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "履带式推土机 功率P(kW)P=75", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "履带式单斗挖掘机 液压斗容量C(m³) C=1.0", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "履带式长臂单斗挖掘机 挖掘半径R(m)R=18", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "抓铲挖掘机 斗容量C(m³)C=0.5", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "履带式单斗挖掘机 液压斗容量C(m³)C=0.5", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "电动单级离心清水泵出口直径D(mm)D=100", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "履带式起重机 起重量 Gn(t)\nGn=15", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "履带式起重机 起重量 Gn(t)Gn=15", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "履带式单斗挖掘机 液压斗容量 C(m³) C=0.5", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "人工", "name": "技工人工费", "spec": null, "unit": "元", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "空心六角钢", "spec": null, "unit": "kg", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "铜芯连接线", "spec": null, "unit": "m", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "电子雷管", "spec": null, "unit": "发", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "高压风管 φ25mm", "spec": null, "unit": "m", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "高压胶皮水管 φ19mm", "spec": null, "unit": "m", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "水", "spec": null, "unit": "m³", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "合金钢钻头(综合)", "spec": null, "unit": "个", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "乳化炸药", "spec": null, "unit": "kg", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "其他材料费", "spec": null, "unit": "%", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "风动凿岩机 气腿式", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "电动空气压缩机 排气量 Q (m³/min) Q=10", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "风动锻钎机", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "电动空气压缩机 排气量 Q(m³/min) Q=10", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "电动空气压缩机 排气量Q(m³/min) Q=10", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "风镐", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "高压风管φ25mm", "spec": null, "unit": "m", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "高压胶皮水管φ19mm", "spec": null, "unit": "m", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "风动凿岩机气腿式", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "电动空气压缩机排气量Q(m³/min)Q=10", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "电动空气压缩机排气量Q(m³/min) Q=10", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "粘土", "spec": null, "unit": "m³", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "电动修钎机", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "轴流通风机功率P(kW)P=30", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "电动卷扬机双筒慢速牵引力F(kN)F=50", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "履带式推土机 功率P(kW)\nP=75", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "机动翻斗车装载质量M(t)M=1", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "扒钉", "spec": null, "unit": "kg", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "高压胶皮风管 φ50mm", "spec": null, "unit": "m", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "松杂枋板材", "spec": null, "unit": "m³", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "轨道平车装载质量M(t)M=5", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "装岩机电动斗容量C(m³)C=0.4", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "装岩机电动斗容量C(m³)C=0.2", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "电瓶车牵引质量F(t)F=7", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "硅整流充电机电流I(A)/电压U(V)I=90/U=190", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "洒水车罐容量V(m³)V=4", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "新型全密闭式智能泥头车国V柴油发动机配装DPF", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "电动卷扬机双筒慢速牵引力F(kN) F=50", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "钢丝绳滑轮使用费", "spec": null, "unit": "元", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "装岩机 电动斗容量 C(m³)C=0.6", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "轨道矿车", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "卷扬机架 架高 H(m) H=40", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "拖式铲运机 斗容量C(m³)C=10", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "轮胎式装载机 斗容量 C(m³) C=1.5", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "履带式推土机功率P(kW)\nP=105", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "型钢(综合)", "spec": null, "unit": "t", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "载货汽车装载质量M(t)M=4", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "载货汽车 装载质量M(t)M=4", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "普通硅酸盐水泥(国产)42.5(R)(散装)", "spec": null, "unit": "t", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "喷浆钻机", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "灰浆搅拌机 搅筒容量 V(L)V=200", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "挤压式灰浆输送泵 输送量 Q(m³/h) Q=3", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "双轴搅拌桩机 孔径D1(mm)D1=650", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "灰浆搅拌机 拌筒容量V(L)V=200", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "挤压式灰浆输送泵 输送量Q(m³/h) Q=3", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "内燃单级离心清水泵 出口直径D(mm) D=50", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "三轴搅拌桩机 孔径D1(mm)D1=850", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "低合金钢焊条 E43系列", "spec": null, "unit": "kg", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "氧气", "spec": null, "unit": "m³", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "乙炔气", "spec": null, "unit": "kg", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "履带式起重机 起重量 Gn(t)Gn=25", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "交流弧焊机 容量 E(kV·A)E=32", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "型钢使用费", "spec": null, "unit": "元/(t·月)", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "减摩剂", "spec": null, "unit": "kg", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "履带式起重机起重量Gn(t)Gn=25", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "立式油压千斤顶起重量Gn(t)Gn=200", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "液压H型钢拔桩机", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "塑料注浆阀管", "spec": null, "unit": "m", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "膨润土", "spec": null, "unit": "t", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "泥浆泵 出口直径D(mm)D=50", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "泥浆拌合机 罐容量C(m³)100≤C≤150", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "液压钻机 孔径D1(mm)D1=500", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "转盘钻孔机 孔径D1(mm)D1=800", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "泥浆泵 出口直径D(mm)D=100", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "泥浆拌合机罐容量C(m³)100≤C≤150", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "泥浆泵出口直径D(mm) D=50", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "液压钻机孔径Dt(mm)D1=500", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "强夯机夯击能量E(kN·m)1 200<E≤2 000", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "强夯机夯击能量E(kN·m)E≤1 200", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "强夯机夯击能量E(kN·m)\n3000< E≤4000", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "强夯机夯击能量E(kN·m)\n2000< E≤3000", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "强夯机 夯击能量 E (kN·m)\n5000< E ≤6000", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "强夯机 夯击能量 E (kN·m)\n4000< E ≤5000", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "履带式拖拉机 功率P(kW)\nP=90", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "碎石20~40mm", "spec": null, "unit": "m³", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "粗砂", "spec": null, "unit": "m³", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "片石", "spec": null, "unit": "m³", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "块石", "spec": null, "unit": "m³", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "湿拌砌筑砂浆 M10", "spec": null, "unit": "m³", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "混凝土预制块 C20", "spec": null, "unit": "m³", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "高压胶皮管 φ57mm", "spec": null, "unit": "m", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "湿拌抹灰砂浆 M7.5", "spec": null, "unit": "m³", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "风动灌浆机", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "圆钢（HPB235）φ10mm以外", "spec": null, "unit": "t", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "泵送预拌混凝土C20,骨料最大粒径31.5mm", "spec": null, "unit": "m³", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "混凝土输送泵车输送量Q(m³/h) Q=60", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "混凝土振动器插入式", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "钢板桩使用费", "spec": null, "unit": "元/(t·月)", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "木楔", "spec": null, "unit": "m³", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "汽车式起重机起重量Gn(t)Gn=20", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "轨道式柴油打桩机冲击部分质量M(t)M=2.5", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "静压植桩机压入力F(kN)F=1000", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "履带式起重机起重量Gn(t)Gn=15", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "振动沉拔桩机激振力F(kN)F=400", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "泵送预拌混凝土C30,骨料最大粒径31.5mm", "spec": null, "unit": "m³", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "金属周转材料摊销费", "spec": null, "unit": "元", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "电动空气压缩机 排气量 Q(m³/min) Q=1", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "编织袋", "spec": null, "unit": "条", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "静态破碎剂", "spec": null, "unit": "kg", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "水磨钻头 φ300mm", "spec": null, "unit": "个", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "风镐钻头", "spec": null, "unit": "个", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "水磨钻机", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "电动卷扬机双筒慢速 牵引力F(kN) F=50", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "普通预拌混凝土C20,骨料最大粒径31.5mm", "spec": null, "unit": "m³", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "普通预拌混凝土C30,骨料最大粒径31.5mm", "spec": null, "unit": "m³", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "混凝土输送泵车输送量Q(m³/h)Q=20", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "预埋铁件", "spec": null, "unit": "kg", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "预应力高强混凝土管桩φ400×95A", "spec": null, "unit": "m", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "预应力高强混凝土管桩φ300×75A", "spec": null, "unit": "m", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "低合金钢焊条E43系列", "spec": null, "unit": "kg", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "履带式柴油打桩机冲击部分质量M(t)M=3.5", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "汽车式起重机起重量Gn(t)Gn=25", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "汽车式起重机起重量Gn(t)Gn=16", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "交流电焊机容量E(kV·A)E=30", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "预应力高强混凝土管桩φ600×110A", "spec": null, "unit": "m", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "预应力高强混凝土管桩φ500×100A", "spec": null, "unit": "m", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "镀锌铁丝(综合)", "spec": null, "unit": "kg", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "尼龙网30目", "spec": null, "unit": "m²", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "井管φ325×4桥式钢管", "spec": null, "unit": "m", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "无缝钢管φ325×4", "spec": null, "unit": "m", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "旋挖钻机孔径D1(mm) D1≤1000", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "交流电焊机容量E(kV·A) E=40", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "内燃空气压缩机排气量Q(m³/min) Q=12.0", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "尼龙网 30 目", "spec": null, "unit": "m²", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "碎石 20~40mm", "spec": null, "unit": "m³", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "井管 φ600 桥式钢管", "spec": null, "unit": "m", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "无缝钢管 φ325×4", "spec": null, "unit": "m", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "无缝钢管 φ600×5", "spec": null, "unit": "m", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "井管 φ325×4 桥式钢管", "spec": null, "unit": "m", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "旋挖钻机 孔径 D₁ (mm) D₁ ≤ 1 000", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "履带式起重机 起重量 Gₙ (t) Gₙ=15", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "交流电焊机 容量E (kV·A) E=40", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "内燃空气压缩机 排气量 Q (m³/min) Q=12.0", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "天然砂石", "spec": null, "unit": "m³", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "交流电焊机 容量 E(kV·A)E=30", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "潜水泵 出口直径D(mm) D=50", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "钢板Q235Bδ=2.0mm(成品)", "spec": null, "unit": "kg", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "钢板Q235Bδ=3.0mm(成品)", "spec": null, "unit": "kg", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "钢板Q235Bδ=6.0mm(成品)", "spec": null, "unit": "kg", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "法兰盘δ=10.0mm(成品)", "spec": null, "unit": "kg", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "钢梁(成品)", "spec": null, "unit": "kg", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "钢柱(成品)", "spec": null, "unit": "kg", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "螺栓M16", "spec": null, "unit": "套", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "锚栓M24", "spec": null, "unit": "套", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "钢花管地锚(成品)", "spec": null, "unit": "套", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "槽钢", "spec": null, "unit": "kg", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "钢管φ48×3.5(成品)", "spec": null, "unit": "m", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "合金钎头(综合)", "spec": null, "unit": "个", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "履带式液压岩石破碎机功率P(kW) P=105", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "履带式单斗挖掘机 液压斗容\n量C(m³) C=1.0", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "合金钎头（综合）", "spec": null, "unit": "个", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "履带式液压岩石破碎机 功率 P(kW) P=105", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "机动翻斗车 装载质量M(t)M=1", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "桥式起重机 起重量Gn(t)Gn=10", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "履带式液压岩石破碎机 功率P(kW) P=105", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "电动夯实机 夯击能量 E(N·m) 20≤E≤62", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "内燃光轮压路机 工作质量 M(t) M=15", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "机动翻斗车装载质量M(t)\nM=1", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "装岩机 电动斗容量 C(m³)\nC=0.6", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "履带式推土机 功率P(kW)\nP=105", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "铁钉(综合)", "spec": null, "unit": "kg", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "塑料排水板 拼接型", "spec": null, "unit": "m²", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "型钢(综合)", "spec": null, "unit": "kg", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "塑料排水板插塑", "spec": null, "unit": "m", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "插塑钢护管", "spec": null, "unit": "kg", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "钢轨式插板机", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "泥浆泵出口直径D(mm)D=50", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "液压钻机孔径D1(mm)D1=250", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "单管旋喷桩机", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "灰浆搅拌机拌筒容量V(L)V=200", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "电动多级离心清水泵扬程H(m)/出口直径D(mm)H>120/D=100", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "高压注浆泵压力P(MPa)P=50", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "三重管旋喷桩机", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "双重管旋喷桩机", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "电动空气压缩机排气量Q(m³/min)Q=3", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "40°Be'水玻璃", "spec": null, "unit": "kg", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "双液压注浆泵 压力P(MPa)P=2×5", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "灰浆搅拌机 搅筒容量V(L)V=400", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "强夯机夯击能量E(kN·m)1200< E≤2000", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "强夯机夯击能量E(kN·m)2000< E≤3000", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "强夯机夯击能量E(kN·m)3000<E≤4000", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "强夯机夯击能量E(kN·m)2000<E≤3000", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "强夯机夯击能量E(kN·m)5000＜E≤6000", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "强夯机夯击能量E(kN·m)4000＜E≤5000", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "强夯机 夯击能量 E(kN·m) 5000＜E≤6000", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "履带式推土机 功率 P(kW) P=75", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "土工布", "spec": null, "unit": "m²", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "双向拉伸塑料土工格栅30kN/m", "spec": null, "unit": "m²", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "普通预拌混凝土C15,骨料最大粒径31.5mm", "spec": null, "unit": "m³", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "混凝土预制块C20", "spec": null, "unit": "m³", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "湿拌砌筑砂浆M10", "spec": null, "unit": "m³", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "粗料石", "spec": null, "unit": "m³", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "m³", "spec": null, "unit": "(9.100)", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "泵送预拌混凝土C35,骨料最大粒径31.5mm", "spec": null, "unit": "m³", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "混凝土输送泵车输送量Q(m³/h)Q=60", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "液压注浆泵 压力P(MPa)P=5", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "锚杆钻孔机 单套管", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "护壁泥浆", "spec": null, "unit": "m³", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "超声波测壁机", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "履带式绳索抓斗成槽机 挖掘深度 H(m) H=70", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "泥浆制作循环设备", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "切削齿", "spec": null, "unit": "个", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "旋挖钻机孔径D1(mm)1000×D1≤1500", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "履带式绳索抓斗成槽机挖掘深度H(m)H=70", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "双轮铣槽机成套设备", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "旋挖钻机孔径D1(mm)D1≤1000", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "旋挖钻机孔径D1(mm)1000< D1≤1500", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "方木垫", "spec": null, "unit": "m³", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "钢丝绳(综合)", "spec": null, "unit": "kg", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "汽车式起重机 起重量 Gn(t)Gn=20", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "静压植桩机 压入力 F(kN)F=1000", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "振动沉拔桩机 激振力 F(kN)F=400", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "汽车式起重机 起重量 Gn(t)Gn=5", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "载货汽车装载质量 M(t) M=8", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "人工", "name": "高级技工人工费", "spec": null, "unit": "元", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "沥青枕木", "spec": null, "unit": "m³", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "六角螺栓(综合)(以10套计)", "spec": null, "unit": "10套", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "交流电焊机 容量E(kV·A)E=32", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "载货汽车 装载质量M(t) M=4", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "履带式起重机 起重量Gn(t)Gn=25", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "立式油压千斤顶 起重量Gn(t) Gn=100", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "立式油压千斤顶 起重量Gn(t)Gn=100", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "钢支撑使用费", "spec": null, "unit": "元/(t·月)", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "立式油压千斤顶起重量Gn(t)Gn=100", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "合金钻头φ4~φ6mm", "spec": null, "unit": "kg", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "旋挖钻机孔径D1(mm)2000< D1≤2500", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "旋挖钻机孔径D1(mm)1500< D1≤2000", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "泥浆泵出口直径D(mm)D=100", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "交流电焊机容量E(kV·A) E=32", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "合金钻头 φ4~φ6mm", "spec": null, "unit": "kg", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "旋挖钻机 孔径 D1 (mm) 1500< D1 ≤2000", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "旋挖钻机 孔径 D1 (mm) 2000< D1 ≤2500", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "旋挖钻机 孔径 D1 (mm) 1000< D1 ≤1500", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "旋挖钻机 孔径 D1 (mm) D1 ≤1000", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "预应力高强混凝土方桩300×300", "spec": null, "unit": "m", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "预应力高强混凝土方桩350×350", "spec": null, "unit": "m", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "预应力高强混凝土方桩250×250", "spec": null, "unit": "m", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "预应力高强混凝土方桩400×400", "spec": null, "unit": "m", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "橡皮垫δ=2mm", "spec": null, "unit": "m²", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "中砂", "spec": null, "unit": "m³", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "胶管 φ50mm", "spec": null, "unit": "m", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "轻型井点井管 φ40mm", "spec": null, "unit": "m", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "轻型井点总管 φ100mm", "spec": null, "unit": "m", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "水井钻孔机 孔径D1(mm)D1=300", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "污水泵 出口直径D(mm)D=100", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "电动多级离心清水泵 扬程H(m)/出口直径D(mm) H≤180/D=150", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "射流井点泵 最大抽吸深度H(m) H=9.5", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "PVC横杆60mm×60mm(δ=2.0mm)", "spec": null, "unit": "m", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "PVC扣板", "spec": null, "unit": "m²", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "PVC立柱套管120mm×120mm(δ=2.0mm)", "spec": null, "unit": "m", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "方钢50mm×50mm(δ=5.0mm)", "spec": null, "unit": "m", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "方钢100mm×100mm(δ=5.0mm)", "spec": null, "unit": "m", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "电动夯实机 夯击能量 E (N·m) 20≤E≤62", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "生石灰", "spec": null, "unit": "t", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "素土", "spec": null, "unit": "m³", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "电动夯实机 夯击能量 E(N·m)20≤E≤62", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "级配砂石", "spec": null, "unit": "m³", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "电动夯实机 夯击能量E(N·m)20≤E≤62", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "石粉渣", "spec": null, "unit": "m³", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "4%水泥石粉渣", "spec": null, "unit": "m³", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "内燃光轮压路机 工作质量 M(t) M=8", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "履带式推土机 功率 P(kW) P=90", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "履带式推土机 功率P(kW)P=90", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "内燃光轮压路机 工作质量M(t) M=8", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "履带式推土机 功率P(kW)\nP=90", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "内燃光轮压路机 工作质量M\n(t) M=8", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "振动压路机 工作质量 M(t)\nM=15", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "内燃光轮压路机 工作质量\nM(t) M=8", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "振动压路机工作质量M(t)M=15", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "平地机 功率P(kW) P=120", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "振动压路机 工作质量M(t)M=15", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "洒水车 罐容量V(m³) V=6", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "内燃光轮压路机 工作质量M(t) M=12", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "平地机功率P(kW)P=120", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "履带式推土机功率P(kW)P=90", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "内燃光轮压路机工作质量M(t)M=12", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "新型全密闭式智能泥头车LNG", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "新型全密闭式智能泥头车 纯电动", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "洒水车 罐容量 V(m³) V=4", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "尼龙编织袋", "spec": null, "unit": "m", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "钢轨", "spec": null, "unit": "kg", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "袋装砂井机 带门架", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "袋装砂井机 不带门架", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "无缝钢管(综合)", "spec": null, "unit": "kg", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "轮胎式装载机 斗容量C(m³)C=1.0", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "振动沉拔桩机 激振力F(kN)F=400", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "履带式起重机 起重量Gn(t)Gn=10", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "振动沉拔桩机 激振力 F(kN)F=300", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "机动翻斗车 装载质量 M(t)M=1", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "吊锤打桩机锤重G(t)G=6", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "吊锤打桩机锤重G(t)G=2.5", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "振冲器功率P(kW)P=55", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "塑料薄膜", "spec": null, "unit": "m²", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "塑料管综合", "spec": null, "unit": "kg", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "轮胎式装载机斗容量C(m³)C=1.0", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "步履式电动打桩机功率P(kW)P=60", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "液压注浆泵压力P(MPa)P=5", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "振动压路机 工作质量M(t)\nM=15", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "电动夯实机 夯击能量 E(N·m)\n20≤E≤62", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "湿拌砌筑砂浆 M5", "spec": null, "unit": "m³", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "毛石", "spec": null, "unit": "m³", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "碎石 5~25mm", "spec": null, "unit": "m³", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "普通预拌混凝土C25,骨料最大粒径31.5mm", "spec": null, "unit": "m³", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "混凝土喷射机 生产率Q(m³/h) 4≤Q≤6", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "锯条", "spec": null, "unit": "根", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "承插塑料排水管 dn75 白色\nUPVC", "spec": null, "unit": "m", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "锁口管", "spec": null, "unit": "kg", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "锁口管顶升机", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "松杂原木", "spec": null, "unit": "m³", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "低合金钢焊条 E43 系列", "spec": null, "unit": "kg", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "钢板", "spec": null, "unit": "kg", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "泡沫塑料", "spec": null, "unit": "m³", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "交流电焊机 容量E(kV·A)E=30", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "电动空气压缩机 排气量Q(m³/min) Q=1", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "交流电焊机 容量E(kV·A)E=40", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "轨道式柴油打桩机 冲击部分质量 M(t) M=2.5", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "杂麻绳", "spec": null, "unit": "kg", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "麻袋", "spec": null, "unit": "个", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "垫铁", "spec": null, "unit": "kg", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "汽油", "spec": null, "unit": "kg", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "钢板δ=4mm以外", "spec": null, "unit": "t", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "红丹漆", "spec": null, "unit": "kg", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "螺栓(综合)", "spec": null, "unit": "kg", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "H型钢 H500-900", "spec": null, "unit": "t", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "角钢 综合", "spec": null, "unit": "t", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "内燃空气压缩机 排气量Q(m³/min) Q=9.0", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "焊条恒温箱", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "电焊条烘干箱 长L(cm)×宽B(cm)×高H(cm)L×B×H=45×35×45", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "型钢矫正机", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "刨边机 加工长度L(mm)L=12000", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "多辊板料校平机 厚度T(mm)/宽度B(mm)T=16/B=2000", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "型钢剪断机 剪断宽度B(mm)B=500", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "剪板机 厚度T(mm)/宽度B(mm)T=40/B=3100", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "门式起重机 起重量Gn(t)Gn=20", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "摇臂钻床 孔径Dt(mm)D1=63", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "履带式起重机 起重量 Gn(t)Gn=20", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "松节油", "spec": null, "unit": "kg", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "油性防锈漆", "spec": null, "unit": "kg", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "冷轧薄钢板 δ=1.0~1.5mm", "spec": null, "unit": "t", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "剪板机 厚度T(mm)/宽度B(mm) T=40/B=3 100", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "摇臂钻床 孔径D1(mm) D1=50", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "轨道平车 装载质量M(t) M=5", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "汽车式起重机 起重量Gn(t)Gn=12", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "热轧薄钢板δ=4mm以内", "spec": null, "unit": "t", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "角钢综合", "spec": null, "unit": "t", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "槽钢", "spec": null, "unit": "t", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "螺栓（综合）", "spec": null, "unit": "kg", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "酚醛防锈漆", "spec": null, "unit": "kg", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "镀锌铁丝（综合）", "spec": null, "unit": "kg", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "门式起重机起重量Gn(t)Gn=10", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "门式起重机起重量Gn(t)Gn=20", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "轨道平车装载质量M(t)M=10", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "剪板机厚度T(mm)/宽度B(mm)T=20/B=4000", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "型钢剪断机剪断宽度B(mm)B=500", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "刨边机加工长度L(mm)L=9000", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "摇臂钻床孔径D1(mm)D1=50", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "成品钢套管 δ=30.0mm", "spec": null, "unit": "t", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "钢丝绳（综合）", "spec": null, "unit": "kg", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "刀具（钢套管专用）", "spec": null, "unit": "把", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "搓管机", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "履带式起重机 起重量 Gn(t) \nGn=75", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "静力压桩机 液压压力F(kN)F=3 000", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "静力压桩机 液压压力F(kN)F=4 000", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "静力压桩机 液压压力F(kN)F=2 000", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "汽车式起重机 起重量Gn(t)Gn=25", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "汽车式起重机 起重量Gn(t)Gn=16", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "m³", "spec": null, "unit": "(10.000)", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "汽车式起重机 起重量 Gn(t)\nGn=5", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "土工膜", "spec": null, "unit": "m²", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "塑料排水管 DN80", "spec": null, "unit": "m", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "硬塑料管 φ50mm", "spec": null, "unit": "m", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "真空泵 抽气速度 Q(m³/h)Q=204", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "白棕绳 φ40mm", "spec": null, "unit": "kg", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "垫木", "spec": null, "unit": "m³", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "桩帽", "spec": null, "unit": "kg", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "钢管桩", "spec": null, "unit": "t", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "履带式柴油打桩机冲击部分质量M(t)M=5", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "履带式柴油打桩机冲击部分质量M(t)M=7", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "履带式柴油打桩机冲击部分质量M(t)M=2.5", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "履带式柴油打桩机冲击部分质量M(t)M=8", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "履带式起重机 起重量Gn(t)Gn=15", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "静力压桩机 液压压力F(kN)F=3000", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "内切割机", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "钢帽 φ800mm", "spec": null, "unit": "个", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "钢帽 φ600mm", "spec": null, "unit": "个", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "钢帽 φ1000mm", "spec": null, "unit": "个", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "钢帽 φ400mm", "spec": null, "unit": "个", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "电动切割机", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "长螺旋钻机 孔径Di(mm)Df=600", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "普通预拌混凝土 C30,骨料最大粒径31.5mm", "spec": null, "unit": "m³", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "混凝土振动器 插入式", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "潜水泵 出口直径D(mm) D=100", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "潜水泵 出口直径 D(mm) D=100", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "泵送预拌混凝土C15,骨料最大粒径31.5mm", "spec": null, "unit": "m³", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "煤沥青", "spec": null, "unit": "t", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "天然气", "spec": null, "unit": "m³", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "麻丝", "spec": null, "unit": "kg", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "石油沥青 30#", "spec": null, "unit": "kg", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "钢筋 φ10mm以外", "spec": null, "unit": "t", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "螺杆带帽(锚杆专用)", "spec": null, "unit": "kg", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "塑料软管", "spec": null, "unit": "m", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "对焊机 容量E(kV·A) E=75", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "钢筋切断机 直径D(mm) D=40", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "高压油泵 压力P(MPa) P=80", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "预应力拉伸机 拉伸力F(kN) F=900", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "钢绞线（综合）", "spec": null, "unit": "t", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "钢绞线锚具（5孔）", "spec": null, "unit": "套", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "泥浆泵 出口直径 D(mm) D=100", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "导管(浇筑混凝土专用)", "spec": null, "unit": "kg", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "泵送预拌水下混凝土 C25,骨料最大粒径 31.5mm", "spec": null, "unit": "m³", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "泥浆泵出口直径D(mm)\nD=100", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "履带式起重机起重量 Gn(t)\nGn=15", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "刀具(钢套管专用)", "spec": null, "unit": "把", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "成品钢套管δ=30.0mm", "spec": null, "unit": "t", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "履带式起重机起重量Gn(t)Gn=100", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "全回转钻机孔径Dt(mm)D1≤2000", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "全回转钻机孔径Dt(mm)Dt≤2000", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "履带式起重机 起重量 Gn(t)Gn=100", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "全回转钻机 孔径 Dt (mm)Dt≤2000", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "橡皮垫 δ=2mm", "spec": null, "unit": "m²", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "预应力高强混凝土方桩 350×350", "spec": null, "unit": "m", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "预应力高强混凝土方桩 400×400", "spec": null, "unit": "m", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "静力压桩机 液压压力 F(kN)F=3 000", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "静力压桩机 液压压力 F(kN)F=4 000", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "汽车式起重机 起重量 Gn(t)Gn=16", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "长螺旋钻机孔径Dt(mm)Dt=600", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "橡胶止水带", "spec": null, "unit": "m", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "环氧树脂", "spec": null, "unit": "kg", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "丙酮", "spec": null, "unit": "kg", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "甲苯", "spec": null, "unit": "kg", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "乙二胺", "spec": null, "unit": "kg", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "紫铜板 δ=1.0mm", "spec": null, "unit": "kg", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "热轧薄钢板 250mm×5mm", "spec": null, "unit": "m", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "铜焊条", "spec": null, "unit": "kg", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "交流电焊机 容量E(kV·A) E=30", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "氯丁橡胶条", "spec": null, "unit": "m", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "三异氰酸酯", "spec": null, "unit": "kg", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "乙酸乙酯", "spec": null, "unit": "kg", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "牛皮纸", "spec": null, "unit": "m²", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "圆钢(盘圆)(HPB300)φ6.5~10.0mm(以千克计)", "spec": null, "unit": "kg", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "钢板δ=4.5~10.0mm(以千克计)", "spec": null, "unit": "kg", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "麻布", "spec": null, "unit": "kg", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "锯材", "spec": null, "unit": "m³", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "石油沥青 10#", "spec": null, "unit": "kg", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "钢挡土板", "spec": null, "unit": "t", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "冲击锤(6t)", "spec": null, "unit": "kg", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "泥浆泵 出口直径D(mm) D=100", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "冲击成孔机 冲击部分质量M(t) M=6", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "冲击成孔机冲击部分质量M(t)M=6", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "履带式柴油打桩机 冲击部分质量 M(t) M=3.5", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "交流电焊机 容量 E(kV·A) E=30", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "管桩机械接头", "spec": null, "unit": "套", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "角钢(综合)", "spec": null, "unit": "t", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "履带式柴油打桩机 冲击部分质量 M(t) M=5", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "钢板(Q235B)8mm", "spec": null, "unit": "t", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "轨道式柴油打桩机冲击部分质量M(t)M=4", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "钢筋Φ10mm以内", "spec": null, "unit": "t", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "钢丝网 20# 10×10", "spec": null, "unit": "m²", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "无缝钢管(综合)", "spec": null, "unit": "t", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "振动沉拔桩机 激振力 F(kN) F=400", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "圆钢(盘圆)(HPB300)φ6.5~φ10.0mm", "spec": null, "unit": "t", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "圆钢(HPB235)φ10mm以外", "spec": null, "unit": "t", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "地模摊销费", "spec": null, "unit": "元", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "钢模摊销费", "spec": null, "unit": "元", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "机动翻斗车装载质量M(t)M=1.5", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "钢筋调直机直径D(mm)D=14", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "钢筋切断机直径D(mm)D=40", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "钢筋弯曲机直径D(mm)D=40", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "钢板 δ=8mm", "spec": null, "unit": "t", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "汽车式起重机 起重量 Gn(t)Gn=12", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "剪板机 厚度 T(mm)/宽度B(mm) T=6.3/B=2 000", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "轨道平车 装载质量 M(t) M=5", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "长螺旋钻机孔径Dt(mm)D1=600", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "长螺旋钻机孔径Dt(mm)D1=400", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "普通预拌水下混凝土C30,骨料最大粒径31.5mm", "spec": null, "unit": "m³", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "石料切割锯片", "spec": null, "unit": "片", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "石料切割机", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "管桩切割机", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "无缝钢管 φ32×3.0", "spec": null, "unit": "m", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "管子切断机 管径D(mm)D≤250", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "交流弧焊机 容量E(kV·A)E=32", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "焊接钢管(综合)", "spec": null, "unit": "t", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "交流电焊机 容量E(kV·A)\nE=32", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "管子切断机 管径D(mm) D≤250", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "普通硅酸盐水泥（国产）42.5（R）（散装）", "spec": null, "unit": "t", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "灰浆搅拌机 拌筒容量 V（L）V=200", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "电动灌浆机", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "外加剂", "spec": null, "unit": "kg", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "汽车式钻孔机 孔径D1(mm)D1=1000", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "交流电焊机 容量E(kV·A)E=21", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "汽车式钻孔机孔径D1(mm)D1=1000", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "交流电焊机容量E(kV·A)E=21", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "风动凿岩机 手持式", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "钢护筒", "spec": null, "unit": "t", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "旋挖钻机孔径Dt(mm)1500＜Dt≤2000", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "旋挖钻机孔径Dt(mm)1000＜Dt≤1500", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "旋挖钻机孔径Dt(mm)Dt≤1000", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "旋挖钻机孔径Dt(mm)2000＜Dt≤2500", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "履带式电动起重机起重量Gn(t)Gn=5", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "振动沉拔桩机 激振力 F(kN)\nF=400", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "轨道式柴油打桩机冲击部分质量 M(t)M=4", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "钢筋 Φ10mm 以外", "spec": null, "unit": "t", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "钢筋 Φ10mm 以内", "spec": null, "unit": "t", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "钢筋弯曲机 直径D(mm)D=40", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "钢筋切断机 直径D(mm)D=40", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "履带式起重机 起重量 Gn(t)Gn=40", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "履带式起重机 起重量 Gn(t)Gn=60", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "履带式起重机 起重量 Gn(t)Gn=90", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "钢筋 Φ10mm以外", "spec": null, "unit": "t", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "钢筋 Φ10mm以内", "spec": null, "unit": "t", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "履带式起重机 起重量 Gn(t) Gn=15", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "钢筋调直机 直径D(mm)D=40", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "工字钢(综合)(以千克计)", "spec": null, "unit": "kg", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "钢筋Φ10mm以外", "spec": null, "unit": "t", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "直螺纹连接套筒 φ32mm", "spec": null, "unit": "个", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "直螺纹连接套筒 φ25mm", "spec": null, "unit": "个", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "锥型螺纹车丝机", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "轮胎式装载机 斗容量C(m³) C=1.0", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "内燃空气压缩机 排气量 Q(m³/min) Q=3.0", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "钢管、扣件", "spec": null, "unit": "kg", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "金刚石绳", "spec": null, "unit": "m", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "金刚石绳锯切割机", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "普通预拌混凝土 C20,骨料最大粒径31.5mm", "spec": null, "unit": "m³", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "蒸压灰砂砖 240×115×53 10MPa", "spec": null, "unit": "千块", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "m³", "spec": null, "unit": "(10.100)", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "防锈漆 红色", "spec": null, "unit": "kg", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "铸铁盖板 320×500×18", "spec": null, "unit": "块", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "交流电焊机 容量E(kV·A)\nE=30", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "湿拌抹灰砂浆 M5", "spec": null, "unit": "m³", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "履带式推土机功率P(kW)\nP=90", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "内燃光轮压路机工作质量M(t)M=8", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "轨道式柴油打桩机冲击部分质量M(t)M=0.6", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "驳船装载质量M(t)M=100", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "电动卷扬机双筒快速牵引力F(kN)F=50", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "脱模剂", "spec": null, "unit": "kg", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "钢模板", "spec": null, "unit": "kg", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "钢模板连接件", "spec": null, "unit": "kg", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "涂胶建筑模板(红板)1 830×915×15", "spec": null, "unit": "张", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "支撑钢管及扣件(模板支撑专用)", "spec": null, "unit": "kg", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "模板嵌缝料", "spec": null, "unit": "kg", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "对拉螺栓", "spec": null, "unit": "kg", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "载货汽车装载质量M(t)M=6", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "载货汽车装载质量M(t)M=5", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "木工圆锯机直径D(mm)D=500", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "汽车式起重机起重量Gn(t)Gn=8", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "木支撑", "spec": null, "unit": "m³", "doc_id": "SZ-SJG170"}
+{"category": "材料", "name": "零星卡具", "spec": null, "unit": "kg", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "汽车式起重机 起重量 Gn(t)Gn=8", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "木工圆锯机 直径D(mm) D=500", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "载货汽车 装载质量M(t) M=8", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "木工平刨床 刨削宽度B(mm)B=500", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "木工圆锯机 直径D(mm)D=500", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}
+{"category": "机械", "name": "载货汽车 装载质量M(t)M=6", "spec": null, "unit": "台班", "doc_id": "SZ-SJG170"}

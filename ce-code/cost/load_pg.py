@@ -8,8 +8,9 @@
 ``postgresql://cost@localhost:5433/ce_cost``（密码走 libpq 的 ``PGPASSWORD`` / ``~/.pgpass``，
 不硬编码进仓库）。
 
-跑法（服务器，单行）：
-  uv run python -m cost.load_pg --init-schema --bill-spec data/structured/bill_spec.jsonl --aux data/structured/aux_tables.jsonl
+跑法（服务器，单行）：产物按 doc_id 分目录（``data/structured/<doc_id>/<表>.jsonl``），
+``--scan-dir`` 自动扫全部规范 + 扁平 bill_quota_map 一把灌（依赖序在内已排）：
+  uv run python -m cost.load_pg --init-schema --scan-dir data/structured
 
 依赖：psycopg（服务器装：``uv add 'psycopg[binary]'``）。
 """
@@ -263,9 +264,47 @@ def load_bill_quota_map(conn, records: list[dict]) -> int:
     return len(rows)
 
 
+def _collect(scan_dir: Path | None, name: str, explicit: Path | None,
+             flat: bool = False) -> list[Path]:
+    """汇总一张表的待灌路径：scan_dir 下的 per-doc（或扁平）产物 + 显式单文件。
+
+    参数：scan_dir —— 结构化产物根（None 则只用显式）；name —— 文件名；
+    explicit —— 显式 ``--xxx`` 路径（可叠加）；flat —— True 则取 ``scan_dir/name``
+    （跨规范关系产物如 bill_quota_map），否则取 ``scan_dir/*/name``（per-doc）。
+    返回：去重保序的路径列表。
+    """
+    paths: list[Path] = []
+    if scan_dir:
+        if flat:
+            p = scan_dir / name
+            if p.exists():
+                paths.append(p)
+        else:
+            paths.extend(sorted(scan_dir.glob(f"*/{name}")))
+    if explicit:
+        paths.append(explicit)
+    seen, uniq = set(), []
+    for p in paths:
+        rp = p.resolve()
+        if rp not in seen:
+            seen.add(rp); uniq.append(p)
+    return uniq
+
+
+def _read_many(paths: list[Path]) -> list[dict]:
+    """读多份 jsonl 并拼接。"""
+    out: list[dict] = []
+    for p in paths:
+        out.extend(_read_jsonl(p))
+    return out
+
+
 @click.command()
 @click.option("--dsn", default="", help="PG 连接串；空=环境变量 CE_PG_DSN 或默认 localhost:5433/ce_cost。")
 @click.option("--init-schema", is_flag=True, help="先执行 schema.sql 建表（幂等）。")
+@click.option("--scan-dir", "scan_dir", type=click.Path(exists=True, path_type=Path), default=None,
+              help="结构化产物根：自动扫各 <doc_id>/ 子目录的全表 + 扁平 bill_quota_map.jsonl，"
+                   "按依赖序一把灌（多规范累积）。可与下列单文件选项叠加。")
 @click.option("--bill-spec", "bill_spec_path", type=click.Path(exists=True, path_type=Path),
               default=None, help="bill_spec.jsonl 路径。")
 @click.option("--aux", "aux_path", type=click.Path(exists=True, path_type=Path),
@@ -280,42 +319,58 @@ def load_bill_quota_map(conn, records: list[dict]) -> int:
               default=None, help="quota_resource.jsonl 路径（子目×资源含量）。")
 @click.option("--bill-quota-map", "bq_map_path", type=click.Path(exists=True, path_type=Path),
               default=None, help="bill_quota_map.jsonl 路径（清单→定额 APPLIES）。")
-def main(dsn: str, init_schema: bool, bill_spec_path: Path | None,
-         aux_path: Path | None, price_comp_path: Path | None,
-         resource_path: Path | None, quota_item_path: Path | None,
-         quota_res_path: Path | None, bq_map_path: Path | None) -> None:
-    """JSONL → PostgreSQL 幂等导入（建表 + 清单/定额/费用构成各表，单事务提交）。"""
+def main(dsn: str, init_schema: bool, scan_dir: Path | None,
+         bill_spec_path: Path | None, aux_path: Path | None,
+         price_comp_path: Path | None, resource_path: Path | None,
+         quota_item_path: Path | None, quota_res_path: Path | None,
+         bq_map_path: Path | None) -> None:
+    """JSONL → PostgreSQL 幂等导入（建表 + 清单/定额/费用构成各表，单事务提交）。
+
+    ``--scan-dir`` 扫各 ``<doc_id>/`` 子目录全表（多规范累积）+ 扁平 bill_quota_map，
+    与显式单文件选项叠加；下方按 **依赖序** 灌：resource/quota_item 先于 quota_resource、
+    bill_spec 先于 bill_quota_map（同一事务内后续查询可见先前插入，故 FK 解析成立）。
+    """
     import psycopg
 
     dsn = dsn or os.environ.get("CE_PG_DSN") or DEFAULT_DSN
     console.print(f"[bold]连接[/] {dsn}")
 
+    # 依赖序收集各表路径
+    resource_paths = _collect(scan_dir, "resource.jsonl", resource_path)
+    quota_item_paths = _collect(scan_dir, "quota_item.jsonl", quota_item_path)
+    quota_res_paths = _collect(scan_dir, "quota_resource.jsonl", quota_res_path)
+    bill_spec_paths = _collect(scan_dir, "bill_spec.jsonl", bill_spec_path)
+    aux_paths = _collect(scan_dir, "aux_tables.jsonl", aux_path)
+    price_comp_paths = _collect(scan_dir, "price_composition.jsonl", price_comp_path)
+    bq_map_paths = _collect(scan_dir, "bill_quota_map.jsonl", bq_map_path, flat=True)
+
     with psycopg.connect(dsn) as conn:
         if init_schema:
             conn.execute(SCHEMA_SQL.read_text(encoding="utf-8"))
             console.print(f"[green]✓ schema 已建/对齐[/]（{SCHEMA_SQL.name}）")
-        if bill_spec_path:
-            n = load_bill_spec(conn, _read_jsonl(bill_spec_path))
-            console.print(f"[green]✓ bill_spec upsert {n} 条[/]")
-        if aux_path:
-            n = load_aux(conn, _read_jsonl(aux_path))
-            console.print(f"[green]✓ aux_table upsert {n} 条[/]")
-        if price_comp_path:
-            n = load_price_composition(conn, _read_jsonl(price_comp_path))
-            console.print(f"[green]✓ price_composition upsert {n} 条[/]")
         # 定额三表按依赖序：resource / quota_item 先入库，quota_resource 再解析 FK
-        if resource_path:
-            n = load_resource(conn, _read_jsonl(resource_path))
-            console.print(f"[green]✓ resource upsert {n} 条[/]")
-        if quota_item_path:
-            n = load_quota_item(conn, _read_jsonl(quota_item_path))
-            console.print(f"[green]✓ quota_item upsert {n} 条[/]")
-        if quota_res_path:
-            n, skip = load_quota_resource(conn, _read_jsonl(quota_res_path))
+        if resource_paths:
+            n = load_resource(conn, _read_many(resource_paths))
+            console.print(f"[green]✓ resource upsert {n} 条[/]（{len(resource_paths)} 文件）")
+        if quota_item_paths:
+            n = load_quota_item(conn, _read_many(quota_item_paths))
+            console.print(f"[green]✓ quota_item upsert {n} 条[/]（{len(quota_item_paths)} 文件）")
+        if quota_res_paths:
+            n, skip = load_quota_resource(conn, _read_many(quota_res_paths))
             console.print(f"[green]✓ quota_resource upsert {n} 条[/]"
                           + (f"，[yellow]跳过 {skip}（id 未解析）[/]" if skip else ""))
-        if bq_map_path:
-            n = load_bill_quota_map(conn, _read_jsonl(bq_map_path))
+        if bill_spec_paths:
+            n = load_bill_spec(conn, _read_many(bill_spec_paths))
+            console.print(f"[green]✓ bill_spec upsert {n} 条[/]（{len(bill_spec_paths)} 文件）")
+        if aux_paths:
+            n = load_aux(conn, _read_many(aux_paths))
+            console.print(f"[green]✓ aux_table upsert {n} 条[/]（{len(aux_paths)} 文件）")
+        if price_comp_paths:
+            n = load_price_composition(conn, _read_many(price_comp_paths))
+            console.print(f"[green]✓ price_composition upsert {n} 条[/]")
+        # bill_quota_map 依赖 bill_spec + quota_item 已在库，放最后
+        if bq_map_paths:
+            n = load_bill_quota_map(conn, _read_many(bq_map_paths))
             console.print(f"[green]✓ bill_quota_map upsert {n} 条[/]")
         conn.commit()
     console.print("[bold green]✓ 提交完成[/]")

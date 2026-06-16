@@ -21,7 +21,7 @@ ce-code/
 ├── data/                           # 数据资产（parsed/structured/eval_set 入 git；raw/vector_store 不入）
 │   ├── raw/                        #   原始 PDF（手动放入；⛔不入 git，版权敏感）
 │   ├── parsed/                     #   MinerU 解析输出（python -m parser 产物，阶段 0 缓存；✅入 git）
-│   ├── structured/                 #   Chunk 树 chunks.json + bill_spec.jsonl（build/cost 产物；✅入 git）
+│   ├── structured/                 #   <规范名>/default/chunks.json（build）+ <doc_id>/<表>.jsonl（cost 按 doc_id 分目录）+ 扁平 bill_quota_map.jsonl；✅入 git
 │   ├── vector_store/               #   BM25 + Milvus 索引（build 索引层产物；⛔不入 git，大体积可重生）
 │   ├── eval_set/                   #   评测集（✅入 git）
 │   │   └── gb50016_eval.json       #     GB 50016 的 45 条评测用例
@@ -254,7 +254,9 @@ curl -s http://localhost:8101/qa -H 'Content-Type: application/json' -d '{"query
 uv run python -m cost.bill_spec --input "data/structured/GB_T50854_2024_房屋建筑与装饰工程工程量计算标准/default/chunks.json"
 ```
 
-产物落 `data/structured/bill_spec.jsonl` + `aux_tables.jsonl`，终端打印质量 report（数量 / 编码唯一性 / 连续性 / 单位受控 / 特征空率 / 辅助表清单）。`--dry-run` 只看 report 不落盘。
+产物按 doc_id 分目录落 `data/structured/<doc_id>/bill_spec.jsonl` + `aux_tables.jsonl`（doc_id 从记录推断，多规范不互相覆盖），终端打印质量 report（数量 / 编码唯一性 / 连续性 / 单位受控 / 特征空率 / 辅助表清单）。`--dry-run` 只看 report 不落盘。
+
+> ⚠️ **GB 50856 通用安装暂未入库**：dry-run 可抽 1184 清单，但有 5 个重复编码——4 个是「同码多计量单位」（如金属结构刷油 kg/m²，规范一码配多单位，需 unit 多值建模、动 schema）、1 个是真冲突（`031003010` 倒流防止器 vs 淋浴器，源码读错需标记）。`bill_spec` PG 主键是 `code`，直灌会 `ON CONFLICT` 丢数据，故 50856 推迟到「多单位建模 + 冲突标记」后续，不带 PK 冲突塞库（详见 TODO）。
 
 ### Step C1b — 从 50500 抽费用构成规则（`cost/price_composition.py`）
 
@@ -271,18 +273,18 @@ SJG 171/170 的定额子目表是**转置矩阵**（列=定额子目，行=属�
 > 须先 `build split` 出 SJG 的 chunks.json（SJG 无规整目录，`chapter`/`ancestor_titles` 可能偏弱，入库后抽查）：
 
 ```bash
-uv run python build.py split --input "data/parsed/SJG_建筑工程消耗量标准/hybrid_auto/SJG_建筑工程消耗量标准_content_list.json" --standard-id "SJG 171-2024"
-uv run python -m cost.quota --input "data/structured/SJG_171-2024/default/chunks.json"
+uv run python -m cost.quota --input "data/structured/SJG_建筑工程消耗量标准/default/chunks.json"
+uv run python -m cost.quota --input "data/structured/SJG_土石方与地基基础工程消耗量标准/default/chunks.json"
 ```
 
-产物落 `data/structured/quota_item.jsonl` / `resource.jsonl` / `quota_resource.jsonl`，终端打印总览（子目/资源/含量数、无费用子目、资源类别分布）。`--dry-run` 只看 report。
+产物按 doc_id 分目录落 `data/structured/<doc_id>/{quota_item,resource,quota_resource}.jsonl`（SJG171→`SZ-SJG171/`、SJG170→`SZ-SJG170/`，互不覆盖），终端打印总览（子目/资源/含量数、跨页续表合并数、无费用子目、资源类别分布）。`--dry-run` 只看 report。同一定额子目跨页（续表/续前）会被 MinerU 拆成两行，`extract` 按 `(doc_id, quota_code)` 合并（优先非空费用），避免续前页 null 价覆盖首页真值。当前：SJG171 = 640 子目 / 407 资源 / 4173 含量；SJG170 = 617 子目（合并 1 续前）/ 584 资源 / 4105 含量。
 
 ### Step C1d — 清单→定额映射（KG P0，`cost/bill_quota.py`）
 
-清单（GB 50854，9 位码）与定额（SJG，6 位+变体）编码不可互推，映射是组价关键一跳。P0 用**名称匹配**自动种子：清单名==定额名首段 → conf 0.9，清单名⊂首段 → conf 0.6（1 清单 : N 定额）。产 `bill_quota_map.jsonl`（带 `relation=APPLIES`/`confidence`/`source`）。这是**起步映射**（SJG 171 建筑工程覆盖约 42/472），未覆盖/低置信项待富化（语义召回/专家标注），按红线「只建议不定稿」交任务层 HITL。
+清单（GB 50854，9 位码）与定额（SJG，6 位+变体）编码不可互推，映射是组价关键一跳。P0 用**名称匹配**自动种子：清单名==定额名首段 → conf 0.9，清单名⊂首段 → conf 0.6（1 清单 : N 定额）。**扫 `data/structured/<doc_id>/` 下全部 bill_spec + quota_item 跨规范汇总匹配**（SJG171 建筑 + SJG170 土方一起），产扁平 `data/structured/bill_quota_map.jsonl`（跨规范关系产物，带 `relation=APPLIES`/`confidence`/`source`）。这是**起步映射**（含 SJG171+170 后覆盖 53/472、313 边），未覆盖/低置信项待富化（语义召回/专家标注），按红线「只建议不定稿」交任务层 HITL。
 
 ```bash
-uv run python -m cost.bill_quota --bill-spec data/structured/bill_spec.jsonl --quota-item data/structured/quota_item.jsonl
+uv run python -m cost.bill_quota   # 默认扫 data/structured/<doc_id>/，--struct-dir 可改根
 ```
 
 ### Step C2 — 建表 + 幂等导入 PG（`cost/schema.sql` + `cost/load_pg.py`）
@@ -290,13 +292,12 @@ uv run python -m cost.bill_quota --bill-spec data/structured/bill_spec.jsonl --q
 `schema.sql` 一次建齐全部造价表（`bill_spec` / `aux_table` / `price_composition` / `quota_item` / `quota_resource` / `resource` / `resource_price` / `hist_bill`），强制治理字段 `doc_id`/`spec_version`/`region`/`effective_priority`（价格 `resource_price` 带 `effective_period` 时效 + `btree_gist` EXCLUDE 防重叠；`resource` 唯一键 `NULLS NOT DISTINCT` 让 `spec=NULL` 也算同行）；`IF NOT EXISTS` 幂等。`load_pg.py` 读 jsonl，按主键 `ON CONFLICT DO UPDATE` upsert（`bill_spec` 按 `code`、`aux_table` 按 `doc_id+caption+chapter`、`price_composition` 按 `doc_id+composite+seq`、`quota_item` 按 `region+quota_code+spec_version`、`resource` 按 `category+name+spec+unit`），可重复执行不产生重复行。
 
 ```bash
-# 清单 + 费用构成
-CE_PG_DSN='postgresql://cost:<密码>@localhost:5433/ce_cost' uv run python -m cost.load_pg --init-schema --bill-spec data/structured/bill_spec.jsonl --aux data/structured/aux_tables.jsonl --price-composition data/structured/price_composition.jsonl
-# 定额三表（依赖序：resource/quota_item 先入库，quota_resource 再按 natural key 解析 FK）
-CE_PG_DSN='postgresql://cost:<密码>@localhost:5433/ce_cost' uv run python -m cost.load_pg --resource data/structured/resource.jsonl --quota-item data/structured/quota_item.jsonl --quota-resource data/structured/quota_resource.jsonl
-# 清单→定额映射（KG P0）
-CE_PG_DSN='postgresql://cost:<密码>@localhost:5433/ce_cost' uv run python -m cost.load_pg --bill-quota-map data/structured/bill_quota_map.jsonl
+# --scan-dir 自动扫各 <doc_id>/ 子目录全表 + 扁平 bill_quota_map，按依赖序一把灌
+# （resource/quota_item 先于 quota_resource，bill_spec 先于 bill_quota_map）
+CE_PG_DSN='postgresql://cost:<密码>@localhost:5433/ce_cost' uv run python -m cost.load_pg --init-schema --scan-dir data/structured
 ```
+
+> 单文件 `--bill-spec` / `--quota-item` 等选项仍在（targeted 灌某表/某规范），可与 `--scan-dir` 叠加。预期计数：bill_spec 472 / aux 5 / price_composition 10 / resource 991（SJG171 407 + SJG170 584）/ quota_item 1257（640+617）/ quota_resource 8278（4173+4105，跳过 0）/ bill_quota_map 313。
 
 > ⚠️ `--init-schema` 是 `CREATE TABLE IF NOT EXISTS`，**不会改已存在的表结构**。若库里有缺治理字段的旧 `bill_spec`（早期手敲建的），先删了再灌（导入幂等，删表无损）：`docker exec ce-postgres psql -U cost -d ce_cost -c "DROP TABLE IF EXISTS bill_spec"`。
 

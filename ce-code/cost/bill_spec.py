@@ -25,6 +25,8 @@ import click
 from rich.console import Console
 from rich.table import Table
 
+from cost import resolve_doc_dir
+
 console = Console()
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -356,13 +358,16 @@ def main(input_path: Path, outdir: Path, dry_run: bool) -> None:
         console.print("[dim]--dry-run：未落盘[/]")
         return
 
-    outdir.mkdir(parents=True, exist_ok=True)
-    _write_jsonl(bill_specs, outdir / "bill_spec.jsonl")
-    _write_jsonl(aux_tables, outdir / "aux_tables.jsonl")
+    # 按 doc_id 分目录（bill_spec 与 aux 同源单一规范，从 bill_spec 推断；
+    # aux 兜底，防某规范全是辅助表无清单项）
+    doc_dir = resolve_doc_dir(outdir, bill_specs or aux_tables)
+    doc_dir.mkdir(parents=True, exist_ok=True)
+    _write_jsonl(bill_specs, doc_dir / "bill_spec.jsonl")
+    _write_jsonl(aux_tables, doc_dir / "aux_tables.jsonl")
     if anomalies:
-        _write_jsonl(anomalies, outdir / "bill_spec_anomalies.jsonl")
-    console.print(f"[green]已写[/] {outdir/'bill_spec.jsonl'}（{len(bill_specs)}）、"
-                  f"{outdir/'aux_tables.jsonl'}（{len(aux_tables)}）"
+        _write_jsonl(anomalies, doc_dir / "bill_spec_anomalies.jsonl")
+    console.print(f"[green]已写[/] {doc_dir}/ ：bill_spec（{len(bill_specs)}）、"
+                  f"aux_tables（{len(aux_tables)}）"
                   + (f"、anomalies（{len(anomalies)}）" if anomalies else ""))
 
 

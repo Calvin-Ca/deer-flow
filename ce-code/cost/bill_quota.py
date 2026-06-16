@@ -7,8 +7,10 @@
 > 这是**起步映射**（覆盖有限、带 confidence/source 标注），非定稿；未覆盖项与低置信项
 > 待富化（语义召回 / 专家标注），按红线「只建议不定稿」交任务层 HITL。
 
-输入：bill_spec.jsonl（清单）+ quota_item.jsonl（定额子目）
-输出：bill_quota_map.jsonl（bill_code → quota_code，带 relation/confidence/source）+ 覆盖 report
+输入：扫 ``data/structured/<doc_id>/`` 下全部 bill_spec.jsonl（清单）+ quota_item.jsonl
+      （定额子目）——跨规范汇总（SJG171 建筑 + SJG170 土方一起匹配，扩大覆盖）。
+输出：bill_quota_map.jsonl（bill_code → quota_code，带 relation/confidence/source；跨规范
+      关系产物，扁平落 ``data/structured/`` 下）+ 覆盖 report
 
 取数路径（入库后，见 README Step C 验收 SQL）：
   bill_spec → bill_quota_map → quota_item → quota_resource → resource（→ resource_price）
@@ -114,24 +116,40 @@ def _write_jsonl(records: list[dict], path: Path) -> None:
             f.write(json.dumps(r, ensure_ascii=False) + "\n")
 
 
+def _scan(struct: Path, name: str) -> list[dict]:
+    """跨 per-doc 子目录汇总同名 jsonl（``struct/<doc_id>/<name>``）。
+
+    清单（bill_spec）与定额（quota_item）按 doc_id 分目录存放，APPLIES 映射需跨
+    全部规范名称匹配，故汇总所有规范的同名产物（如 SJG171 + SJG170 定额一起）。
+    参数：struct —— 结构化产物根；name —— 文件名。返回：拼接后的记录列表。
+    """
+    rows: list[dict] = []
+    for path in sorted(struct.glob(f"*/{name}")):
+        rows.extend(_read_jsonl(path))
+    return rows
+
+
 @click.command()
-@click.option("--bill-spec", "bill_path", type=click.Path(exists=True, path_type=Path),
-              default=STRUCT / "bill_spec.jsonl", show_default=True, help="bill_spec.jsonl")
-@click.option("--quota-item", "quota_path", type=click.Path(exists=True, path_type=Path),
-              default=STRUCT / "quota_item.jsonl", show_default=True, help="quota_item.jsonl")
+@click.option("--struct-dir", "struct_dir", type=click.Path(exists=True, path_type=Path),
+              default=STRUCT, show_default=True,
+              help="结构化产物根；扫 <doc_id>/bill_spec.jsonl 与 <doc_id>/quota_item.jsonl")
 @click.option("--outdir", type=click.Path(path_type=Path), default=STRUCT, show_default=True)
 @click.option("--dry-run", is_flag=True, help="只看 report，不落盘")
-def main(bill_path: Path, quota_path: Path, outdir: Path, dry_run: bool) -> None:
+def main(struct_dir: Path, outdir: Path, dry_run: bool) -> None:
     """bill_spec + quota_item → bill_quota_map.jsonl（清单→定额 APPLIES 名称匹配）。"""
-    bills = _read_jsonl(bill_path)
-    quotas = _read_jsonl(quota_path)
+    bills = _scan(struct_dir, "bill_spec.jsonl")
+    quotas = _scan(struct_dir, "quota_item.jsonl")
+    if not bills or not quotas:
+        raise click.ClickException(
+            f"未扫到 bill_spec/quota_item（bills={len(bills)} quotas={len(quotas)}）："
+            f"确认 {struct_dir}/<doc_id>/ 下已生成 per-doc 产物")
     rows = match(bills, quotas)
     report(rows, len(bills))
     if dry_run:
         console.print("[dim]--dry-run：未落盘[/]")
         return
     outdir.mkdir(parents=True, exist_ok=True)
-    _write_jsonl(rows, outdir / "bill_quota_map.jsonl")
+    _write_jsonl(rows, outdir / "bill_quota_map.jsonl")  # 跨规范关系产物，保持扁平
     console.print(f"[green]已写[/] {outdir/'bill_quota_map.jsonl'}（{len(rows)} 边）")
 
 

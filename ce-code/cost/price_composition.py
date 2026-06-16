@@ -27,6 +27,7 @@ import click
 from rich.console import Console
 from rich.table import Table
 
+from cost import resolve_doc_dir
 from cost.bill_spec import normalize_spec
 
 console = Console()
@@ -188,9 +189,10 @@ def main(input_path: Path, outdir: Path, dry_run: bool) -> None:
         console.print("[dim]--dry-run：未落盘[/]")
         return
 
-    outdir.mkdir(parents=True, exist_ok=True)
-    _write_jsonl(rows, outdir / "price_composition.jsonl")
-    console.print(f"[green]已写[/] {outdir/'price_composition.jsonl'}（{len(rows)} 行）")
+    doc_dir = resolve_doc_dir(outdir, rows)  # data/structured/<doc_id>/
+    doc_dir.mkdir(parents=True, exist_ok=True)
+    _write_jsonl(rows, doc_dir / "price_composition.jsonl")
+    console.print(f"[green]已写[/] {doc_dir/'price_composition.jsonl'}（{len(rows)} 行）")
 
 
 if __name__ == "__main__":

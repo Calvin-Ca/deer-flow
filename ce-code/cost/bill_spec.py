@@ -56,6 +56,14 @@ AUX_KIND_RULES = [
     ("classification", re.compile(r"分类|类别")),
     ("parameter", re.compile(r"宽度|系数|计算|厚度|高度|含量|增加")),
 ]
+# 规范号归一：原始 standard_id（= 文件名 basename，如 "GB_T50854-2024_房屋…"）→
+# (doc_id, canonical spec_version)，让导入端不再从文件名猜版本。键为 5 位规范数字。
+SPEC_REGISTRY = {
+    "50500": ("GB-50500", "GB 50500-2024"),
+    "50854": ("GB-50854", "GB/T 50854-2024"),
+    "50856": ("GB-50856", "GB/T 50856-2024"),
+}
+DEFAULT_DOC = ("GB-50854", "GB/T 50854-2024")
 
 
 # ---------------------------------------------------------------------------
@@ -129,6 +137,21 @@ def chapter_of(chunk: dict) -> str:
     return (anc[0] if anc else chunk.get("title", "")).strip()
 
 
+def normalize_spec(standard_id: str) -> tuple[str, str]:
+    """原始 standard_id → (doc_id, canonical spec_version)。
+
+    从 standard_id 里抠 5 位规范数字（如 "GB_T50854-2024_房屋…" → "50854"）查 SPEC_REGISTRY；
+    查不到则退回默认（GB/T 50854-2024），避免把文件名当版本号写进库。
+
+    参数：standard_id —— chunk.standard_id（splitter 透传的文件名 basename）。
+    返回：(doc_id, spec_version) 二元组。
+    """
+    m = re.search(r"(50500|50854|50856)", standard_id or "")
+    if m:
+        return SPEC_REGISTRY[m.group(1)]
+    return DEFAULT_DOC
+
+
 def classify_aux(caption: str) -> str:
     """按 caption 关键词粗分辅助表类型。
 
@@ -171,7 +194,7 @@ def extract(chunks: list[dict]) -> tuple[list[dict], list[dict], list[dict]]:
 
     for chunk in chunks:
         chapter = chapter_of(chunk)
-        spec_version = chunk.get("standard_id") or "GB/T 50854-2024"
+        doc_id, spec_version = normalize_spec(chunk.get("standard_id") or "")
 
         for table in chunk.get("tables") or []:
             body = table.get("body") or []
@@ -187,6 +210,8 @@ def extract(chunks: list[dict]) -> tuple[list[dict], list[dict], list[dict]]:
                     "header": header,
                     "body": body,
                     "provenance": _provenance(chunk, table),
+                    "doc_id": doc_id,
+                    "spec_version": spec_version,
                 })
                 continue
 
@@ -226,6 +251,7 @@ def extract(chunks: list[dict]) -> tuple[list[dict], list[dict], list[dict]]:
                     "calc_rule": cell("工程量计算规则"),
                     "work_content": split_numbered(cell("工作内容")),
                     "chapter": chapter,
+                    "doc_id": doc_id,
                     "spec_version": spec_version,
                     "provenance": _provenance(chunk, table),
                 })

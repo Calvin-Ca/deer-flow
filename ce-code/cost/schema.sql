@@ -1,0 +1,129 @@
+-- cost/schema.sql —— 结构化造价数据关系库（PostgreSQL 16，库 ce_cost）单一事实源 DDL
+--
+-- 用途：把服务器上手敲建好的 bill_spec 落成可复现 DDL，并一次建齐组价主体表
+--       （quota_item / quota_resource / resource / resource_price / hist_bill）与
+--       辅助表 aux_table。全部幂等（IF NOT EXISTS），可重复执行、可纳入 git 审计。
+--
+-- 治理铁律（TODO Phase C / DEV §3.3）：规范库与定额库为强一致、可审计资产，**所有口径表
+--   强制带 doc_id + version + region + effective_priority**；价格走动态管道，带 effective_period
+--   时效、不参与口径优先级排序。effective_priority 越小越优先（深圳本地 = 1）。
+--
+-- 跑法（服务器，单行）：
+--   docker exec -i ce-postgres psql -U cost -d ce_cost < cost/schema.sql
+-- 或本地 psycopg：load_pg.py --init-schema 会先执行本文件。
+
+-- btree_gist：resource_price 的 EXCLUDE 约束要让等值列参与 gist，须在建表前装好
+CREATE EXTENSION IF NOT EXISTS btree_gist;
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 1. 清单规范库（GB 50500 计价 + GB/T 50854 计量，9 位全国统一编码）
+-- ─────────────────────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS bill_spec (
+  code            CHAR(9) PRIMARY KEY,        -- 前 9 位全国统一编码
+  name            TEXT NOT NULL,              -- 清单项目名称
+  unit            TEXT,                       -- 计量单位（措施项目类可空）
+  calc_rule       TEXT,                       -- 工程量计算规则（GB/T 50854）
+  feature_schema  JSONB DEFAULT '[]'::jsonb,  -- 项目特征项模板（已拆 list）
+  work_content    JSONB DEFAULT '[]'::jsonb,  -- 工作内容（已拆 list）
+  chapter         TEXT,                       -- 所属分部（祖先链根）
+  provenance      JSONB,                      -- 溯源 {node_path, caption, page}
+  -- 治理字段 ──
+  doc_id          TEXT NOT NULL DEFAULT 'GB-50854',  -- 收录文档标识（GB-50854 / GB-50500）
+  spec_version    TEXT NOT NULL,              -- 规范版本（canonical，如 GB/T 50854-2024）
+  region          TEXT NOT NULL DEFAULT '全国', -- 适用地区（国标 = 全国）
+  effective_priority SMALLINT NOT NULL DEFAULT 1  -- 口径优先级（越小越优先）
+);
+CREATE INDEX IF NOT EXISTS idx_bill_spec_chapter ON bill_spec (chapter);
+CREATE INDEX IF NOT EXISTS idx_bill_spec_doc ON bill_spec (doc_id, spec_version);
+
+-- 辅助/参数表（土石分类表、工作面宽度表…）：列头异构、不归一化，原样留矩形 body 供 calc_rule 查表
+CREATE TABLE IF NOT EXISTS aux_table (
+  id          BIGSERIAL PRIMARY KEY,
+  chapter     TEXT,                           -- 所属分部
+  caption     TEXT,                           -- 表标题（如「表 A.4.3-1 土分类表」）
+  kind        TEXT,                           -- 粗分类 classification / parameter / unknown
+  header      JSONB,                          -- 表头行
+  body        JSONB,                          -- 完整矩形二维表
+  provenance  JSONB,                          -- 溯源 {node_path, caption, page}
+  doc_id      TEXT NOT NULL DEFAULT 'GB-50854',
+  spec_version TEXT NOT NULL,
+  UNIQUE (doc_id, caption, chapter)           -- 同文档同表唯一（续表 caption 不同 → 各占一行）
+);
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 2. 定额库（组价主体；MVP 取深圳市消耗量标准 SJG 171/170-2024，region=深圳 priority=1）
+-- ─────────────────────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS quota_item (
+  id            BIGSERIAL PRIMARY KEY,
+  quota_code    TEXT NOT NULL,                -- 定额子目编号
+  name          TEXT NOT NULL,
+  unit          TEXT NOT NULL,
+  base_price    NUMERIC,                      -- 基价
+  labor_cost    NUMERIC,                      -- 人工费
+  material_cost NUMERIC,                      -- 材料费
+  machine_cost  NUMERIC,                      -- 机械费
+  chapter       TEXT,                         -- 所属分部/章
+  provenance    JSONB,
+  -- 治理字段 ──
+  doc_id        TEXT NOT NULL,                -- SZ-SJG171 / SZ-SJG170
+  spec_version  TEXT NOT NULL,                -- 如 SJG 171-2024
+  region        TEXT NOT NULL DEFAULT '深圳',
+  effective_priority SMALLINT NOT NULL DEFAULT 1,
+  UNIQUE (region, quota_code, spec_version)
+);
+CREATE INDEX IF NOT EXISTS idx_quota_item_chapter ON quota_item (chapter);
+
+-- 资源（人材机）主数据
+CREATE TABLE IF NOT EXISTS resource (
+  id        BIGSERIAL PRIMARY KEY,
+  res_code  TEXT,                             -- 资源编码（如有）
+  name      TEXT NOT NULL,
+  spec      TEXT,                             -- 规格型号
+  category  TEXT NOT NULL,                    -- 人工 / 材料 / 机械
+  unit      TEXT NOT NULL,
+  doc_id    TEXT,
+  UNIQUE (category, name, spec, unit)
+);
+
+-- 工料机含量：定额子目 → 资源（多对多 + 含量）
+CREATE TABLE IF NOT EXISTS quota_resource (
+  id           BIGSERIAL PRIMARY KEY,
+  quota_id     BIGINT NOT NULL REFERENCES quota_item(id) ON DELETE CASCADE,
+  resource_id  BIGINT NOT NULL REFERENCES resource(id) ON DELETE CASCADE,
+  consumption  NUMERIC NOT NULL,             -- 含量
+  UNIQUE (quota_id, resource_id)
+);
+CREATE INDEX IF NOT EXISTS idx_quota_resource_quota ON quota_resource (quota_id);
+CREATE INDEX IF NOT EXISTS idx_quota_resource_res ON quota_resource (resource_id);
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 3. 价格库（动态独立管道：信息价月更，带时效；不参与口径优先级排序）
+-- ─────────────────────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS resource_price (
+  id               BIGSERIAL PRIMARY KEY,
+  resource_id      BIGINT NOT NULL REFERENCES resource(id) ON DELETE CASCADE,
+  region           TEXT NOT NULL DEFAULT '深圳',
+  price            NUMERIC NOT NULL,
+  price_type       TEXT NOT NULL DEFAULT '信息价', -- 信息价 / 市场价 / 历史价
+  effective_period DATERANGE NOT NULL,            -- 时效区间
+  doc_id           TEXT,                          -- SZ-JGXX-PRICE
+  -- 同资源同地区同来源时效不重叠（按期取价的前提）
+  EXCLUDE USING gist (resource_id WITH =, region WITH =, price_type WITH =, effective_period WITH &&)
+);
+CREATE INDEX IF NOT EXISTS idx_resource_price_res ON resource_price (resource_id);
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 4. 历史工程库（脱敏，供相似案例对标与异常检测；[可缓]）
+-- ─────────────────────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS hist_bill (
+  id           BIGSERIAL PRIMARY KEY,
+  project_id   BIGINT,
+  bill_code    CHAR(9),
+  feature      JSONB,
+  quantity     NUMERIC,
+  unit_price   NUMERIC,
+  project_type TEXT,
+  region       TEXT,
+  completed_at DATE
+);
+CREATE INDEX IF NOT EXISTS idx_hist_bill_code ON hist_bill (bill_code);

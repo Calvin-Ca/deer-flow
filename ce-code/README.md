@@ -93,6 +93,7 @@ ce-code/
 │   ├── price_composition.py        #   50500 chunks.json → price_composition.jsonl（费用构成规则，正则锚定原文）
 │   ├── quota.py                    #   SJG chunks.json → quota_item/resource/quota_resource.jsonl（定额转置矩阵·单位格锚定）
 │   ├── bill_quota.py               #   bill_spec + quota_item → bill_quota_map.jsonl（清单→定额 APPLIES 名称匹配·KG P0）
+│   ├── price.py                    #   信息价 chunks.json → resource_price.jsonl（物料月度价 + 时效，动态独立管道）
 │   ├── schema.sql                  #   全表 DDL（bill_spec/aux_table/price_composition/quota_*/resource*/bill_quota_map/hist_bill + 治理字段）
 │   └── load_pg.py                  #   JSONL → PG 幂等导入（-m cost.load_pg）
 │
@@ -287,6 +288,16 @@ uv run python -m cost.quota --input "data/structured/SJG_土石方与地基基�
 uv run python -m cost.bill_quota   # 默认扫 data/structured/<doc_id>/，--struct-dir 可改根
 ```
 
+### Step C1e — 信息价 → 价格库（动态独立管道，`cost/price.py`）
+
+深圳信息价（月刊）是**动态数据**，与定额/规范的静态口径解耦：`resource_price` 带 `effective_period` 时效，按 region + 期取价，不参与 `effective_priority` 排序。`price.py` 从信息价 `chunks.json` 抽价目表（`序号|材料名称|型号、规格|单位|价格(元)` 等变体），**列名子串定位**（名称列：设备名称→机械 / 项目名称→人工 / 否则材料；含「价格」+「元」且非「公式」→price），分类行（「一、黑色及有色金属」）记为 `sub_category`；天然排除价格指数（月份列）/ 造价对比 / 系数表 / 混凝土公式价（`价格计算公式(元)`）。时效从 standard_id「2026-5」推 `[2026-05-01, 2026-06-01)`（`--period YYYY-MM` 可覆盖）。产 per-doc `data/structured/SZ-JGXX-PRICE/resource_price.jsonl`（含物料自然键供 `load_pg` upsert 进 `resource` 取 id + price + 时效 + 溯源）。
+
+```bash
+uv run python -m cost.price --input "data/structured/2026_5深圳信息价_www_zgjct_com下载/default/chunks.json"
+```
+
+当前 2026-05：56 价目表 / 1138 价目行（材料 1024 / 机械 96 / 人工 35，同期多价去重 17），17 个分类。⚠️ 信息价物料名（如「建筑废渣混凝土实心砖 240x115x53」）与定额 resource 名（「普通混凝土实心砖 240×115×53」）格式有差，精确命中有限 → 大多作为**信息价自有资源**入 `resource`（doc_id=SZ-JGXX-PRICE），与定额 resource 的对接（语义匹配）待富化，按红线「只建议不定稿」。
+
 ### Step C2 — 建表 + 幂等导入 PG（`cost/schema.sql` + `cost/load_pg.py`）
 
 `schema.sql` 一次建齐全部造价表（`bill_spec` / `aux_table` / `price_composition` / `quota_item` / `quota_resource` / `resource` / `resource_price` / `hist_bill`），强制治理字段 `doc_id`/`spec_version`/`region`/`effective_priority`（价格 `resource_price` 带 `effective_period` 时效 + `btree_gist` EXCLUDE 防重叠；`resource` 唯一键 `NULLS NOT DISTINCT` 让 `spec=NULL` 也算同行）；`IF NOT EXISTS` 幂等。`load_pg.py` 读 jsonl，按主键 `ON CONFLICT DO UPDATE` upsert（`bill_spec` 按 `code`、`aux_table` 按 `doc_id+caption+chapter`、`price_composition` 按 `doc_id+composite+seq`、`quota_item` 按 `region+quota_code+spec_version`、`resource` 按 `category+name+spec+unit`），可重复执行不产生重复行。
@@ -297,7 +308,7 @@ uv run python -m cost.bill_quota   # 默认扫 data/structured/<doc_id>/，--str
 CE_PG_DSN='postgresql://cost:<密码>@localhost:5433/ce_cost' uv run python -m cost.load_pg --init-schema --scan-dir data/structured
 ```
 
-> 单文件 `--bill-spec` / `--quota-item` 等选项仍在（targeted 灌某表/某规范），可与 `--scan-dir` 叠加。预期计数：bill_spec 472 / aux 5 / price_composition 10 / resource 991（SJG171 407 + SJG170 584）/ quota_item 1257（640+617）/ quota_resource 8278（4173+4105，跳过 0）/ bill_quota_map 313。
+> 单文件 `--bill-spec` / `--quota-item` / `--resource-price` 等选项仍在（targeted 灌某表/某规范），可与 `--scan-dir` 叠加。预期计数：bill_spec 472 / aux 5 / price_composition 10 / resource 991+（SJG171 407 + SJG170 584，再并入信息价新物料）/ quota_item 1257（640+617）/ quota_resource 8278（4173+4105，跳过 0）/ resource_price 1138（信息价 2026-05；EXCLUDE 约束按 doc_id+期先删后插、同月重跑幂等）/ bill_quota_map 313。
 
 > ⚠️ `--init-schema` 是 `CREATE TABLE IF NOT EXISTS`，**不会改已存在的表结构**。若库里有缺治理字段的旧 `bill_spec`（早期手敲建的），先删了再灌（导入幂等，删表无损）：`docker exec ce-postgres psql -U cost -d ce_cost -c "DROP TABLE IF EXISTS bill_spec"`。
 

@@ -204,7 +204,7 @@ MinerU 解析 + 条款树提取 + 质量审核，在 GB 50378-2006 和 GB 50016 
 >
 > **⏸ 服务器灌库（BLOCKED：2026-06-16 服务器暂不可达，待恢复后跑）**：先 `git pull`，再 `uv add 'psycopg[binary]'`，然后 `--scan-dir` 一把灌（自动扫各 doc 目录全表 + 扁平 bill_quota_map，依赖序在内已排）——
 > `uv run python -m cost.load_pg --init-schema --scan-dir data/structured`
-> 预期：bill_spec 472 / aux 5 / price_composition 10 / resource 991（407+584）/ quota_item 1257（640+617）/ quota_resource 8278（4173+4105，跳过 0）/ bill_quota_map 313。灌后 `docker exec ce-postgres psql -U cost -d ce_cost` 逐表 `count(*)` + 跑 README C3 取数 demo（清单 `010401002 实心砖墙` → 4 定额子目 → 工料机）。⚠️ `--init-schema` 是 `CREATE TABLE IF NOT EXISTS`，**不改已存在表结构**——库里有缺治理字段的手敲版 `bill_spec` 时先 `DROP TABLE IF EXISTS bill_spec`（导入幂等、删表无损）再灌。
+> 预期：bill_spec 472 / aux 5 / price_composition 10 / resource 991+（407+584，再并入信息价新物料）/ quota_item 1257（640+617）/ quota_resource 8278（4173+4105，跳过 0）/ resource_price 1138（信息价 2026-05）/ bill_quota_map 313。灌后 `docker exec ce-postgres psql -U cost -d ce_cost` 逐表 `count(*)` + 跑 README C3 取数 demo（清单 `010401002 实心砖墙` → 4 定额子目 → 工料机）。⚠️ `--init-schema` 是 `CREATE TABLE IF NOT EXISTS`，**不改已存在表结构**——库里有缺治理字段的手敲版 `bill_spec` 时先 `DROP TABLE IF EXISTS bill_spec`（导入幂等、删表无损）再灌。
 
 - [ ] 关系库 PostgreSQL 建表：`bill_spec` / `quota_item` / `quota_resource` / `resource` / `resource_price` / `hist_bill`，**强制带 `doc_id` + `version` + `region`(深圳) + `effective_priority`(深圳本地=1)**，价格带 `effective_period`
   - [x] **PostgreSQL 16 已部署**（✅ 2026-06-16，服务器 stone）：因系统共用 docker 与满盘 `/` 不可动，**用 rootless docker 起独立 daemon**（caic 用户名下，data-root=`/mnt/nvme/calvin/docker/data`，与共用 daemon 零交集），`postgres:16` 容器 `ce-postgres`（端口 **5433**，库 `ce_cost`，用户 `cost`，卷 `ce_pgdata` 落 nvme，对内网开放）。部署细节见 DEV §6。`bill_spec` 表已建（code/name/unit/feature_schema JSONB/calc_rule/work_content JSONB/chapter/spec_version/provenance JSONB）**并已导入 GB/T 50854 的 472 条**。
@@ -224,7 +224,11 @@ MinerU 解析 + 条款树提取 + 质量审核，在 GB 50378-2006 和 GB 50016 
   - [ ] **load_pg 实际入 PG + 抽查**（git 不可证，PG 状态不进库；⏸ 服务器待恢复）：`python -m cost.load_pg --init-schema --scan-dir data/structured` 一把灌（含 SJG171+170）后 `SELECT count(*)` 核对——预期 resource 991 / quota_item 1257 / quota_resource 8278（跳过 0）。⚠️ SJG 无规整目录，`chapter`/`ancestor_titles` 偏弱，入库后抽查。
   - [ ] **精修**：`见表`(26) 引用单位、三层子目名称中间「墙厚」行未贴回（quota_code 仍唯一）。SJG 170 抽取已完成（见上「多规范累积」）；其 14 子目缺人材机费（土方机械主导，部分子目本无人工/材料）入库后抽查。
   - [x] **多规范累积（✅ 2026-06-16，原阻塞已解）**：`quota.py`/`bill_spec.py`/`price_composition.py` 原写死固定文件名→第二份规范覆盖第一份。已改**按 `doc_id` 分目录输出** `data/structured/<doc_id>/<表>.jsonl`（doc_id 从记录推断，共享 helper `cost.resolve_doc_dir`，多于一个即报错）；`bill_quota.py` 改扫 `structured/<doc_id>/` 跨规范汇总匹配；`load_pg.py` 加 `--scan-dir` 按依赖序一把灌各 doc 全表 + 扁平 bill_quota_map（单文件选项保留可叠加）。**SJG 170 已落盘**：617 子目（跨页「续前」按 (doc_id,quota_code) 合并 1 行、保住首页真价）/ 584 资源 / 4105 含量，FK 本地校验 0 缺失。现有 50854/SJG171/50500 产物已迁入 per-doc 目录、扁平旧文件 git rm。**GB 50856 安装仍推迟**（不是布局问题，是数据建模）：5 个重复编码里 4 个「同码多计量单位」（金属结构刷油 kg/m² 等，需 unit 多值建模、动 schema）、1 个真冲突（`031003010` 倒流防止器 vs 淋浴器，源码读错需标记）；`bill_spec` PG 主键 `code`，直灌 `ON CONFLICT` 丢数据，待「多单位建模 + 冲突标记」后续再收。
-- [ ] 价格库导入 `resource_price`（深圳信息价 SZ-JGXX-PRICE，带 `effective_period` 时效，**走动态独立更新管道**）
+- [🟡] 价格库导入 `resource_price`（深圳信息价 SZ-JGXX-PRICE，带 `effective_period` 时效，**走动态独立更新管道**）
+  - [x] **信息价解析器 `cost/price.py`**（✅ 2026-06-16）：从信息价 chunks.json 抽价目表（`序号|材料名称|型号、规格|单位|价格(元)` 等变体），**列名子串定位**（名称列：设备名称→机械/项目名称→人工/否则材料；含「价格」+「元」且非「公式」→price），分类行「一、黑色及有色金属」记 `sub_category`；天然排除价格指数（月份列）/造价对比/系数表/混凝土公式价（`价格计算公式(元)`）。时效从 standard_id「2026-5」推 `[2026-05-01,2026-06-01)`（`--period` 可覆盖）。产 per-doc `data/structured/SZ-JGXX-PRICE/resource_price.jsonl`。**本地全量验证 2026-05**：56 价目表 / 1138 价目行（材料 1024/机械 96/人工 35，同期多价去重 17，价格非数字跳过 1）/ 17 分类。
+  - [x] **schema 已含 + load_pg loader**（✅ 2026-06-16）：`resource_price`（resource_id FK + region + price + price_type + `effective_period` DATERANGE + `btree_gist` EXCLUDE 防同资源同期重叠）DDL 早建；`load_pg` 加 `--resource-price`——信息价物料先 upsert 进 `resource`（自然键合并，`ON CONFLICT DO NOTHING` 不覆盖定额行 doc_id）取 id，再按 (doc_id,price_type,region,期) **先删后插** 写价（EXCLUDE 不能 ON CONFLICT，故同月重跑幂等）。本地编译 + CLI 验证。
+  - [ ] **load_pg 实际入 PG + 抽查**（git 不可证；⏸ 服务器待恢复）：随 `--scan-dir` 一把灌（resource_price.jsonl 已纳入扫描）。⚠️ 信息价物料名与定额 resource 名格式有差，精确命中有限→多作信息价自有资源入库，与定额 resource 对接（语义匹配）待富化，按红线「只建议不定稿」。
+  - [ ] **多月时效**：当前仅 2026-05；后续按月入库（不同 doc_id 期不重叠，EXCLUDE 保证按期取价）。
 - [ ] 费率标准（SZ-FLBZ-2023）入费用计算表（企业管理费/利润/安文费/规费/税金）
 - [ ] 历史工程库 `hist_bill`（脱敏 + 质量标注，供相似案例对标；[可缓]）
 

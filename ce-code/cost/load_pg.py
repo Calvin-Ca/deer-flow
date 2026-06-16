@@ -242,6 +242,65 @@ def load_quota_resource(conn, links: list[dict]) -> tuple[int, int]:
     return len(rows), skipped
 
 
+def load_resource_price(conn, records: list[dict]) -> tuple[int, int]:
+    """信息价物料 → 先 upsert resource 取 id，再幂等写 resource_price（按时效区间）。
+
+    `resource_price` 有 EXCLUDE（同资源+地区+来源时效不重叠）约束、不能 ON CONFLICT，
+    故按 (doc_id, price_type, region, 时效区间) **先删后插**，保证同月重跑幂等。信息价
+    物料即资源主数据的一个来源：`ON CONFLICT DO NOTHING` 与定额 resource 自然键合并、
+    不覆盖定额行的 doc_id（命中即复用其 id，未命中则新建带 doc_id=SZ-JGXX-PRICE）。
+
+    参数：conn；records —— resource_price.jsonl（含物料自然键 + price + 时效）。
+    返回：(写入价行数, resource 解析失败跳过数)。
+    """
+    from datetime import date as _date
+
+    from psycopg.types.range import Range
+
+    def rng(r):
+        return Range(_date.fromisoformat(r["effective_start"]),
+                     _date.fromisoformat(r["effective_end"]), "[)")
+
+    # 1. 信息价物料 upsert 进 resource（资源主数据来源之一；命中定额行则复用、不覆盖）
+    res_rows = [(None, r["name"], r.get("spec") or None, r["category"],
+                 r["unit"], r.get("doc_id") or None) for r in records]
+    with conn.cursor() as cur:
+        cur.executemany("""
+            INSERT INTO resource (res_code, name, spec, category, unit, doc_id)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            ON CONFLICT (category, name, spec, unit) DO NOTHING
+        """, res_rows)
+        cur.execute("SELECT id, category, name, spec, unit FROM resource")
+        rmap = {(c, n, s, u): i for i, c, n, s, u in cur.fetchall()}
+
+    # 2. 先删本期同来源价（幂等），再插
+    with conn.cursor() as cur:
+        for doc, pt, region, s, e in {(r["doc_id"], r["price_type"], r["region"],
+                                       r["effective_start"], r["effective_end"])
+                                      for r in records}:
+            cur.execute("""DELETE FROM resource_price
+                           WHERE doc_id=%s AND price_type=%s AND region=%s
+                                 AND effective_period=%s""",
+                        (doc, pt, region, Range(_date.fromisoformat(s),
+                                                _date.fromisoformat(e), "[)")))
+
+    rows, skipped = [], 0
+    for r in records:
+        rid = rmap.get((r["category"], r["name"], r.get("spec") or None, r["unit"]))
+        if rid is None:
+            skipped += 1
+            continue
+        rows.append((rid, r["region"], r["price"], r["price_type"], rng(r),
+                     r.get("doc_id")))
+    with conn.cursor() as cur:
+        cur.executemany("""
+            INSERT INTO resource_price
+                (resource_id, region, price, price_type, effective_period, doc_id)
+            VALUES (%s, %s, %s, %s, %s, %s)
+        """, rows)
+    return len(rows), skipped
+
+
 def load_bill_quota_map(conn, records: list[dict]) -> int:
     """幂等 upsert bill_quota_map（按 bill_code+quota_code+quota_doc_id 唯一键）。
 
@@ -317,13 +376,15 @@ def _read_many(paths: list[Path]) -> list[dict]:
               default=None, help="quota_item.jsonl 路径（定额子目）。")
 @click.option("--quota-resource", "quota_res_path", type=click.Path(exists=True, path_type=Path),
               default=None, help="quota_resource.jsonl 路径（子目×资源含量）。")
+@click.option("--resource-price", "resource_price_path", type=click.Path(exists=True, path_type=Path),
+              default=None, help="resource_price.jsonl 路径（信息价物料月度价 + 时效）。")
 @click.option("--bill-quota-map", "bq_map_path", type=click.Path(exists=True, path_type=Path),
               default=None, help="bill_quota_map.jsonl 路径（清单→定额 APPLIES）。")
 def main(dsn: str, init_schema: bool, scan_dir: Path | None,
          bill_spec_path: Path | None, aux_path: Path | None,
          price_comp_path: Path | None, resource_path: Path | None,
          quota_item_path: Path | None, quota_res_path: Path | None,
-         bq_map_path: Path | None) -> None:
+         resource_price_path: Path | None, bq_map_path: Path | None) -> None:
     """JSONL → PostgreSQL 幂等导入（建表 + 清单/定额/费用构成各表，单事务提交）。
 
     ``--scan-dir`` 扫各 ``<doc_id>/`` 子目录全表（多规范累积）+ 扁平 bill_quota_map，
@@ -342,6 +403,7 @@ def main(dsn: str, init_schema: bool, scan_dir: Path | None,
     bill_spec_paths = _collect(scan_dir, "bill_spec.jsonl", bill_spec_path)
     aux_paths = _collect(scan_dir, "aux_tables.jsonl", aux_path)
     price_comp_paths = _collect(scan_dir, "price_composition.jsonl", price_comp_path)
+    resource_price_paths = _collect(scan_dir, "resource_price.jsonl", resource_price_path)
     bq_map_paths = _collect(scan_dir, "bill_quota_map.jsonl", bq_map_path, flat=True)
 
     with psycopg.connect(dsn) as conn:
@@ -368,6 +430,11 @@ def main(dsn: str, init_schema: bool, scan_dir: Path | None,
         if price_comp_paths:
             n = load_price_composition(conn, _read_many(price_comp_paths))
             console.print(f"[green]✓ price_composition upsert {n} 条[/]")
+        # 信息价：物料 upsert 进 resource 后写月度价（依赖 resource 表存在；自带 resource upsert）
+        if resource_price_paths:
+            n, skip = load_resource_price(conn, _read_many(resource_price_paths))
+            console.print(f"[green]✓ resource_price 写 {n} 条[/]"
+                          + (f"，[yellow]跳过 {skip}（resource 未解析）[/]" if skip else ""))
         # bill_quota_map 依赖 bill_spec + quota_item 已在库，放最后
         if bq_map_paths:
             n = load_bill_quota_map(conn, _read_many(bq_map_paths))

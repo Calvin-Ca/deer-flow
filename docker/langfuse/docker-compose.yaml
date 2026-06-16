@@ -16,10 +16,19 @@
 #   cd docker/langfuse && docker compose up -d
 # 访问：http://<服务器IP>:3030   登录邮箱见 LANGFUSE_INIT_USER_EMAIL，密码见 .env / 下方默认值
 
+# 公共 logging 配置，所有服务通过 <<: *default-logging 引用
+x-logging: &default-logging
+  logging:
+    driver: "json-file"
+    options:
+      max-size: "50m"
+      max-file: "3"
+
 services:
   langfuse-web:
     image: langfuse/langfuse:3
     restart: always
+    <<: *default-logging
     depends_on:
       postgres:
         condition: service_healthy
@@ -80,6 +89,7 @@ services:
   langfuse-worker:
     image: langfuse/langfuse-worker:3
     restart: always
+    <<: *default-logging
     depends_on:
       postgres:
         condition: service_healthy
@@ -120,6 +130,7 @@ services:
   postgres:
     image: postgres:16
     restart: always
+    <<: *default-logging
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-758812007d952668c4193f3fd8fb9717}
@@ -135,6 +146,7 @@ services:
   clickhouse:
     image: clickhouse/clickhouse-server
     restart: always
+    <<: *default-logging
     user: "101:101"
     environment:
       CLICKHOUSE_DB: default
@@ -153,6 +165,7 @@ services:
   minio:
     image: minio/minio
     restart: always
+    <<: *default-logging
     entrypoint: sh
     # 启动后自动建好 langfuse bucket
     command: -c 'mkdir -p /data/langfuse && minio server --address ":9000" --console-address ":9001" /data'
@@ -170,6 +183,7 @@ services:
   redis:
     image: redis:7
     restart: always
+    <<: *default-logging
     command: >
       --requirepass ${REDIS_AUTH:-ba0c6aee03df61d8d660e4706e2ba4d7}
     healthcheck:

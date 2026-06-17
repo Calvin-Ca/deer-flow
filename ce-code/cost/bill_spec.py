@@ -59,13 +59,17 @@ AUX_KIND_RULES = [
     ("parameter", re.compile(r"宽度|系数|计算|厚度|高度|含量|增加")),
 ]
 # 规范号归一：原始 standard_id（= 文件名 basename，如 "GB_T50854-2024_房屋…"）→
-# (doc_id, canonical spec_version)，让导入端不再从文件名猜版本。键为 5 位规范数字。
+# (doc_id, canonical spec_version)。键为 5 位规范号 → (doc_id 基名, 编号前缀)；**版本年份从
+# standard_id 另抠**（同一规范号 2013/2024 不同版本须隔离，见 normalize_spec）。50500 为强制性
+# 标准（前缀 GB），50854/50856 为推荐性（GB/T）。
 SPEC_REGISTRY = {
-    "50500": ("GB-50500", "GB 50500-2024"),
-    "50854": ("GB-50854", "GB/T 50854-2024"),
-    "50856": ("GB-50856", "GB/T 50856-2024"),
+    "50500": ("GB-50500", "GB"),
+    "50854": ("GB-50854", "GB/T"),
+    "50856": ("GB-50856", "GB/T"),
 }
-DEFAULT_DOC = ("GB-50854", "GB/T 50854-2024")
+DEFAULT_NUM = "50854"
+# 无显式年份时的缺省版本年（现行 2024 版；保持旧行为：2024 文件 doc_id 不带年后缀）
+DEFAULT_YEAR = "2024"
 
 
 # ---------------------------------------------------------------------------
@@ -140,18 +144,25 @@ def chapter_of(chunk: dict) -> str:
 
 
 def normalize_spec(standard_id: str) -> tuple[str, str]:
-    """原始 standard_id → (doc_id, canonical spec_version)。
+    """原始 standard_id → (doc_id, canonical spec_version)，**版本年份感知**（2013/2024 隔离）。
 
-    从 standard_id 里抠 5 位规范数字（如 "GB_T50854-2024_房屋…" → "50854"）查 SPEC_REGISTRY；
-    查不到则退回默认（GB/T 50854-2024），避免把文件名当版本号写进库。
+    从 standard_id 抠 5 位规范号（→ doc_id 基名 + 前缀）与 4 位版本年（20xx）。**关键**：同一规范号
+    不同版本（GB/T 50854-2013 vs -2024）须落不同 doc_id，否则 2013 真实数据会与 2024 撞库——
+    故 doc_id 在非现行年时带年后缀（如 ``GB-50854-2013``），现行 2024 保持裸名 ``GB-50854``
+    （旧行为不变，已入库的 2024 数据不受影响）。年份缺省取 2024。
 
-    参数：standard_id —— chunk.standard_id（splitter 透传的文件名 basename）。
-    返回：(doc_id, spec_version) 二元组。
+    参数：standard_id —— chunk.standard_id（splitter 透传的文件名 basename，如 "GB_T50854-2013_…"）。
+    返回：(doc_id, spec_version) 二元组，如 ("GB-50854-2013", "GB/T 50854-2013")。
     """
-    m = re.search(r"(50500|50854|50856)", standard_id or "")
-    if m:
-        return SPEC_REGISTRY[m.group(1)]
-    return DEFAULT_DOC
+    sid = standard_id or ""
+    m = re.search(r"(50500|50854|50856)", sid)
+    num = m.group(1) if m else DEFAULT_NUM
+    ym = re.search(r"(20\d{2})", sid)
+    year = ym.group(1) if ym else DEFAULT_YEAR
+    doc_base, prefix = SPEC_REGISTRY[num]
+    doc_id = doc_base if year == DEFAULT_YEAR else f"{doc_base}-{year}"
+    spec_version = f"{prefix} {num}-{year}"
+    return doc_id, spec_version
 
 
 def classify_aux(caption: str) -> str:

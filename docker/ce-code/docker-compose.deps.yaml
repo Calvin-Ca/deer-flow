@@ -1,0 +1,103 @@
+# ce-code 知识层 · 依赖数据服务（PostgreSQL + Milvus 栈）—— 项目自有、落 rootless docker / 大盘
+#
+# 为什么单独一份、且跑 rootless：系统 docker 为多用户共用、data-root 在 100% 满的 `/`，且别人的
+# 栈（如 anju-milvus）会被随意删除（19530 曾因此掉线）。故本项目**自有**一套 PG + Milvus，跑在
+# caic 的 rootless daemon（data-root 已在 /mnt/nvme），数据卷再显式 bind 到大盘目录，谁也删不掉。
+#
+# 端口/库名与项目约定**逐字一致**（config.py / cost/query.py 依赖）：
+#   PostgreSQL  localhost:5433  库 ce_cost / 用户 cost      —— compose 内服务名 postgres
+#   Milvus      localhost:19530 (+ 9091 健康)               —— 服务名 milvus（etcd/minio 仅内网互联）
+# 模型服务（不在本 compose）：embedding bge-large :8097 / LLM qwen3-8b :8099 —— 共享 GPU 容器，外部依赖。
+#
+# ── 启动（务必走 rootless daemon，绝不用 sudo docker）────────────────────────────
+#   export DOCKER_HOST=unix:///run/user/$(id -u)/docker.sock        # 或：docker context use rootless
+#   mkdir -p /mnt/nvme/calvin/data/ce-code/{postgres,milvus,etcd,minio}
+#   cp docker/ce-code/.env.deps.example docker/ce-code/.env.deps
+#   docker compose -f docker/ce-code/docker-compose.deps.yaml --env-file docker/ce-code/.env.deps up -d
+#
+# ⚠️ 迁移注记：旧的 `docker run` 起的 ce-postgres 与系统 docker 的 anju-milvus 要先停掉再起本 compose
+#   （避免 5433/19530 端口冲突）。PG 数据卷路径已变（旧 named volume ce_pgdata → 新 bind 大盘），
+#   故首次起 PG 为空库，按 README 重新灌库（产物全在 git，幂等）：
+#     uv run python -m cost.load_pg --init-schema --scan-dir data/structured
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: ce-postgres
+    restart: unless-stopped
+    ports:
+      - "5433:5432"                         # 对内网 dev 开放；config DEFAULT_DSN = localhost:5433/ce_cost
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-cost}
+      POSTGRES_DB: ${POSTGRES_DB:-ce_cost}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-caic}
+    volumes:
+      - ${CE_DATA_ROOT:-/mnt/nvme/calvin/data/ce-code}/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-cost} -d ${POSTGRES_DB:-ce_cost}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  etcd:
+    image: quay.io/coreos/etcd:v3.5.16
+    container_name: ce-milvus-etcd
+    restart: unless-stopped
+    environment:
+      ETCD_AUTO_COMPACTION_MODE: revision
+      ETCD_AUTO_COMPACTION_RETENTION: "1000"
+      ETCD_QUOTA_BACKEND_BYTES: "4294967296"
+      ETCD_SNAPSHOT_COUNT: "50000"
+    command: >
+      etcd
+      -advertise-client-urls=http://etcd:2379
+      -listen-client-urls=http://0.0.0.0:2379
+      --data-dir=/etcd
+    volumes:
+      - ${CE_DATA_ROOT:-/mnt/nvme/calvin/data/ce-code}/etcd:/etcd
+    healthcheck:
+      test: ["CMD", "etcdctl", "endpoint", "health"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    container_name: ce-milvus-minio
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: ${MINIO_USER:-minioadmin}      # Milvus 默认即用 minioadmin/minioadmin
+      MINIO_ROOT_PASSWORD: ${MINIO_PASSWORD:-minioadmin}
+    command: server /data --console-address ":9001"
+    volumes:
+      - ${CE_DATA_ROOT:-/mnt/nvme/calvin/data/ce-code}/minio:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  milvus:
+    image: milvusdb/milvus:v2.4.13
+    container_name: ce-milvus
+    restart: unless-stopped
+    command: ["milvus", "run", "standalone"]
+    ports:
+      - "19530:19530"                       # config milvus_host=localhost milvus_port=19530
+      - "9091:9091"                         # 健康/metrics
+    environment:
+      ETCD_ENDPOINTS: etcd:2379
+      MINIO_ADDRESS: minio:9000
+    volumes:
+      - ${CE_DATA_ROOT:-/mnt/nvme/calvin/data/ce-code}/milvus:/var/lib/milvus
+    depends_on:
+      etcd:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9091/healthz"]
+      interval: 15s
+      timeout: 10s
+      retries: 6
+      start_period: 40s                     # 冷启动 standalone 需要数十秒

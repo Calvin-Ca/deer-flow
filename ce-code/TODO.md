@@ -274,11 +274,11 @@ MinerU 解析 + 条款树提取 + 质量审核，在 GB 50378-2006 和 GB 50016 
 
 > **下一步主线（2026-06-17 定）**：给 `/bill/match` 上护栏——`/bill/match` 端点已服务器实测通过，但实测暴露 dense 单通道 Top-1 不稳（正解在 top-k 非首位），**必须先有评测集量化 Top-1/Top-3，再决定上 sparse(BGE-M3)/rerank/KG 约束**（勿凭单条样本盲目上模型）。
 
-- [ ] **评测 harness（先写，与 gold 来源无关）**：`tools/eval_bill.py`——读 `match_gold.jsonl` → 跑 `cost.bill_match.search_bill`（或 HTTP `/bill/match`）→ 算 **Top-1 / Top-3 / MRR / 金标秩**，按 PRD §6 排序敏感口径。
-- [ ] **清单编码匹配 gold `match_gold.jsonl`**（构件→编码标注），指标 **Top-1 ≥ 85% / Top-3 ≥ 95%**。gold 来源三选一（待用户定）：
-  - ① **半自动种子**：从 `bill_spec` 名称反向生成「构件描述→编码」候选，人工校验修订（快、初版偏机械）。
-  - ② **真实结算项目**：用户提供已结算工程清单（构件→实际套用编码）转 gold（最真实，需脱敏数据）。
-  - ③ **先跑通机制（推荐先做）**：harness + 手工 5~10 条金标先把护栏链路跑通，gold 后续按 ①/② 扩充（合「先跑通」纪律）。
+- [x] **评测 harness `tools/eval_bill.py`**（代码 ✅ 2026-06-17，服务器待跑）：读 `match_gold.jsonl` → 跑 `cost.bill_match.search_bill` → 按**编码精确相等**判命中（清单 9 位码唯一，无规范轨「包含关系」）→ 算 **Top-1 / Top-3 / Recall@k / MRR / 平均金标秩**（PRD §6 排序敏感）+ rich 逐条表 + 红线着色（Top-1≥85%/Top-3≥95%）。结构：纯指标 `first_gold_rank`/`aggregate`/`_load_gold` 只依赖 stdlib+config（本地可测），click/rich/搜索在 `run_eval`/`_cli` lazy import。纯函数本地 11/11 测试通过。⚠️ 服务器 `uv run python -m tools.eval_bill`（Milvus+嵌入在跑）。
+- [🟡] **清单编码匹配 gold `match_gold.jsonl`**（构件→编码标注），指标 **Top-1 ≥ 85% / Top-3 ≥ 95%**。gold 来源三选一：
+  - [x] **③ 先跑通机制（已选，2026-06-17）**：手工 **10 条**种子金标（编码均从 `bill_spec.jsonl` 核实，非杜撰：矩形柱/梁、实心砖墙、平整场地、圈梁、过梁、独立基础、砌块墙、屋面防水、柱钢筋——含「柱本体 m3 vs 柱钢筋 t」对照测排序区分度）落 `data/eval_set/match_gold.jsonl`，护栏链路打通。
+  - [ ] ① **半自动种子**：从 `bill_spec` 名称反向生成「构件描述→编码」候选、人工校验扩样本量（后续扩充）。
+  - [ ] ② **真实结算项目**：用户提供已结算工程清单（构件→实际套用编码）转 gold（最真实，需脱敏数据）。
 - [ ] **据评测对症提升 `/bill/match`**：① BGE-M3 sparse 混检 / reranker 拉开精确名命中；② KG 约束按 unit/章节/有无定额覆盖收窄候选（柱本体 m3 vs 柱钢筋 t）。
 - [ ] 定额套用：对照已结算项目，定额套用准确率 ≥ 85%
 - [ ] 红线门禁：未达准确率红线的原语默认「只建议不定稿」（HITL 在任务层兜底）

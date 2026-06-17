@@ -45,3 +45,40 @@ def test_shape_hits():
 def test_shape_hits_empty():
     """空命中返回空列表。"""
     assert _shape_hits([]) == []
+
+
+# ── 评测 harness 纯指标（tools.eval_bill）────────────────────────────────────────
+from tools.eval_bill import aggregate, first_gold_rank
+
+
+def test_first_gold_rank_hit():
+    """首个命中金标的 1-based 秩。"""
+    assert first_gold_rank({"B"}, ["A", "B", "C"]) == 2
+    assert first_gold_rank({"A"}, ["A", "B"]) == 1
+
+
+def test_first_gold_rank_multi_gold():
+    """多金标取最靠前命中。"""
+    assert first_gold_rank({"C", "B"}, ["A", "B", "C"]) == 2
+
+
+def test_first_gold_rank_miss():
+    """top_k 内无金标→None。"""
+    assert first_gold_rank({"Z"}, ["A", "B"]) is None
+
+
+def test_aggregate_metrics():
+    """Top-1/Top-3/Recall/MRR/平均命中秩 计算。ranks=[1,2,None,4]，k=10。"""
+    m = aggregate([1, 2, None, 4], 10)
+    assert m["n"] == 4
+    assert m["top1"] == 0.25           # 1 个 rank==1
+    assert m["top3"] == 0.5            # rank<=3: {1,2}
+    assert m["recall_at_k"] == 0.75    # 3/4 命中(<=10)
+    assert abs(m["mrr"] - (1 + 0.5 + 0.25) / 4) < 1e-9
+    assert abs(m["mean_hit_rank"] - (1 + 2 + 4) / 3) < 1e-9
+
+
+def test_aggregate_empty():
+    """空 ranks 不除零，mean_hit_rank=None。"""
+    m = aggregate([], 10)
+    assert m["n"] == 0 and m["mean_hit_rank"] is None

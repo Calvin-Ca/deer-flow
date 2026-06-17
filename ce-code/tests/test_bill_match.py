@@ -93,6 +93,39 @@ def test_structural_reorder_stable():
     assert out[0]["type_penalty"] == 0 and out[-1]["type_penalty"] == 1
 
 
+# ── xlsx → gold 转换（tools.build_match_gold，2013 版隔离）────────────────────────
+from tools.build_match_gold import build_query, clean_feature, code9, rows_to_gold
+
+
+def test_code9_strips_project_suffix():
+    """12 位 xlsx 码取前 9 位规范码（去 3 位项目自编）。"""
+    assert code9("010202007001") == "010202007"
+    assert code9("010202007") == "010202007"
+
+
+def test_clean_feature_collapses():
+    """多行项目特征折叠为单行紧凑文本。"""
+    assert clean_feature("(1)地层情况:综合\n(2)类型:锚杆  ") == "(1)地层情况:综合 (2)类型:锚杆"
+
+
+def test_build_query_excludes_name():
+    """查询=构件名+特征，不含清单 NAME（避免循环）。"""
+    q = build_query("锚索", "(1)类型:基坑底抗拔锚杆")
+    assert q == "锚索；(1)类型:基坑底抗拔锚杆" and "锚杆(锚索)" not in q
+
+
+def test_rows_to_gold_dedup_and_coverage():
+    """同(码,特征)去重；不在库的码进 uncovered 不进 gold。"""
+    rows = [
+        {"CODE": "010202007001", "NAME": "锚杆(锚索)", "FEATURE": "类型:抗拔", "COMP_NAME": "锚索"},
+        {"CODE": "010202007002", "NAME": "锚杆(锚索)", "FEATURE": "类型:抗拔", "COMP_NAME": "锚索"},  # 同(码9,特征)→去重
+        {"CODE": "999999999001", "NAME": "未知项", "FEATURE": "x", "COMP_NAME": "y"},               # 不在库→uncovered
+    ]
+    gold, uncovered = rows_to_gold(rows, valid_codes={"010202007"})
+    assert len(gold) == 1 and gold[0]["gold"] == ["010202007"]
+    assert len(uncovered) == 1 and uncovered[0]["code9"] == "999999999"
+
+
 # ── 评测 harness 纯指标（tools.eval_bill）────────────────────────────────────────
 from tools.eval_bill import aggregate, first_gold_rank
 

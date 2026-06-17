@@ -37,25 +37,32 @@ def bill_embed_text(name: str, feature_schema: list[str] | None, chapter: str | 
     return "。".join(parts)
 
 
-def _fetch_bills(dsn: str | None) -> list[dict]:
-    """从 PG 读全部清单项（建库源数据），按 code 排序。
+def _fetch_bills(dsn: str | None, doc_ids: list[str] | None = None) -> list[dict]:
+    """从 PG 读清单项（建库源数据），按 code 排序。
 
-    参数：dsn —— PG 连接串（见 cost.query.resolve_dsn）。
+    参数：
+        dsn —— PG 连接串（见 cost.query.resolve_dsn）。
+        doc_ids —— 只取这些 doc_id（**版本隔离**：如只建 2013 传 ['GB-50500-2013']）；None=全部。
     返回：list[dict]，每项含 code/name/unit/feature_schema/chapter/doc_id/spec_version。
     """
     from cost import query as cost_query
 
+    sql = ("SELECT code, name, unit, feature_schema, chapter, doc_id, spec_version "
+           "FROM bill_spec")
+    params: list = []
+    if doc_ids:
+        sql += " WHERE doc_id = ANY(%s)"
+        params.append(list(doc_ids))
+    sql += " ORDER BY code"
     with cost_query.connect(dsn) as conn, conn.cursor() as cur:
-        cur.execute(
-            "SELECT code, name, unit, feature_schema, chapter, doc_id, spec_version "
-            "FROM bill_spec ORDER BY code"
-        )
+        cur.execute(sql, params or None)
         return cur.fetchall()
 
 
 def build(
     dsn: str | None = None,
     collection_name: str = COST_BILL_COLLECTION,
+    doc_ids: list[str] | None = None,
     milvus_host: str = DEFAULTS["milvus_host"],
     milvus_port: int = DEFAULTS["milvus_port"],
     embed_url: str = DEFAULTS["embed_url"],
@@ -66,7 +73,9 @@ def build(
 
     参数：
         dsn (str | None): PG 连接串（None 走默认 :5433/ce_cost）。
-        collection_name (str): Milvus collection 名（默认 cost_bill_spec_kb）。
+        collection_name (str): Milvus collection 名（默认 cost_bill_spec_kb；隔离版本用独立名）。
+        doc_ids (list[str] | None): 只建这些 doc_id（**版本隔离**：2013 用独立 collection + doc_id，
+            不与 2024 混；None=全部）。
         milvus_host/milvus_port/embed_url/embed_model_id/batch_size: Milvus 与嵌入服务参数。
     返回：
         无（副作用：drop 重建 collection 并灌入向量 + 标量行）。
@@ -78,8 +87,9 @@ def build(
     from index.vector_index import embed_texts
 
     console = Console()
-    bills = _fetch_bills(dsn)
-    console.print(f"读 PG bill_spec：{len(bills)} 条清单项")
+    bills = _fetch_bills(dsn, doc_ids)
+    scope = f"（doc_id={list(doc_ids)}）" if doc_ids else "（全部 doc_id）"
+    console.print(f"读 PG bill_spec：{len(bills)} 条清单项 {scope} → collection {collection_name}")
     if not bills:
         console.print("[yellow]bill_spec 为空，跳过建库（先 load_pg 灌库）[/yellow]")
         return
@@ -135,5 +145,24 @@ def build(
     console.print(f"[green]✓ bill_spec_kb 建成：{stats['row_count']} 个向量[/green]")
 
 
+def _cli():
+    """构造 click 命令（click lazy import，模块顶层无依赖，保持 bill_embed_text 可被纯测 import）。"""
+    import click
+
+    @click.command()
+    @click.option("--collection", default=COST_BILL_COLLECTION, show_default=True,
+                  help="Milvus collection 名（隔离版本用独立名，如 cost_bill_spec_kb_2013）")
+    @click.option("--doc-id", "doc_ids", multiple=True,
+                  help="只建这些 doc_id（版本隔离，可多次；如 --doc-id GB-50500-2013）；不传=全部")
+    @click.option("--dsn", default=None, help="PG 连接串（默认 :5433/ce_cost）")
+    @click.option("--batch-size", default=64, show_default=True)
+    def main(collection: str, doc_ids: tuple, dsn: str | None, batch_size: int) -> None:
+        """从 PG bill_spec 建/重建造价清单向量库。"""
+        build(dsn=dsn, collection_name=collection,
+              doc_ids=list(doc_ids) or None, batch_size=batch_size)
+
+    return main
+
+
 if __name__ == "__main__":
-    build()
+    _cli()()

@@ -61,6 +61,20 @@ qa（:8102）+ compliance（:8101）两进程合并为单一进程，共用 :810
 
 ---
 
+## 阶段 4：算量计价 CostAgent（🟡 进行中 · 当前主线）
+
+> 项目已聚焦算量 + 计价（防火轨停做，见 ce-code TODO）。CostAgent 是知识层造价取数原语
+> （`/bill/match` `/price/compose` `/quota`，均在 :8100）的消费方，组价闭环：
+> **构件描述 → bill_match 拿清单候选 → LLM 在候选内选码 → price_compose 组价**（红线：只建议不定稿、HITL 复核）。
+
+- [x] **造价取数客户端 `common/cost_client.py`**（✅ 2026-06-17）：封装 `bill_match`/`price_compose`/`quota`
+  HTTP 客户端（与 `knowledge_client` 同模式，复用 `KNOWLEDGE_URL`:8100；region/code path 段
+  `urllib.parse.quote` 编码避中文 404）。组价闭环「取数 plumbing」就位。
+- [ ] **CostAgent 选码编排**：收构件 → `cost_client.bill_match` 拿 top-k 候选 → Qwen3 在候选内选码
+  （结构化输出 + 出处 + 置信度；红线只建议不定稿）→ `cost_client.price_compose` 组价。
+- [ ] **封装为 skill + deer-flow agent 集成**（与 code-qa/compliance-check 同模式）。
+- [ ] **端到端验证**：给一段已知工程量的构件 → 跑通「清单候选→选码→组价」最小闭环。
+
 ## 阶段 3：设计辅助（⬜ 待办）
 
 **目标**：实时给出参数约束（如"此建筑高度下最大防火分区面积"）。

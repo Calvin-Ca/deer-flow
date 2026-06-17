@@ -268,7 +268,7 @@ MinerU 解析 + 条款树提取 + 质量审核，在 GB 50378-2006 和 GB 50016 
 - [x] 新增 `/quota/{region}/{code}`（定额子目直取）（✅ 2026-06-17，服务器实测通过）
   - [x] **取数访问层 + 端点骨架**（✅ 2026-06-17）：`cost/query.py` 只读 PG 数据访问（`resolve_dsn`/`connect`/`get_quota`，与写入侧 `load_pg` 分离）；`service/cost_api.py` 暴露 `GET /quota/{region}/{code}`（子目字段 + 工料机含量，按人工/材料/机械排序；404/503 映射），挂载进 `service.knowledge_api`（:8100，与规范检索同进程、PG 与 Milvus 依赖隔离）。
   - [x] **服务器实测**（✅ 2026-06-17）：`GET /quota/深圳/010001-3`（region 须百分号编码，curl 手敲坑；httpx/requests 客户端自动编码）回实心砖墙子目（base_price 11328.89 + 人材机费）+ 9 工料机（2 人工/6 材料/1 机械，排序正确）。契约完整。
-  - [ ] **ce-services 客户端接入**：任务层做 HTTP 客户端复用（与 `/search` 同模式）。
+  - [x] **ce-services 客户端接入**（✅ 2026-06-17，`ce-services/common/cost_client.py`）：任务层封装造价取数原语 HTTP 客户端 `bill_match`/`price_compose`/`quota`（与 `knowledge_client` 同模式，复用 `KNOWLEDGE_URL`:8100；region/code path 段 `urllib.parse.quote` 编码避 404）。组价闭环 plumbing 就位；CostAgent 的 LLM 选码编排在 ce-services 待建（见 ce-services TODO）。
 
 ### 造价评测集
 
@@ -282,8 +282,8 @@ MinerU 解析 + 条款树提取 + 质量审核，在 GB 50378-2006 和 GB 50016 
 - [🟡] **据评测对症提升 `/bill/match`**：
   - [x] ~~**reranker 重排**~~（代码 ✅ 但**实测劣化、默认关闭** 2026-06-17）：dense 基线 `Top-1=70% / Top-3=100% / Recall@10=100%`，加 bge-reranker-large 后**反降** `Top-1=60% / Top-3=90% / MRR 0.833→0.743`。**根因**：cross-encoder（为 query×长段落训练）在「构件描述 × 极短清单名」上**抓共享限定词当强相关**——查询「M5水泥砂浆/专用砂浆」把「砂浆找平层」顶过「实心砖墙/砌块墙」，过梁被错排到秩 10；过召回 30 条又引入 dense 压低的干扰项。**结论：dense 单通道是更强基线**，reranker 默认 `rerank=False`（`search_bill`/`/bill/match`/`eval_bill` 保留 toggle 备查/换模型再试，复用规范轨单例的接法不变）。
   - [x] **认知修正**：知识层职责是**召回候选**，dense `Recall@10=100% / Top-3=100%` 已达标（前 3 必含正解）；Top-1 选码按 PRD §6 归任务层 LLM 在候选内做（红线：只建议不定稿）。故不在召回原语层硬追 Top-1，转而用**结构化约束**辅助排序 + 把 Top-1 红线留给任务层。
-  - [ ] **扩 gold 10→30~50（优先，先把数字做稳）**：当前 10 条样本 Top-1 置信区间太宽（reranker ±10% 难判真伪）。走来源①半自动种子。
-  - [x] **结构约束·类型对齐重排（代码 ✅ 2026-06-17，服务器待验）**：替代劣化的 reranker。`cost.bill_match._structural_reorder` 对 dense 候选**稳定重排**——候选名带「附属/措施类型标记」(`STRUCTURAL_MARKERS`=模板/钢筋/脚手架/支撑/支架/拆除/泵送/超高) 而查询未提及 → 罚分下压到本体之后（`_type_penalty`）。关键细节：「钢筋混凝土」是**材料词非要钢筋项的意图**，查询与候选名都先归一「钢筋混凝土→混凝土」再判钢筋标记（避免误罚本体）。确定性、对本体/同类零扰动（同罚分保持 dense 序）。`search_bill(structural=True 默认)` / `POST /bill/match {structural}` / `eval_bill --structural/--no-structural` 可切。纯函数 `_type_penalty`/`_structural_reorder` 本地 17/17 通过。**预期**：修「圈梁→圈梁模板」「矩形柱→柱钢筋」；**不修「屋面 vs 楼地面」**（部位词非类型，两者同罚分，需后续部位感知）。⚠️ 服务器 `eval_bill` 量 structural on vs off。
+  - [ ] **⏸️ 待办（以后准备数据集）· 扩 gold 10→30~50 把 Top-1 数字做稳**：当前 10 条样本 Top-1 置信区间太宽（structural +10% / reranker ±10% 难判真伪），需更大样本才能验收。**首选来源②真实结算项目**——待用户给一份可脱敏的「构件描述→实际套用编码」样例，再写转换脚本生成 `match_gold.jsonl`（无真实数据时退而求其次走①半自动种子，数字偏乐观当下限）。**数据就绪前暂不动 `/bill/match` 引擎**（避免在 10 样本上过拟合堆规则，见 experiments E5 结论）。
+  - [x] **结构约束·类型对齐重排（✅ 服务器实测 +10% Top-1，2026-06-17）**：实测 structural on `Top-1 70%→80% / MRR 0.833→0.900 / 命中秩 1.40→1.20`，**零回归**（圈梁 2→1 修好，过梁 3→2 改善，矩形柱/柱钢筋保持）。替代劣化的 reranker。`cost.bill_match._structural_reorder` 对 dense 候选**稳定重排**——候选名带「附属/措施类型标记」(`STRUCTURAL_MARKERS`=模板/钢筋/脚手架/支撑/支架/拆除/泵送/超高) 而查询未提及 → 罚分下压到本体之后（`_type_penalty`）。关键细节：「钢筋混凝土」是**材料词非要钢筋项的意图**，查询与候选名都先归一「钢筋混凝土→混凝土」再判钢筋标记（避免误罚本体）。确定性、对本体/同类零扰动（同罚分保持 dense 序）。`search_bill(structural=True 默认)` / `POST /bill/match {structural}` / `eval_bill --structural/--no-structural` 可切。纯函数 `_type_penalty`/`_structural_reorder` 本地 17/17 通过。**预期**：修「圈梁→圈梁模板」「矩形柱→柱钢筋」；**不修「屋面 vs 楼地面」**（部位词非类型，两者同罚分，需后续部位感知）。⚠️ 服务器 `eval_bill` 量 structural on vs off。
   - [ ] **KG 定额覆盖加成（待做，需 PG）**：候选在 `bill_quota_map` 有定额映射者优先（组价-able）；属真 KG 信号但会把 PG 依赖引入召回路径，单列、与上「词法结构约束」分开。
   - [ ] **部位感知**（屋面 vs 楼地面 vs 墙面）：结构约束修不了（同类型），后续按部位词对齐或特征匹配补。
   - [ ] **BGE-M3 sparse 混检**：召回已满分（Recall@10=100%），sparse 主救召回，优先级最低，暂不做。

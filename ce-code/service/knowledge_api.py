@@ -10,6 +10,9 @@
   POST /expand                       对 node_path 做引用图扩展
   GET  /clause/{standard}/{path}     单条款直取
 
+造价取数原语（走 PG，依赖隔离，挂载自 ``service.cost_api``）：
+  GET  /quota/{region}/{code}        定额子目直取（子目字段 + 工料机含量）
+
 启动（服务器，从 ce-code 根，模块式）：
   cd /mnt/nvme/calvin/code/deer-flow/ce-code
   .venv/bin/python -m service.knowledge_api
@@ -24,6 +27,7 @@ from pydantic import BaseModel, Field
 
 from config import DEFAULTS, STANDARD_ALIASES
 from ir.query import RetrievalQuery
+from service.cost_api import router as cost_router
 from service.retrieve_service import KnowledgeRetrieveService
 
 # data/ 路径由本文件位置推出（service/knowledge_api.py → 上两级即 ce-code 根），与 cwd 无关
@@ -33,6 +37,7 @@ _VECTOR_STORE = _ROOT / "data" / "vector_store"
 _service = KnowledgeRetrieveService(_VECTOR_STORE)
 
 app = FastAPI(title="Building Code RAG · Retrieval Service", version="3.0.0")
+app.include_router(cost_router)                  # 造价取数原语（PG，依赖隔离，见 service.cost_api）
 
 
 # ── 请求模型 ──────────────────────────────────────────────────────────────────

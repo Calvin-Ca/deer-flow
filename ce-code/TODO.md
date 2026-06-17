@@ -232,7 +232,7 @@ MinerU 解析 + 条款树提取 + 质量审核，在 GB 50378-2006 和 GB 50016 
     - `cost/resource_price_map.py` matcher：归一键 + 单位换算对齐，产扁平 `resource_price_map.jsonl`。**本地全量**：**43 确定性边**（confidence 1.0，含 5 条千块→块换算）/ unit_bad 9 / **no_source 882（信息价无此料，主导）**。
     - `schema.sql` 加 `resource_price_map` 表；`load_pg` 加 `--resource-price-map`（纳入 `--scan-dir`，依赖 resource 两来源全在库后灌）；`compose_price` 改两路取价（直连优先 / 经 map 套 unit_factor），`price_status` 改 **matched / no_source**（诚实区分"命中"vs"信息价根本没登"）。
     - **结论**：信息价（~152 种常用大宗料）覆盖定额材料约 10%，但按组价**金额**占比是大头（砖/砌块/砂浆/混凝土/钢筋）。语义匹配对价覆盖近零收益（缺口是缺失非同义），故不建 BGE-M3 价匹配。
-    - **待办**：服务器 `python -m cost.resource_price_map` 产 jsonl（提交）→ `load_pg --scan-dir` 灌库 → 重测 `/price/compose` 看 matched 边的 amount。
+    - [x] **服务器落库 + 实测**（✅ 2026-06-17）：`resource_price_map` 入 PG，`/price/compose/深圳/010401002` 砖/湿拌砂浆/板材/水从 no_source 变 **matched**，amount 算术全对（砖 0.77 元/块 ×1000 = 4294.29，占该定额材料费 ~66%）；干混砂浆/铁钉/灰浆搅拌机仍 no_source（信息价确无）。**印证论点**：信息价覆盖材料数少但**金额大头命中**。⚠️ `resource_price_map.jsonl` 派生产物待从服务器 commit 入 git。
   - [ ] **⚠️ 顺带修：定额单位 `$m^3$` LaTeX 残留**（`quota.py` 抽取遗留，污染 quota_item/resource 的 unit、害 /quota 与 /price/compose 输出）：matcher 端已靠 `canonical_unit` 容错，但**根治要回 `quota.py` 清洗 unit 后重抽 SJG**——单列一项。
   - [ ] **web_search 动态查价（补 no_source 缺口）**：信息价未登的 ~90% 材料（专项小料/市场价）走任务层 `web_search` 工具实时检索当期市场价/厂家报价 → 填 `price_status=no_source` 的工料机。**红线**：web 来源标 `price_type=市场价(web)` + 出处 URL + 时间戳，**只建议不定稿**、HITL 复核后才入价；不与信息价混库。属任务层 CostAgent 能力（知识层 `/price/compose` 只暴露 no_source 缺口清单供其消费）。
   - [ ] **多月时效**：当前仅 2026-05；后续按月入库（不同 doc_id 期不重叠，EXCLUDE 保证按期取价）。

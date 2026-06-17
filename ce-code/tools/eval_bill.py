@@ -76,10 +76,11 @@ def _load_gold(path: Path) -> list[dict]:
     return cases
 
 
-def run_eval(gold_path: str, top_k: int, collection: str) -> dict:
+def run_eval(gold_path: str, top_k: int, collection: str, rerank: bool = True) -> dict:
     """跑清单匹配评测：逐条召回 + 判命中，打印指标表，返回汇总 dict（无 click 依赖）。
 
-    参数：gold_path —— 金标 jsonl（相对 ce-code 根）；top_k —— 召回深度；collection —— 向量库名。
+    参数：gold_path —— 金标 jsonl（相对 ce-code 根）；top_k —— 召回深度；collection —— 向量库名；
+      rerank —— 是否 cross-encoder 精排（默认 True；传 False 量 dense 基线作对比）。
     返回：``aggregate`` 的汇总 dict（n/top1/top3/recall_at_k/mrr/mean_hit_rank）。
     """
     from rich.console import Console
@@ -89,7 +90,8 @@ def run_eval(gold_path: str, top_k: int, collection: str) -> dict:
 
     console = Console()
     cases = _load_gold(ROOT / gold_path)
-    console.print(f"金标 {len(cases)} 条 · top_k={top_k} · collection={collection}\n")
+    console.print(f"金标 {len(cases)} 条 · top_k={top_k} · collection={collection} · "
+                  f"rerank={'on' if rerank else 'off'}\n")
 
     table = Table(title="清单匹配评测 · 逐条", show_lines=False)
     for col in ("查询", "金标", "Top-1 召回", "金标秩", "命中"):
@@ -97,7 +99,7 @@ def run_eval(gold_path: str, top_k: int, collection: str) -> dict:
 
     ranks: list[int | None] = []
     for c in cases:
-        candidates = search_bill(c["query"], top_k, collection_name=collection)
+        candidates = search_bill(c["query"], top_k, collection_name=collection, rerank=rerank)
         codes = [x["code"] for x in candidates]
         rank = first_gold_rank(c["gold"], codes)
         ranks.append(rank)
@@ -128,9 +130,10 @@ def _cli():
                   help="金标 jsonl 路径（相对 ce-code 根）")
     @click.option("--top-k", default=10, help="召回深度 k")
     @click.option("--collection", default=COST_BILL_COLLECTION, help="清单向量库 collection")
-    def main(gold_path: str, top_k: int, collection: str) -> None:
+    @click.option("--rerank/--no-rerank", default=True, help="是否 cross-encoder 精排（--no-rerank 量 dense 基线）")
+    def main(gold_path: str, top_k: int, collection: str, rerank: bool) -> None:
         """跑清单匹配评测并打印指标表。"""
-        run_eval(gold_path, top_k, collection)
+        run_eval(gold_path, top_k, collection, rerank)
 
     return main
 

@@ -4,7 +4,7 @@
 真链路（PG 建库 + 向量召回）在服务器跑，本地仅验纯逻辑（torch cu121 本地不可用）。
 """
 from cost.bill_index import bill_embed_text
-from cost.bill_match import _shape_hits
+from cost.bill_match import _rerank_text, _shape_hits
 
 
 def test_embed_text_full():
@@ -45,6 +45,18 @@ def test_shape_hits():
 def test_shape_hits_empty():
     """空命中返回空列表。"""
     assert _shape_hits([]) == []
+
+
+def test_rerank_text_from_candidate():
+    """候选(feature 为 '/'-串)还原为与建库同构的配对文本。"""
+    cand = {"name": "矩形柱", "feature": "图代号/混凝土强度等级", "chapter": "附录E 混凝土工程"}
+    assert _rerank_text(cand) == "矩形柱。特征:图代号/混凝土强度等级。附录E 混凝土工程"
+
+
+def test_rerank_text_empty_feature():
+    """feature 空串时省略特征段，与 bill_embed_text 行为一致。"""
+    cand = {"name": "平整场地", "feature": "", "chapter": "附录A"}
+    assert _rerank_text(cand) == "平整场地。附录A"
 
 
 # ── 评测 harness 纯指标（tools.eval_bill）────────────────────────────────────────

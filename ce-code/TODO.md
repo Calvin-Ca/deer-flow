@@ -279,7 +279,10 @@ MinerU 解析 + 条款树提取 + 质量审核，在 GB 50378-2006 和 GB 50016 
   - [x] **③ 先跑通机制（已选，2026-06-17）**：手工 **10 条**种子金标（编码均从 `bill_spec.jsonl` 核实，非杜撰：矩形柱/梁、实心砖墙、平整场地、圈梁、过梁、独立基础、砌块墙、屋面防水、柱钢筋——含「柱本体 m3 vs 柱钢筋 t」对照测排序区分度）落 `data/eval_set/match_gold.jsonl`，护栏链路打通。
   - [ ] ① **半自动种子**：从 `bill_spec` 名称反向生成「构件描述→编码」候选、人工校验扩样本量（后续扩充）。
   - [ ] ② **真实结算项目**：用户提供已结算工程清单（构件→实际套用编码）转 gold（最真实，需脱敏数据）。
-- [ ] **据评测对症提升 `/bill/match`**：① BGE-M3 sparse 混检 / reranker 拉开精确名命中；② KG 约束按 unit/章节/有无定额覆盖收窄候选（柱本体 m3 vs 柱钢筋 t）。
+- [🟡] **据评测对症提升 `/bill/match`**：
+  - [x] **reranker 重排（代码 ✅ 2026-06-17，服务器待验）**：实测 dense `Top-1=70% / Top-3=100% / Recall@10=100%`——**纯排序问题**（召回满分，3 个 miss 全在第 2–3 位：圈梁/过梁→其「模板」项、屋面防水→楼地面防水）。故加 cross-encoder 精排：`cost.bill_match` dense 多召回 `RERANK_POOL=30` → `_rerank` 重排截 top_k，**复用规范轨 `retrieval.hybrid_retriever._get_reranker` 进程内单例**（bge-reranker-large，DEV §1「rerank 唯一 owner」，不重复加载），不可用自动回退 dense 顺序。`search_bill(...,rerank=True)` / `POST /bill/match {rerank}` / `eval_bill --rerank/--no-rerank` 全可切（量前后对比）。纯函数 `_rerank_text` 本地测试通过（13/13）。⚠️ 服务器重起 :8100 后 `uv run python -m tools.eval_bill`（默认 rerank on）对比 `--no-rerank` 基线。
+  - [ ] **BGE-M3 sparse 混检**：若 reranker 后 Top-1 仍不达 85%（召回已满分，优先级低于 rerank）。
+  - [ ] **KG 约束按 unit/章节/有无定额覆盖收窄候选**（柱本体 m3 vs 柱钢筋 t；reranker 之外的结构化补强，对任务层选码也有用）。
 - [ ] 定额套用：对照已结算项目，定额套用准确率 ≥ 85%
 - [ ] 红线门禁：未达准确率红线的原语默认「只建议不定稿」（HITL 在任务层兜底）
 

@@ -247,7 +247,8 @@ MinerU 解析 + 条款树提取 + 质量审核，在 GB 50378-2006 和 GB 50016 
 - [ ] 造价 `bill_spec_kb` collection（BGE-M3 dense+sparse 混检），供清单匹配候选生成
 - [🟡] 新增 `/price/compose`（清单项+region→工料机含量+价格：KG + 价格库；**先跑通取数路径**）
   - [x] **取数链 + 端点骨架**（✅ 2026-06-17）：`cost.query.compose_price`（bill_spec → bill_quota_map(APPLIES,带 confidence) → quota_item → quota_resource → resource ⋈ resource_price）；`GET /price/compose/{region}/{code}?on_date=` 挂 :8100。**价取数**：信息价按 region + 时效区间 LEFT JOIN LATERAL，`on_date` 命中期优先、缺省取每资源最新可用期（避开「今天 2026-06-17 超出 2026-05 期」坑）。**红线**：未命中信息价的工料机 `unit_price=None`+`price_status="unpriced"`、绝不杜撰，amount 仅在有价时算。本地 py_compile 通过；**服务器验证待跑**。
-  - [ ] **服务器实测**：`GET /price/compose/深圳/010401002` 应回实心砖墙 → 多定额（带 confidence）→ 工料机含量 + 单价/小计（部分 unpriced）。
+  - [x] **服务器实测**（✅ 2026-06-17）：`GET /price/compose/深圳/010401002` 回实心砖墙 → 6 定额变体（1/2·3/4·1砖 × 干混/湿拌砂浆，全 conf 0.9 / auto_name_exact）→ 工料机含量 + 单价/小计。机制全对：水 4.76 元（信息价 2026-05 命中）、amount=1.713×4.76=8.15 算术正确、未命中价的 `price_status=unpriced` 不杜撰。
+  - [ ] **⚠️ 实测暴露：信息价命中率极低（材料价覆盖 ≈ 1/材料数）**——每定额 ~9 工料机仅「水」命中价。分类：人工费(单位元，本不在信息价，正确 unpriced) + 其他材料费(%，派生费率) + **真材料/机械(砂浆/砖/铁钉/板材/灰浆搅拌机) 应有价却全 miss**（信息价物料名 vs 定额 resource 名格式差，精确名匹配命中不了）。**提覆盖**：与 KG 映射富化同源——补资源名对齐/语义匹配（BGE-M3），见下「映射富化」「价格库 load_pg→对接」。这是 `/price/compose` 从「跑通」到「可用」的主瓶颈。
 - [ ] 新增 `/bill/match`（构件→清单候选：BGE-M3 混合召回 + KG 约束 + LLM 决策；依赖上一步 KG 跑通）
 - [x] 新增 `/quota/{region}/{code}`（定额子目直取）（✅ 2026-06-17，服务器实测通过）
   - [x] **取数访问层 + 端点骨架**（✅ 2026-06-17）：`cost/query.py` 只读 PG 数据访问（`resolve_dsn`/`connect`/`get_quota`，与写入侧 `load_pg` 分离）；`service/cost_api.py` 暴露 `GET /quota/{region}/{code}`（子目字段 + 工料机含量，按人工/材料/机械排序；404/503 映射），挂载进 `service.knowledge_api`（:8100，与规范检索同进程、PG 与 Milvus 依赖隔离）。

@@ -245,7 +245,9 @@ MinerU 解析 + 条款树提取 + 质量审核，在 GB 50378-2006 和 GB 50016 
 ### 向量库 + 检索原语
 
 - [ ] 造价 `bill_spec_kb` collection（BGE-M3 dense+sparse 混检），供清单匹配候选生成
-- [ ] 新增 `/price/compose`（清单项+region→工料机含量+价格：KG + 价格库；**先跑通取数路径**）
+- [🟡] 新增 `/price/compose`（清单项+region→工料机含量+价格：KG + 价格库；**先跑通取数路径**）
+  - [x] **取数链 + 端点骨架**（✅ 2026-06-17）：`cost.query.compose_price`（bill_spec → bill_quota_map(APPLIES,带 confidence) → quota_item → quota_resource → resource ⋈ resource_price）；`GET /price/compose/{region}/{code}?on_date=` 挂 :8100。**价取数**：信息价按 region + 时效区间 LEFT JOIN LATERAL，`on_date` 命中期优先、缺省取每资源最新可用期（避开「今天 2026-06-17 超出 2026-05 期」坑）。**红线**：未命中信息价的工料机 `unit_price=None`+`price_status="unpriced"`、绝不杜撰，amount 仅在有价时算。本地 py_compile 通过；**服务器验证待跑**。
+  - [ ] **服务器实测**：`GET /price/compose/深圳/010401002` 应回实心砖墙 → 多定额（带 confidence）→ 工料机含量 + 单价/小计（部分 unpriced）。
 - [ ] 新增 `/bill/match`（构件→清单候选：BGE-M3 混合召回 + KG 约束 + LLM 决策；依赖上一步 KG 跑通）
 - [x] 新增 `/quota/{region}/{code}`（定额子目直取）（✅ 2026-06-17，服务器实测通过）
   - [x] **取数访问层 + 端点骨架**（✅ 2026-06-17）：`cost/query.py` 只读 PG 数据访问（`resolve_dsn`/`connect`/`get_quota`，与写入侧 `load_pg` 分离）；`service/cost_api.py` 暴露 `GET /quota/{region}/{code}`（子目字段 + 工料机含量，按人工/材料/机械排序；404/503 映射），挂载进 `service.knowledge_api`（:8100，与规范检索同进程、PG 与 Milvus 依赖隔离）。

@@ -11,7 +11,8 @@
   GET  /clause/{standard}/{path}     单条款直取
 
 造价取数原语（走 PG，依赖隔离，挂载自 ``service.cost_api``）：
-  GET  /quota/{region}/{code}        定额子目直取（子目字段 + 工料机含量）
+  GET  /quota/{region}/{code}            定额子目直取（子目字段 + 工料机含量）
+  GET  /price/compose/{region}/{code}    组价取数（清单 → 定额 → 工料机含量 + 信息价单价）
 
 启动（服务器，从 ce-code 根，模块式）：
   cd /mnt/nvme/calvin/code/deer-flow/ce-code

@@ -72,7 +72,7 @@ def search_bill(
     query: str,
     top_k: int = 10,
     collection_name: str = COST_BILL_COLLECTION,
-    rerank: bool = True,
+    rerank: bool = False,
     rerank_pool: int = RERANK_POOL,
     milvus_host: str = DEFAULTS["milvus_host"],
     milvus_port: int = DEFAULTS["milvus_port"],
@@ -89,7 +89,9 @@ def search_bill(
         query (str): 构件/做法的自然语言描述（如「C30 现浇钢筋混凝土矩形柱」）。
         top_k (int): 返回候选数。
         collection_name (str): bill_spec_kb collection 名。
-        rerank (bool): 是否 cross-encoder 精排（默认 True；评测对比可关）。
+        rerank (bool): 是否 cross-encoder 精排（**默认 False**——2026-06-17 实测 bge-reranker-large
+            在「构件描述 × 极短清单名」上劣化 dense 基线：Top-1 70%→60%、Top-3 100%→90%
+            （抓共享限定词如「砂浆」当强相关，把砂浆找平层顶过实心砖墙）。保留 toggle 备查/换模型再试）。
         rerank_pool (int): rerank 前 dense 召回的候选池大小。
         milvus_host/milvus_port/embed_url/embed_model_id: Milvus 与嵌入服务参数。
     返回：

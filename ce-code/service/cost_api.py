@@ -31,7 +31,7 @@ class BillMatchRequest(BaseModel):
 
     query: str = Field(..., description="构件/做法自然语言描述，如「C30 现浇钢筋混凝土矩形柱」")
     top_k: int = Field(10, ge=1, le=50, description="返回候选数")
-    rerank: bool = Field(True, description="是否 cross-encoder 精排（默认开；关则纯 dense 召回）")
+    rerank: bool = Field(False, description="是否 cross-encoder 精排（默认关——实测在短清单名上劣化 dense；备查）")
 
 
 @router.get("/quota/{region}/{code}")

@@ -280,9 +280,11 @@ MinerU 解析 + 条款树提取 + 质量审核，在 GB 50378-2006 和 GB 50016 
   - [ ] ① **半自动种子**：从 `bill_spec` 名称反向生成「构件描述→编码」候选、人工校验扩样本量（后续扩充）。
   - [ ] ② **真实结算项目**：用户提供已结算工程清单（构件→实际套用编码）转 gold（最真实，需脱敏数据）。
 - [🟡] **据评测对症提升 `/bill/match`**：
-  - [x] **reranker 重排（代码 ✅ 2026-06-17，服务器待验）**：实测 dense `Top-1=70% / Top-3=100% / Recall@10=100%`——**纯排序问题**（召回满分，3 个 miss 全在第 2–3 位：圈梁/过梁→其「模板」项、屋面防水→楼地面防水）。故加 cross-encoder 精排：`cost.bill_match` dense 多召回 `RERANK_POOL=30` → `_rerank` 重排截 top_k，**复用规范轨 `retrieval.hybrid_retriever._get_reranker` 进程内单例**（bge-reranker-large，DEV §1「rerank 唯一 owner」，不重复加载），不可用自动回退 dense 顺序。`search_bill(...,rerank=True)` / `POST /bill/match {rerank}` / `eval_bill --rerank/--no-rerank` 全可切（量前后对比）。纯函数 `_rerank_text` 本地测试通过（13/13）。⚠️ 服务器重起 :8100 后 `uv run python -m tools.eval_bill`（默认 rerank on）对比 `--no-rerank` 基线。
-  - [ ] **BGE-M3 sparse 混检**：若 reranker 后 Top-1 仍不达 85%（召回已满分，优先级低于 rerank）。
-  - [ ] **KG 约束按 unit/章节/有无定额覆盖收窄候选**（柱本体 m3 vs 柱钢筋 t；reranker 之外的结构化补强，对任务层选码也有用）。
+  - [x] ~~**reranker 重排**~~（代码 ✅ 但**实测劣化、默认关闭** 2026-06-17）：dense 基线 `Top-1=70% / Top-3=100% / Recall@10=100%`，加 bge-reranker-large 后**反降** `Top-1=60% / Top-3=90% / MRR 0.833→0.743`。**根因**：cross-encoder（为 query×长段落训练）在「构件描述 × 极短清单名」上**抓共享限定词当强相关**——查询「M5水泥砂浆/专用砂浆」把「砂浆找平层」顶过「实心砖墙/砌块墙」，过梁被错排到秩 10；过召回 30 条又引入 dense 压低的干扰项。**结论：dense 单通道是更强基线**，reranker 默认 `rerank=False`（`search_bill`/`/bill/match`/`eval_bill` 保留 toggle 备查/换模型再试，复用规范轨单例的接法不变）。
+  - [x] **认知修正**：知识层职责是**召回候选**，dense `Recall@10=100% / Top-3=100%` 已达标（前 3 必含正解）；Top-1 选码按 PRD §6 归任务层 LLM 在候选内做（红线：只建议不定稿）。故不在召回原语层硬追 Top-1，转而用**结构化约束**辅助排序 + 把 Top-1 红线留给任务层。
+  - [ ] **扩 gold 10→30~50（优先，先把数字做稳）**：当前 10 条样本 Top-1 置信区间太宽（reranker ±10% 难判真伪）。走来源①半自动种子。
+  - [ ] **KG/结构约束按 unit+章节对齐**（替代 reranker 作 Top-1 补强）：本体/模板/钢筋 = m3/m2/t + 不同章节段（010502/03 本体、010505 模板、010506 钢筋）。查询为现浇本体时优先 m3、压低模板/钢筋——可靠区分「圈梁 vs 圈梁模板」，且对任务层选码有用。
+  - [ ] **BGE-M3 sparse 混检**：召回已满分（Recall@10=100%），sparse 主救召回，优先级最低，暂不做。
 - [ ] 定额套用：对照已结算项目，定额套用准确率 ≥ 85%
 - [ ] 红线门禁：未达准确率红线的原语默认「只建议不定稿」（HITL 在任务层兜底）
 

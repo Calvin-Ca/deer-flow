@@ -76,7 +76,7 @@ def _load_gold(path: Path) -> list[dict]:
     return cases
 
 
-def run_eval(gold_path: str, top_k: int, collection: str, rerank: bool = True) -> dict:
+def run_eval(gold_path: str, top_k: int, collection: str, rerank: bool = False) -> dict:
     """跑清单匹配评测：逐条召回 + 判命中，打印指标表，返回汇总 dict（无 click 依赖）。
 
     参数：gold_path —— 金标 jsonl（相对 ce-code 根）；top_k —— 召回深度；collection —— 向量库名；
@@ -130,7 +130,7 @@ def _cli():
                   help="金标 jsonl 路径（相对 ce-code 根）")
     @click.option("--top-k", default=10, help="召回深度 k")
     @click.option("--collection", default=COST_BILL_COLLECTION, help="清单向量库 collection")
-    @click.option("--rerank/--no-rerank", default=True, help="是否 cross-encoder 精排（--no-rerank 量 dense 基线）")
+    @click.option("--rerank/--no-rerank", default=False, help="是否 cross-encoder 精排（默认关；实测劣化 dense，--rerank 仅备查）")
     def main(gold_path: str, top_k: int, collection: str, rerank: bool) -> None:
         """跑清单匹配评测并打印指标表。"""
         run_eval(gold_path, top_k, collection, rerank)

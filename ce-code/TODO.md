@@ -247,9 +247,10 @@ MinerU 解析 + 条款树提取 + 质量审核，在 GB 50378-2006 和 GB 50016 
 - [ ] 造价 `bill_spec_kb` collection（BGE-M3 dense+sparse 混检），供清单匹配候选生成
 - [ ] 新增 `/price/compose`（清单项+region→工料机含量+价格：KG + 价格库；**先跑通取数路径**）
 - [ ] 新增 `/bill/match`（构件→清单候选：BGE-M3 混合召回 + KG 约束 + LLM 决策；依赖上一步 KG 跑通）
-- [🟡] 新增 `/quota/{region}/{code}`（定额子目直取）
-  - [x] **取数访问层 + 端点骨架**（✅ 2026-06-17）：`cost/query.py` 只读 PG 数据访问（`resolve_dsn`/`connect`/`get_quota`，与写入侧 `load_pg` 分离）；`service/cost_api.py` 暴露 `GET /quota/{region}/{code}`（子目字段 + 工料机含量，按人工/材料/机械排序；404/503 映射），挂载进 `service.knowledge_api`（:8100，与规范检索同进程、PG 与 Milvus 依赖隔离）。本地 py_compile 通过；**服务器验证待跑**（起 :8100 后 `GET /quota/深圳/010001-3` 应回实心砖墙子目 + 工料机）。
-  - [ ] **服务器验证 + ce-services 客户端接入**：起服务实测端点、对齐响应契约。
+- [x] 新增 `/quota/{region}/{code}`（定额子目直取）（✅ 2026-06-17，服务器实测通过）
+  - [x] **取数访问层 + 端点骨架**（✅ 2026-06-17）：`cost/query.py` 只读 PG 数据访问（`resolve_dsn`/`connect`/`get_quota`，与写入侧 `load_pg` 分离）；`service/cost_api.py` 暴露 `GET /quota/{region}/{code}`（子目字段 + 工料机含量，按人工/材料/机械排序；404/503 映射），挂载进 `service.knowledge_api`（:8100，与规范检索同进程、PG 与 Milvus 依赖隔离）。
+  - [x] **服务器实测**（✅ 2026-06-17）：`GET /quota/深圳/010001-3`（region 须百分号编码，curl 手敲坑；httpx/requests 客户端自动编码）回实心砖墙子目（base_price 11328.89 + 人材机费）+ 9 工料机（2 人工/6 材料/1 机械，排序正确）。契约完整。
+  - [ ] **ce-services 客户端接入**：任务层做 HTTP 客户端复用（与 `/search` 同模式）。
 
 ### 造价评测集
 

@@ -152,6 +152,19 @@ CREATE TABLE IF NOT EXISTS bill_quota_map (
 CREATE INDEX IF NOT EXISTS idx_bill_quota_map_bill ON bill_quota_map (bill_code);
 CREATE INDEX IF NOT EXISTS idx_bill_quota_map_quota ON bill_quota_map (quota_code);
 
+-- 定额资源 → 信息价物料 价格映射（资源同物异名对齐，拉高组价价覆盖）。
+-- 规则归一键命中 = 确定匹配（confidence 1.0），amount = 含量 × 单价 × unit_factor。
+CREATE TABLE IF NOT EXISTS resource_price_map (
+  id                BIGSERIAL PRIMARY KEY,
+  quota_resource_id BIGINT NOT NULL REFERENCES resource(id) ON DELETE CASCADE, -- 定额侧资源
+  price_resource_id BIGINT NOT NULL REFERENCES resource(id) ON DELETE CASCADE, -- 信息价侧物料
+  unit_factor       NUMERIC NOT NULL DEFAULT 1.0,  -- 定额单位/信息价单位 换算（千块↔块=1000）
+  confidence        NUMERIC,                       -- 1.0=规则归一精确命中（非猜测）
+  method            TEXT,                          -- rule_canon_exact / semantic / manual
+  UNIQUE (quota_resource_id, price_resource_id)
+);
+CREATE INDEX IF NOT EXISTS idx_resource_price_map_q ON resource_price_map (quota_resource_id);
+
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 4. 历史工程库（脱敏，供相似案例对标与异常检测；[可缓]）
 -- ─────────────────────────────────────────────────────────────────────────────

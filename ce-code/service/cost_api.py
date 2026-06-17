@@ -49,7 +49,7 @@ def price_compose_endpoint(region: str, code: str, on_date: date | None = None) 
     参数：region —— 地区（如 深圳）；code —— 清单编码（GB 50854 9 位）；
       on_date —— 计价期（query，ISO 日期，可选；缺省每资源取最新可用信息价期）。
     返回：见 ``cost.query.compose_price``；清单项不存在→404；PG 不可达→503。
-      未命中信息价的工料机 ``price_status="unpriced"``（红线：只建议不定稿）。
+      未命中信息价的工料机 ``price_status="no_source"``（红线：只建议不定稿，交 HITL 询价）。
     """
     try:
         with cost_query.connect() as conn:

@@ -75,23 +75,28 @@ def get_quota(conn: psycopg.Connection, region: str, code: str) -> dict | None:
     return {"item": item, "resources": resources}
 
 
-# 组价取数：清单 → 定额（带 confidence）→ 工料机含量 ⋈ 信息价单价。价取「按期」时优先
-# on_date 命中的时效区间；on_date 为 None 时取该资源最新可用期（lower(period) 最大的一条）。
+# 组价取数：清单 → 定额（带 confidence）→ 工料机含量 ⋈ 信息价单价。价来源两路：①直连
+# （定额 resource 本身有信息价，自然键已精确相等，factor=1）②经 resource_price_map 对齐到
+# 信息价物料（带 unit_factor 单位换算）——直连优先。价取「按期」时优先 on_date 命中区间；
+# on_date 为 None 时取该资源最新可用期（lower(period) 最大）。amount = 含量 × 单价 × factor。
 _COMPOSE_SQL = (
     "SELECT q.quota_code, m.quota_doc_id, q.name AS quota_name, q.unit AS quota_unit, "
     "       q.base_price, q.labor_cost, q.material_cost, q.machine_cost, "
     "       m.confidence, m.source, "
     "       r.category, r.name AS res_name, r.spec, r.unit AS res_unit, qr.consumption, "
-    "       p.price AS unit_price, p.effective_period, p.price_type "
+    "       p.price AS unit_price, p.effective_period, p.price_type, p.factor AS unit_factor "
     "FROM bill_quota_map m "
     "JOIN quota_item q ON q.quota_code = m.quota_code AND q.doc_id = m.quota_doc_id "
     "JOIN quota_resource qr ON qr.quota_id = q.id "
     "JOIN resource r ON r.id = qr.resource_id "
+    "LEFT JOIN resource_price_map rm ON rm.quota_resource_id = r.id "
     "LEFT JOIN LATERAL ("
-    "    SELECT rp.price, rp.effective_period, rp.price_type FROM resource_price rp "
-    "    WHERE rp.resource_id = r.id AND rp.region = %(region)s "
+    "    SELECT rp.price, rp.effective_period, rp.price_type, "
+    "           CASE WHEN rp.resource_id = r.id THEN 1.0 ELSE rm.unit_factor END AS factor "
+    "    FROM resource_price rp "
+    "    WHERE rp.resource_id IN (r.id, rm.price_resource_id) AND rp.region = %(region)s "
     "      AND (%(on_date)s::date IS NULL OR rp.effective_period @> %(on_date)s::date) "
-    "    ORDER BY lower(rp.effective_period) DESC LIMIT 1"
+    "    ORDER BY (rp.resource_id = r.id) DESC, lower(rp.effective_period) DESC LIMIT 1"
     ") p ON true "
     "WHERE m.bill_code = %(code)s AND q.region = %(region)s "
     f"ORDER BY m.confidence DESC NULLS LAST, q.quota_code, {_CATEGORY_ORDER}, r.name"
@@ -103,9 +108,10 @@ def compose_price(conn: psycopg.Connection, region: str, code: str,
     """组价取数：清单项 → 适用定额 → 工料机含量 + 信息价单价（含小计）。
 
     取数链 bill_spec → bill_quota_map(APPLIES, 带 confidence) → quota_item → quota_resource
-    → resource → resource_price。**红线**：信息价物料名与定额 resource 名格式有差、命中有限，
-    join 不到价的工料机 ``unit_price=None`` + ``price_status="unpriced"``（绝不杜撰价），由任务层
-    HITL 兜底，本端点「只建议不定稿」。
+    → resource → resource_price（经 resource_price_map 对齐同物异名）。**红线**：信息价（~152 种
+    常用大宗料）未登的定额材料约 90%（干混砂浆/电焊条/料石毛石铁钉等专项料），join 不到价的工料机
+    ``unit_price=None`` + ``price_status="no_source"``（绝不杜撰价），交任务层 HITL 询价、本端点
+    「只建议不定稿」。命中的工料机走 resource_price_map 单位换算（amount=含量×单价×unit_factor）。
 
     参数：
       conn —— psycopg 连接（dict_row）。
@@ -114,8 +120,9 @@ def compose_price(conn: psycopg.Connection, region: str, code: str,
       on_date —— 计价期（date）；None 时每个资源取最新可用信息价期（非当日，故 2026-05 期亦可命中）。
     返回：``{"bill": {...清单字段...}, "region", "on_date", "quota_count",
           "quotas": [{quota_code, name, unit, confidence, source, 人材机费,
-                      "resources": [{category,name,spec,unit,consumption,unit_price,
+                      "resources": [{category,name,spec,unit,consumption,unit_price,unit_factor,
                                      price_period,price_type,price_status,amount}...]}...]}``；
+          price_status: matched（信息价命中）/ no_source（信息价无此料→HITL 询价）；
           清单项不存在→None；存在但无映射定额→quotas 为空列表（200，供任务层感知覆盖缺口）。
     """
     with conn.cursor() as cur:
@@ -153,8 +160,9 @@ def compose_price(conn: psycopg.Connection, region: str, code: str,
             order.append(key)
         price = row["unit_price"]
         period = row["effective_period"]
-        # 含量 × 单价 = 小计；其他材料费等「%」行无信息价、单价为 None → amount 留空
-        amount = round(row["consumption"] * price, 2) if price is not None else None
+        factor = row["unit_factor"] if row["unit_factor"] is not None else 1
+        # 含量 × 单价 × 单位换算系数 = 小计；无信息价（含「%」其他材料费、信息价未登料）→ amount 留空
+        amount = round(row["consumption"] * price * factor, 2) if price is not None else None
         q["resources"].append({
             "category": row["category"],
             "name": row["res_name"],
@@ -162,9 +170,10 @@ def compose_price(conn: psycopg.Connection, region: str, code: str,
             "unit": row["res_unit"],
             "consumption": row["consumption"],
             "unit_price": price,
+            "unit_factor": float(factor) if price is not None else None,
             "price_period": str(period) if period is not None else None,
             "price_type": row["price_type"],
-            "price_status": "matched" if price is not None else "unpriced",
+            "price_status": "matched" if price is not None else "no_source",
             "amount": amount,
         })
     return {

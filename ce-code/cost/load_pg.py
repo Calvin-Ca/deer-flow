@@ -355,6 +355,43 @@ def load_bill_quota_map(conn, records: list[dict]) -> int:
     return len(rows)
 
 
+def load_resource_price_map(conn, records: list[dict]) -> tuple[int, int]:
+    """定额 resource → 信息价 resource 价格映射：解析两侧自然键为 resource_id 后幂等 upsert。
+
+    依赖 resource 已先入库（定额 + 信息价物料两来源都在表中）。两侧均按
+    (category, name, spec, unit) 自然键解析；任一端解析不到、或两端解析到同一行（自然键已精确
+    相等，直连即可、无需映射）则跳过。
+    参数：conn —— psycopg 连接；records —— resource_price_map.jsonl（含 quota_resource /
+      price_resource 自然键 + unit_factor + confidence + method）。
+    返回：(写入行数, 跳过行数)。
+    """
+    with conn.cursor() as cur:
+        cur.execute("SELECT id, category, name, spec, unit FROM resource")
+        rmap = {(c, n, s, u): i for i, c, n, s, u in cur.fetchall()}
+
+    rows, skipped = [], 0
+    for r in records:
+        q, p = r["quota_resource"], r["price_resource"]
+        qid = rmap.get((q.get("category"), q.get("name"), q.get("spec"), q.get("unit")))
+        pid = rmap.get((p.get("category"), p.get("name"), p.get("spec"), p.get("unit")))
+        if qid is None or pid is None or qid == pid:
+            skipped += 1
+            continue
+        rows.append((qid, pid, r.get("unit_factor") or 1.0,
+                     r.get("confidence"), r.get("method") or None))
+    sql = """
+        INSERT INTO resource_price_map
+            (quota_resource_id, price_resource_id, unit_factor, confidence, method)
+        VALUES (%s, %s, %s, %s, %s)
+        ON CONFLICT (quota_resource_id, price_resource_id) DO UPDATE SET
+            unit_factor = EXCLUDED.unit_factor, confidence = EXCLUDED.confidence,
+            method = EXCLUDED.method
+    """
+    with conn.cursor() as cur:
+        cur.executemany(sql, rows)
+    return len(rows), skipped
+
+
 def _collect(scan_dir: Path | None, name: str, explicit: Path | None,
              flat: bool = False) -> list[Path]:
     """汇总一张表的待灌路径：scan_dir 下的 per-doc（或扁平）产物 + 显式单文件。
@@ -394,7 +431,7 @@ def _read_many(paths: list[Path]) -> list[dict]:
 @click.option("--dsn", default="", help="PG 连接串；空=环境变量 CE_PG_DSN 或默认 localhost:5433/ce_cost。")
 @click.option("--init-schema", is_flag=True, help="先执行 schema.sql 建表（幂等）。")
 @click.option("--scan-dir", "scan_dir", type=click.Path(exists=True, path_type=Path), default=None,
-              help="结构化产物根：自动扫各 <doc_id>/ 子目录的全表 + 扁平 bill_quota_map.jsonl，"
+              help="结构化产物根：自动扫各 <doc_id>/ 子目录的全表 + 扁平 bill_quota_map/resource_price_map.jsonl，"
                    "按依赖序一把灌（多规范累积）。可与下列单文件选项叠加。")
 @click.option("--bill-spec", "bill_spec_path", type=click.Path(exists=True, path_type=Path),
               default=None, help="bill_spec.jsonl 路径。")
@@ -414,12 +451,14 @@ def _read_many(paths: list[Path]) -> list[dict]:
               default=None, help="fee_rate.jsonl 路径（计价费率标准）。")
 @click.option("--bill-quota-map", "bq_map_path", type=click.Path(exists=True, path_type=Path),
               default=None, help="bill_quota_map.jsonl 路径（清单→定额 APPLIES）。")
+@click.option("--resource-price-map", "rp_map_path", type=click.Path(exists=True, path_type=Path),
+              default=None, help="resource_price_map.jsonl 路径（定额资源→信息价物料）。")
 def main(dsn: str, init_schema: bool, scan_dir: Path | None,
          bill_spec_path: Path | None, aux_path: Path | None,
          price_comp_path: Path | None, resource_path: Path | None,
          quota_item_path: Path | None, quota_res_path: Path | None,
          resource_price_path: Path | None, fee_rate_path: Path | None,
-         bq_map_path: Path | None) -> None:
+         bq_map_path: Path | None, rp_map_path: Path | None) -> None:
     """JSONL → PostgreSQL 幂等导入（建表 + 清单/定额/费用构成各表，单事务提交）。
 
     ``--scan-dir`` 扫各 ``<doc_id>/`` 子目录全表（多规范累积）+ 扁平 bill_quota_map，
@@ -441,6 +480,7 @@ def main(dsn: str, init_schema: bool, scan_dir: Path | None,
     resource_price_paths = _collect(scan_dir, "resource_price.jsonl", resource_price_path)
     fee_rate_paths = _collect(scan_dir, "fee_rate.jsonl", fee_rate_path)
     bq_map_paths = _collect(scan_dir, "bill_quota_map.jsonl", bq_map_path, flat=True)
+    rp_map_paths = _collect(scan_dir, "resource_price_map.jsonl", rp_map_path, flat=True)
 
     with psycopg.connect(dsn) as conn:
         if init_schema:
@@ -478,6 +518,11 @@ def main(dsn: str, init_schema: bool, scan_dir: Path | None,
         if bq_map_paths:
             n = load_bill_quota_map(conn, _read_many(bq_map_paths))
             console.print(f"[green]✓ bill_quota_map upsert {n} 条[/]")
+        # resource_price_map 依赖 resource（定额 + 信息价物料两来源）全在库，放最后
+        if rp_map_paths:
+            n, skip = load_resource_price_map(conn, _read_many(rp_map_paths))
+            console.print(f"[green]✓ resource_price_map upsert {n} 条[/]"
+                          + (f"，[yellow]跳过 {skip}（id 未解析/自然键已直连）[/]" if skip else ""))
         conn.commit()
     console.print("[bold green]✓ 提交完成[/]")
 

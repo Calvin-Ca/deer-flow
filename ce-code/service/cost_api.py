@@ -19,10 +19,18 @@ from datetime import date
 
 import psycopg
 from fastapi import APIRouter, FastAPI, HTTPException
+from pydantic import BaseModel, Field
 
-from cost import query as cost_query
+from cost import bill_match, query as cost_query
 
 router = APIRouter(tags=["cost"])
+
+
+class BillMatchRequest(BaseModel):
+    """/bill/match 请求体：构件描述 → 清单候选召回。"""
+
+    query: str = Field(..., description="构件/做法自然语言描述，如「C30 现浇钢筋混凝土矩形柱」")
+    top_k: int = Field(10, ge=1, le=50, description="返回候选数")
 
 
 @router.get("/quota/{region}/{code}")
@@ -59,6 +67,24 @@ def price_compose_endpoint(region: str, code: str, on_date: date | None = None) 
     if result is None:
         raise HTTPException(status_code=404, detail=f"清单项 {code} 不存在（bill_spec）")
     return result
+
+
+@router.post("/bill/match")
+def bill_match_endpoint(req: BillMatchRequest) -> dict:
+    """构件描述 → 清单候选召回（dense 向量检索 bill_spec_kb）。
+
+    参数：req —— ``{query, top_k}``（见 BillMatchRequest）。
+    返回：``{"query", "count", "candidates": [{code,name,unit,feature,chapter,doc_id,spec_version,score}...]}``，
+      按相似度降序。**知识层只召回候选**，选码由任务层在候选内决策（红线：只建议不定稿）。
+      向量库未就绪 / Milvus / 嵌入服务不可达→503。
+    """
+    try:
+        candidates = bill_match.search_bill(req.query, req.top_k)
+    except ValueError as exc:                              # collection 未就绪
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except Exception as exc:                               # Milvus / 嵌入服务不可达
+        raise HTTPException(status_code=503, detail=f"清单召回服务不可达: {exc}") from exc
+    return {"query": req.query, "count": len(candidates), "candidates": candidates}
 
 
 # ── 独立 app（调试单跑用；正式挂载见 knowledge_api）──────────────────────────────

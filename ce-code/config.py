@@ -24,6 +24,10 @@ EMBED_MODEL = "BAAI/bge-large-zh-v1.5"
 EMBED_DIM = 1024  # bge-large-zh-v1.5 输出维度
 COLLECTION_PREFIX = "building_code"
 
+# 造价清单向量库（bill_spec → Milvus，供 /bill/match 构件→清单候选召回）。复用规范轨同一
+# embedding（bge-large-zh-v1.5 @ embed_url, dim 1024），不新部署服务；BGE-M3 sparse 混检留后续。
+COST_BILL_COLLECTION = "cost_bill_spec_kb"
+
 # 规范代号别名 → vector_store 目录名（与旧 server.py STANDARD_ALIASES 完全一致）
 STANDARD_ALIASES: dict[str, str] = {
     "gb50016": "GB_50016-20142018",

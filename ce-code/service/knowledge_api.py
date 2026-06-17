@@ -10,9 +10,10 @@
   POST /expand                       对 node_path 做引用图扩展
   GET  /clause/{standard}/{path}     单条款直取
 
-造价取数原语（走 PG，依赖隔离，挂载自 ``service.cost_api``）：
-  GET  /quota/{region}/{code}            定额子目直取（子目字段 + 工料机含量）
-  GET  /price/compose/{region}/{code}    组价取数（清单 → 定额 → 工料机含量 + 信息价单价）
+造价取数原语（挂载自 ``service.cost_api``）：
+  GET  /quota/{region}/{code}            定额子目直取（子目字段 + 工料机含量）         · PG
+  GET  /price/compose/{region}/{code}    组价取数（清单 → 定额 → 工料机含量 + 信息价单价）· PG
+  POST /bill/match                       构件→清单候选召回（dense 向量检索 bill_spec_kb）· Milvus
 
 启动（服务器，从 ce-code 根，模块式）：
   cd /mnt/nvme/calvin/code/deer-flow/ce-code

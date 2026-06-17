@@ -1,0 +1,139 @@
+"""造价清单向量库 bill_spec_kb —— 从 PG bill_spec 建 Milvus collection，供 /bill/match 构件→清单候选召回。
+
+**源是 PG ``ce_cost.bill_spec``**（非 chunks.json；造价取数一律走 PG），把每条清单项嵌成向量入 Milvus。
+**嵌入复用规范轨**（bge-large-zh-v1.5 @ ``embed_url``, dim 1024）与 ``index.vector_index.embed_texts``——
+不新部署 embedding 服务，先 dense 单通道跑通；BGE-M3 sparse 混检为后续覆盖率升级项（见 TODO）。
+
+嵌入文本拼法：``清单名 + 特征(feature_schema) + 章节``——清单匹配的核心信号是**名称 + 项目特征**
+（feature_schema 区分同名异特征项，如「现浇混凝土柱」按「混凝土强度等级」分），章节给专业域上下文；
+calc_rule/work_content 偏施工细节、对「构件→选码」区分度低，不入嵌入文本（留 PG 原表供取数）。
+
+依赖：Milvus localhost:19530 + vLLM bge-large @ :8097（服务器已部署）+ PG :5433（psycopg）。
+
+构建（服务器，从 ce-code 根，灌库后跑）：
+  .venv/bin/python -m cost.bill_index            # 全量重建 cost_bill_spec_kb
+"""
+from __future__ import annotations
+
+from config import COST_BILL_COLLECTION, DEFAULTS, EMBED_DIM
+
+
+def bill_embed_text(name: str, feature_schema: list[str] | None, chapter: str | None) -> str:
+    """拼一条清单项的待嵌入文本（纯函数，建库与调试共用）。
+
+    参数：
+        name (str): 清单项名称（核心信号）。
+        feature_schema (list[str] | None): 项目特征项名列表（区分同名异特征清单）。
+        chapter (str | None): 所属章节（专业域上下文）。
+    返回：
+        str: ``"{name}。特征:{特征/分隔}。{chapter}"``，缺项自然省略，首尾去空白。
+    """
+    parts = [name.strip()]
+    feats = [f.strip() for f in (feature_schema or []) if f and f.strip()]
+    if feats:
+        parts.append("特征:" + "/".join(feats))
+    if chapter and chapter.strip():
+        parts.append(chapter.strip())
+    return "。".join(parts)
+
+
+def _fetch_bills(dsn: str | None) -> list[dict]:
+    """从 PG 读全部清单项（建库源数据），按 code 排序。
+
+    参数：dsn —— PG 连接串（见 cost.query.resolve_dsn）。
+    返回：list[dict]，每项含 code/name/unit/feature_schema/chapter/doc_id/spec_version。
+    """
+    from cost import query as cost_query
+
+    with cost_query.connect(dsn) as conn, conn.cursor() as cur:
+        cur.execute(
+            "SELECT code, name, unit, feature_schema, chapter, doc_id, spec_version "
+            "FROM bill_spec ORDER BY code"
+        )
+        return cur.fetchall()
+
+
+def build(
+    dsn: str | None = None,
+    collection_name: str = COST_BILL_COLLECTION,
+    milvus_host: str = DEFAULTS["milvus_host"],
+    milvus_port: int = DEFAULTS["milvus_port"],
+    embed_url: str = DEFAULTS["embed_url"],
+    embed_model_id: str = DEFAULTS["embed_model_id"],
+    batch_size: int = 64,
+) -> None:
+    """建/重建 bill_spec_kb：读 PG 清单项 → 嵌入名称+特征文本 → 插入 Milvus。
+
+    参数：
+        dsn (str | None): PG 连接串（None 走默认 :5433/ce_cost）。
+        collection_name (str): Milvus collection 名（默认 cost_bill_spec_kb）。
+        milvus_host/milvus_port/embed_url/embed_model_id/batch_size: Milvus 与嵌入服务参数。
+    返回：
+        无（副作用：drop 重建 collection 并灌入向量 + 标量行）。
+    """
+    from pymilvus import DataType, MilvusClient
+    from rich.console import Console
+    from tqdm import tqdm
+
+    from index.vector_index import embed_texts
+
+    console = Console()
+    bills = _fetch_bills(dsn)
+    console.print(f"读 PG bill_spec：{len(bills)} 条清单项")
+    if not bills:
+        console.print("[yellow]bill_spec 为空，跳过建库（先 load_pg 灌库）[/yellow]")
+        return
+
+    client = MilvusClient(uri=f"http://{milvus_host}:{milvus_port}")
+    console.print(f"[green]已连接 Milvus {milvus_host}:{milvus_port}[/green]")
+    if client.has_collection(collection_name):
+        console.print(f"[yellow]集合 {collection_name} 已存在，将重建[/yellow]")
+        client.drop_collection(collection_name)
+
+    schema_ = client.create_schema(auto_id=True, enable_dynamic_field=False)
+    schema_.add_field("id",          DataType.INT64,        is_primary=True)
+    schema_.add_field("code",        DataType.VARCHAR,      max_length=32)
+    schema_.add_field("name",        DataType.VARCHAR,      max_length=512)
+    schema_.add_field("unit",        DataType.VARCHAR,      max_length=64)
+    schema_.add_field("feature",     DataType.VARCHAR,      max_length=1_024)
+    schema_.add_field("chapter",     DataType.VARCHAR,      max_length=256)
+    schema_.add_field("doc_id",      DataType.VARCHAR,      max_length=32)
+    schema_.add_field("spec_version", DataType.VARCHAR,     max_length=64)
+    schema_.add_field("embedding",   DataType.FLOAT_VECTOR, dim=EMBED_DIM)
+
+    index_params = client.prepare_index_params()
+    index_params.add_index("embedding", metric_type="COSINE", index_type="HNSW",
+                           params={"M": 16, "efConstruction": 200})
+    index_params.add_index("code", index_type="INVERTED")
+    client.create_collection(collection_name=collection_name,
+                             schema=schema_, index_params=index_params)
+    console.print(f"集合 {collection_name} 已创建")
+
+    texts = [bill_embed_text(b["name"], b.get("feature_schema"), b.get("chapter")) for b in bills]
+    console.print(f"调用嵌入服务 {embed_url}，model={embed_model_id}…")
+    total_batches = (len(bills) + batch_size - 1) // batch_size
+    for i in tqdm(range(0, len(bills), batch_size), total=total_batches, desc="嵌入并插入"):
+        batch = bills[i: i + batch_size]
+        embeddings = embed_texts(texts[i: i + batch_size], embed_url, embed_model_id, len(batch))
+        rows = []
+        for b, emb in zip(batch, embeddings):
+            feats = b.get("feature_schema") or []
+            rows.append({
+                "code": b["code"],
+                "name": b["name"],
+                "unit": b.get("unit") or "",
+                "feature": "/".join(feats),
+                "chapter": b.get("chapter") or "",
+                "doc_id": b.get("doc_id") or "",
+                "spec_version": b.get("spec_version") or "",
+                "embedding": emb,
+            })
+        client.insert(collection_name=collection_name, data=rows)
+
+    client.flush(collection_name)
+    stats = client.get_collection_stats(collection_name)
+    console.print(f"[green]✓ bill_spec_kb 建成：{stats['row_count']} 个向量[/green]")
+
+
+if __name__ == "__main__":
+    build()

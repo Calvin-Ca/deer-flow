@@ -254,14 +254,15 @@ MinerU 解析 + 条款树提取 + 质量审核，在 GB 50378-2006 和 GB 50016 
 
 ### 向量库 + 检索原语
 
-- [🟡] 造价 `bill_spec_kb` collection（供清单匹配候选生成）
-  - [x] **建库器 `cost/bill_index.py`**（代码 ✅ 2026-06-17，服务器建库待跑）：源 = PG `bill_spec`（非 chunks.json，造价取数一律走 PG）；**MVP 用 dense 单通道 + 复用规范轨已部署 bge-large-zh-v1.5 @:8097 dim1024**（不新部署 embedding 服务、`index.vector_index.embed_texts` 复用）——**BGE-M3 sparse 混检降级为后续覆盖率升级项**（一次只动一个变量，先跑通）。嵌入文本 = `清单名。特征(feature_schema)。章节`（纯函数 `bill_embed_text`，区分同名异特征项；calc_rule/work_content 偏施工细节不入嵌入）。Milvus schema：code(INVERTED 直取/去重)+name+unit+feature+chapter+doc_id+spec_version+embedding。`config.COST_BILL_COLLECTION="cost_bill_spec_kb"`。重 import（pymilvus/rich/cost.query）全 lazy，纯函数本地可测。⚠️ 服务器跑 `python -m cost.bill_index`（灌库后）。
+- [x] 造价 `bill_spec_kb` collection（供清单匹配候选生成）（✅ 2026-06-17 服务器建库通过：1655 向量）
+  - [x] **建库器 `cost/bill_index.py`**（代码 ✅ + **服务器建库通过** 2026-06-17：读 PG 1655 → 嵌入 :8097 → Milvus `cost_bill_spec_kb` 1655 向量）：源 = PG `bill_spec`（非 chunks.json，造价取数一律走 PG）；**MVP 用 dense 单通道 + 复用规范轨已部署 bge-large-zh-v1.5 @:8097 dim1024**（不新部署 embedding 服务、`index.vector_index.embed_texts` 复用）——**BGE-M3 sparse 混检降级为后续覆盖率升级项**（一次只动一个变量，先跑通）。嵌入文本 = `清单名。特征(feature_schema)。章节`（纯函数 `bill_embed_text`，区分同名异特征项；calc_rule/work_content 偏施工细节不入嵌入）。Milvus schema：code(INVERTED 直取/去重)+name+unit+feature+chapter+doc_id+spec_version+embedding。`config.COST_BILL_COLLECTION="cost_bill_spec_kb"`。重 import（pymilvus/rich/cost.query）全 lazy，纯函数本地可测。⚠️ 服务器跑 `python -m cost.bill_index`（灌库后）。
 - [🟡] 新增 `/price/compose`（清单项+region→工料机含量+价格：KG + 价格库；**先跑通取数路径**）
   - [x] **取数链 + 端点骨架**（✅ 2026-06-17）：`cost.query.compose_price`（bill_spec → bill_quota_map(APPLIES,带 confidence) → quota_item → quota_resource → resource ⋈ resource_price）；`GET /price/compose/{region}/{code}?on_date=` 挂 :8100。**价取数**：信息价按 region + 时效区间 LEFT JOIN LATERAL，`on_date` 命中期优先、缺省取每资源最新可用期（避开「今天 2026-06-17 超出 2026-05 期」坑）。**红线**：未命中信息价的工料机 `unit_price=None`+`price_status="unpriced"`、绝不杜撰，amount 仅在有价时算。本地 py_compile 通过；**服务器验证待跑**。
   - [x] **服务器实测**（✅ 2026-06-17）：`GET /price/compose/深圳/010401002` 回实心砖墙 → 6 定额变体（1/2·3/4·1砖 × 干混/湿拌砂浆，全 conf 0.9 / auto_name_exact）→ 工料机含量 + 单价/小计。机制全对：水 4.76 元（信息价 2026-05 命中）、amount=1.713×4.76=8.15 算术正确、未命中价的 `price_status=unpriced` 不杜撰。
   - [ ] **⚠️ 实测暴露：信息价命中率极低（材料价覆盖 ≈ 1/材料数）**——每定额 ~9 工料机仅「水」命中价。分类：人工费(单位元，本不在信息价，正确 unpriced) + 其他材料费(%，派生费率) + **真材料/机械(砂浆/砖/铁钉/板材/灰浆搅拌机) 应有价却全 miss**（信息价物料名 vs 定额 resource 名格式差，精确名匹配命中不了）。**提覆盖**：与 KG 映射富化同源——补资源名对齐/语义匹配（BGE-M3），见下「映射富化」「价格库 load_pg→对接」。这是 `/price/compose` 从「跑通」到「可用」的主瓶颈。
-- [🟡] 新增 `/bill/match`（构件→清单候选）
-  - [x] **召回原语 `cost/bill_match.py` + 端点**（代码 ✅ 2026-06-17，服务器实测待跑）：`search_bill(query, top_k)` 嵌入构件描述 → `bill_spec_kb` COSINE 向量召回 top_k 清单候选（code/name/unit/feature/chapter/doc_id/spec_version + score）；与 `cost.query`（PG 只读）分层（走 Milvus+embedding，依赖隔离单列一文件）。`POST /bill/match`（body `{query, top_k}`）挂 :8100，向量库未就绪/Milvus/嵌入不可达→503。**知识层只召回候选**，LLM 在候选内选码 + KG 约束（章节对齐/清单↔定额覆盖收窄）归任务层（红线：只建议不定稿）。纯函数 `_shape_hits`/`bill_embed_text` 本地 6/6 测试通过。⚠️ 服务器：先 `cost.bill_index` 建库 → `curl -XPOST :8100/bill/match -d '{"query":"C30现浇钢筋混凝土矩形柱","top_k":10}'` 实测。
+- [🟡] 新增 `/bill/match`（构件→清单候选）（端点 ✅ 服务器实测通过；召回质量待评测/提升）
+  - [x] **召回原语 `cost/bill_match.py` + 端点**（代码 ✅ + **服务器实测通过** 2026-06-17）：`search_bill(query, top_k)` 嵌入构件描述 → `bill_spec_kb` COSINE 向量召回 top_k 清单候选（code/name/unit/feature/chapter/doc_id/spec_version + score）；与 `cost.query`（PG 只读）分层（走 Milvus+embedding，依赖隔离单列一文件）。`POST /bill/match`（body `{query, top_k}`）挂 :8100，向量库未就绪/Milvus/嵌入不可达→503。**知识层只召回候选**，LLM 在候选内选码 + KG 约束（章节对齐/清单↔定额覆盖收窄）归任务层（红线：只建议不定稿）。纯函数 `_shape_hits`/`bill_embed_text` 本地 6/6 测试通过。
+  - [ ] **⚠️ 实测暴露：dense 单通道 Top-1 不稳（正解在 top-k 但非首位）**：查询「C30现浇钢筋混凝土矩形柱」→ 正解 `010503001 矩形柱`(m3) 排第 2（score 0.585），第 1 被 `010506002 现浇混凝土柱钢筋`(t, 0.595) 抢（query 含「钢筋」拉高一众 `...钢筋` 项）；score 挤在 0.52–0.60 区分度弱。**根因**：bge-large dense 对「精确名命中」加权不足。**提升方向**（先评测后对症，勿盲目上模型）：① BGE-M3 sparse 混检（对「矩形柱」词项匹配）或 reranker 拉开精确名；② KG 约束按 unit/章节/有无定额覆盖收窄（柱本体 m3 vs 钢筋 t）。**先建评测集量化 Top-1/Top-3 再定**。
   - [ ] **KG 约束收窄候选**（待做）：召回候选按章节对齐 / 与 bill_quota_map 有定额覆盖优先排序，收窄给任务层 LLM 的候选集。
   - [ ] **造价评测集护栏**：`match_gold.jsonl`（构件→编码标注）→ 验 Top-1≥85%/Top-3≥95%，否则 `/bill/match` 只「跑通」无法验收（见下「造价评测集」）。
 - [x] 新增 `/quota/{region}/{code}`（定额子目直取）（✅ 2026-06-17，服务器实测通过）
@@ -271,7 +272,14 @@ MinerU 解析 + 条款树提取 + 质量审核，在 GB 50378-2006 和 GB 50016 
 
 ### 造价评测集
 
-- [ ] 清单编码匹配：`match_gold.jsonl`（构件→编码标注），指标 Top-1 ≥ 85% / Top-3 ≥ 95%
+> **下一步主线（2026-06-17 定）**：给 `/bill/match` 上护栏——`/bill/match` 端点已服务器实测通过，但实测暴露 dense 单通道 Top-1 不稳（正解在 top-k 非首位），**必须先有评测集量化 Top-1/Top-3，再决定上 sparse(BGE-M3)/rerank/KG 约束**（勿凭单条样本盲目上模型）。
+
+- [ ] **评测 harness（先写，与 gold 来源无关）**：`tools/eval_bill.py`——读 `match_gold.jsonl` → 跑 `cost.bill_match.search_bill`（或 HTTP `/bill/match`）→ 算 **Top-1 / Top-3 / MRR / 金标秩**，按 PRD §6 排序敏感口径。
+- [ ] **清单编码匹配 gold `match_gold.jsonl`**（构件→编码标注），指标 **Top-1 ≥ 85% / Top-3 ≥ 95%**。gold 来源三选一（待用户定）：
+  - ① **半自动种子**：从 `bill_spec` 名称反向生成「构件描述→编码」候选，人工校验修订（快、初版偏机械）。
+  - ② **真实结算项目**：用户提供已结算工程清单（构件→实际套用编码）转 gold（最真实，需脱敏数据）。
+  - ③ **先跑通机制（推荐先做）**：harness + 手工 5~10 条金标先把护栏链路跑通，gold 后续按 ①/② 扩充（合「先跑通」纪律）。
+- [ ] **据评测对症提升 `/bill/match`**：① BGE-M3 sparse 混检 / reranker 拉开精确名命中；② KG 约束按 unit/章节/有无定额覆盖收窄候选（柱本体 m3 vs 柱钢筋 t）。
 - [ ] 定额套用：对照已结算项目，定额套用准确率 ≥ 85%
 - [ ] 红线门禁：未达准确率红线的原语默认「只建议不定稿」（HITL 在任务层兜底）
 

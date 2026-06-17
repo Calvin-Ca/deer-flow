@@ -31,6 +31,7 @@ class BillMatchRequest(BaseModel):
 
     query: str = Field(..., description="构件/做法自然语言描述，如「C30 现浇钢筋混凝土矩形柱」")
     top_k: int = Field(10, ge=1, le=50, description="返回候选数")
+    structural: bool = Field(True, description="是否结构约束重排（默认开——按类型对齐下压查询没要的模板/钢筋项）")
     rerank: bool = Field(False, description="是否 cross-encoder 精排（默认关——实测在短清单名上劣化 dense；备查）")
 
 
@@ -80,7 +81,8 @@ def bill_match_endpoint(req: BillMatchRequest) -> dict:
       向量库未就绪 / Milvus / 嵌入服务不可达→503。
     """
     try:
-        candidates = bill_match.search_bill(req.query, req.top_k, rerank=req.rerank)
+        candidates = bill_match.search_bill(req.query, req.top_k,
+                                            structural=req.structural, rerank=req.rerank)
     except ValueError as exc:                              # collection 未就绪
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except Exception as exc:                               # Milvus / 嵌入服务不可达

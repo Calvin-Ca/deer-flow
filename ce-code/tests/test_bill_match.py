@@ -4,7 +4,7 @@
 真链路（PG 建库 + 向量召回）在服务器跑，本地仅验纯逻辑（torch cu121 本地不可用）。
 """
 from cost.bill_index import bill_embed_text
-from cost.bill_match import _rerank_text, _shape_hits
+from cost.bill_match import _rerank_text, _shape_hits, _structural_reorder, _type_penalty
 
 
 def test_embed_text_full():
@@ -57,6 +57,40 @@ def test_rerank_text_empty_feature():
     """feature 空串时省略特征段，与 bill_embed_text 行为一致。"""
     cand = {"name": "平整场地", "feature": "", "chapter": "附录A"}
     assert _rerank_text(cand) == "平整场地。附录A"
+
+
+# ── 结构约束（类型对齐重排）────────────────────────────────────────────────────
+def test_type_penalty_template_demoted():
+    """查询要本体(无「模板」)，候选「圈梁模板」带模板标记→罚 1；本体「圈梁」罚 0。"""
+    assert _type_penalty("C25现浇混凝土圈梁", "圈梁模板") == 1
+    assert _type_penalty("C25现浇混凝土圈梁", "圈梁") == 0
+
+
+def test_type_penalty_steel_material_word_not_intent():
+    """「钢筋混凝土」是材料词、非要钢筋项：本体查询里它不触发钢筋罚，柱钢筋候选仍被罚。"""
+    # 查询「现浇混凝土矩形柱」无钢筋意图 → 柱钢筋候选罚 1
+    assert _type_penalty("C30现浇混凝土矩形柱", "现浇混凝土柱钢筋") == 1
+    # 查询含「钢筋混凝土」材料词 → 归一后无钢筋意图，柱钢筋候选仍罚 1（不被材料词误免罚）
+    assert _type_penalty("C30现浇钢筋混凝土独立基础", "现浇混凝土基础钢筋") == 1
+    # 候选本体「钢筋混凝土管」归一后无「钢筋」→ 不误罚
+    assert _type_penalty("钢筋混凝土管", "钢筋混凝土管") == 0
+
+
+def test_type_penalty_steel_intent_kept():
+    """查询明确要钢筋项（非材料词）→ 柱钢筋候选不罚（类型对齐）。"""
+    assert _type_penalty("现浇混凝土柱内HRB400钢筋制作安装", "现浇混凝土柱钢筋") == 0
+
+
+def test_structural_reorder_stable():
+    """稳定重排：罚分低者靠前，同罚分保持原序。本体反超模板，部位同罚分不动。"""
+    cands = [
+        {"name": "圈梁模板"},          # 罚 1（被压后）
+        {"name": "圈梁"},              # 罚 0（应升首位）
+        {"name": "楼地面卷材防水"},     # 罚 0（同罚分，保持原相对序）
+    ]
+    out = _structural_reorder("C25现浇混凝土圈梁", cands)
+    assert [c["name"] for c in out] == ["圈梁", "楼地面卷材防水", "圈梁模板"]
+    assert out[0]["type_penalty"] == 0 and out[-1]["type_penalty"] == 1
 
 
 # ── 评测 harness 纯指标（tools.eval_bill）────────────────────────────────────────

@@ -76,11 +76,13 @@ def _load_gold(path: Path) -> list[dict]:
     return cases
 
 
-def run_eval(gold_path: str, top_k: int, collection: str, rerank: bool = False) -> dict:
+def run_eval(gold_path: str, top_k: int, collection: str,
+             structural: bool = True, rerank: bool = False) -> dict:
     """跑清单匹配评测：逐条召回 + 判命中，打印指标表，返回汇总 dict（无 click 依赖）。
 
     参数：gold_path —— 金标 jsonl（相对 ce-code 根）；top_k —— 召回深度；collection —— 向量库名；
-      rerank —— 是否 cross-encoder 精排（默认 True；传 False 量 dense 基线作对比）。
+      structural —— 是否结构约束重排（默认 True）；rerank —— 是否 cross-encoder 精排（默认 False，
+      实测劣化、仅备查）。三者组合可量各档对比。
     返回：``aggregate`` 的汇总 dict（n/top1/top3/recall_at_k/mrr/mean_hit_rank）。
     """
     from rich.console import Console
@@ -91,7 +93,7 @@ def run_eval(gold_path: str, top_k: int, collection: str, rerank: bool = False) 
     console = Console()
     cases = _load_gold(ROOT / gold_path)
     console.print(f"金标 {len(cases)} 条 · top_k={top_k} · collection={collection} · "
-                  f"rerank={'on' if rerank else 'off'}\n")
+                  f"structural={'on' if structural else 'off'} · rerank={'on' if rerank else 'off'}\n")
 
     table = Table(title="清单匹配评测 · 逐条", show_lines=False)
     for col in ("查询", "金标", "Top-1 召回", "金标秩", "命中"):
@@ -99,7 +101,8 @@ def run_eval(gold_path: str, top_k: int, collection: str, rerank: bool = False) 
 
     ranks: list[int | None] = []
     for c in cases:
-        candidates = search_bill(c["query"], top_k, collection_name=collection, rerank=rerank)
+        candidates = search_bill(c["query"], top_k, collection_name=collection,
+                                 structural=structural, rerank=rerank)
         codes = [x["code"] for x in candidates]
         rank = first_gold_rank(c["gold"], codes)
         ranks.append(rank)
@@ -130,10 +133,11 @@ def _cli():
                   help="金标 jsonl 路径（相对 ce-code 根）")
     @click.option("--top-k", default=10, help="召回深度 k")
     @click.option("--collection", default=COST_BILL_COLLECTION, help="清单向量库 collection")
+    @click.option("--structural/--no-structural", default=True, help="是否结构约束重排（默认开；--no-structural 量 dense 基线）")
     @click.option("--rerank/--no-rerank", default=False, help="是否 cross-encoder 精排（默认关；实测劣化 dense，--rerank 仅备查）")
-    def main(gold_path: str, top_k: int, collection: str, rerank: bool) -> None:
+    def main(gold_path: str, top_k: int, collection: str, structural: bool, rerank: bool) -> None:
         """跑清单匹配评测并打印指标表。"""
-        run_eval(gold_path, top_k, collection, rerank)
+        run_eval(gold_path, top_k, collection, structural, rerank)
 
     return main
 

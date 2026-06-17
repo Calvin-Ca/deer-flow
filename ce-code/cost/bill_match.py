@@ -14,9 +14,13 @@ from cost.bill_index import bill_embed_text
 
 _OUTPUT_FIELDS = ["code", "name", "unit", "feature", "chapter", "doc_id", "spec_version"]
 
-# rerank 候选池：dense 先多召回这么多条，再 cross-encoder 精排截到 top_k（实测 gold 均在 dense 前 3，
-# 池给足即可。reranker 复用规范轨进程内单例，模型只加载一份，见 DEV §1「rerank 唯一 owner」）。
+# rerank 候选池：dense 先多召回这么多条，再重排截到 top_k（实测 gold 均在 dense 前 3，池给足即可）。
 RERANK_POOL = 30
+
+# 结构约束：附属/措施项类型标记。这些 token 出现在清单名里 = 该项是「本体之外的附属/措施项」
+# （模板/钢筋/脚手架…各自独立成清单项）。查询未提及对应标记 → 该候选与查询意图错位、应压到本体之后。
+# 实测修「现浇混凝土圈梁→圈梁模板」「矩形柱→柱钢筋」这类 dense 错排（替代劣化的 reranker，见 E4）。
+STRUCTURAL_MARKERS = ("模板", "钢筋", "脚手架", "支撑", "支架", "拆除", "泵送", "超高")
 
 
 def _shape_hits(hits: list) -> list[dict]:
@@ -68,10 +72,42 @@ def _rerank(query: str, candidates: list[dict], top_k: int) -> list[dict]:
     return candidates[:top_k]
 
 
+def _type_penalty(query: str, name: str) -> int:
+    """候选名相对查询的「附属/措施类型错位」罚分（纯函数，便于单测）。
+
+    罚 = 候选名里**查询未提及**的 STRUCTURAL_MARKERS 个数。「钢筋混凝土」是材料词、非「要钢筋项」
+    的意图，故查询与候选名都先把「钢筋混凝土」归一为「混凝土」再判「钢筋」标记，避免误罚本体。
+
+    参数：query —— 构件描述；name —— 候选清单名。
+    返回：int 罚分（0 = 类型对齐，越大越错位）。
+    """
+    q = (query or "").replace("钢筋混凝土", "混凝土")
+    nm = (name or "").replace("钢筋混凝土", "混凝土")
+    return sum(1 for m in STRUCTURAL_MARKERS if m in nm and m not in q)
+
+
+def _structural_reorder(query: str, candidates: list[dict]) -> list[dict]:
+    """按类型对齐罚分**稳定重排**候选：罚分低者靠前，同罚分保持原(dense/rerank)序（纯函数，便于单测）。
+
+    只下压「查询没要的附属/措施项」（模板/钢筋…），对本体/同类候选零扰动——故是对 dense 的最小修正。
+    给每条候选挂 ``type_penalty`` 字段供观测。
+    """
+    ranked = sorted(
+        enumerate(candidates),
+        key=lambda ic: (_type_penalty(query, ic[1].get("name") or ""), ic[0]),
+    )
+    out = []
+    for _, c in ranked:
+        c["type_penalty"] = _type_penalty(query, c.get("name") or "")
+        out.append(c)
+    return out
+
+
 def search_bill(
     query: str,
     top_k: int = 10,
     collection_name: str = COST_BILL_COLLECTION,
+    structural: bool = True,
     rerank: bool = False,
     rerank_pool: int = RERANK_POOL,
     milvus_host: str = DEFAULTS["milvus_host"],
@@ -89,6 +125,8 @@ def search_bill(
         query (str): 构件/做法的自然语言描述（如「C30 现浇钢筋混凝土矩形柱」）。
         top_k (int): 返回候选数。
         collection_name (str): bill_spec_kb collection 名。
+        structural (bool): 是否结构约束重排（**默认 True**）——按附属/措施类型对齐稳定下压查询没要的
+            模板/钢筋项（替代劣化的 reranker，确定性、对本体零扰动；见 E4）。
         rerank (bool): 是否 cross-encoder 精排（**默认 False**——2026-06-17 实测 bge-reranker-large
             在「构件描述 × 极短清单名」上劣化 dense 基线：Top-1 70%→60%、Top-3 100%→90%
             （抓共享限定词如「砂浆」当强相关，把砂浆找平层顶过实心砖墙）。保留 toggle 备查/换模型再试）。
@@ -107,15 +145,18 @@ def search_bill(
         raise ValueError(f"清单向量库 {collection_name} 未就绪（先 cost.bill_index 建库）")
 
     vector = embed_texts([query], embed_url, embed_model_id, 1)[0]
-    dense_limit = max(top_k, rerank_pool) if rerank else top_k
+    # rerank/structural 都需多召回候选池再重排，末尾统一截 top_k
+    pool_limit = max(top_k, rerank_pool) if (rerank or structural) else top_k
     results = client.search(
         collection_name=collection_name,
         data=[vector],
-        limit=dense_limit,
+        limit=pool_limit,
         output_fields=_OUTPUT_FIELDS,
         search_params={"metric_type": "COSINE", "params": {"ef": 64}},
     )
     candidates = _shape_hits(results[0]) if results else []
     if rerank and candidates:
-        return _rerank(query, candidates, top_k)
+        candidates = _rerank(query, candidates, len(candidates))   # 仅排序、不截断
+    if structural and candidates:
+        candidates = _structural_reorder(query, candidates)        # 类型对齐稳定重排
     return candidates[:top_k]

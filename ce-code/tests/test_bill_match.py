@@ -3,7 +3,22 @@
 覆盖：嵌入文本拼装（缺项省略、特征/章节并入）+ Milvus 命中整形（字段抽取 + score 取整）。
 真链路（PG 建库 + 向量召回）在服务器跑，本地仅验纯逻辑（torch cu121 本地不可用）。
 """
-from cost.bill_index import bill_embed_text, cast_type
+from cost.bill_index import bill_embed_text, caption_category, cast_type
+
+
+def test_caption_category_measure():
+    # 措施项 caption → 剥表号前缀 + (编码) 后缀，留子类（含"模板"，补 name 缺的信号）
+    assert caption_category("表 S.2 混凝土模板及支架(撑)(编码:011702)") == "混凝土模板及支架(撑)"
+    assert caption_category("续表 A.1-1") == ""        # 只有表号，无类别
+    assert caption_category(None) == ""
+
+
+def test_bill_embed_text_with_category():
+    # 措施梁模板：name=矩形梁不含"模板"，category 补回 → 嵌入文本含"模板"
+    t = bill_embed_text("矩形梁", ["支撑高度"], "附录S 措施项目", "混凝土模板及支架")
+    assert "模板" in t and "矩形梁" in t
+    # category 与 name 相同则不重复
+    assert bill_embed_text("矩形柱", [], "附录E", "矩形柱") == "矩形柱。附录E"
 from cost.bill_match import (
     _prefab_penalty, _prefix_filter, _shape_hits, _structural_reorder, _type_penalty,
 )

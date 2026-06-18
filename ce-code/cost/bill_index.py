@@ -47,20 +47,45 @@ def cast_type(caption: str | None, unit: str | None) -> str:
     return ""
 
 
-def bill_embed_text(name: str, feature_schema: list[str] | None, chapter: str | None) -> str:
+def caption_category(caption: str | None) -> str:
+    """从来源表标题派生「子表类别」（纯函数，便于单测）。
+
+    措施项（附录S）的清单码名是结构名（"矩形梁"/"有梁板"），**不含"模板/脚手架"**，子类只在 caption
+    里（如 "表 S.2 混凝土模板及支架(撑)(编码:011702)"）→ 不进嵌入文本就召不回（见 notebooks E8/E9）。
+    本函数剥掉 caption 的「表号前缀」与「(编码:...)后缀」，留中间类别串（"混凝土模板及支架(撑)"），
+    注入嵌入文本补回措施子类信号。对本体项同样有益（"现浇混凝土柱" 补现浇/分部上下文）。
+
+    参数：caption —— 来源表标题（provenance.caption）。
+    返回：清洗后的类别串；无 caption / 提不出 → ""。
+    """
+    import re
+    cap = re.sub(r"\s+", "", caption or "")
+    if not cap:
+        return ""
+    cap = re.sub(r"^(续)?表[A-Za-z0-9.\-]*", "", cap)       # 去「表 S.2 / 续表 A.1-1」前缀
+    cap = re.sub(r"[（(](编码|编号)[：:][^）)]*[）)]", "", cap)  # 去「(编码:011702)」后缀
+    return cap.strip("：: ")                                  # 只去空白/冒号，保留正文括号如"(撑)"
+
+
+def bill_embed_text(name: str, feature_schema: list[str] | None, chapter: str | None,
+                    category: str | None = None) -> str:
     """拼一条清单项的待嵌入文本（纯函数，建库与调试共用）。
 
     参数：
         name (str): 清单项名称（核心信号）。
         feature_schema (list[str] | None): 项目特征项名列表（区分同名异特征清单）。
         chapter (str | None): 所属章节（专业域上下文）。
+        category (str | None): 子表类别（caption_category 派生）——补措施子类（模板/脚手架…）等
+            name 不含的信号，提升召回（见 notebooks E8/E9）。
     返回：
-        str: ``"{name}。特征:{特征/分隔}。{chapter}"``，缺项自然省略，首尾去空白。
+        str: ``"{name}。特征:{特征/分隔}。{category}。{chapter}"``，缺项自然省略，首尾去空白。
     """
     parts = [name.strip()]
     feats = [f.strip() for f in (feature_schema or []) if f and f.strip()]
     if feats:
         parts.append("特征:" + "/".join(feats))
+    if category and category.strip() and category.strip() != name.strip():  # 与名相同则不重复
+        parts.append(category.strip())
     if chapter and chapter.strip():
         parts.append(chapter.strip())
     return "。".join(parts)
@@ -90,8 +115,9 @@ def _fetch_bills(dsn: str | None, doc_ids: list[str] | None = None) -> list[dict
     with cost_query.connect(dsn) as conn, conn.cursor() as cur:
         cur.execute(sql, params or None)
         rows = cur.fetchall()
-    for r in rows:                                   # 从 caption/unit 派生现浇/预制标记
+    for r in rows:                                   # 从 caption/unit 派生现浇预制标记 + 子表类别
         r["cast_type"] = cast_type(r.get("caption"), r.get("unit"))
+        r["category"] = caption_category(r.get("caption"))
     return rows
 
 
@@ -122,6 +148,7 @@ def _read_bills_jsonl(path, doc_ids: list[str] | None = None) -> list[dict]:
         bill = {k: rec.get(k) for k in _BILL_FIELDS}
         caption = (rec.get("provenance") or {}).get("caption")
         bill["cast_type"] = cast_type(caption, rec.get("unit"))   # 现浇/预制标记
+        bill["category"] = caption_category(caption)              # 子表类别（补措施子类等）
         bills.append(bill)
     bills.sort(key=lambda b: b.get("code") or "")
     return bills
@@ -192,7 +219,8 @@ def build(
                              schema=schema_, index_params=index_params)
     console.print(f"集合 {collection_name} 已创建")
 
-    texts = [bill_embed_text(b["name"], b.get("feature_schema"), b.get("chapter")) for b in bills]
+    texts = [bill_embed_text(b["name"], b.get("feature_schema"), b.get("chapter"), b.get("category"))
+             for b in bills]
     console.print(f"调用嵌入服务 {embed_url}，model={embed_model_id}…")
     total_batches = (len(bills) + batch_size - 1) // batch_size
     for i in tqdm(range(0, len(bills), batch_size), total=total_batches, desc="嵌入并插入"):

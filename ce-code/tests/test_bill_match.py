@@ -3,8 +3,37 @@
 覆盖：嵌入文本拼装（缺项省略、特征/章节并入）+ Milvus 命中整形（字段抽取 + score 取整）。
 真链路（PG 建库 + 向量召回）在服务器跑，本地仅验纯逻辑（torch cu121 本地不可用）。
 """
-from cost.bill_index import bill_embed_text
-from cost.bill_match import _prefix_filter, _rerank_text, _shape_hits, _structural_reorder, _type_penalty
+from cost.bill_index import bill_embed_text, cast_type
+from cost.bill_match import (
+    _prefab_penalty, _prefix_filter, _rerank_text, _shape_hits, _structural_reorder, _type_penalty,
+)
+
+
+def test_cast_type_prefab():
+    assert cast_type("表 E.9 预制混凝土柱（编号：010509）", "1.m³2.根") == "预制"
+
+
+def test_cast_type_cast_in_place_untagged():
+    # 现浇柱不强加标记（返回空），避免给非混凝土项贴错
+    assert cast_type("表 E.2 现浇混凝土柱（编号：010502）", "m³") == ""
+    assert cast_type(None, "m²") == ""
+
+
+def test_prefab_penalty_demotes_unrequested_prefab():
+    assert _prefab_penalty("柱；混凝土强度等级C40", {"cast_type": "预制"}) == 1
+    assert _prefab_penalty("预制柱安装", {"cast_type": "预制"}) == 0     # query 明示预制 → 不罚
+    assert _prefab_penalty("柱；C40", {"cast_type": ""}) == 0            # 候选非预制 → 不罚
+
+
+def test_structural_reorder_demotes_prefab_keeps_castinplace():
+    # 同名「矩形柱」现浇 vs 预制，dense 把预制排前 → 重排应翻转
+    cands = [
+        {"code": "010509001", "name": "矩形柱", "cast_type": "预制"},
+        {"code": "010502001", "name": "矩形柱", "cast_type": ""},
+    ]
+    out = _structural_reorder("柱；混凝土强度等级C40", cands)
+    assert out[0]["code"] == "010502001"
+    assert out[1]["code"] == "010509001"
 
 
 def test_prefix_filter_single():

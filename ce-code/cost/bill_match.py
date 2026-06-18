@@ -12,7 +12,7 @@ from __future__ import annotations
 from config import COST_BILL_COLLECTION, DEFAULTS
 from cost.bill_index import bill_embed_text
 
-_OUTPUT_FIELDS = ["code", "name", "unit", "feature", "chapter", "doc_id", "spec_version"]
+_OUTPUT_FIELDS = ["code", "name", "unit", "feature", "chapter", "doc_id", "spec_version", "cast_type"]
 
 # rerank 候选池：dense 先多召回这么多条，再重排截到 top_k（实测 gold 均在 dense 前 3，池给足即可）。
 RERANK_POOL = 30
@@ -21,6 +21,11 @@ RERANK_POOL = 30
 # （模板/钢筋/脚手架…各自独立成清单项）。查询未提及对应标记 → 该候选与查询意图错位、应压到本体之后。
 # 实测修「现浇混凝土圈梁→圈梁模板」「矩形柱→柱钢筋」这类 dense 错排（替代劣化的 reranker，见 E4）。
 STRUCTURAL_MARKERS = ("模板", "钢筋", "脚手架", "支撑", "支架", "拆除", "泵送", "超高")
+
+# 现浇/预制消歧：预制柱(010509 矩形柱)与现浇柱(010502 矩形柱)同名、索引 chapter 同，dense 无从区分。
+# 建库期已从 caption 派生 cast_type；查询未提及「预制/装配」→ 该预制候选与意图错位、下压到现浇之后
+# （房建 BIM 构件默认现浇）。见 notebooks E6。
+PREFAB_WORDS = ("预制", "装配")
 
 
 def _shape_hits(hits: list) -> list[dict]:
@@ -86,19 +91,36 @@ def _type_penalty(query: str, name: str) -> int:
     return sum(1 for m in STRUCTURAL_MARKERS if m in nm and m not in q)
 
 
+def _prefab_penalty(query: str, cand: dict) -> int:
+    """预制/装配候选相对查询的错位罚分（纯函数，便于单测）。
+
+    候选 cast_type 为「预制/装配」而查询未提及 → 罚 1（房建默认现浇，预制需 query 明示）。
+    依赖建库期派生的 ``cast_type`` 字段（见 cost.bill_index.cast_type）。
+
+    参数：query —— 构件描述；cand —— 候选 dict（含 cast_type）。
+    返回：int 罚分（0 = 对齐 / 候选非预制）。
+    """
+    cast = cand.get("cast_type") or ""
+    if cast in PREFAB_WORDS and not any(w in (query or "") for w in PREFAB_WORDS):
+        return 1
+    return 0
+
+
 def _structural_reorder(query: str, candidates: list[dict]) -> list[dict]:
     """按类型对齐罚分**稳定重排**候选：罚分低者靠前，同罚分保持原(dense/rerank)序（纯函数，便于单测）。
 
-    只下压「查询没要的附属/措施项」（模板/钢筋…），对本体/同类候选零扰动——故是对 dense 的最小修正。
-    给每条候选挂 ``type_penalty`` 字段供观测。
+    罚分 = 附属/措施类型错位（_type_penalty，模板/钢筋…）+ 现浇预制错位（_prefab_penalty）。只下压
+    「查询没要的附属/措施/预制项」，对本体/同类候选零扰动——故是对 dense 的最小修正。
+    给每条候选挂 ``type_penalty``/``prefab_penalty`` 字段供观测。
     """
-    ranked = sorted(
-        enumerate(candidates),
-        key=lambda ic: (_type_penalty(query, ic[1].get("name") or ""), ic[0]),
-    )
+    def _penalty(c: dict) -> int:
+        return _type_penalty(query, c.get("name") or "") + _prefab_penalty(query, c)
+
+    ranked = sorted(enumerate(candidates), key=lambda ic: (_penalty(ic[1]), ic[0]))
     out = []
     for _, c in ranked:
         c["type_penalty"] = _type_penalty(query, c.get("name") or "")
+        c["prefab_penalty"] = _prefab_penalty(query, c)
         out.append(c)
     return out
 

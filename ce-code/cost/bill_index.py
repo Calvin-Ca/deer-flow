@@ -22,6 +22,25 @@ from __future__ import annotations
 from config import COST_BILL_COLLECTION, DEFAULTS, EMBED_DIM
 
 
+def cast_type(caption: str | None, unit: str | None) -> str:
+    """从清单项的表标题/单位派生「现浇/预制」标记（纯函数，便于单测）。
+
+    现浇柱（010502 矩形柱）与预制柱（010509 矩形柱）**同名**，索引的 chapter 又相同
+    （都「附录 E 混凝土…」），dense 无从区分。判别信号在 caption（"预制混凝土柱"）/ unit
+    （预制按"根/块"计量）。只在 caption 明示「预制/装配」时打标，其余返回 ""（不强加"现浇"，
+    避免给脚手架/防水等非混凝土项贴错标；down-rank 只对预制/装配生效，未打标者不受罚）。
+
+    参数：caption —— 来源表标题（如 "表 E.9 预制混凝土柱"）；unit —— 计量单位。
+    返回："预制" / "装配" / ""（未明示）。
+    """
+    cap = caption or ""
+    if "预制" in cap:
+        return "预制"
+    if "装配" in cap:
+        return "装配"
+    return ""
+
+
 def bill_embed_text(name: str, feature_schema: list[str] | None, chapter: str | None) -> str:
     """拼一条清单项的待嵌入文本（纯函数，建库与调试共用）。
 
@@ -54,7 +73,8 @@ def _fetch_bills(dsn: str | None, doc_ids: list[str] | None = None) -> list[dict
     """
     from cost import query as cost_query
 
-    sql = ("SELECT code, name, unit, feature_schema, chapter, doc_id, spec_version "
+    sql = ("SELECT code, name, unit, feature_schema, chapter, doc_id, spec_version, "
+           "provenance->>'caption' AS caption "
            "FROM bill_spec")
     params: list = []
     if doc_ids:
@@ -63,7 +83,10 @@ def _fetch_bills(dsn: str | None, doc_ids: list[str] | None = None) -> list[dict
     sql += " ORDER BY code"
     with cost_query.connect(dsn) as conn, conn.cursor() as cur:
         cur.execute(sql, params or None)
-        return cur.fetchall()
+        rows = cur.fetchall()
+    for r in rows:                                   # 从 caption/unit 派生现浇/预制标记
+        r["cast_type"] = cast_type(r.get("caption"), r.get("unit"))
+    return rows
 
 
 def _read_bills_jsonl(path, doc_ids: list[str] | None = None) -> list[dict]:
@@ -90,7 +113,10 @@ def _read_bills_jsonl(path, doc_ids: list[str] | None = None) -> list[dict]:
         rec = json.loads(line)
         if wanted is not None and rec.get("doc_id") not in wanted:
             continue
-        bills.append({k: rec.get(k) for k in _BILL_FIELDS})
+        bill = {k: rec.get(k) for k in _BILL_FIELDS}
+        caption = (rec.get("provenance") or {}).get("caption")
+        bill["cast_type"] = cast_type(caption, rec.get("unit"))   # 现浇/预制标记
+        bills.append(bill)
     bills.sort(key=lambda b: b.get("code") or "")
     return bills
 
@@ -149,6 +175,7 @@ def build(
     schema_.add_field("chapter",     DataType.VARCHAR,      max_length=256)
     schema_.add_field("doc_id",      DataType.VARCHAR,      max_length=32)
     schema_.add_field("spec_version", DataType.VARCHAR,     max_length=64)
+    schema_.add_field("cast_type",   DataType.VARCHAR,      max_length=16)
     schema_.add_field("embedding",   DataType.FLOAT_VECTOR, dim=EMBED_DIM)
 
     index_params = client.prepare_index_params()
@@ -176,6 +203,7 @@ def build(
                 "chapter": b.get("chapter") or "",
                 "doc_id": b.get("doc_id") or "",
                 "spec_version": b.get("spec_version") or "",
+                "cast_type": b.get("cast_type") or "",
                 "embedding": emb,
             })
         client.insert(collection_name=collection_name, data=rows)

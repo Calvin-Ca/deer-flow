@@ -33,6 +33,7 @@
   计算规则对得上）——**不能拿现行 SJG-2024 定额套 2013 清单**。故 2013 组价需收**那个真实结算项目实际采用的定额版本 +
   价格时点**（待用户从结算数据查实定额依据/价格时点）。隔离机制 Phase 1 已就绪，数据补齐后把 `SPEC_REGISTRY` 的
   2013 `supports_compose` 翻 True 即可，代码不改。
-- [ ] **bill_quota_map 版本无关（Phase 2 前置）**：`bill_quota_map.bill_code` 只有 9 位码、无 spec_version/doc_id。
-  当前 2013 `supports_compose=False` 不出数无碍；Phase 2 给 2013 建映射后，2013/2024 同码会共用同一映射行 →
-  须给 `bill_quota_map` 加 `bill_spec_version`（或 bill_doc_id）维度，`compose_price` 的 join 按版本过滤。
+- [x] ~~**bill_quota_map 版本无关（Phase 2 前置）**~~（✅ 2026-06-18 完成，commit b42c0a92 等）：`bill_quota_map`
+  已加 `bill_spec_version`（NOT NULL）+ 唯一键纳入；`bill_quota.py` 生成带版本且只为 supports_compose 版本建映射
+  （2013 自动跳过）；`compose_price` join 按 `bill.spec_version` 过滤。服务器重灌验证：2024 `010401002` 仍
+  quota_count=6 零回归。Phase 2 给 2013 收定额后翻 `supports_compose=True` 即自动生效，代码不改。

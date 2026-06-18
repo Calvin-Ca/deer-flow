@@ -22,11 +22,8 @@ import json
 from collections import defaultdict
 from pathlib import Path
 
-import click
-from rich.console import Console
-from rich.table import Table
-
-console = Console()
+# click / rich 在 CLI（_cli）与 report 内 lazy import，保持纯函数（match/_compose_capable_versions 等）
+# 在无这些依赖的环境也可 import + 单测（与 cost.bill_index 同款）。
 
 ROOT = Path(__file__).resolve().parent.parent
 STRUCT = ROOT / "data" / "structured"
@@ -113,6 +110,10 @@ def report(rows: list[dict], n_bills: int) -> None:
     参数：rows —— 映射行；n_bills —— 清单总数。
     返回：无（终端打印）。
     """
+    from rich.console import Console
+    from rich.table import Table
+
+    console = Console()
     covered = {r["bill_code"] for r in rows}
     t = Table(title="清单→定额 映射（P0 名称匹配）", show_header=False)
     t.add_row("映射边（APPLIES）", str(len(rows)))
@@ -148,35 +149,44 @@ def _scan(struct: Path, name: str) -> list[dict]:
     return rows
 
 
-@click.command()
-@click.option("--struct-dir", "struct_dir", type=click.Path(exists=True, path_type=Path),
-              default=STRUCT, show_default=True,
-              help="结构化产物根；扫 <doc_id>/bill_spec.jsonl 与 <doc_id>/quota_item.jsonl")
-@click.option("--outdir", type=click.Path(path_type=Path), default=STRUCT, show_default=True)
-@click.option("--dry-run", is_flag=True, help="只看 report，不落盘")
-def main(struct_dir: Path, outdir: Path, dry_run: bool) -> None:
-    """bill_spec + quota_item → bill_quota_map.jsonl（清单→定额 APPLIES 名称匹配）。"""
-    bills = _scan(struct_dir, "bill_spec.jsonl")
-    quotas = _scan(struct_dir, "quota_item.jsonl")
-    if not bills or not quotas:
-        raise click.ClickException(
-            f"未扫到 bill_spec/quota_item（bills={len(bills)} quotas={len(quotas)}）："
-            f"确认 {struct_dir}/<doc_id>/ 下已生成 per-doc 产物")
-    # 版本隔离：只为「有兼容定额」的清单版本建映射（2013 定额未就绪 → 跳过，免造错耦合）
-    capable = _compose_capable_versions()
-    bills_capable = [b for b in bills if b.get("spec_version") in capable]
-    skipped = len(bills) - len(bills_capable)
-    if skipped:
-        console.print(f"[yellow]跳过 {skipped} 条无兼容定额版本的清单[/]（仅为 {sorted(capable)} 建映射）")
-    rows = match(bills_capable, quotas)
-    report(rows, len(bills_capable))
-    if dry_run:
-        console.print("[dim]--dry-run：未落盘[/]")
-        return
-    outdir.mkdir(parents=True, exist_ok=True)
-    _write_jsonl(rows, outdir / "bill_quota_map.jsonl")  # 跨规范关系产物，保持扁平
-    console.print(f"[green]已写[/] {outdir/'bill_quota_map.jsonl'}（{len(rows)} 边）")
+def _cli():
+    """构造 click 命令（click/rich lazy import，纯函数模块顶层无依赖、本地可测）。"""
+    import click
+    from rich.console import Console
+
+    console = Console()
+
+    @click.command()
+    @click.option("--struct-dir", "struct_dir", type=click.Path(exists=True, path_type=Path),
+                  default=STRUCT, show_default=True,
+                  help="结构化产物根；扫 <doc_id>/bill_spec.jsonl 与 <doc_id>/quota_item.jsonl")
+    @click.option("--outdir", type=click.Path(path_type=Path), default=STRUCT, show_default=True)
+    @click.option("--dry-run", is_flag=True, help="只看 report，不落盘")
+    def main(struct_dir: Path, outdir: Path, dry_run: bool) -> None:
+        """bill_spec + quota_item → bill_quota_map.jsonl（清单→定额 APPLIES 名称匹配）。"""
+        bills = _scan(struct_dir, "bill_spec.jsonl")
+        quotas = _scan(struct_dir, "quota_item.jsonl")
+        if not bills or not quotas:
+            raise click.ClickException(
+                f"未扫到 bill_spec/quota_item（bills={len(bills)} quotas={len(quotas)}）："
+                f"确认 {struct_dir}/<doc_id>/ 下已生成 per-doc 产物")
+        # 版本隔离：只为「有兼容定额」的清单版本建映射（2013 定额未就绪 → 跳过，免造错耦合）
+        capable = _compose_capable_versions()
+        bills_capable = [b for b in bills if b.get("spec_version") in capable]
+        skipped = len(bills) - len(bills_capable)
+        if skipped:
+            console.print(f"[yellow]跳过 {skipped} 条无兼容定额版本的清单[/]（仅为 {sorted(capable)} 建映射）")
+        rows = match(bills_capable, quotas)
+        report(rows, len(bills_capable))
+        if dry_run:
+            console.print("[dim]--dry-run：未落盘[/]")
+            return
+        outdir.mkdir(parents=True, exist_ok=True)
+        _write_jsonl(rows, outdir / "bill_quota_map.jsonl")  # 跨规范关系产物，保持扁平
+        console.print(f"[green]已写[/] {outdir/'bill_quota_map.jsonl'}（{len(rows)} 边）")
+
+    return main
 
 
 if __name__ == "__main__":
-    main()
+    _cli()()

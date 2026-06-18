@@ -13,11 +13,11 @@
 """
 from __future__ import annotations
 
-from splitter import toc_splitter as references  # §1 引用纯函数沿用 references.* 命名空间访问
-from splitter.toc_splitter import (
+from ingest.splitter import toc_splitter as references  # §1 引用纯函数沿用 references.* 命名空间访问
+from ingest.splitter.toc_splitter import (
     classify_heading, _parent_path, _resolve_parent, _path_depth,  # §2 建树纯函数
 )
-from splitter.toc_splitter import _split_catalog_line, _is_catalog_list, _norm  # 目录解析纯函数（§0 目录打标）
+from ingest.splitter.toc_splitter import _split_catalog_line, _is_catalog_list, _norm  # 目录解析纯函数（§0 目录打标）
 
 
 # ── classify_heading：标题文字 → node_path / 来源 / 置信 ──────────────────────────

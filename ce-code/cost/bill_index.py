@@ -225,16 +225,30 @@ def _cli():
     @click.option("--collection", default=COST_BILL_COLLECTION, show_default=True,
                   help="Milvus collection 名（隔离版本用独立名，如 cost_bill_spec_kb_2013）")
     @click.option("--doc-id", "doc_ids", multiple=True,
-                  help="只建这些 doc_id（版本隔离，可多次；如 --doc-id GB-50500-2013）；不传=全部")
+                  help="只建这些 doc_id（版本隔离，可多次；如 --doc-id GB-50854-2013）；不传=全部")
+    @click.option("--spec", default=None,
+                  help="国标版本（2013/2024）：按 config.SPEC_REGISTRY 自动取 collection + doc_ids，"
+                       "免手写 --doc-id 漏写混版本（与 --collection/--doc-id 二选一）")
     @click.option("--from-jsonl", "from_jsonl", default=None,
                   help="建库源 bill_spec.jsonl 路径（直读绕开 PG，纯评测数据如 2013 gold 用）；不传=读 PG")
     @click.option("--dsn", default=None, help="PG 连接串（默认 :5433/ce_cost）")
     @click.option("--batch-size", default=64, show_default=True)
-    def main(collection: str, doc_ids: tuple, from_jsonl: str | None,
+    def main(collection: str, doc_ids: tuple, spec: str | None, from_jsonl: str | None,
              dsn: str | None, batch_size: int) -> None:
-        """从 PG bill_spec（或 --from-jsonl 指定的 jsonl）建/重建造价清单向量库。"""
-        build(dsn=dsn, collection_name=collection,
-              doc_ids=list(doc_ids) or None, from_jsonl=from_jsonl, batch_size=batch_size)
+        """从 PG bill_spec（或 --from-jsonl 指定的 jsonl）建/重建造价清单向量库。
+
+        --spec 优先：按 SPEC_REGISTRY 解析出该版本的 collection 与 doc_ids（防止重建时漏写
+        --doc-id 把别版本混进同一 collection）。显式 --collection/--doc-id 仍可覆盖（不传 --spec 时）。
+        """
+        from config import resolve_spec
+
+        sel_collection, sel_doc_ids = collection, list(doc_ids) or None
+        if spec:
+            cfg = resolve_spec(spec)
+            sel_collection = cfg["bill_collection"]
+            sel_doc_ids = list(cfg["bill_doc_ids"])
+        build(dsn=dsn, collection_name=sel_collection,
+              doc_ids=sel_doc_ids, from_jsonl=from_jsonl, batch_size=batch_size)
 
     return main
 

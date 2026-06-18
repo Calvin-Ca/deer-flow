@@ -37,12 +37,14 @@ SPEC_REGISTRY: dict[str, dict] = {
     "2024": {
         "label": "GB/T 50854-2024 房屋建筑与装饰（现行）",
         "bill_collection": COST_BILL_COLLECTION,                 # cost_bill_spec_kb
+        "bill_doc_ids": ["GB-50854", "GB-50856"],                # 建库源 doc_id（房建 + 安装）
         "bill_spec_versions": ["GB/T 50854-2024", "GB/T 50856-2024"],  # 房建 + 安装 清单
         "supports_compose": True,                                # 2024 有定额/价格/映射，组价可出数
     },
     "2013": {
         "label": "GB 50854-2013 房屋建筑与装饰（旧版）",
         "bill_collection": "cost_bill_spec_kb_2013",
+        "bill_doc_ids": ["GB-50854-2013"],
         "bill_spec_versions": ["GB/T 50854-2013"],
         "supports_compose": False,  # 2013 组价数据（定额/价格/清单→定额映射）未就绪，见 notebooks/BACKLOG Phase 2
     },

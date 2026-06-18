@@ -22,6 +22,7 @@ from common.config import KNOWLEDGE_URL
 
 def bill_match(
     query: str,
+    spec: str,
     top_k: int = 10,
     structural: bool = True,
     rerank: bool = False,
@@ -30,16 +31,17 @@ def bill_match(
 ) -> dict:
     """打 /bill/match：构件描述 → 清单候选召回（dense 向量 + 结构约束重排）。
 
-    参数：query —— 构件/做法自然语言描述；top_k —— 候选数；structural —— 结构约束重排（默认开）；
-      rerank —— cross-encoder 精排（默认关，实测劣化短清单名）。
-    返回：``{"query","count","candidates":[{code,name,unit,feature,chapter,score,...}]}``。
+    参数：query —— 构件/做法自然语言描述；spec —— **国标版本（必填）**：2013 / 2024，按版本路由清单库；
+      top_k —— 候选数；structural —— 结构约束重排（默认开）；rerank —— cross-encoder 精排（默认关）。
+    返回：``{"query","spec","count","candidates":[{code,name,unit,feature,chapter,score,...}]}``。
       知识层只召回候选，选码由 CostAgent 在候选内做（红线：只建议不定稿）；
-      向量库未就绪/依赖不可达→503 经 ``requests.HTTPError`` 上抛。
+      未知 spec→400、向量库未就绪/依赖不可达→503 经 ``requests.HTTPError`` 上抛。
+      **CostAgent 调用前须向用户确认所用国标版本（2013/2024）再传 spec。**
     """
     base = (base_url or KNOWLEDGE_URL).rstrip("/")
     resp = requests.post(
         f"{base}/bill/match",
-        json={"query": query, "top_k": top_k, "structural": structural, "rerank": rerank},
+        json={"query": query, "spec": spec, "top_k": top_k, "structural": structural, "rerank": rerank},
         timeout=timeout,
     )
     resp.raise_for_status()
@@ -49,19 +51,23 @@ def bill_match(
 def price_compose(
     region: str,
     code: str,
+    spec: str,
     on_date: date | str | None = None,
     base_url: str | None = None,
     timeout: int = 120,
 ) -> dict:
     """打 /price/compose/{region}/{code}：清单 → 适用定额 → 工料机含量 + 信息价单价（含小计）。
 
-    参数：region —— 地区（如「深圳」）；code —— 清单编码（9 位）；on_date —— 计价期（可选，
-      缺省每资源取最新可用信息价期）。返回见知识层 ``cost.query.compose_price``；
+    参数：region —— 地区（如「深圳」）；code —— 清单编码（9 位）；spec —— **国标版本（必填）**：2013 / 2024
+      （按版本隔离 bill_spec 取数）；on_date —— 计价期（可选，缺省每资源取最新可用信息价期）。
+      返回见知识层 ``cost.query.compose_price``；未知 spec→400、该版本组价数据未就绪→501、
       清单项不存在→404、PG 不可达→503 经 HTTPError 上抛。未命中信息价的工料机 price_status=no_source。
     """
     base = (base_url or KNOWLEDGE_URL).rstrip("/")
     url = f"{base}/price/compose/{quote(region)}/{quote(code)}"
-    params = {"on_date": on_date.isoformat() if isinstance(on_date, date) else on_date} if on_date else None
+    params: dict = {"spec": spec}
+    if on_date:
+        params["on_date"] = on_date.isoformat() if isinstance(on_date, date) else on_date
     resp = requests.get(url, params=params, timeout=timeout)
     resp.raise_for_status()
     return resp.json()

@@ -19,7 +19,7 @@ CREATE EXTENSION IF NOT EXISTS btree_gist;
 -- 1. 清单规范库（GB 50500 计价 + GB/T 50854 计量，9 位全国统一编码）
 -- ─────────────────────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS bill_spec (
-  code            CHAR(9) PRIMARY KEY,        -- 前 9 位全国统一编码
+  code            CHAR(9) NOT NULL,           -- 前 9 位全国统一编码
   name            TEXT NOT NULL,              -- 清单项目名称
   unit            TEXT,                       -- 计量单位（首选；措施项目类可空）
   unit_options    JSONB DEFAULT '[]'::jsonb,  -- 可选计量单位（规范一码配多单位，如刷油 kg/m²）
@@ -32,7 +32,10 @@ CREATE TABLE IF NOT EXISTS bill_spec (
   doc_id          TEXT NOT NULL DEFAULT 'GB-50854',  -- 收录文档标识（GB-50854 / GB-50500）
   spec_version    TEXT NOT NULL,              -- 规范版本（canonical，如 GB/T 50854-2024）
   region          TEXT NOT NULL DEFAULT '全国', -- 适用地区（国标 = 全国）
-  effective_priority SMALLINT NOT NULL DEFAULT 1  -- 口径优先级（越小越优先）
+  effective_priority SMALLINT NOT NULL DEFAULT 1,  -- 口径优先级（越小越优先）
+  -- 复合主键：同 9 位码跨国标版本（GB/T 50854-2013 vs -2024）须共存隔离，不可只按 code
+  -- （2013/2024 同码不同义，单 code 主键会互相覆盖、令取数串版本，见 notebooks E6/E9）。
+  PRIMARY KEY (code, spec_version)
 );
 CREATE INDEX IF NOT EXISTS idx_bill_spec_chapter ON bill_spec (chapter);
 CREATE INDEX IF NOT EXISTS idx_bill_spec_doc ON bill_spec (doc_id, spec_version);

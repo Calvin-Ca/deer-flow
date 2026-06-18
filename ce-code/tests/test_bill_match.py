@@ -42,6 +42,24 @@ def test_structural_reorder_demotes_prefab_keeps_castinplace():
     assert out[1]["code"] == "010509001"
 
 
+def test_resolve_spec_known():
+    import config
+    assert config.resolve_spec("2024")["bill_collection"] == "cost_bill_spec_kb"
+    assert config.resolve_spec("2013")["bill_collection"] == "cost_bill_spec_kb_2013"
+    assert config.resolve_spec("2024")["supports_compose"] is True
+    assert config.resolve_spec("2013")["supports_compose"] is False
+    assert config.resolve_spec(" 2024 ")["bill_collection"] == "cost_bill_spec_kb"  # 去空白
+
+
+def test_resolve_spec_required_and_unknown():
+    import config
+    import pytest
+    with pytest.raises(ValueError):
+        config.resolve_spec("")        # 必填、无默认
+    with pytest.raises(ValueError):
+        config.resolve_spec("2099")    # 未知版本
+
+
 def test_prefix_filter_single():
     assert _prefix_filter(["01"]) == 'code like "01%"'
 

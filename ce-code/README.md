@@ -311,7 +311,7 @@ uv run python -m cost.fee_rate --input "data/structured/深圳市建设工程计
 
 ### Step C2 — 建表 + 幂等导入 PG（`cost/schema.sql` + `cost/load_pg.py`）
 
-`schema.sql` 一次建齐全部造价表（`bill_spec` / `aux_table` / `price_composition` / `quota_item` / `quota_resource` / `resource` / `resource_price` / `fee_rate` / `bill_quota_map` / `hist_bill`），强制治理字段 `doc_id`/`spec_version`/`region`/`effective_priority`（价格 `resource_price` 带 `effective_period` 时效 + `btree_gist` EXCLUDE 防重叠；`resource` 唯一键 `NULLS NOT DISTINCT` 让 `spec=NULL` 也算同行）；`IF NOT EXISTS` 幂等。`load_pg.py` 读 jsonl，按主键 `ON CONFLICT DO UPDATE` upsert（`bill_spec` 按 `code`、`aux_table` 按 `doc_id+caption+chapter`、`price_composition` 按 `doc_id+composite+seq`、`quota_item` 按 `region+quota_code+spec_version`、`resource` 按 `category+name+spec+unit`），可重复执行不产生重复行。
+`schema.sql` 一次建齐全部造价表（`bill_spec` / `aux_table` / `price_composition` / `quota_item` / `quota_resource` / `resource` / `resource_price` / `fee_rate` / `bill_quota_map` / `hist_bill`），强制治理字段 `doc_id`/`spec_version`/`region`/`effective_priority`（价格 `resource_price` 带 `effective_period` 时效 + `btree_gist` EXCLUDE 防重叠；`resource` 唯一键 `NULLS NOT DISTINCT` 让 `spec=NULL` 也算同行）；`IF NOT EXISTS` 幂等。`load_pg.py` 读 jsonl，按主键 `ON CONFLICT DO UPDATE` upsert（`bill_spec` 按 **`code+spec_version`**（国标版本隔离：2013/2024 同 9 位码共存不互相覆盖，见下「国标版本隔离」）、`aux_table` 按 `doc_id+caption+chapter`、`price_composition` 按 `doc_id+composite+seq`、`quota_item` 按 `region+quota_code+spec_version`、`resource` 按 `category+name+spec+unit`），可重复执行不产生重复行。
 
 ```bash
 # --scan-dir 自动扫各 <doc_id>/ 子目录全表 + 扁平 bill_quota_map，按依赖序一把灌
@@ -321,7 +321,16 @@ CE_PG_DSN='postgresql://cost:<密码>@localhost:5433/ce_cost' uv run python -m c
 
 > 单文件 `--bill-spec` / `--quota-item` / `--resource-price` 等选项仍在（targeted 灌某表/某规范），可与 `--scan-dir` 叠加。预期计数：bill_spec 1655（50854 472 + 50856 1183）/ aux 20（5+15）/ price_composition 10 / resource 991+（SJG171 407 + SJG170 584，再并入信息价新物料）/ quota_item 1257（640+617）/ quota_resource 8278（4173+4105，跳过 0）/ resource_price 1138（信息价 2026-05；EXCLUDE 约束按 doc_id+期先删后插、同月重跑幂等）/ fee_rate 24 / bill_quota_map 313。
 
-> ⚠️ `--init-schema` 是 `CREATE TABLE IF NOT EXISTS`，**不会改已存在的表结构**。若库里有缺治理字段的旧 `bill_spec`（早期手敲建的），先删了再灌（导入幂等，删表无损）：`docker exec ce-postgres psql -U cost -d ce_cost -c "DROP TABLE IF EXISTS bill_spec"`。
+> ⚠️ `--init-schema` 是 `CREATE TABLE IF NOT EXISTS`，**不会改已存在的表结构**。若库里有旧 `bill_spec`（缺治理字段、或主键还是单 `code`——见下「国标版本隔离」改为复合主键 `(code, spec_version)`），先删了再灌（导入幂等，删表无损）：`docker exec ce-postgres psql -U cost -d ce_cost -c "DROP TABLE IF EXISTS bill_spec CASCADE"`。
+
+### 国标版本严格隔离（spec 必填路由）
+
+2013 与 2024 两套清单计量国标**同 9 位码不同义**（见 `notebooks/experiments.md` E6–E9），混用会串库。隔离三层：
+- **关系库**：`bill_spec` 复合主键 `(code, spec_version)`，2013（`GB/T 50854-2013`）与 2024（`GB/T 50854-2024`/`GB/T 50856-2024`）同码共存不覆盖。
+- **向量库**：每版本独立 collection —— `cost_bill_spec_kb`(2024) / `cost_bill_spec_kb_2013`(2013)。
+- **路由**：`config.SPEC_REGISTRY` + `resolve_spec(spec)` 把版本号（`"2013"`/`"2024"`）映射到 collection + `bill_spec_versions` 过滤集 + `supports_compose` 标志。`/bill/match`（请求体 `spec` 必填）、`/price/compose`（query `spec` 必填）按版本路由；**spec 无默认，缺省/未知 → 400**（逼调用方显式选版本）。`supports_compose=False`（当前 2013，组价定额/价格/映射数据未就绪）→ `/price/compose` 返回 501，仅 `/bill/match` 可用。
+
+任务层 CostAgent 调用前须向用户确认所用国标版本（2013/2024）再透传 `spec`（`ce-services/common/cost_client.py` 的 `bill_match`/`price_compose` 已加 `spec` 必填参数）。
 
 ### Step C3 — 验收
 

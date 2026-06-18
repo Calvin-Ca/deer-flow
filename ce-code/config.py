@@ -28,6 +28,43 @@ COLLECTION_PREFIX = "building_code"
 # embedding（bge-large-zh-v1.5 @ embed_url, dim 1024），不新部署服务；BGE-M3 sparse 混检留后续。
 COST_BILL_COLLECTION = "cost_bill_spec_kb"
 
+# ── 国标版本严格隔离 ─────────────────────────────────────────────────────────
+# 2013 与 2024 两套清单计量国标**同 9 位码不同义**（如 011702006：2013=矩形梁模板 / 2024 体系不同；
+# 010502001 现浇矩形柱两版编码虽同但口径有别），混用会串库。故造价知识库调用须**显式指定国标版本**
+# （spec ∈ {"2013","2024"}），按下表路由到对应 Milvus collection / PG 过滤（spec_version 集）。
+# 任务层 CostAgent 调用前提示用户输入所用国标版本，再透传 spec。背景见 notebooks E6–E9。
+SPEC_REGISTRY: dict[str, dict] = {
+    "2024": {
+        "label": "GB/T 50854-2024 房屋建筑与装饰（现行）",
+        "bill_collection": COST_BILL_COLLECTION,                 # cost_bill_spec_kb
+        "bill_spec_versions": ["GB/T 50854-2024", "GB/T 50856-2024"],  # 房建 + 安装 清单
+        "supports_compose": True,                                # 2024 有定额/价格/映射，组价可出数
+    },
+    "2013": {
+        "label": "GB 50854-2013 房屋建筑与装饰（旧版）",
+        "bill_collection": "cost_bill_spec_kb_2013",
+        "bill_spec_versions": ["GB/T 50854-2013"],
+        "supports_compose": False,  # 2013 组价数据（定额/价格/清单→定额映射）未就绪，见 notebooks/BACKLOG Phase 2
+    },
+}
+
+
+def resolve_spec(spec: str) -> dict:
+    """国标版本号（"2013"/"2024"）→ SPEC_REGISTRY 配置。
+
+    **spec 必填、无默认**：缺省或未知都抛 ValueError（逼调用方显式选版本，避免错版静默串库）。
+    参数：spec —— 国标版本号字符串。
+    返回：该版本的路由配置 dict（bill_collection / bill_spec_versions / supports_compose / label）。
+    """
+    if not spec:
+        raise ValueError(
+            f"须指定国标版本 spec（{sorted(SPEC_REGISTRY)}）——调用造价知识库前请确认所用国标版本（2013/2024）"
+        )
+    cfg = SPEC_REGISTRY.get(str(spec).strip())
+    if cfg is None:
+        raise ValueError(f"未知国标版本 spec={spec!r}，支持: {sorted(SPEC_REGISTRY)}")
+    return cfg
+
 # 规范代号别名 → vector_store 目录名（与旧 server.py STANDARD_ALIASES 完全一致）
 STANDARD_ALIASES: dict[str, str] = {
     "gb50016": "GB_50016-20142018",

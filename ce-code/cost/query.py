@@ -104,7 +104,8 @@ _COMPOSE_SQL = (
 
 
 def compose_price(conn: psycopg.Connection, region: str, code: str,
-                  on_date: date | None = None) -> dict | None:
+                  on_date: date | None = None,
+                  spec_versions: list[str] | None = None) -> dict | None:
     """组价取数：清单项 → 适用定额 → 工料机含量 + 信息价单价（含小计）。
 
     取数链 bill_spec → bill_quota_map(APPLIES, 带 confidence) → quota_item → quota_resource
@@ -118,6 +119,9 @@ def compose_price(conn: psycopg.Connection, region: str, code: str,
       region —— 地区（如 "深圳"），同时用于定额 region 过滤与信息价 region 取价。
       code —— 清单编码（GB 50854，9 位）。
       on_date —— 计价期（date）；None 时每个资源取最新可用信息价期（非当日，故 2026-05 期亦可命中）。
+      spec_versions —— **国标版本隔离**：限定 bill_spec 只取这些 spec_version（如 2024→
+        ["GB/T 50854-2024","GB/T 50856-2024"]，2013→["GB/T 50854-2013"]）；同 9 位码跨版本共存时
+        据此选版本，避免串库（见 config.SPEC_REGISTRY）。None=不限版本（仅单版本库时安全）。
     返回：``{"bill": {...清单字段...}, "region", "on_date", "quota_count",
           "quotas": [{quota_code, name, unit, confidence, source, 人材机费,
                       "resources": [{category,name,spec,unit,consumption,unit_price,unit_factor,
@@ -126,11 +130,14 @@ def compose_price(conn: psycopg.Connection, region: str, code: str,
           清单项不存在→None；存在但无映射定额→quotas 为空列表（200，供任务层感知覆盖缺口）。
     """
     with conn.cursor() as cur:
-        cur.execute(
-            "SELECT code, name, unit, unit_options, chapter, doc_id, spec_version "
-            "FROM bill_spec WHERE code = %s",
-            (code,),
-        )
+        sql = ("SELECT code, name, unit, unit_options, chapter, doc_id, spec_version "
+               "FROM bill_spec WHERE code = %s")
+        params: list = [code]
+        if spec_versions:                                  # 国标版本隔离：限定版本，避免跨版本同码串库
+            sql += " AND spec_version = ANY(%s)"
+            params.append(list(spec_versions))
+        sql += " LIMIT 1"
+        cur.execute(sql, params)
         bill = cur.fetchone()
         if bill is None:
             return None

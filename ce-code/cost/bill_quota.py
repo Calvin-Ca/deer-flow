@@ -57,9 +57,10 @@ def match(bills: list[dict], quotas: list[dict]) -> list[dict]:
     """名称匹配生成 APPLIES 映射边。
 
     清单名 == 定额 base 名 → confidence 0.9；清单名 ⊂ base 名 → 0.6。
-    一个清单匹配多个定额子目（1:N）。
+    一个清单匹配多个定额子目（1:N）。每行带 ``bill_spec_version``（清单所属国标版本）做**版本隔离**：
+    同 9 位码跨版本不同义，映射须按版本区分（compose_price join 按 bill_spec_version 过滤）。
 
-    参数：bills —— 清单列表；quotas —— 定额子目列表。
+    参数：bills —— 清单列表（每条须含 spec_version）；quotas —— 定额子目列表。
     返回：bill_quota_map 行列表。
     """
     by_base: dict[str, list[dict]] = defaultdict(list)
@@ -80,12 +81,30 @@ def match(bills: list[dict], quotas: list[dict]) -> list[dict]:
                 continue
             for q in qs:
                 rows.append({
-                    "bill_code": b["code"], "quota_code": q["quota_code"],
+                    "bill_code": b["code"], "bill_spec_version": b.get("spec_version"),
+                    "quota_code": q["quota_code"],
                     "quota_doc_id": q.get("doc_id") or "SZ-SJG171",
                     "relation": "APPLIES", "confidence": conf, "source": src,
                     "note": f"{bn} → {q['name']}",
                 })
     return rows
+
+
+def _compose_capable_versions() -> set[str]:
+    """从 SPEC_REGISTRY 取「有兼容定额、可组价」的清单 spec_version 集合。
+
+    定额（SJG）口径与现行清单配套，跨版本套用会口径错位（见 notebooks 口径讨论 + BACKLOG）。
+    故只为 supports_compose 的版本生成清单→定额映射；2013（定额未就绪）暂不生成，避免造
+    「2013 清单 → 2024 SJG 定额」的错耦合行。Phase 2 翻 2013 supports_compose=True 后自动纳入。
+    返回：可组价的 spec_version 字符串集合。
+    """
+    import config
+
+    versions: set[str] = set()
+    for cfg in config.SPEC_REGISTRY.values():
+        if cfg.get("supports_compose"):
+            versions.update(cfg.get("bill_spec_versions") or [])
+    return versions
 
 
 def report(rows: list[dict], n_bills: int) -> None:
@@ -143,8 +162,14 @@ def main(struct_dir: Path, outdir: Path, dry_run: bool) -> None:
         raise click.ClickException(
             f"未扫到 bill_spec/quota_item（bills={len(bills)} quotas={len(quotas)}）："
             f"确认 {struct_dir}/<doc_id>/ 下已生成 per-doc 产物")
-    rows = match(bills, quotas)
-    report(rows, len(bills))
+    # 版本隔离：只为「有兼容定额」的清单版本建映射（2013 定额未就绪 → 跳过，免造错耦合）
+    capable = _compose_capable_versions()
+    bills_capable = [b for b in bills if b.get("spec_version") in capable]
+    skipped = len(bills) - len(bills_capable)
+    if skipped:
+        console.print(f"[yellow]跳过 {skipped} 条无兼容定额版本的清单[/]（仅为 {sorted(capable)} 建映射）")
+    rows = match(bills_capable, quotas)
+    report(rows, len(bills_capable))
     if dry_run:
         console.print("[dim]--dry-run：未落盘[/]")
         return

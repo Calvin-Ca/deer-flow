@@ -333,19 +333,22 @@ def load_fee_rate(conn, records: list[dict]) -> int:
 
 
 def load_bill_quota_map(conn, records: list[dict]) -> int:
-    """幂等 upsert bill_quota_map（按 bill_code+quota_code+quota_doc_id 唯一键）。
+    """幂等 upsert bill_quota_map（按 bill_code+bill_spec_version+quota_code+quota_doc_id 唯一键）。
 
+    bill_spec_version 做版本隔离：同 9 位码跨国标版本不同义，映射须按版本区分（见 schema 注释）。
     参数：conn —— psycopg 连接；records —— bill_quota_map.jsonl 记录列表。
     返回：写入行数。
     """
-    rows = [(r["bill_code"], r["quota_code"], r["quota_doc_id"],
+    # 兼容旧 jsonl（加 bill_spec_version 字段前生成的）：旧映射全是 2024 口径（仅 2024 有定额）→ 回填
+    rows = [(r["bill_code"], r.get("bill_spec_version") or "GB/T 50854-2024",
+             r["quota_code"], r["quota_doc_id"],
              r.get("relation") or "APPLIES", r.get("confidence"),
              r.get("source") or None, r.get("note") or None) for r in records]
     sql = """
         INSERT INTO bill_quota_map
-            (bill_code, quota_code, quota_doc_id, relation, confidence, source, note)
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
-        ON CONFLICT (bill_code, quota_code, quota_doc_id) DO UPDATE SET
+            (bill_code, bill_spec_version, quota_code, quota_doc_id, relation, confidence, source, note)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        ON CONFLICT (bill_code, bill_spec_version, quota_code, quota_doc_id) DO UPDATE SET
             relation = EXCLUDED.relation, confidence = EXCLUDED.confidence,
             source = EXCLUDED.source, note = EXCLUDED.note
     """

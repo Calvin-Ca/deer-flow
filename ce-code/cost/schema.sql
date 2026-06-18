@@ -144,15 +144,18 @@ CREATE INDEX IF NOT EXISTS idx_resource_price_res ON resource_price (resource_id
 CREATE TABLE IF NOT EXISTS bill_quota_map (
   id           BIGSERIAL PRIMARY KEY,
   bill_code    CHAR(9) NOT NULL,             -- 清单编码（GB 50854，9 位）
+  bill_spec_version TEXT NOT NULL,           -- 清单所属国标版本（如 GB/T 50854-2024）——
+                                             -- **版本隔离**：同 9 位码跨版本不同义，映射须按版本区分，
+                                             -- 否则 2013/2024 同码共用映射、组价串版本（见 notebooks E6/E9 + BACKLOG）
   quota_code   TEXT NOT NULL,                -- 定额子目编号（SJG）
   quota_doc_id TEXT NOT NULL,                -- 定额来源（SZ-SJG171/170），与 quota_code 共同定位
   relation     TEXT NOT NULL DEFAULT 'APPLIES',
   confidence   NUMERIC,                      -- 映射置信度（0~1）
   source       TEXT,                         -- 来源：auto_name_substr / manual / …
   note         TEXT,
-  UNIQUE (bill_code, quota_code, quota_doc_id)
+  UNIQUE (bill_code, bill_spec_version, quota_code, quota_doc_id)
 );
-CREATE INDEX IF NOT EXISTS idx_bill_quota_map_bill ON bill_quota_map (bill_code);
+CREATE INDEX IF NOT EXISTS idx_bill_quota_map_bill ON bill_quota_map (bill_code, bill_spec_version);
 CREATE INDEX IF NOT EXISTS idx_bill_quota_map_quota ON bill_quota_map (quota_code);
 
 -- 定额资源 → 信息价物料 价格映射（资源同物异名对齐，拉高组价价覆盖）。

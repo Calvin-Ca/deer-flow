@@ -98,7 +98,8 @@ _COMPOSE_SQL = (
     "      AND (%(on_date)s::date IS NULL OR rp.effective_period @> %(on_date)s::date) "
     "    ORDER BY (rp.resource_id = r.id) DESC, lower(rp.effective_period) DESC LIMIT 1"
     ") p ON true "
-    "WHERE m.bill_code = %(code)s AND q.region = %(region)s "
+    "WHERE m.bill_code = %(code)s AND m.bill_spec_version = %(bill_spec_version)s "
+    "  AND q.region = %(region)s "
     f"ORDER BY m.confidence DESC NULLS LAST, q.quota_code, {_CATEGORY_ORDER}, r.name"
 )
 
@@ -141,7 +142,9 @@ def compose_price(conn: psycopg.Connection, region: str, code: str,
         bill = cur.fetchone()
         if bill is None:
             return None
-        cur.execute(_COMPOSE_SQL, {"code": code, "region": region, "on_date": on_date})
+        # 按解析出的清单版本过滤 bill_quota_map，避免同 9 位码跨版本共用映射（版本隔离）
+        cur.execute(_COMPOSE_SQL, {"code": code, "region": region, "on_date": on_date,
+                                   "bill_spec_version": bill["spec_version"]})
         rows = cur.fetchall()
 
     quotas: dict[tuple[str, str], dict] = {}

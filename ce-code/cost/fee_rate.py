@@ -9,12 +9,12 @@
 任何规则即跳过并计数（**宁缺毋造**，不猜列）。安文费清单部分列项表 / 附录 B 包含内容
 等非费率表不在此处理。
 
-输出：``data/structured/SZ-FLBZ-2023/fee_rate.jsonl``（per-doc），每行：
+输出：``data/structured/cost/SZ-FLBZ-2023/fee_rate.jsonl``（per-doc），每行：
 fee_category / fee_name / applicable（可空）/ ref_low / ref_high / recommended / unit
 + doc_id / spec_version / region / effective_priority / provenance。
 
 跑法（单行）：
-  uv run python -m cost.fee_rate --input "data/structured/深圳市建设工程计价费率标准2023/default/chunks.json"
+  uv run python -m cost.fee_rate --input "data/structured/chunks/深圳市建设工程计价费率标准2023/default/chunks.json"
 """
 
 from __future__ import annotations
@@ -32,7 +32,7 @@ from cost import resolve_doc_dir
 console = Console()
 
 ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_OUTDIR = ROOT / "data" / "structured"
+DEFAULT_OUTDIR = ROOT / "data" / "structured" / "cost"
 
 DOC_ID = "SZ-FLBZ-2023"
 SPEC_VERSION = "深圳市建设工程计价费率标准 2023"
@@ -185,7 +185,7 @@ def main(input_path: Path, outdir: Path, dry_run: bool) -> None:
         return
     if not records:
         raise click.ClickException("未抽到任何费率行：检查 caption 是否匹配 RULES")
-    doc_dir = resolve_doc_dir(outdir, records)  # data/structured/SZ-FLBZ-2023/
+    doc_dir = resolve_doc_dir(outdir, records)  # data/structured/cost/SZ-FLBZ-2023/
     doc_dir.mkdir(parents=True, exist_ok=True)
     _write_jsonl(records, doc_dir / "fee_rate.jsonl")
     console.print(f"[green]已写[/] {doc_dir}/fee_rate.jsonl（{len(records)} 行）")

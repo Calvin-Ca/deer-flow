@@ -6,9 +6,9 @@
              含治理字段 doc_id/version/region/effective_priority），幂等可审计。
   load_pg    JSONL → PostgreSQL 幂等导入（替代手敲 staging+\\copy）。
 
-产物布局：抽取产物按 **doc_id 分目录** 落 ``data/structured/<doc_id>/<表>.jsonl``
-（多规范累积不互相覆盖；与 splitter 的 ``<原始规范名>/default/chunks.json`` 子目录
-不撞）。跨规范关系产物（如 bill_quota_map）保持扁平在 ``data/structured/`` 下。
+产物布局（2026-06-18 整理）：抽取产物按 **doc_id 分目录** 落 ``data/structured/cost/<doc_id>/<表>.jsonl``
+（多规范累积不互相覆盖）；跨规范关系产物（bill_quota_map / resource_price_map）扁平落
+``data/structured/cost/`` 下。摄取产物（chunks）另落 ``data/structured/chunks/<规范>/default/``，与 cost 分离。
 """
 
 from __future__ import annotations

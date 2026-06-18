@@ -18,7 +18,7 @@ PDF（清单/计量规范/定额/信息价/费率）
    │  [摄取 ingest]
    ▼
 MinerU 解析 ──► toc 切分建树 ──► chunks.json（单一真值，含表格矩形化 + 引用图/祖先链）
- -m ingest.parser   -m ingest.splitter        data/structured/<规范>/default/
+ -m ingest.parser   -m ingest.splitter        data/structured/chunks/<规范>/default/
    │  [抽取 cost]
    ▼
 cost/ 各模块（chunks.json → 结构化 jsonl）          [入库] load_pg --scan-dir

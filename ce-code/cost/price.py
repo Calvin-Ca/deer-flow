@@ -14,7 +14,7 @@
 「单位」列→unit；含「价格」+「元」且非「公式」的列→price。据此天然排除：
 价格指数（月份列、无价格列）/ 造价对比（BIM）/ 系数表 / 混凝土公式价（价格计算公式(元)）。
 
-输出：``data/structured/SZ-JGXX-PRICE/resource_price.jsonl``（per-doc），每行带物料
+输出：``data/structured/cost/SZ-JGXX-PRICE/resource_price.jsonl``（per-doc），每行带物料
 自然键（category/name/spec/unit，供 ``load_pg`` upsert 进 `resource` 取 id）+ price +
 effective_period + region + price_type + doc_id + provenance。
 
@@ -23,7 +23,7 @@ effective_period + region + price_type + doc_id + provenance。
 > 精确命中有限，语义匹配待后续——P0 先把价目结构化入库，按红线「只建议不定稿」。
 
 跑法（单行）：
-  uv run python -m cost.price --input "data/structured/2026_5深圳信息价_www_zgjct_com下载/default/chunks.json"
+  uv run python -m cost.price --input "data/structured/chunks/2026_5深圳信息价_www_zgjct_com下载/default/chunks.json"
 """
 
 from __future__ import annotations
@@ -42,7 +42,7 @@ from cost import resolve_doc_dir
 console = Console()
 
 ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_OUTDIR = ROOT / "data" / "structured"
+DEFAULT_OUTDIR = ROOT / "data" / "structured" / "cost"
 
 DOC_ID = "SZ-JGXX-PRICE"
 REGION = "深圳"
@@ -258,7 +258,7 @@ def main(input_path: Path, outdir: Path, period_override: str, dry_run: bool) ->
     if dry_run:
         console.print("[dim]--dry-run：未落盘[/]")
         return
-    doc_dir = resolve_doc_dir(outdir, records)  # data/structured/SZ-JGXX-PRICE/
+    doc_dir = resolve_doc_dir(outdir, records)  # data/structured/cost/SZ-JGXX-PRICE/
     doc_dir.mkdir(parents=True, exist_ok=True)
     _write_jsonl(records, doc_dir / "resource_price.jsonl")
     console.print(f"[green]已写[/] {doc_dir}/resource_price.jsonl（{len(records)} 行）")

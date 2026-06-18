@@ -13,7 +13,7 @@
 规则声明式（RULES），加一条新构成只需补一个 RuleSpec（node_path + 正则 + 名称）。
 
 输入：50500 的 chunks.json（splitter 产物）
-输出：data/structured/price_composition.jsonl（一行一个「构成项」）+ 终端质量 report
+输出：data/structured/cost/price_composition.jsonl（一行一个「构成项」）+ 终端质量 report
 """
 
 from __future__ import annotations
@@ -35,7 +35,7 @@ console = Console()
 ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_INPUT = (ROOT / "data" / "structured"
                  / "GB_T50500_2024_建设工程工程量清单计价标准" / "default" / "chunks.json")
-DEFAULT_OUTDIR = ROOT / "data" / "structured"
+DEFAULT_OUTDIR = ROOT / "data" / "structured" / "cost"
 
 # 构成项分隔：顿号 + 末项「利润和…风险费用」的「和」
 SPLIT_RE = re.compile(r"[、和]")
@@ -189,7 +189,7 @@ def main(input_path: Path, outdir: Path, dry_run: bool) -> None:
         console.print("[dim]--dry-run：未落盘[/]")
         return
 
-    doc_dir = resolve_doc_dir(outdir, rows)  # data/structured/<doc_id>/
+    doc_dir = resolve_doc_dir(outdir, rows)  # data/structured/cost/<doc_id>/
     doc_dir.mkdir(parents=True, exist_ok=True)
     _write_jsonl(rows, doc_dir / "price_composition.jsonl")
     console.print(f"[green]已写[/] {doc_dir/'price_composition.jsonl'}（{len(rows)} 行）")

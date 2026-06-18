@@ -7,10 +7,10 @@
 > 这是**起步映射**（覆盖有限、带 confidence/source 标注），非定稿；未覆盖项与低置信项
 > 待富化（语义召回 / 专家标注），按红线「只建议不定稿」交任务层 HITL。
 
-输入：扫 ``data/structured/<doc_id>/`` 下全部 bill_spec.jsonl（清单）+ quota_item.jsonl
+输入：扫 ``data/structured/cost/<doc_id>/`` 下全部 bill_spec.jsonl（清单）+ quota_item.jsonl
       （定额子目）——跨规范汇总（SJG171 建筑 + SJG170 土方一起匹配，扩大覆盖）。
 输出：bill_quota_map.jsonl（bill_code → quota_code，带 relation/confidence/source；跨规范
-      关系产物，扁平落 ``data/structured/`` 下）+ 覆盖 report
+      关系产物，扁平落 ``data/structured/cost/`` 下）+ 覆盖 report
 
 取数路径（入库后，见 README Step C 验收 SQL）：
   bill_spec → bill_quota_map → quota_item → quota_resource → resource（→ resource_price）
@@ -26,7 +26,7 @@ from pathlib import Path
 # 在无这些依赖的环境也可 import + 单测（与 cost.bill_index 同款）。
 
 ROOT = Path(__file__).resolve().parent.parent
-STRUCT = ROOT / "data" / "structured"
+STRUCT = ROOT / "data" / "structured" / "cost"
 
 
 def _read_jsonl(path: Path) -> list[dict]:

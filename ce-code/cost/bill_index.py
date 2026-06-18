@@ -16,7 +16,7 @@ calc_rule/work_content 偏施工细节、对「构件→选码」区分度低，
   .venv/bin/python -m cost.bill_index --spec 2013     # 重建 2013 库 cost_bill_spec_kb_2013（GB-50854-2013）
 
 纯评测数据也可直读 jsonl 绕 PG：
-  .venv/bin/python -m cost.bill_index --from-jsonl data/structured/GB-50854-2013/bill_spec.jsonl \\
+  .venv/bin/python -m cost.bill_index --from-jsonl data/structured/cost/GB-50854-2013/bill_spec.jsonl \\
     --doc-id GB-50854-2013 --collection cost_bill_spec_kb_2013
 """
 from __future__ import annotations

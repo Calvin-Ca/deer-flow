@@ -22,7 +22,7 @@ N 格（N=子目数）即各子目的值。
 非定额子目表（系数表/厚度表等）→ aux_tables.jsonl（复用 bill_spec 的辅助表口径）。
 
 输入：SJG 的 chunks.json（splitter 产物）
-输出：data/structured/quota_item.jsonl + resource.jsonl + quota_resource.jsonl + aux 复用
+输出：data/structured/cost/quota_item.jsonl + resource.jsonl + quota_resource.jsonl + aux 复用
 """
 
 from __future__ import annotations
@@ -40,7 +40,7 @@ from cost import resolve_doc_dir
 console = Console()
 
 ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_OUTDIR = ROOT / "data" / "structured"
+DEFAULT_OUTDIR = ROOT / "data" / "structured" / "cost"
 
 # 定额子目编号：6 位 + 「-序号」（如 010001-1）
 CODE_RE = re.compile(r"^\d{6}-\d+$")
@@ -406,7 +406,7 @@ def main(input_path: Path, outdir: Path, dry_run: bool) -> None:
     if dry_run:
         console.print("[dim]--dry-run：未落盘[/]")
         return
-    doc_dir = resolve_doc_dir(outdir, data["items"])  # data/structured/<doc_id>/
+    doc_dir = resolve_doc_dir(outdir, data["items"])  # data/structured/cost/<doc_id>/
     doc_dir.mkdir(parents=True, exist_ok=True)
     _write_jsonl(data["items"], doc_dir / "quota_item.jsonl")
     _write_jsonl(data["resources"], doc_dir / "resource.jsonl")

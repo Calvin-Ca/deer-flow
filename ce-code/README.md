@@ -22,7 +22,9 @@ ce-code/
 ├── data/                           # 数据资产（parsed/structured/eval_set 入 git；raw/vector_store 不入）
 │   ├── raw/                        #   原始 PDF（手动放入；⛔不入 git，版权敏感）
 │   ├── parsed/                     #   MinerU 解析输出（python -m ingest.parser 产物，缓存；✅入 git）
-│   ├── structured/                 #   <规范>/default/chunks.json（ingest 产）+ <doc_id>/<表>.jsonl（cost 按 doc_id）+ 扁平 bill_quota_map/resource_price_map.jsonl；✅入 git
+│   ├── structured/                 #   ✅入 git，两桶分离：
+│   │   ├── chunks/<规范>/default/   #     摄取产物 chunks.json（ingest 写）
+│   │   └── cost/<doc_id>/<表>.jsonl #     抽取产物（cost 写）+ 扁平 bill_quota_map/resource_price_map.jsonl
 │   ├── vector_store/               #   Milvus 索引（⛔不入 git，可重生）
 │   └── eval_set/                   #   评测集（✅入 git；xlsx 原件不入 git）
 │
@@ -140,7 +142,7 @@ curl -s -X POST http://172.19.2.2:8000/file_parse -F "files=@data/raw/<文件名
 uv run python -m ingest.splitter toc --input "data/parsed/<basename>/auto/<basename>_content_list.json" --subsplit number
 ```
 
-产物落 `data/structured/<规范>/default/`：`chunks.json`（Chunk 树·单一真值）+ `catalog_blocks.json`（目录打标快照·调试）。可选切分深度 `--toc-max-depth` / `--subsplit`；`--preview` 只打印前若干节点不落盘。
+产物落 `data/structured/chunks/<规范>/default/`：`chunks.json`（Chunk 树·单一真值）+ `catalog_blocks.json`（目录打标快照·调试）。可选切分深度 `--toc-max-depth` / `--subsplit`；`--preview` 只打印前若干节点不落盘。
 
 > 拿到 chunks.json 后，进入下方「造价数据轨」用 `cost/` 各模块抽清单/定额/价格/费率 → PG。
 
@@ -178,10 +180,10 @@ curl -s "http://localhost:8100/price/compose/%E6%B7%B1%E5%9C%B3/010401002?spec=2
 > `chunks.json` 按 `<规范>/<profile>/` 隔离，须用 `--input` 指到具体路径（默认值是旧扁平位置，已过时）：
 
 ```bash
-uv run python -m cost.bill_spec --input "data/structured/GB_T50854_2024_房屋建筑与装饰工程工程量计算标准/default/chunks.json"
+uv run python -m cost.bill_spec --input "data/structured/chunks/GB_T50854_2024_房屋建筑与装饰工程工程量计算标准/default/chunks.json"
 ```
 
-产物按 doc_id 分目录落 `data/structured/<doc_id>/bill_spec.jsonl` + `aux_tables.jsonl`（doc_id 从记录推断，多规范不互相覆盖），终端打印质量 report（数量 / 编码唯一性 / 连续性 / 单位受控 / 特征空率 / 辅助表清单）。`--dry-run` 只看 report 不落盘。
+产物按 doc_id 分目录落 `data/structured/cost/<doc_id>/bill_spec.jsonl` + `aux_tables.jsonl`（doc_id 从记录推断，多规范不互相覆盖），终端打印质量 report（数量 / 编码唯一性 / 连续性 / 单位受控 / 特征空率 / 辅助表清单）。`--dry-run` 只看 report 不落盘。
 
 > **同码多行收口（`resolve_dups`）**：清单 PG 主键是 `code`，同码多行须收口——① **同名多单位**（规范一码配多个可选计量单位，如金属结构刷油 kg/m²）→ 合并成一行，`unit_options`(JSONB) 收全部单位、`unit` 取首个；② **异名撞码**（不同清单项撞同一 code，多为源 PDF/MinerU 编码读错）→ 该 code 全部行路由到 `bill_spec_conflicts.jsonl`、**不进主表**（宁缺毋造，不猜正确编码），报告供人工核对。GB 50856 通用安装已据此入库：1189 行 → 合并 4 多单位 + 出 2 冲突行（`031003010` 倒流防止器/淋浴器）→ **主表 1183（PK 零重复）** + aux 15 + anomalies 3 + conflicts 2。GB 50854 无重复，收口为 no-op。
 
@@ -190,7 +192,7 @@ uv run python -m cost.bill_spec --input "data/structured/GB_T50854_2024_房屋�
 2024 版 GB 50500 已无清单项目录（搬到 50854），只剩计价规则正文。本步抽组价要程序化读的**费用构成**：声明式规则集 `RULES`（`node_path` + 正则）锚定 50500 原文单句，正则抽出构成项列表，**不中即报错（宁缺毋造）**。产 `price_composition.jsonl`（每行一个构成项，带 provenance + `doc_id`/`spec_version`）：综合单价（2.0.9）= 人工费/材料费/施工机具使用费/管理费/利润/风险（不含增值税）；工程造价（3.1.2）= 分部分项/措施项目/其他项目/增值税（2024 版四部分）。加新构成只需在 `RULES` 追加一条。
 
 ```bash
-uv run python -m cost.price_composition --input "data/structured/GB_T50500_2024_建设工程工程量清单计价标准/default/chunks.json"
+uv run python -m cost.price_composition --input "data/structured/chunks/GB_T50500_2024_建设工程工程量清单计价标准/default/chunks.json"
 ```
 
 ### Step C1c — 从 SJG 消耗量标准抽定额三表（`cost/quota.py`）
@@ -200,36 +202,36 @@ SJG 171/170 的定额子目表是**转置矩阵**（列=定额子目，行=属�
 > 须先 `python -m ingest.splitter toc` 出 SJG 的 chunks.json（SJG 无规整目录，`chapter`/`ancestor_titles` 可能偏弱，入库后抽查）：
 
 ```bash
-uv run python -m cost.quota --input "data/structured/SJG_建筑工程消耗量标准/default/chunks.json"
-uv run python -m cost.quota --input "data/structured/SJG_土石方与地基基础工程消耗量标准/default/chunks.json"
+uv run python -m cost.quota --input "data/structured/chunks/SJG_建筑工程消耗量标准/default/chunks.json"
+uv run python -m cost.quota --input "data/structured/chunks/SJG_土石方与地基基础工程消耗量标准/default/chunks.json"
 ```
 
-产物按 doc_id 分目录落 `data/structured/<doc_id>/{quota_item,resource,quota_resource}.jsonl`（SJG171→`SZ-SJG171/`、SJG170→`SZ-SJG170/`，互不覆盖），终端打印总览（子目/资源/含量数、跨页续表合并数、无费用子目、资源类别分布）。`--dry-run` 只看 report。同一定额子目跨页（续表/续前）会被 MinerU 拆成两行，`extract` 按 `(doc_id, quota_code)` 合并（优先非空费用），避免续前页 null 价覆盖首页真值。当前：SJG171 = 640 子目 / 407 资源 / 4173 含量；SJG170 = 617 子目（合并 1 续前）/ 584 资源 / 4105 含量。
+产物按 doc_id 分目录落 `data/structured/cost/<doc_id>/{quota_item,resource,quota_resource}.jsonl`（SJG171→`SZ-SJG171/`、SJG170→`SZ-SJG170/`，互不覆盖），终端打印总览（子目/资源/含量数、跨页续表合并数、无费用子目、资源类别分布）。`--dry-run` 只看 report。同一定额子目跨页（续表/续前）会被 MinerU 拆成两行，`extract` 按 `(doc_id, quota_code)` 合并（优先非空费用），避免续前页 null 价覆盖首页真值。当前：SJG171 = 640 子目 / 407 资源 / 4173 含量；SJG170 = 617 子目（合并 1 续前）/ 584 资源 / 4105 含量。
 
 ### Step C1d — 清单→定额映射（KG P0，`cost/bill_quota.py`）
 
-清单（GB 50854，9 位码）与定额（SJG，6 位+变体）编码不可互推，映射是组价关键一跳。P0 用**名称匹配**自动种子：清单名==定额名首段 → conf 0.9，清单名⊂首段 → conf 0.6（1 清单 : N 定额）。**扫 `data/structured/<doc_id>/` 下全部 bill_spec + quota_item 跨规范汇总匹配**（SJG171 建筑 + SJG170 土方一起），产扁平 `data/structured/bill_quota_map.jsonl`（跨规范关系产物，带 `relation=APPLIES`/`confidence`/`source`）。这是**起步映射**（含 SJG171+170 后覆盖 53/472、313 边），未覆盖/低置信项待富化（语义召回/专家标注），按红线「只建议不定稿」交任务层 HITL。
+清单（GB 50854，9 位码）与定额（SJG，6 位+变体）编码不可互推，映射是组价关键一跳。P0 用**名称匹配**自动种子：清单名==定额名首段 → conf 0.9，清单名⊂首段 → conf 0.6（1 清单 : N 定额）。**扫 `data/structured/cost/<doc_id>/` 下全部 bill_spec + quota_item 跨规范汇总匹配**（SJG171 建筑 + SJG170 土方一起），产扁平 `data/structured/cost/bill_quota_map.jsonl`（跨规范关系产物，带 `relation=APPLIES`/`confidence`/`source`）。这是**起步映射**（含 SJG171+170 后覆盖 53/472、313 边），未覆盖/低置信项待富化（语义召回/专家标注），按红线「只建议不定稿」交任务层 HITL。
 
 ```bash
-uv run python -m cost.bill_quota   # 默认扫 data/structured/<doc_id>/，--struct-dir 可改根
+uv run python -m cost.bill_quota   # 默认扫 data/structured/cost/<doc_id>/，--struct-dir 可改根
 ```
 
 ### Step C1e — 信息价 → 价格库（动态独立管道，`cost/price.py`）
 
-深圳信息价（月刊）是**动态数据**，与定额/规范的静态口径解耦：`resource_price` 带 `effective_period` 时效，按 region + 期取价，不参与 `effective_priority` 排序。`price.py` 从信息价 `chunks.json` 抽价目表（`序号|材料名称|型号、规格|单位|价格(元)` 等变体），**列名子串定位**（名称列：设备名称→机械 / 项目名称→人工 / 否则材料；含「价格」+「元」且非「公式」→price），分类行（「一、黑色及有色金属」）记为 `sub_category`；天然排除价格指数（月份列）/ 造价对比 / 系数表 / 混凝土公式价（`价格计算公式(元)`）。时效从 standard_id「2026-5」推 `[2026-05-01, 2026-06-01)`（`--period YYYY-MM` 可覆盖）。产 per-doc `data/structured/SZ-JGXX-PRICE/resource_price.jsonl`（含物料自然键供 `load_pg` upsert 进 `resource` 取 id + price + 时效 + 溯源）。
+深圳信息价（月刊）是**动态数据**，与定额/规范的静态口径解耦：`resource_price` 带 `effective_period` 时效，按 region + 期取价，不参与 `effective_priority` 排序。`price.py` 从信息价 `chunks.json` 抽价目表（`序号|材料名称|型号、规格|单位|价格(元)` 等变体），**列名子串定位**（名称列：设备名称→机械 / 项目名称→人工 / 否则材料；含「价格」+「元」且非「公式」→price），分类行（「一、黑色及有色金属」）记为 `sub_category`；天然排除价格指数（月份列）/ 造价对比 / 系数表 / 混凝土公式价（`价格计算公式(元)`）。时效从 standard_id「2026-5」推 `[2026-05-01, 2026-06-01)`（`--period YYYY-MM` 可覆盖）。产 per-doc `data/structured/cost/SZ-JGXX-PRICE/resource_price.jsonl`（含物料自然键供 `load_pg` upsert 进 `resource` 取 id + price + 时效 + 溯源）。
 
 ```bash
-uv run python -m cost.price --input "data/structured/2026_5深圳信息价_www_zgjct_com下载/default/chunks.json"
+uv run python -m cost.price --input "data/structured/chunks/2026_5深圳信息价_www_zgjct_com下载/default/chunks.json"
 ```
 
 当前 2026-05：56 价目表 / 1138 价目行（材料 1024 / 机械 96 / 人工 35，同期多价去重 17），17 个分类。⚠️ 信息价物料名（如「建筑废渣混凝土实心砖 240x115x53」）与定额 resource 名（「普通混凝土实心砖 240×115×53」）格式有差，精确命中有限 → 大多作为**信息价自有资源**入 `resource`（doc_id=SZ-JGXX-PRICE），与定额 resource 的对接（语义匹配）待富化，按红线「只建议不定稿」。
 
 ### Step C1f — 计价费率标准 → 费率库（`cost/fee_rate.py`）
 
-费率是「综合单价之上算工程造价」的乘数（安全文明施工/夜间施工/赶工/总承包服务费/增值税/附加税费/工程保险费）。费率标准 7 张费率表表头**各不相同**（专业工程/工程类别/费用名称\\系数/项目名称，单位 %/‰/系数混用），表少而杂 → 用**声明式规则 `RULES`**（按 caption 锚定每表的列布局 + 费用元数据），caption 不中任何规则即跳过并计数（**宁缺毋造**，不猜列）。产 per-doc `data/structured/SZ-FLBZ-2023/fee_rate.jsonl`（fee_category / fee_name / applicable / ref_low / ref_high / recommended / unit + 治理字段 + provenance）。
+费率是「综合单价之上算工程造价」的乘数（安全文明施工/夜间施工/赶工/总承包服务费/增值税/附加税费/工程保险费）。费率标准 7 张费率表表头**各不相同**（专业工程/工程类别/费用名称\\系数/项目名称，单位 %/‰/系数混用），表少而杂 → 用**声明式规则 `RULES`**（按 caption 锚定每表的列布局 + 费用元数据），caption 不中任何规则即跳过并计数（**宁缺毋造**，不猜列）。产 per-doc `data/structured/cost/SZ-FLBZ-2023/fee_rate.jsonl`（fee_category / fee_name / applicable / ref_low / ref_high / recommended / unit + 治理字段 + provenance）。
 
 ```bash
-uv run python -m cost.fee_rate --input "data/structured/深圳市建设工程计价费率标准2023/default/chunks.json"
+uv run python -m cost.fee_rate --input "data/structured/chunks/深圳市建设工程计价费率标准2023/default/chunks.json"
 ```
 
 当前：7 费率表 / 2 跳过（安文费清单列项表 + 附录 B 包含内容，非费率）/ **24 费率行**（安文费 11 / 总承包服务费 3 / 附加税费 3 / 工程保险费 3 / 赶工 2 / 夜间施工 1 / 增值税 1），0 异常。
@@ -241,7 +243,7 @@ uv run python -m cost.fee_rate --input "data/structured/深圳市建设工程计
 ```bash
 # --scan-dir 自动扫各 <doc_id>/ 子目录全表 + 扁平 bill_quota_map，按依赖序一把灌
 # （resource/quota_item 先于 quota_resource，bill_spec 先于 bill_quota_map）
-CE_PG_DSN='postgresql://cost:<密码>@localhost:5433/ce_cost' uv run python -m cost.load_pg --init-schema --scan-dir data/structured
+CE_PG_DSN='postgresql://cost:<密码>@localhost:5433/ce_cost' uv run python -m cost.load_pg --init-schema --scan-dir data/structured/cost
 ```
 
 > 单文件 `--bill-spec` / `--quota-item` / `--resource-price` 等选项仍在（targeted 灌某表/某规范），可与 `--scan-dir` 叠加。预期计数：bill_spec 1655（50854 472 + 50856 1183）/ aux 20（5+15）/ price_composition 10 / resource 991+（SJG171 407 + SJG170 584，再并入信息价新物料）/ quota_item 1257（640+617）/ quota_resource 8278（4173+4105，跳过 0）/ resource_price 1138（信息价 2026-05；EXCLUDE 约束按 doc_id+期先删后插、同月重跑幂等）/ fee_rate 24 / bill_quota_map 313。

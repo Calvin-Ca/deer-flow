@@ -13,7 +13,7 @@
 用法（服务器，从 ce-code 根；需先抽出 2013 bill_spec.jsonl）：
   uv run python -m tools.build_match_gold \
     --xlsx data/raw/清单量关联实物量数据.xlsx \
-    --bill-spec data/structured/GB-50854-2013/bill_spec.jsonl \
+    --bill-spec data/structured/cost/GB-50854-2013/bill_spec.jsonl \
     --out data/eval_set/match_gold_2013.jsonl
 """
 from __future__ import annotations

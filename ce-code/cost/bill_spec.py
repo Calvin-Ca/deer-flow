@@ -9,8 +9,8 @@ GB/T 50854 每节那张 6 列表（项目编码/项目名称/项目特征/计量
 
 非 9 位编码的行落 anomalies（人工抽查），不进 bill_spec。
 
-输入：data/structured/chunks.json（splitter 产物）
-输出：data/structured/bill_spec.jsonl + aux_tables.jsonl + 终端质量 report
+输入：data/structured/chunks/<规范>/default/chunks.json（splitter 产物）
+输出：data/structured/cost/bill_spec.jsonl + aux_tables.jsonl + 终端质量 report
 """
 
 from __future__ import annotations
@@ -31,7 +31,7 @@ console = Console()
 
 ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_INPUT = ROOT / "data" / "structured" / "chunks.json"
-DEFAULT_OUTDIR = ROOT / "data" / "structured"
+DEFAULT_OUTDIR = ROOT / "data" / "structured" / "cost"
 
 # 清单项表的判别列头（出现即视为清单项规范表）
 SPEC_HEADER_KEY = "项目编码"

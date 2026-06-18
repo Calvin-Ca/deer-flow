@@ -1048,7 +1048,8 @@ class TocSplitter(Splitter):
             click.Command: 切分命令；由 ``splitter.__main__`` 挂载为 ``python -m splitter toc``。
         """
         split = self.split  # 闭包捕获绑定方法
-        default_structured = Path(__file__).resolve().parent.parent / "data" / "structured"
+        # 摄取 chunks 落 data/structured/chunks/<std>/<profile>/（toc_splitter.py 在 ce-code/ingest/splitter/）
+        default_structured = Path(__file__).resolve().parents[2] / "data" / "structured" / "chunks"
 
         @click.command(name=self.name)
         @click.option("--input", "input_path", required=True,

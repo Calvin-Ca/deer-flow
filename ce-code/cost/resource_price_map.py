@@ -8,9 +8,9 @@
 > 料石毛石铁钉等专项小料 → 走市场价/询价），缺口是「缺失」非「同义」，语义匹配几乎零收益。归一键
 > 命中的是**确定匹配**（非猜测）→ confidence 1.0 可定稿；未命中归 ``no_source``，红线交 HITL 询价。
 
-输入：扫 ``data/structured/<doc_id>/resource.jsonl``（定额，仅 材料/机械；人工费单位元不走信息价）
+输入：扫 ``data/structured/cost/<doc_id>/resource.jsonl``（定额，仅 材料/机械；人工费单位元不走信息价）
       + ``SZ-JGXX-PRICE/resource_price.jsonl``（信息价物料）。
-输出：``data/structured/resource_price_map.jsonl``（跨规范关系产物，扁平）+ 覆盖 report。
+输出：``data/structured/cost/resource_price_map.jsonl``（跨规范关系产物，扁平）+ 覆盖 report。
 """
 
 from __future__ import annotations
@@ -28,7 +28,7 @@ from cost.resource_norm import canonical_key, unit_factor
 console = Console()
 
 ROOT = Path(__file__).resolve().parent.parent
-STRUCT = ROOT / "data" / "structured"
+STRUCT = ROOT / "data" / "structured" / "cost"
 
 # 走信息价取价的资源类别（人工费单位为元、是成本不是量，不走信息价单价）
 _PRICED_CATEGORIES = {"材料", "机械"}

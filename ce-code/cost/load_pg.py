@@ -8,9 +8,9 @@
 ``postgresql://cost@localhost:5433/ce_cost``（密码走 libpq 的 ``PGPASSWORD`` / ``~/.pgpass``，
 不硬编码进仓库）。
 
-跑法（服务器，单行）：产物按 doc_id 分目录（``data/structured/<doc_id>/<表>.jsonl``），
+跑法（服务器，单行）：产物按 doc_id 分目录（``data/structured/cost/<doc_id>/<表>.jsonl``），
 ``--scan-dir`` 自动扫全部规范 + 扁平 bill_quota_map 一把灌（依赖序在内已排）：
-  uv run python -m cost.load_pg --init-schema --scan-dir data/structured
+  uv run python -m cost.load_pg --init-schema --scan-dir data/structured/cost
 
 依赖：psycopg（服务器装：``uv add 'psycopg[binary]'``）。
 """

@@ -35,7 +35,7 @@ from ingest.parser.base import Parser
 console = Console()
 
 # 项目根目录（ce-code/），本模块在 parser/ 下
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[2]   # ce-code/（mineru.py 在 ce-code/ingest/parser/）
 DEFAULT_OUTPUT = ROOT / "data" / "parsed"
 
 # 远程 MinerU API 主机（版本 3.2.1，vllm 正常）。共享环境细节见 DEV.md。

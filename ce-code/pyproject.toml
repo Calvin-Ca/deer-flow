@@ -26,6 +26,7 @@ dependencies = [
     "rich>=13.7",            # 终端日志/表格输出
     "tqdm>=4.66",
     "pydantic>=2.7",         # 条款树 schema 校验
+    "psycopg[binary]>=3.3.4",
 ]
 
 [project.optional-dependencies]

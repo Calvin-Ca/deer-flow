@@ -29,7 +29,9 @@ __pycache__/
 .ruff_cache/
 
 # ===== 评测集：入 git 同步（CLAUDE.md 约定，2026-06-16 起生效） =====
-# data/eval_set/  随 git 同步
+# data/eval_set/  随 git 同步（json/jsonl 派生小文本）
+# 例外：真实工程 xlsx 原件（版权敏感 + 大体积）不入 git，保留在 eval_set 本地
+data/eval_set/*.xlsx
 
 # ===== 评测结果：目录保留，文件不入 git =====
 data/eval_results/*

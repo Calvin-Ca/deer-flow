@@ -5,7 +5,7 @@
 """
 from cost.bill_index import bill_embed_text, cast_type
 from cost.bill_match import (
-    _prefab_penalty, _prefix_filter, _rerank_text, _shape_hits, _structural_reorder, _type_penalty,
+    _prefab_penalty, _prefix_filter, _shape_hits, _structural_reorder, _type_penalty,
 )
 
 
@@ -114,18 +114,6 @@ def test_shape_hits():
 def test_shape_hits_empty():
     """空命中返回空列表。"""
     assert _shape_hits([]) == []
-
-
-def test_rerank_text_from_candidate():
-    """候选(feature 为 '/'-串)还原为与建库同构的配对文本。"""
-    cand = {"name": "矩形柱", "feature": "图代号/混凝土强度等级", "chapter": "附录E 混凝土工程"}
-    assert _rerank_text(cand) == "矩形柱。特征:图代号/混凝土强度等级。附录E 混凝土工程"
-
-
-def test_rerank_text_empty_feature():
-    """feature 空串时省略特征段，与 bill_embed_text 行为一致。"""
-    cand = {"name": "平整场地", "feature": "", "chapter": "附录A"}
-    assert _rerank_text(cand) == "平整场地。附录A"
 
 
 # ── 结构约束（类型对齐重排）────────────────────────────────────────────────────

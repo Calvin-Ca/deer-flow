@@ -33,8 +33,7 @@ class BillMatchRequest(BaseModel):
     query: str = Field(..., description="构件/做法自然语言描述，如「C30 现浇钢筋混凝土矩形柱」")
     spec: str = Field(..., description="国标版本（必填，无默认）：2013 / 2024。按版本路由到对应清单库，避免跨版本串库")
     top_k: int = Field(10, ge=1, le=50, description="返回候选数")
-    structural: bool = Field(True, description="是否结构约束重排（默认开——按类型对齐下压查询没要的模板/钢筋项）")
-    rerank: bool = Field(False, description="是否 cross-encoder 精排（默认关——实测在短清单名上劣化 dense；备查）")
+    structural: bool = Field(True, description="是否结构约束重排（默认开——按类型/现浇预制对齐下压查询没要的模板/钢筋/预制项）")
     code_prefixes: list[str] | None = Field(None, description="专业 code 前缀过滤，如 ['01','03'] 只在建筑+安装内召回；不传=全专业")
 
 
@@ -99,7 +98,7 @@ def bill_match_endpoint(req: BillMatchRequest) -> dict:
     try:
         candidates = bill_match.search_bill(req.query, req.top_k,
                                             collection_name=cfg["bill_collection"],
-                                            structural=req.structural, rerank=req.rerank,
+                                            structural=req.structural,
                                             code_prefixes=req.code_prefixes)
     except ValueError as exc:                              # collection 未就绪
         raise HTTPException(status_code=503, detail=str(exc)) from exc

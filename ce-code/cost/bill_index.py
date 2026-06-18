@@ -155,7 +155,7 @@ def build(
     from rich.console import Console
     from tqdm import tqdm
 
-    from index.vector_index import embed_texts
+    from cost.embed import embed_texts
 
     console = Console()
     bills = _read_bills_jsonl(from_jsonl, doc_ids) if from_jsonl else _fetch_bills(dsn, doc_ids)

@@ -1,7 +1,7 @@
 """真实工程数据 xlsx → 清单匹配评测 gold（`match_gold.jsonl`）。
 
 输入是真实工程的「BIM 构件↔清单」关联表（列 CODE/NAME/FEATURE/COMP_NAME/.../WORK_VALUE）。
-**版本隔离**：xlsx 是 2013 版清单编码，gold 完全对 2013 版国标（`bill_spec` of GB-50500-2013）验证，
+**版本隔离**：xlsx 是 2013 版清单编码，gold 完全对 2013 版国标（`bill_spec` of GB-50854-2013，房建计量规范）验证，
 不做 2013→2024 桥接（见 ce-code TODO 决策）。
 
 做法：
@@ -13,7 +13,7 @@
 用法（服务器，从 ce-code 根；需先抽出 2013 bill_spec.jsonl）：
   uv run python -m tools.build_match_gold \
     --xlsx data/raw/清单量关联实物量数据.xlsx \
-    --bill-spec data/structured/GB-50500-2013/bill_spec.jsonl \
+    --bill-spec data/structured/GB-50854-2013/bill_spec.jsonl \
     --out data/eval_set/match_gold_2013.jsonl
 """
 from __future__ import annotations

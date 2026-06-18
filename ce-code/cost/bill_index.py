@@ -10,12 +10,14 @@ calc_rule/work_content 偏施工细节、对「构件→选码」区分度低，
 
 依赖：Milvus localhost:19530 + vLLM bge-large @ :8097（服务器已部署）+ PG :5433（psycopg）。
 
-构建（服务器，从 ce-code 根，灌库后跑）：
-  .venv/bin/python -m cost.bill_index            # 全量重建 cost_bill_spec_kb（读 PG）
+构建（服务器，从 ce-code 根，灌库后跑）。**推荐 --spec 按版本路由**（自动取 collection + doc_ids，
+防漏写 --doc-id 把别版本混进同一库）：
+  .venv/bin/python -m cost.bill_index --spec 2024     # 重建 2024 库 cost_bill_spec_kb（GB-50854 + GB-50856）
+  .venv/bin/python -m cost.bill_index --spec 2013     # 重建 2013 库 cost_bill_spec_kb_2013（GB-50854-2013）
 
-纯评测数据（如 2013 gold）直读 jsonl、不进 PG（2013/2024 同 9 位码会撞，混库污染 2024 取数）：
-  .venv/bin/python -m cost.bill_index --from-jsonl data/structured/GB-50500-2013/bill_spec.jsonl \\
-    --doc-id GB-50500-2013 --collection cost_bill_spec_kb_2013
+纯评测数据也可直读 jsonl 绕 PG：
+  .venv/bin/python -m cost.bill_index --from-jsonl data/structured/GB-50854-2013/bill_spec.jsonl \\
+    --doc-id GB-50854-2013 --collection cost_bill_spec_kb_2013
 """
 from __future__ import annotations
 
@@ -72,7 +74,7 @@ def _fetch_bills(dsn: str | None, doc_ids: list[str] | None = None) -> list[dict
 
     参数：
         dsn —— PG 连接串（见 cost.query.resolve_dsn）。
-        doc_ids —— 只取这些 doc_id（**版本隔离**：如只建 2013 传 ['GB-50500-2013']）；None=全部。
+        doc_ids —— 只取这些 doc_id（**版本隔离**：如只建 2013 传 ['GB-50854-2013']）；None=全部。
     返回：list[dict]，每项含 code/name/unit/feature_schema/chapter/doc_id/spec_version。
     """
     from cost import query as cost_query

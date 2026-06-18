@@ -11,7 +11,11 @@ calc_rule/work_content 偏施工细节、对「构件→选码」区分度低，
 依赖：Milvus localhost:19530 + vLLM bge-large @ :8097（服务器已部署）+ PG :5433（psycopg）。
 
 构建（服务器，从 ce-code 根，灌库后跑）：
-  .venv/bin/python -m cost.bill_index            # 全量重建 cost_bill_spec_kb
+  .venv/bin/python -m cost.bill_index            # 全量重建 cost_bill_spec_kb（读 PG）
+
+纯评测数据（如 2013 gold）直读 jsonl、不进 PG（2013/2024 同 9 位码会撞，混库污染 2024 取数）：
+  .venv/bin/python -m cost.bill_index --from-jsonl data/structured/GB-50500-2013/bill_spec.jsonl \\
+    --doc-id GB-50500-2013 --collection cost_bill_spec_kb_2013
 """
 from __future__ import annotations
 
@@ -37,6 +41,9 @@ def bill_embed_text(name: str, feature_schema: list[str] | None, chapter: str | 
     return "。".join(parts)
 
 
+_BILL_FIELDS = ("code", "name", "unit", "feature_schema", "chapter", "doc_id", "spec_version")
+
+
 def _fetch_bills(dsn: str | None, doc_ids: list[str] | None = None) -> list[dict]:
     """从 PG 读清单项（建库源数据），按 code 排序。
 
@@ -59,23 +66,55 @@ def _fetch_bills(dsn: str | None, doc_ids: list[str] | None = None) -> list[dict
         return cur.fetchall()
 
 
+def _read_bills_jsonl(path, doc_ids: list[str] | None = None) -> list[dict]:
+    """从 bill_spec.jsonl 直读清单项（建库源，绕开 PG），按 code 排序。
+
+    **纯评测数据专用**（如 2013 真实结算 gold）：2013 清单无定额映射、不参与组价取数、
+    不被 /price/compose 服务，故其建库源直读 jsonl，不污染生产 PG bill_spec 表
+    （PK 仅 code，2013/2024 同 9 位码会撞，混库会让 2024 取数返回重复行）。
+
+    参数：
+        path —— bill_spec.jsonl 路径。
+        doc_ids —— 只取这些 doc_id；None=全部。
+    返回：list[dict]，字段与 _fetch_bills 对齐（code/name/unit/feature_schema/chapter/doc_id/spec_version）。
+    """
+    import json
+    from pathlib import Path
+
+    wanted = set(doc_ids) if doc_ids else None
+    bills: list[dict] = []
+    for line in Path(path).read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        rec = json.loads(line)
+        if wanted is not None and rec.get("doc_id") not in wanted:
+            continue
+        bills.append({k: rec.get(k) for k in _BILL_FIELDS})
+    bills.sort(key=lambda b: b.get("code") or "")
+    return bills
+
+
 def build(
     dsn: str | None = None,
     collection_name: str = COST_BILL_COLLECTION,
     doc_ids: list[str] | None = None,
+    from_jsonl: str | None = None,
     milvus_host: str = DEFAULTS["milvus_host"],
     milvus_port: int = DEFAULTS["milvus_port"],
     embed_url: str = DEFAULTS["embed_url"],
     embed_model_id: str = DEFAULTS["embed_model_id"],
     batch_size: int = 64,
 ) -> None:
-    """建/重建 bill_spec_kb：读 PG 清单项 → 嵌入名称+特征文本 → 插入 Milvus。
+    """建/重建 bill_spec_kb：读清单项 → 嵌入名称+特征文本 → 插入 Milvus。
 
     参数：
         dsn (str | None): PG 连接串（None 走默认 :5433/ce_cost）。
         collection_name (str): Milvus collection 名（默认 cost_bill_spec_kb；隔离版本用独立名）。
         doc_ids (list[str] | None): 只建这些 doc_id（**版本隔离**：2013 用独立 collection + doc_id，
             不与 2024 混；None=全部）。
+        from_jsonl (str | None): 建库源 bill_spec.jsonl 路径（直读，绕开 PG）；None=读 PG。
+            纯评测数据（如 2013 gold）走此路，不污染生产 PG bill_spec 表（见 _read_bills_jsonl）。
         milvus_host/milvus_port/embed_url/embed_model_id/batch_size: Milvus 与嵌入服务参数。
     返回：
         无（副作用：drop 重建 collection 并灌入向量 + 标量行）。
@@ -87,11 +126,12 @@ def build(
     from index.vector_index import embed_texts
 
     console = Console()
-    bills = _fetch_bills(dsn, doc_ids)
+    bills = _read_bills_jsonl(from_jsonl, doc_ids) if from_jsonl else _fetch_bills(dsn, doc_ids)
+    src = f"jsonl {from_jsonl}" if from_jsonl else "PG bill_spec"
     scope = f"（doc_id={list(doc_ids)}）" if doc_ids else "（全部 doc_id）"
-    console.print(f"读 PG bill_spec：{len(bills)} 条清单项 {scope} → collection {collection_name}")
+    console.print(f"读 {src}：{len(bills)} 条清单项 {scope} → collection {collection_name}")
     if not bills:
-        console.print("[yellow]bill_spec 为空，跳过建库（先 load_pg 灌库）[/yellow]")
+        console.print("[yellow]bill_spec 为空，跳过建库（PG 源先 load_pg 灌库 / jsonl 源检查路径与 doc_id）[/yellow]")
         return
 
     client = MilvusClient(uri=f"http://{milvus_host}:{milvus_port}")
@@ -154,12 +194,15 @@ def _cli():
                   help="Milvus collection 名（隔离版本用独立名，如 cost_bill_spec_kb_2013）")
     @click.option("--doc-id", "doc_ids", multiple=True,
                   help="只建这些 doc_id（版本隔离，可多次；如 --doc-id GB-50500-2013）；不传=全部")
+    @click.option("--from-jsonl", "from_jsonl", default=None,
+                  help="建库源 bill_spec.jsonl 路径（直读绕开 PG，纯评测数据如 2013 gold 用）；不传=读 PG")
     @click.option("--dsn", default=None, help="PG 连接串（默认 :5433/ce_cost）")
     @click.option("--batch-size", default=64, show_default=True)
-    def main(collection: str, doc_ids: tuple, dsn: str | None, batch_size: int) -> None:
-        """从 PG bill_spec 建/重建造价清单向量库。"""
+    def main(collection: str, doc_ids: tuple, from_jsonl: str | None,
+             dsn: str | None, batch_size: int) -> None:
+        """从 PG bill_spec（或 --from-jsonl 指定的 jsonl）建/重建造价清单向量库。"""
         build(dsn=dsn, collection_name=collection,
-              doc_ids=list(doc_ids) or None, batch_size=batch_size)
+              doc_ids=list(doc_ids) or None, from_jsonl=from_jsonl, batch_size=batch_size)
 
     return main
 

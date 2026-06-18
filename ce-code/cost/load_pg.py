@@ -392,6 +392,13 @@ def load_resource_price_map(conn, records: list[dict]) -> tuple[int, int]:
     return len(rows), skipped
 
 
+# 纯评测数据 doc_id（不入生产 PG）：2013 清单仅用于 /bill/match 评测 gold，无定额映射、
+# 不参与组价取数；且其 9 位码与 2024 撞，bill_spec PK 仅 code，混库会覆盖 2024 同码行、
+# 令 compose_price 等取数返回重复行。故 --scan-dir 自动发现时跳过这些 doc 目录
+# （建评测向量库走 bill_index --from-jsonl 直读 jsonl，不经 PG）。显式 --bill-spec 点名仍可灌（人工 override）。
+EVAL_ONLY_DOCS = {"GB-50500-2013"}
+
+
 def _collect(scan_dir: Path | None, name: str, explicit: Path | None,
              flat: bool = False) -> list[Path]:
     """汇总一张表的待灌路径：scan_dir 下的 per-doc（或扁平）产物 + 显式单文件。
@@ -399,6 +406,7 @@ def _collect(scan_dir: Path | None, name: str, explicit: Path | None,
     参数：scan_dir —— 结构化产物根（None 则只用显式）；name —— 文件名；
     explicit —— 显式 ``--xxx`` 路径（可叠加）；flat —— True 则取 ``scan_dir/name``
     （跨规范关系产物如 bill_quota_map），否则取 ``scan_dir/*/name``（per-doc）。
+    scan_dir 自动发现会跳过 EVAL_ONLY_DOCS 下的 per-doc 产物（纯评测、不入生产 PG）。
     返回：去重保序的路径列表。
     """
     paths: list[Path] = []
@@ -408,7 +416,8 @@ def _collect(scan_dir: Path | None, name: str, explicit: Path | None,
             if p.exists():
                 paths.append(p)
         else:
-            paths.extend(sorted(scan_dir.glob(f"*/{name}")))
+            paths.extend(p for p in sorted(scan_dir.glob(f"*/{name}"))
+                         if p.parent.name not in EVAL_ONLY_DOCS)
     if explicit:
         paths.append(explicit)
     seen, uniq = set(), []

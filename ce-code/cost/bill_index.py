@@ -32,8 +32,12 @@ def cast_type(caption: str | None, unit: str | None) -> str:
 
     参数：caption —— 来源表标题（如 "表 E.9 预制混凝土柱"）；unit —— 计量单位。
     返回："预制" / "装配" / ""（未明示）。
+
+    注：MinerU 解析常在中文字间插空格（如 "预 制混凝土柱"），故匹配前先折叠所有空白，
+    否则 ``"预制" in cap`` 会漏判（实测 010509 预制矩形柱 caption 即 "预 制"，见 notebooks E8）。
     """
-    cap = caption or ""
+    import re
+    cap = re.sub(r"\s+", "", caption or "")
     if "预制" in cap:
         return "预制"
     if "装配" in cap:

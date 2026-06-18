@@ -19,6 +19,12 @@ def test_cast_type_cast_in_place_untagged():
     assert cast_type(None, "m²") == ""
 
 
+def test_cast_type_minerU_spaced_caption():
+    # MinerU 中文插空格：'预 制' 须折叠空白后仍判为预制（notebooks E8 bug）
+    assert cast_type("表 E. ， 预 制混 凝 土柱 （编 号 ：0105)", "1.m32.根") == "预制"
+    assert cast_type("续表 装 配 式", "m³") == "装配"
+
+
 def test_prefab_penalty_demotes_unrequested_prefab():
     assert _prefab_penalty("柱；混凝土强度等级C40", {"cast_type": "预制"}) == 1
     assert _prefab_penalty("预制柱安装", {"cast_type": "预制"}) == 0     # query 明示预制 → 不罚

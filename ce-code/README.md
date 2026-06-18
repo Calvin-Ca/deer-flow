@@ -1,6 +1,7 @@
 # ce-code（知识层）
 
-建筑规范 RAG 的**知识层（数据 + 检索）**。本文件只**涉及**：目录结构、流水线命令、起服务。
+**深圳房建组价知识库**（清单 / 定额 / 价格 / 费率 + 取数原语）。本文件只**涉及**：目录结构、流水线命令、起服务。
+（规范条文检索 RAG 已于 2026-06-18 重构移除，日后按需重建；算量走 BIM 底座 `../ce-bim/`。）
 
 > - 需求/设计（领域铁律、schema、多表征、检索/造价设计、端点规格）见 `PRD.md`
 > - 依赖服务与环境（Embedding/VLM/Milvus/版本约束/GPU）见 `DEV.md`
@@ -17,100 +18,51 @@ ce-code/
 ├── README.md                       # 本文件（操作手册）
 ├── PRD.md / DEV.md / TODO.md        # 需求设计 / 开发环境 / 进度
 ├── pyproject.toml                  # uv 管理依赖
-├── .gitignore                      # 仅忽略 raw/ (PDF) + vector_store/ (大体积索引)
+├── config.py                       # 共享运行配置：服务地址 / 国标版本注册表 SPEC_REGISTRY / collection 命名
 ├── data/                           # 数据资产（parsed/structured/eval_set 入 git；raw/vector_store 不入）
 │   ├── raw/                        #   原始 PDF（手动放入；⛔不入 git，版权敏感）
-│   ├── parsed/                     #   MinerU 解析输出（python -m parser 产物，阶段 0 缓存；✅入 git）
-│   ├── structured/                 #   <规范名>/default/chunks.json（build）+ <doc_id>/<表>.jsonl（cost 按 doc_id 分目录）+ 扁平 bill_quota_map.jsonl；✅入 git
-│   ├── vector_store/               #   BM25 + Milvus 索引（build 索引层产物；⛔不入 git，大体积可重生）
-│   ├── eval_set/                   #   评测集（✅入 git）
-│   │   └── gb50016_eval.json       #     GB 50016 的 45 条评测用例
-│   └── quality_reports/            #   质量审核报告（tools/review_quality 输出）
+│   ├── parsed/                     #   MinerU 解析输出（python -m ingest.parser 产物，缓存；✅入 git）
+│   ├── structured/                 #   <规范>/default/chunks.json（ingest 产）+ <doc_id>/<表>.jsonl（cost 按 doc_id）+ 扁平 bill_quota_map/resource_price_map.jsonl；✅入 git
+│   ├── vector_store/               #   Milvus 索引（⛔不入 git，可重生）
+│   └── eval_set/                   #   评测集（✅入 git；xlsx 原件不入 git）
 │
-│  ── 编排 / 入口（从 ce-code 根运行）──
-├── build.py                        # 构建入口（薄壳，转 service/build_service.main）
-├── config.py                       # 共享运行配置：服务地址 / 规范别名 / collection 命名
+│  ── ① 摄取层 ingest/：PDF → chunks（组价抽取的上游）──
+├── ingest/
+│   ├── parser/                     #   原始文档 → Document IR（MinerU）：python -m ingest.parser mineru
+│   ├── splitter/                   #   Document → Chunk 树（toc）：python -m ingest.splitter toc → chunks.json
+│   └── ir/                         #   IR 契约：document(Document/Block) / chunk(Chunk/Reference/Provenance) / profile(ParseProfile)
 │
-│  ── ir：统一 IR 契约（@dataclass + to_dict/from_dict）──
-├── ir/                             # 各阶段中间表示（IR），全层只认这里
-│   ├── document.py                 #   Document / Block（解析层产物）
-│   ├── chunk.py                    #   Chunk / Reference / Provenance（切分层产物·单一真值）
-│   ├── feature.py                  #   ChunkFeature（表征层产物）
-│   ├── query.py                    #   RetrievalQuery（检索入参）
-│   ├── retrieval.py                #   RetrievedChunk（检索命中·含对外契约 to_response）
-│   ├── context.py                  #   KnowledgeContext（一次检索结果集 = /search 返回体）
-│   └── profile.py                  #   ParseProfile（流水线配置契约）
+│  ── ② 组价核心 cost/：chunks → 结构化造价数据 → PG → 取数/召回 ──
+├── cost/
+│   │  ·抽取（chunks.json → jsonl）
+│   ├── bill_spec.py                #   清单项规范（normalize_spec 年份感知 doc_id）+ aux_tables
+│   ├── quota.py                    #   SJG 定额三表（quota_item/resource/quota_resource，单位格锚定）
+│   ├── price.py                    #   信息价 → resource_price（月度价 + 时效，动态独立管道）
+│   ├── fee_rate.py                 #   费率标准 → fee_rate（声明式规则）
+│   ├── price_composition.py        #   50500 费用构成规则 → price_composition
+│   ├── bill_quota.py               #   清单→定额 APPLIES 映射（名称匹配，带 bill_spec_version 版本隔离）
+│   ├── resource_norm.py / resource_price_map.py   #   定额资源↔信息价物料 同物异名对齐
+│   │  ·入库
+│   ├── schema.sql                  #   全表 DDL（治理字段 doc_id/spec_version/region；bill_spec/bill_quota_map 版本隔离键）
+│   ├── load_pg.py                  #   JSONL → PG 幂等导入（-m cost.load_pg --scan-dir）
+│   │  ·取数 / 召回（对外原语后端）
+│   ├── query.py                    #   PG 只读取数：get_quota / compose_price（spec 版本过滤）
+│   ├── bill_index.py               #   PG bill_spec → Milvus 清单向量库（-m cost.bill_index --spec 2024/2013）
+│   ├── bill_match.py               #   构件描述 → 清单候选 dense 召回 + 结构约束/现浇预制重排
+│   └── embed.py                    #   嵌入服务调用工具（bge-large @ :8097）
 │
-│  ── ① 解析层（多解析模型可插拔）──
-├── parser/                         # 原始文档 → Document IR
-│   ├── base.py / factory.py        #   Parser 基类 + 工厂（profile.parser_strategy 选）
-│   ├── mineru.py                   #   ★ MinerU 工具（单文件）：门面 MineruParser + 适配 FormatAdapter
-│   │                               #     + 阶段0 引擎 parse_via_api + CLI run_command
-│   ├── unstructured.py             #   ◌ 占位
-│   └── __main__.py                 #   阶段 0 启动脚本（registry 驱动）：python -m parser <工具>
-│
-│  ── ② 切分层（多切法可插拔）──
-├── splitter/                       # Document → Chunk 树
-│   ├── base.py / factory.py        #   Splitter 基类 + 工厂（profile.structure_strategy 选）
-│   ├── toc_splitter.py             #   ★ TocSplitter：基于原生目录的多层级切分（切分深度 toc_max_depth/subsplit 可控）
-│   │                               #     三内部件（目录打标/建树/引用图分型）2026-06-15 已合并入此单文件，按 §1/§2/§3 分段
-│   ├── semantic_splitter.py        #   ◌ 占位（语义切）
-│   ├── tree_splitter.py            #   ◌ 占位（标题层级树）
-│   └── __main__.py                 #   阶段 1 启动脚本（registry 驱动）：python -m splitter <切法>
-│
-│  ── ③ 表征层（多表征可插拔）──
-├── feature/                        # Chunk → 多表征（挂 chunk.features）
-│   ├── base.py / pipeline.py       #   Feature 基类 + 注册表/enrich（profile.features 选）
-│   ├── raw / bm25 / dense / context_aug.py   #   ★ 免费 4 项（bm25=旧 sparse）
-│   └── keyword.py / graph.py       #   ◌ 占位
-│
-│  ── ④ 索引层（多索引可插拔）──
-├── index/                          # Chunk 树 → 选粒度视图 → 各索引
-│   ├── manager.py                  #   ★ 粒度视图 view（含空骨架过滤）+ 行准备 + 编排 build_index
-│   ├── bm25_index.py               #   ★ rank-bm25 倒排（消费 sparse）
-│   ├── vector_index.py             #   ★ Milvus 向量（消费 dense，索引期统一嵌入）
-│   ├── metadata_index.py           #   ★ metadata.json 快照（+ clause 直取/引用扩展读取）
-│   └── graph_index.py              #   ◌ 占位（面向 Phase C 造价 KG）
-│
-│  ── ⑤ 检索层（多召回可插拔）──
-├── retrieval/                      # RetrievalQuery → RetrievedChunk
-│   ├── base.py                     #   Retriever 基类
-│   ├── bm25_retriever / dense_retriever.py   #   ★ 单路召回
-│   ├── hybrid_retriever.py         #   ★ BM25+向量+RRF+引用扩展+rerank（主力，逐字保持旧召回）
-│   ├── rrf.py                      #   ★ RRF 合并 + 引用扩展（行 dict 层纯函数）
-│   ├── graph_retriever.py          #   ◌ 占位（KG 多跳）
-│   └── service.py                  #   RetrievalService（统一检索入口：search/expand/get_clause）
-│
-│  ── ⑥ 服务层（对外 API + 构建编排）──
-├── service/                        # 承旧 server.py + build.py
-│   ├── build_service.py            #   构建编排（阶段 1→3）：解析→切分→表征→索引
-│   ├── retrieve_service.py         #   检索编排 + 可观测性（请求级日志/计时）
-│   └── knowledge_api.py            #   知识服务 :8100（/search /expand /clause /health，契约不变）
-│
-│  ── 造价数据轨（Phase C，与 RAG 流水线解耦）──
-├── cost/                           # 结构化造价数据 → PostgreSQL（见末节「造价数据轨」）
-│   ├── bill_spec.py                #   chunks.json → bill_spec.jsonl + aux_tables.jsonl（双出口抽取）
-│   ├── price_composition.py        #   50500 chunks.json → price_composition.jsonl（费用构成规则，正则锚定原文）
-│   ├── quota.py                    #   SJG chunks.json → quota_item/resource/quota_resource.jsonl（定额转置矩阵·单位格锚定）
-│   ├── bill_quota.py               #   bill_spec + quota_item → bill_quota_map.jsonl（清单→定额 APPLIES 名称匹配·KG P0）
-│   ├── price.py                    #   信息价 chunks.json → resource_price.jsonl（物料月度价 + 时效，动态独立管道）
-│   ├── fee_rate.py                 #   费率标准 chunks.json → fee_rate.jsonl（费率参考范围 + 推荐值，声明式规则）
-│   ├── schema.sql                  #   全表 DDL（bill_spec/aux_table/price_composition/quota_*/resource*/resource_price/fee_rate/bill_quota_map/hist_bill + 治理字段）
-│   └── load_pg.py                  #   JSONL → PG 幂等导入（-m cost.load_pg）
-│
-│  ── utils / tools ──
-├── utils/                          # tokenizer（字符级分词）/ text_cleaner / logger
-└── tools/                          # 评测 / 审核 / 运维（-m tools.X 运行）
-    ├── retrieve_cli.py             #   混合检索 CLI（薄封装 HybridRetriever）
-    ├── eval.py                     #   检索质量评测（按包含关系判命中；⚠️ T10 待换指标）
-    ├── review_quality.py           #   质量审核（⚠️ 仍 v1，未适配 chunks.json，T10 待改）
-    └── setup_server.sh / rename_raw_files.sh   #   运维脚本
+│  ── ③ 服务层 / 工具 ──
+├── service/cost_api.py             #   组价取数 HTTP :8100：/bill/match /price/compose /quota（spec 必填路由）
+└── tools/
+    ├── eval_bill.py                #   清单召回评测（Top-1/Top-3/Recall@k/MRR，按编码精确判命中）
+    └── build_match_gold.py         #   真实结算 xlsx → 清单匹配 gold（脱敏 + 覆盖过滤）
 ```
 
-> **运行模型**：ce-code 不安装为包（`packages=[]`），**从 ce-code 根运行**。构建 `python build.py …`；
-> 阶段 0 解析与服务/工具用模块式 `python -m parser mineru …` / `python -m service.knowledge_api` /
-> `python -m tools.eval …`。各层绝对 import（`from ir import Chunk` / `import splitter`），无 sys.path hack。
-> ★=本轮实现、◌=占位（未实装抛 NotImplementedError）。
+> **运行模型**：ce-code 不安装为包（`packages=[]`），**从 ce-code 根运行**，绝对 import 无 sys.path hack。
+> 摄取 `python -m ingest.parser mineru …` / `python -m ingest.splitter toc …`；造价抽取 `python -m cost.<模块>`；
+> 服务 `python -m service.cost_api`；评测 `python -m tools.eval_bill`。
+> **范围**：ce-code 现聚焦**深圳房建组价知识库**（清单/定额/价格/费率 + 取数原语）。规范条文检索 RAG
+> 已于 2026-06-18 重构移除（防火轨停做），日后按需以干净模块重建。算量走 BIM 底座 `../ce-bim/`。
 
 ---
 
@@ -143,14 +95,14 @@ bash tools/setup_server.sh
 
 ### Step 3 — PDF 解析
 
-`python -m parser mineru` **走远程 MinerU API**（`172.19.2.2:8000`，热服务 + `hybrid-auto-engine` 现成可用，无需本地 GPU/MinerU 环境）。环境差异详见 `DEV.md`「MinerU 解析」。
+`python -m ingest.parser mineru` **走远程 MinerU API**（`172.19.2.2:8000`，热服务 + `hybrid-auto-engine` 现成可用，无需本地 GPU/MinerU 环境）。环境差异详见 `DEV.md`「MinerU 解析」。
 
 > backend 选择：定额/造价类含密集表格的文档用 `hybrid-auto-engine`（表格逐列对位，默认）；`--backend pipeline` 更快但密集表格会列错位。
 
 整本一次解析（API 主机资源充足，无本地 OOM 问题）：
 
 ```bash
-uv run python -m parser mineru --pdf data/raw/<文件名>.pdf
+uv run python -m ingest.parser mineru --pdf data/raw/<文件名>.pdf
 ```
 
 也可直接 curl（同步返回 JSON，`results.<文件名>.md_content` / `.content_list`；调试单页用 `start_page_id`/`end_page_id`）：
@@ -168,80 +120,53 @@ curl -s -X POST http://172.19.2.2:8000/file_parse -F "files=@data/raw/<文件名
 | 产物 | 给谁 | 形态 |
 |---|---|---|
 | `<basename>.md` | **人**（对照原 PDF 做质量 review，见 Step 5 评估维度） | 全文按阅读顺序渲染成 markdown：标题 `#`、表格内联成表格文字、插图 `![](images/..)`、公式 `$..$` |
-| `<basename>_content_list.json` | **程序**（build.py 切分层吃的是它） | 分块列表，每块带 `type`(text/title/table/image/equation)、`text_level`(标题层级)、`page_idx`、`bbox` 坐标 |
+| `<basename>_content_list.json` | **程序**（ingest.splitter 吃的是它） | 分块列表，每块带 `type`(text/title/table/image/equation)、`text_level`(标题层级)、`page_idx`、`bbox` 坐标 |
 | `images/` | — | 从 PDF 切出的位图（插图、以及**被裁成图的表格**），上面两份只引用路径、不内嵌字节 |
 
 > 切分层必须用 json 而非 md：建节点树要知道「几级标题 / 第几页 / 是表格还是正文」，这些 md 拿不到。
 
-**图片/表格在 json 里怎么体现（MinerU v1，字段均在顶层；由 `parser/mineru.py` 的 `FormatAdapter` 处理）**：
+**图片/表格在 json 里怎么体现（MinerU v1，字段均在顶层；由 `ingest/parser/mineru.py` 的 `FormatAdapter` 处理）**：
 
 - **插图**：`type=image`，顶层 `img_path` + `image_caption`。md 里对应 `![](images/..)`。
 - **表格**：`type=table`，**三存**——表格裁切图 + 结构化 `<table>` HTML（带 colspan/rowspan）+ 表题。字段：顶层 `table_body`(HTML 串) / `img_path` / `table_caption`(list[str])。md 只把 HTML 渲染成表格文字内联、**不引用**裁切图，所以「md 里看不到表格图路径、表格变成了文字」是正常现象。
 
-> ✅ **表体提取（已实现）**：`parser/mineru.py` 的 `FormatAdapter` 从 `table_body` 取出表格 HTML，经 `_HTMLTableParser` + `_expand_spans` 解析为**矩形**二维表（展开 colspan/rowspan 防串列），随块落入 `body`，建树时挂到所属节点的 `tables[]`。
+> ✅ **表体提取（已实现）**：`ingest/parser/mineru.py` 的 `FormatAdapter` 从 `table_body` 取出表格 HTML，经 `_HTMLTableParser` + `_expand_spans` 解析为**矩形**二维表（展开 colspan/rowspan 防串列），随块落入 `body`，建树时挂到所属节点的 `tables[]`。
 
-### Step 4 — 知识库构建（一次跑完 / 分步跑同源）
+### Step 4 — 切分成 chunks（摄取层 ingest）
 
-`build.py` 是命令组：`all` 一条命令跑完 **解析 → 切分建树 → 选粒度 → 表征 → 建索引**；`parse/split/view/feature/index` 五条分步子命令逐步审核。两者共用同一批 `step_*` 步骤函数、落同一批中间产物，故**一次跑完与分步跑产出逐字一致**。`standard_id` 默认取输入 basename；可加 `--standard-id "GB 50016-2014(2018)"` 固定。需 Milvus + embedding 服务：
-
-```bash
-uv run python build.py all --input "data/parsed/<basename>/auto/<basename>_content_list.json" --profile-name default --index-granularity clause --embed-url http://localhost:8097 --embed-model-id /model
-```
-
-中间产物按 profile 隔离落 `data/structured/<standard>/<profile>/`：① 解析 `document.json`（格式归一后的纯版面块流）→ ② 切分 `chunks.json`（Chunk 树·单一真值）+ `catalog_blocks.json`（目录打标快照·调试）→ ③ 选粒度 `units.json`（检索单元，clause=已接地叶）→ ④ 表征 `features.json`（sidecar，dense 向量留索引期填）→ ⑤ 索引落 `data/vector_store/<standard>/<profile>/`（bm25/metadata/Milvus，collection 名由 profile 推断，与 service/eval 一致）。可选 `--parser-strategy`（缺省 `mineru`）、`--structure-strategy`（缺省 `toc`）、切分深度 `--toc-max-depth` / `--subsplit`。无 Milvus 时加 `--bm25-only`（只建 BM25 + metadata）。
-
-**分步跑（逐步审核中间产物）**：每条子命令从盘上前一步产物起跑、只跑一步、再落盘——用 `--standard-id` + `--profile-name` 定位 `structured/<std>/<profile>/` 目录：
+切分层入口一步出 chunks.json（内部先 parser 解析 content_list，再 toc 切分建树）——这是 cost 抽取的输入：
 
 ```bash
-uv run python build.py parse --input "data/parsed/<basename>/auto/<basename>_content_list.json"   # ① → document.json
-uv run python build.py split --standard-id "<std>" --subsplit number                              # ② → chunks.json
-uv run python build.py view --standard-id "<std>"                                                 # ③ → units.json
-uv run python build.py feature --standard-id "<std>"                                              # ④ → features.json
-uv run python build.py index --standard-id "<std>" --bm25-only                                    # ⑤ → store（去掉 --bm25-only 建 Milvus 向量）
+uv run python -m ingest.splitter toc --input "data/parsed/<basename>/auto/<basename>_content_list.json" --subsplit number
 ```
 
-**只跑到前面某步**（不必动 build）：阶段 0 MinerU 解析见 Step 3 的 `python -m parser`；**只切分建树、看节点树**（本地无需 Milvus）用切分层入口或预览：
+产物落 `data/structured/<规范>/default/`：`chunks.json`（Chunk 树·单一真值）+ `catalog_blocks.json`（目录打标快照·调试）。可选切分深度 `--toc-max-depth` / `--subsplit`；`--preview` 只打印前若干节点不落盘。
 
-```bash
-uv run python -m splitter toc --input "data/parsed/<basename>/auto/<basename>_content_list.json"   # 解析+切分落 catalog_blocks.json + chunks.json
-uv run python build.py all --input "data/parsed/<basename>/auto/<basename>_content_list.json" --preview  # 只打印前 20 条节点，不落盘
-```
-
-### Step 5 — 质量审核
-
-> ⚠️ `tools/review_quality.py` 仍是 v1 口径（读旧 `_clauses.json`、统计强条），**尚未适配 chunks.json**，待 T10 改造成节点树健康检查（孤儿节点 / 空内容 / 表格归属 / 悬空引用）。当前流程可跳过此步。
-
-### Step 6 — 检索验证
-
-```bash
-uv run python -m tools.retrieve_cli --store-dir data/vector_store/<standard>/<profile> --query "24米高的住宅楼疏散楼梯最小净宽度" --skip-rerank
-```
-
-评测集批量评测：`uv run python -m tools.eval --store-dir data/vector_store/<standard>/<profile>`。
-
-> ⚠️ `tools/retrieve_cli` / `tools/eval` 仍含 v1 强条召回率口径，待 T10 换 Recall@k / 引用召回 / MRR（按包含关系判命中）。评测口径见 `TODO.md`。
+> 拿到 chunks.json 后，进入下方「造价数据轨」用 `cost/` 各模块抽清单/定额/价格/费率 → PG。
 
 ---
 
-## HTTP 服务脚本
+## HTTP 服务脚本（组价取数 :8100）
 
 ```bash
-# 知识服务（检索原语 /search /expand /clause，:8100）—— 必须先起（从 ce-code 根，模块式）
-cd /mnt/nvme/calvin/code/deer-flow/ce-code && uv run python -m service.knowledge_api
+# 造价取数服务（/bill/match /price/compose /quota，:8100）—— 从 ce-code 根，模块式
+cd /mnt/nvme/calvin/code/deer-flow/ce-code && uv run python -m service.cost_api
 curl http://localhost:8100/health
 ```
 
-端到端问答/合规检查由任务层提供，示例：
-
+调用须带**国标版本** `spec`（2013/2024，必填）：
 ```bash
-curl -s http://localhost:8101/qa -H 'Content-Type: application/json' -d '{"query":"24米高的住宅楼疏散楼梯最小净宽度是多少？","standard":"gb50016"}'
+curl -s -X POST http://localhost:8100/bill/match -H 'Content-Type: application/json' -d '{"query":"C30现浇矩形柱","spec":"2024","top_k":5}'
+curl -s "http://localhost:8100/price/compose/%E6%B7%B1%E5%9C%B3/010401002?spec=2024"
 ```
+
+端到端组价编排（构件→选码→组价）由任务层 CostAgent（`../ce-services/`）以 HTTP 客户端复用本服务。
 
 ---
 
 ## 造价数据轨（Phase C · `cost/`）
 
-结构化造价数据（清单/定额/价格/历史）走**关系库 PostgreSQL** 作单一事实源，与上面的规范类 RAG 流水线解耦。库在服务器：容器 `ce-postgres`（端口 `5433`，库 `ce_cost`，用户 `cost`）。建表/导入已落成仓库内可复现脚本，**幂等可重跑**，不再手敲 psql。
+结构化造价数据（清单/定额/价格/历史）走**关系库 PostgreSQL** 作单一事实源。库在服务器：容器 `ce-postgres`（端口 `5433`，库 `ce_cost`，用户 `cost`）。建表/导入已落成仓库内可复现脚本，**幂等可重跑**，不再手敲 psql。
 
 > 依赖 `psycopg`：服务器首次跑前 `uv add 'psycopg[binary]'`（写入 `pyproject.toml`，勿 `uv pip install`）。
 > 连接串带密码经环境变量传入、不写进仓库：`CE_PG_DSN='postgresql://cost:<密码>@localhost:5433/ce_cost'`（缺省回退 `postgresql://cost@localhost:5433/ce_cost`，密码走 libpq 的 `PGPASSWORD`/`.pgpass`）。
@@ -272,7 +197,7 @@ uv run python -m cost.price_composition --input "data/structured/GB_T50500_2024_
 
 SJG 171/170 的定额子目表是**转置矩阵**（列=定额子目，行=属性+工料机），MinerU 矩形化后值的列位仍随标签层级深浅错位。`quota.py` 用**单位格锚定**（每行第一个数值/破折号前一格是单位，其后 N 格=N 个子目值）解析，双出口三表：`quota_item.jsonl`（子目编号/名称含变体/单位/工作内容 + 人材机费 + 综合单价 base_price）、`resource.jsonl`（人材机去重）、`quota_resource.jsonl`（子目×资源含量，natural key 链接，`load_pg` 解析成 FK）。`—`（不适用）跳过；价格列（2023-08 参考价）按决策不取（价格主源走信息价月刊独立管道）。非定额表（系数/厚度表）暂归 aux 口径。
 
-> 须先 `build split` 出 SJG 的 chunks.json（SJG 无规整目录，`chapter`/`ancestor_titles` 可能偏弱，入库后抽查）：
+> 须先 `python -m ingest.splitter toc` 出 SJG 的 chunks.json（SJG 无规整目录，`chapter`/`ancestor_titles` 可能偏弱，入库后抽查）：
 
 ```bash
 uv run python -m cost.quota --input "data/structured/SJG_建筑工程消耗量标准/default/chunks.json"

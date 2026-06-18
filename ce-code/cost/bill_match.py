@@ -103,6 +103,19 @@ def _structural_reorder(query: str, candidates: list[dict]) -> list[dict]:
     return out
 
 
+def _prefix_filter(code_prefixes: list[str] | None) -> str:
+    """把专业 code 前缀列表编成 Milvus 布尔过滤表达式（纯函数，便于单测）。
+
+    清单 9 位码前 2 位 = 专业域（01 建筑/03 安装/04 市政/05 园林…）。房建项目只在相关专业内
+    匹配，剔除跨专业噪声（实测全专业库里建筑查询被拽到市政「砌筑方沟」/园林「花架梁」）。
+
+    参数：code_prefixes —— 专业前缀列表（如 ['01','03']）；None/空 → 不过滤。
+    返回：Milvus filter 表达式（如 ``code like "01%" or code like "03%"``）；无前缀返回空串。
+    """
+    prefixes = [p.strip() for p in (code_prefixes or []) if p and p.strip()]
+    return " or ".join(f'code like "{p}%"' for p in prefixes)
+
+
 def search_bill(
     query: str,
     top_k: int = 10,
@@ -110,6 +123,7 @@ def search_bill(
     structural: bool = True,
     rerank: bool = False,
     rerank_pool: int = RERANK_POOL,
+    code_prefixes: list[str] | None = None,
     milvus_host: str = DEFAULTS["milvus_host"],
     milvus_port: int = DEFAULTS["milvus_port"],
     embed_url: str = DEFAULTS["embed_url"],
@@ -131,6 +145,8 @@ def search_bill(
             在「构件描述 × 极短清单名」上劣化 dense 基线：Top-1 70%→60%、Top-3 100%→90%
             （抓共享限定词如「砂浆」当强相关，把砂浆找平层顶过实心砖墙）。保留 toggle 备查/换模型再试）。
         rerank_pool (int): rerank 前 dense 召回的候选池大小。
+        code_prefixes (list[str] | None): 专业 code 前缀过滤（如 ['01','03'] 只在建筑+安装内召回）；
+            None=全专业。剔除跨专业噪声（全专业库里建筑查询会被市政/园林项挤出 top-k，见 eval 2013）。
         milvus_host/milvus_port/embed_url/embed_model_id: Milvus 与嵌入服务参数。
     返回：
         list[dict]: 候选清单项（code/name/unit/feature/chapter/doc_id/spec_version + score[+rerank_score]），
@@ -147,13 +163,17 @@ def search_bill(
     vector = embed_texts([query], embed_url, embed_model_id, 1)[0]
     # rerank/structural 都需多召回候选池再重排，末尾统一截 top_k
     pool_limit = max(top_k, rerank_pool) if (rerank or structural) else top_k
-    results = client.search(
-        collection_name=collection_name,
-        data=[vector],
-        limit=pool_limit,
-        output_fields=_OUTPUT_FIELDS,
-        search_params={"metric_type": "COSINE", "params": {"ef": 64}},
-    )
+    search_kwargs = {
+        "collection_name": collection_name,
+        "data": [vector],
+        "limit": pool_limit,
+        "output_fields": _OUTPUT_FIELDS,
+        "search_params": {"metric_type": "COSINE", "params": {"ef": 64}},
+    }
+    expr = _prefix_filter(code_prefixes)            # 专业域收窄（剔跨专业噪声）
+    if expr:
+        search_kwargs["filter"] = expr
+    results = client.search(**search_kwargs)
     candidates = _shape_hits(results[0]) if results else []
     if rerank and candidates:
         candidates = _rerank(query, candidates, len(candidates))   # 仅排序、不截断

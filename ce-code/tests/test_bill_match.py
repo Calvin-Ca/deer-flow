@@ -4,7 +4,21 @@
 真链路（PG 建库 + 向量召回）在服务器跑，本地仅验纯逻辑（torch cu121 本地不可用）。
 """
 from cost.bill_index import bill_embed_text
-from cost.bill_match import _rerank_text, _shape_hits, _structural_reorder, _type_penalty
+from cost.bill_match import _prefix_filter, _rerank_text, _shape_hits, _structural_reorder, _type_penalty
+
+
+def test_prefix_filter_single():
+    assert _prefix_filter(["01"]) == 'code like "01%"'
+
+
+def test_prefix_filter_multi():
+    assert _prefix_filter(["01", "03"]) == 'code like "01%" or code like "03%"'
+
+
+def test_prefix_filter_none_or_empty():
+    assert _prefix_filter(None) == ""
+    assert _prefix_filter([]) == ""
+    assert _prefix_filter([" ", ""]) == ""
 
 
 def test_embed_text_full():

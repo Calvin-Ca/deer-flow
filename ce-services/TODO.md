@@ -59,7 +59,10 @@
   ① code∉candidates（造码）→ 作废 null + need_review + 标注；② confidence<0.6 → 强制 need_review；
   ③ 空候选 → 不调 LLM 直接转人工；alternatives 仅留候选内 code。Qwen3-8B 直出 JSON（复用 `common/llm`）。
   本地打桩测 5 路径（正常/造码/低置信/自报 review/空候选）全过。
-- [ ] **`cost/orchestration.py`**：`bill_match(spec)` → `select_code` → `price_compose(region,code,spec)` 组装；2013→compose 501 透传「未就绪」。
+- [x] **`cost/orchestration.py`**（✅ 2026-06-22，本地四路径验证）：`compose(description, spec, region, llm_url, model_id, top_k)`
+  串 `bill_match → select_code → price_compose`；选不出码（code=None）→ 跳过组价、`price_status=skipped(need_review)`；
+  spec=2013 组价未就绪 → 捕获 compose 501 **降级**为 `price=None` + `price_status` 说明（保留选码结果）；
+  bill_match spec 400 / 知识服务 503 / compose 404·503 不吞、上抛由 router 映射。
 - [ ] **`cost/router.py` + `server.py`**：`POST /cost/compose {description, spec, region, top_k}`；异常→状态码（spec 错 400 / 知识服务不可达 503）。`main.py` 挂载、`/health` 更新。
 - [ ] **选码评测**：复用 ce-code `match_gold`，量 **LLM 从 top-k 选中正解的 Top-1**（PRD §6 业务层红线 ≥85%）——把知识层 Recall@10=60% 接到任务层 Top-1，端到端可量化。
 - [ ] **端到端验证**：起 :8101 → `curl /cost/compose` → 选码 + 工料机 + 价（带 no_source）跑通。

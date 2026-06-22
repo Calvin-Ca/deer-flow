@@ -88,9 +88,14 @@ def store_out_dir(standard_id: str, profile_name: str,
     return Path(store_root) / safe_std(standard_id) / profile_name
 
 
-def collection_of(store_dir: Path) -> str:
-    """store 目录名 → Milvus collection 名（与 service/eval 共享推断逻辑）。"""
-    return _collection_name(Path(store_dir).name)
+def collection_of(standard_id: str) -> str:
+    """规范标识 → Milvus collection 名（per-标准唯一，与查询侧 config.collection_name 一致）。
+
+    旧实现取 ``store_dir.name``——store 布局加 profile 子目录后 ``.name`` 恒为 "default"，导致多文档
+    全塌进同一 collection ``building_code_default`` 互相覆盖。改为按 ``safe_std(standard_id)`` 推断，
+    与查询侧 ``RetrievalService`` 的 ``collection_name(store_name)`` 对齐（store_name 即 safe_std 名）。
+    """
+    return _collection_name(safe_std(standard_id))
 
 
 # ── 落盘 / 载入小工具 ──────────────────────────────────────────────────────────
@@ -273,7 +278,7 @@ def run_build(
     structured_out = structured_out_dir(standard_id, profile.name, structured_dir)
     store_dir = (Path(store_dir) if store_dir is not None
                  else store_out_dir(standard_id, profile.name))
-    collection = collection_of(store_dir)
+    collection = collection_of(standard_id)
 
     console.print(f"[bold]规范：[/bold]{standard_id}")
     console.print(f"[bold]Profile：[/bold]{profile.name}  粒度={profile.index_granularity}"
@@ -462,7 +467,7 @@ def cmd_index(index_granularity: str, store_dir: Path | None, milvus_host: str,
     out = structured_out_dir(sid, profile_name, structured_dir)
     store = (Path(store_dir) if store_dir is not None
              else store_out_dir(sid, profile_name))
-    collection = collection_of(store)
+    collection = collection_of(sid)
     profile = ParseProfile(name=profile_name, index_granularity=index_granularity)
     units = load_units(out)
     features = load_features(out)

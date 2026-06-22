@@ -6,6 +6,7 @@ Milvus collection 命名规则收口一处（重构前被复制三四份，极�
 """
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 # ── 依赖服务默认地址 ─────────────────────────────────────────────────────────
@@ -86,19 +87,30 @@ STANDARD_ALIASES: dict[str, str] = {
 
 
 def collection_name(store_name: str) -> str:
-    """store 目录名 → Milvus collection 名（只含字母/数字/下划线）。与旧版推断逻辑一致。"""
-    return f"{COLLECTION_PREFIX}_{store_name}".lower().replace("-", "_")
+    """store 名 → Milvus collection 名（**ASCII 安全**：只含字母/数字/下划线）。
+
+    Milvus collection 名不许非 ASCII，而造价规范 store 名含中文（如 GB_T50854_2024_房屋…）；故把
+    非 [a-z0-9] 字符（含中文、连字符）整段折成单下划线再去首尾下划线——保留各规范 ASCII 前缀
+    （GB_50854_2013 / GB_T50856_2024…）即可保证 per-标准唯一。纯 ASCII 名（如防火 GB_50016-20142018）
+    结果与旧版逐字一致（无回归）。
+    """
+    slug = re.sub(r"[^a-z0-9]+", "_", store_name.lower()).strip("_")
+    return f"{COLLECTION_PREFIX}_{slug}"
 
 
-def resolve_store_dir(standard: str, vector_store_root: Path) -> tuple[Path, str]:
+def resolve_store_dir(standard: str, vector_store_root: Path,
+                      profile: str = "default") -> tuple[Path, str]:
     """规范代号 → (store 目录绝对路径, 规范化 store 名)。
 
-    仅解析路径，不检查目录是否存在（由调用方按需校验，便于服务端给出「索引未就绪」语义化错误）。
-    未知代号抛 ``ValueError``。
+    store 布局为 ``vector_store/<store_name>/<profile>/``（build.py 落盘位置）；本函数优先返回
+    该嵌套目录，若不存在则回退扁平 ``vector_store/<store_name>/``（兼容防火 gb50016 等旧扁平索引）。
+    未知代号抛 ``ValueError``；目录是否就绪由调用方按需校验（便于给出「索引未就绪」503）。
     """
     store_name = STANDARD_ALIASES.get(standard) or STANDARD_ALIASES.get(standard.lower())
     if not store_name:
         raise ValueError(
             f"未知规范代号: {standard!r}，支持: {sorted(set(STANDARD_ALIASES))}"
         )
-    return Path(vector_store_root) / store_name, store_name
+    base = Path(vector_store_root) / store_name
+    nested = base / profile
+    return (nested if nested.exists() else base), store_name

@@ -61,11 +61,13 @@ PG `ce_cost`（:5433）已灌齐，组价取数链通（清单→定额→工料
   定版后只搬家未改），`Chunk.from_dict` 原生读 chunks.json；引擎对 chunk 的属性访问（content/title/
   provenance/node_path/standard_id/parent_id/children_ids/ancestor_*/tables/images/expandable_refs/
   is_grounded）全落现字段集，无 `is_mandatory`（强条 2026-06-12 已降级为 `modal` 表征）。结论：无需改代码。
-- [ ] **A3 建索引（服务器）**：chunks.json 已存在 → 跑 `view→feature→index`（跳过 parse/split）。
-  - 入口 `build.py`；prereq：embed 服务 :8097（`/model` bge-large-zh-v1.5，与 cost 轨共用，不新部署）+ Milvus :19530。
-  - chunks 在 `data/structured/chunks/` 桶 → 命令带 `--structured-dir data/structured/chunks`。
-  - collection 自动隔离：`collection_name()` 产 `building_code_*` 前缀，与清单库 `cost_bill_*` 天然不撞。
-  - 语料范围待定：优先 GB 50500/50854/50856（计量计价规范条文）；信息价/费率/消耗量更偏数据表，按需再加。
+- [x] **A3 建索引（服务器）**（✅ 2026-06-22）：5 部 GB 计量计价规范（50500/50854 × 2013/2024 + 50856-2024）
+  `view→feature→index` 建成（98/31/86/103/158 条），各落独立 collection `building_code_gb_*`，与清单库
+  `cost_bill_*` 隔离。embed :8097 + Milvus :19530 复用 cost 轨。**期间修多文档 collection 命名塌缩 bug**
+  （commit 995d16b8：build.collection_of 取 store.name 恒为 "default" 全塌；+ collection_name ASCII 化 + resolve_store_dir 嵌套/扁平兼容）。
+- [ ] **检索质量（B3 前置，🔑 真瓶颈）**：实测"满堂脚手架工程量"召回多为"应按表X执行"样板条文，**真正计量规则在
+  附录表格里、content 只存表标题未进嵌入**——同组价轨"表格内容不入嵌入"老问题。需表格内容增强（参考 ce-code
+  E10 caption 注入思路）。当前端到端可跑但召回偏弱。
 - [x] **A4 检索端点**（✅ 2026-06-22，代码就位待 A3 索引验）：**简化**——不新建 `/norm/search`，复活
   `service/knowledge_api.py` 作 :8100 统一入口（已含 cost_router + /search /expand /clause，是 cost_api 超集）；
   现有通用 `/search` 补 `standard` 别名即服务造价规范。`config.STANDARD_ALIASES` 加 5 部计量计价规范

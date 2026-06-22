@@ -25,7 +25,12 @@
 - [x] **B2 `norm/router.py` + 挂 main.py`**（✅ 2026-06-22）：`POST /norm/qa {query, standard, top_k}`——
   `knowledge_client.search`（打 :8100 /search）→ `generation.answer`；零召回不喂空上下文直返"无依据"；
   异常映射（知识服务 400/503 透传、LLM 不可达 502）。main.py 挂 norm 路由、`/health.routes=["/norm/qa"]`。
-- [ ] **B3 评测**：`ce-code/data/eval_set` 建造价规范问答评测集（条文召回 + 引用准确率）。**待 A3 索引就位后服务器跑。**
+- [x] **端到端验证**（✅ 2026-06-22）：服务器 :8100 知识服务 + :8101 任务服务跑通 `POST /norm/qa`——
+  检索 177ms → Qwen3 生成 4.3s → 结构化带引用回答（cited_clauses 只引检索到的、不杜撰、带免责声明）。
+  A1–A4 + B1–B2 全链路验证完毕。
+- [ ] **B3 评测**：`ce-code/data/eval_set` 建造价规范问答评测集（条文召回 + 引用准确率）。
+  ⚠️ **前置瓶颈=检索质量**：实测计量规则在附录表格里、未进嵌入 → 召回偏弱（见 `../ce-code/TODO.md` 四）。
+  建议先做表格内容增强再评测，否则评的是被表格缺失拖累的下限。
 
 > 知识层检索引擎恢复（A1–A4）见 `../ce-code/TODO.md`。
 

@@ -68,7 +68,10 @@
   need_review、price_status 原样冒泡供 HITL。main.py 挂 cost+norm 双路由、`/health.routes=["/norm/qa","/cost/compose"]`。
   （不单建 `server.py`——沿用 norm 模式，main.py 唯一入口。）
 - [ ] **选码评测**：复用 ce-code `match_gold`，量 **LLM 从 top-k 选中正解的 Top-1**（PRD §6 业务层红线 ≥85%）——把知识层 Recall@10=60% 接到任务层 Top-1，端到端可量化。
-- [ ] **端到端验证**：起 :8101 → `curl /cost/compose` → 选码 + 工料机 + 价（带 no_source）跑通。
+- [x] **端到端验证**（✅ 2026-06-22，服务器跑通）：`curl /cost/compose {"description":"C30现浇矩形柱","spec":"2024","region":"深圳"}`
+  → 选码 `010503001 矩形柱`（confidence 0.95、need_review false、reason 有据）+ 组价取数（2 条模板定额 + 工料机含量
+  + 信息价 matched/no_source）。三红线守住（高置信不 review、no_source 不杜撰）。**P1 选码闭环端到端打通。**
+  - 观察（归知识层 follow-up）：召回定额是矩形柱**模板**（措施），柱本体混凝土定额另算——bill→quota 映射取数行为，不影响选码。
 
 **红线**：选码 `need_review`（低置信→HITL，只建议不定稿）/ `no_source` 不杜撰、透传缺口 / `spec` 必填 / **P1 不算钱**。
 

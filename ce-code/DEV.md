@@ -27,10 +27,11 @@ cost/ 各模块（chunks.json → 结构化 jsonl）          [入库] load_pg -
    │  [取数/召回]
    ├──► cost.bill_index：PG bill_spec → Milvus 清单向量库（按 spec 分 collection）
    ▼
-service/cost_api（FastAPI :8100）对外组价取数原语：
+service/knowledge_api（FastAPI :8100，统一入口 = cost_api router + 规范检索）对外原语：
    /bill/match     构件描述 → 清单候选（dense 召回 + 结构约束/现浇预制重排；spec 必填路由）
    /price/compose  清单 → 定额 → 工料机含量 ⋈ 信息价（spec 版本过滤；未命中价 no_source 不杜撰）
    /quota          定额子目直取（子目 + 人材机含量）
+   /search /expand /clause   造价规范条文 hybrid 检索（Norm-QA，standard 代号路由）
 ```
 
 - **摄取（ingest/）与抽取（cost/）解耦**：MinerU 解析最贵（约 60% 耗时）落 `data/parsed/` 不可变缓存，只跑一次；

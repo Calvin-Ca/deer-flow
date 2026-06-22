@@ -57,12 +57,20 @@ PG `ce_cost`（:5433）已灌齐，组价取数链通（清单→定额→工料
   `index/` + `feature/` + `build.py` + `utils/` + `service/{knowledge_api,retrieve_service}`；
   适配 `ir.{chunk,document,profile}`→`ingest.ir.*`（16处）、build 的 `parser/splitter`→`ingest.*`、
   补恢复漏掉的 `ir/feature.py`。全量 py_compile + 静态 import 解析全绿（运行时第三方依赖/Chunk 接口待服务器验）。
-- [ ] **A2 适配 chunk 格式**：chunks.json 字段（`references`/`referenced_by`、无 `granularity`/`is_mandatory`）
-  对齐引擎期望；强条从 content 文本识别（先"标注不截断"，精细区分后置）。验 `ingest.ir.Chunk` 接口与 feature/index 兼容。
-- [ ] **A3 建索引（服务器）**：BM25 + Milvus 灌 9 个造价规范 chunk 树（复用 `cost/embed.py` 同款 embedding）；
-  **新 collection**，与清单库 `bill_index` 隔离。
-- [ ] **A4 检索端点**：`POST /norm/search`（hybrid: bm25+dense+RRF+rerank+引用扩展），挂 `service/cost_api.py`
-  或复用恢复的 `service/knowledge_api.py`。
+- [x] **A2 验 chunk 兼容**（✅ 2026-06-22，**零适配**）：`ingest.ir.Chunk` 与引擎同期定版（chunk.py 06-15
+  定版后只搬家未改），`Chunk.from_dict` 原生读 chunks.json；引擎对 chunk 的属性访问（content/title/
+  provenance/node_path/standard_id/parent_id/children_ids/ancestor_*/tables/images/expandable_refs/
+  is_grounded）全落现字段集，无 `is_mandatory`（强条 2026-06-12 已降级为 `modal` 表征）。结论：无需改代码。
+- [ ] **A3 建索引（服务器）**：chunks.json 已存在 → 跑 `view→feature→index`（跳过 parse/split）。
+  - 入口 `build.py`；prereq：embed 服务 :8097（`/model` bge-large-zh-v1.5，与 cost 轨共用，不新部署）+ Milvus :19530。
+  - chunks 在 `data/structured/chunks/` 桶 → 命令带 `--structured-dir data/structured/chunks`。
+  - collection 自动隔离：`collection_name()` 产 `building_code_*` 前缀，与清单库 `cost_bill_*` 天然不撞。
+  - 语料范围待定：优先 GB 50500/50854/50856（计量计价规范条文）；信息价/费率/消耗量更偏数据表，按需再加。
+- [x] **A4 检索端点**（✅ 2026-06-22，代码就位待 A3 索引验）：**简化**——不新建 `/norm/search`，复活
+  `service/knowledge_api.py` 作 :8100 统一入口（已含 cost_router + /search /expand /clause，是 cost_api 超集）；
+  现有通用 `/search` 补 `standard` 别名即服务造价规范。`config.STANDARD_ALIASES` 加 5 部计量计价规范
+  （gb50500/50854/50856 × 2013/2024，→ safe_std store 名）。README/DEV 启动改 `python -m service.knowledge_api`。
+  collection `building_code_*` 与清单库 `cost_bill_*` 天然隔离。
 
 ---
 

@@ -67,12 +67,21 @@ def resolve_spec(spec: str) -> dict:
         raise ValueError(f"未知国标版本 spec={spec!r}，支持: {sorted(SPEC_REGISTRY)}")
     return cfg
 
-# 规范代号别名 → vector_store 目录名（与旧 server.py STANDARD_ALIASES 完全一致）
+# 规范代号别名 → vector_store 目录名（resolve_store_dir 查表；store 名 = build.py safe_std(standard_id)）。
+# 防火轨保留历史条目；造价规范问答（Norm-QA，2026-06-22）新增计量计价 5 部规范——store 名取
+# build 期 --standard-id 的 safe_std（连字符→下划线），与 data/structured/chunks/<dir> 同名。
 STANDARD_ALIASES: dict[str, str] = {
+    # ── 防火规范（历史，与旧 server.py 一致）──
     "gb50016": "GB_50016-20142018",
     "gb50016-2014": "GB_50016-20142018",
     "gb50016-20142018": "GB_50016-20142018",
     "GB_50016-20142018": "GB_50016-20142018",
+    # ── 造价计量计价规范（Norm-QA，2013/2024 双版隔离，同 9 位码不同义靠版本号区分）──
+    "gb50500-2013": "GB_50500_2013_建设工程工程量清单计价规范",
+    "gb50500-2024": "GB_T50500_2024_建设工程工程量清单计价标准",
+    "gb50854-2013": "GB_50854_2013_房屋建筑与装饰工程工程量计算规范",
+    "gb50854-2024": "GB_T50854_2024_房屋建筑与装饰工程工程量计算标准",
+    "gb50856-2024": "GB_T50856_2024_通用安装工程工程量计算标准",
 }
 
 

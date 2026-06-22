@@ -53,8 +53,12 @@ ce-code/
 │   ├── bill_match.py               #   构件描述 → 清单候选 dense 召回 + 结构约束/现浇预制重排
 │   └── embed.py                    #   嵌入服务调用工具（bge-large @ :8097）
 │
-│  ── ③ 服务层 / 工具 ──
-├── service/cost_api.py             #   组价取数 HTTP :8100：/bill/match /price/compose /quota（spec 必填路由）
+│  ── ③ 检索引擎 / 服务层 / 工具 ──
+├── retrieval/ index/ feature/      #   规范条文 hybrid 检索（bm25+dense+rrf+rerank+引用扩展）·Norm-QA
+├── build.py                        #   摄取→索引流水线（parse/split/view/feature/index）
+├── service/
+│   ├── knowledge_api.py            #   :8100 统一入口：cost_router + /search /expand /clause
+│   └── cost_api.py                 #   组价取数 router（/bill/match /price/compose /quota，spec 必填）
 └── tools/
     ├── eval_bill.py                #   清单召回评测（Top-1/Top-3/Recall@k/MRR，按编码精确判命中）
     └── build_match_gold.py         #   真实结算 xlsx → 清单匹配 gold（脱敏 + 覆盖过滤）
@@ -62,9 +66,10 @@ ce-code/
 
 > **运行模型**：ce-code 不安装为包（`packages=[]`），**从 ce-code 根运行**，绝对 import 无 sys.path hack。
 > 摄取 `python -m ingest.parser mineru …` / `python -m ingest.splitter toc …`；造价抽取 `python -m cost.<模块>`；
-> 服务 `python -m service.cost_api`；评测 `python -m tools.eval_bill`。
-> **范围**：ce-code 现聚焦**深圳房建组价知识库**（清单/定额/价格/费率 + 取数原语）。规范条文检索 RAG
-> 已于 2026-06-18 重构移除（防火轨停做），日后按需以干净模块重建。算量走 BIM 底座 `../ce-bim/`。
+> 服务 `python -m service.knowledge_api`；评测 `python -m tools.eval_bill`。
+> **范围**：ce-code = **深圳房建组价知识库**（清单/定额/价格/费率 + 取数原语）**+ 造价规范条文检索**
+> （Norm-QA，2026-06-22 起从 git 历史恢复 hybrid 引擎，语料为 GB 50500/50854/50856 计量计价规范）。
+> 防火规范 RAG 仍停做。算量走 BIM 底座 `../ce-bim/`。
 
 ---
 
@@ -148,21 +153,30 @@ uv run python -m ingest.splitter toc --input "data/parsed/<basename>/auto/<basen
 
 ---
 
-## HTTP 服务脚本（组价取数 :8100）
+## HTTP 服务脚本（知识服务 :8100，统一入口）
+
+`service.knowledge_api` 为 :8100 统一入口——挂载组价取数（cost_router：/bill/match /price/compose
+/quota）+ 规范条文检索（/search /expand /clause，供 Norm-QA）。仅起组价测试可单跑 `service.cost_api`。
 
 ```bash
-# 造价取数服务（/bill/match /price/compose /quota，:8100）—— 从 ce-code 根，模块式
-cd /mnt/nvme/calvin/code/deer-flow/ce-code && uv run python -m service.cost_api
-curl http://localhost:8100/health
+# 统一知识服务（组价取数 + 规范条文检索，:8100）—— 从 ce-code 根，模块式
+cd /mnt/nvme/calvin/code/deer-flow/ce-code && uv run python -m service.knowledge_api
+curl http://localhost:8100/health   # ready_standards 列出已建索引的规范
 ```
 
-调用须带**国标版本** `spec`（2013/2024，必填）：
+组价取数须带**国标版本** `spec`（2013/2024，必填）：
 ```bash
 curl -s -X POST http://localhost:8100/bill/match -H 'Content-Type: application/json' -d '{"query":"C30现浇矩形柱","spec":"2024","top_k":5}'
 curl -s "http://localhost:8100/price/compose/%E6%B7%B1%E5%9C%B3/010401002?spec=2024"
 ```
 
-端到端组价编排（构件→选码→组价）由任务层 CostAgent（`../ce-services/`）以 HTTP 客户端复用本服务。
+规范条文检索（Norm-QA，须带 `standard` 代号，见 `config.STANDARD_ALIASES`）：
+```bash
+curl -s -X POST http://localhost:8100/search -H 'Content-Type: application/json' -d '{"query":"满堂脚手架工程量怎么计算","standard":"gb50854-2024","top_k":10}'
+```
+
+端到端：组价编排（构件→选码→组价）由 CostAgent、规范问答由 Norm-QA——均在任务层 `../ce-services/`
+以 HTTP 客户端复用本服务。规范检索索引构建见 `TODO.md` 四、A3（`build.py view→feature→index`）。
 
 ---
 

@@ -28,6 +28,7 @@ SYSTEM_PROMPT = """\
 2. 候选都不匹配 / 信息不足 / 把握不大时，置 need_review=true，并在 reason 说明原因——宁可转人工复核，绝不硬选或编码。
 3. confidence 如实反映把握（0~1 浮点），不确定就给低分。
 4. alternatives 填次优的候选 code（也必须来自候选列表），无则空数组。
+5. **浇筑方式必须对齐**：标「浇筑方式=预制」或「浇筑方式=装配」的候选是预制/装配构件。除非构件描述明确出现「预制」或「装配」字样，否则一律选现浇构件（即没有「浇筑方式=预制/装配」标注的对应项），严禁因名称字面相同（如"矩形柱""过梁"）而选中预制候选——房屋建筑默认现浇，预制需描述明示。
 
 **输出要求**：只返回合法 JSON 对象，不输出任何 JSON 以外的文字。
 """
@@ -45,6 +46,11 @@ def build_user_message(description: str, candidates: list[dict]) -> str:
     lines: list[str] = [f"构件描述：{description}", "", f"候选清单项（共 {len(candidates)} 个，只能从中选）："]
     for i, c in enumerate(candidates, 1):
         parts = [f"{i}. code={c.get('code', '')}", f"名称={c.get('name', '')}"]
+        # 浇筑方式：预制/装配候选与现浇同名同码段易混（如预制矩形柱 vs 现浇钢筋混凝土柱），
+        # 必须显式喂给 LLM 区分——否则只看名称会被"矩形柱"等字面精确命中诱选预制码（见选码评测）。
+        cast = (c.get("cast_type") or "").strip()
+        if cast:
+            parts.append(f"浇筑方式={cast}")
         if c.get("unit"):
             parts.append(f"单位={c['unit']}")
         if c.get("feature"):

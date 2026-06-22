@@ -67,6 +67,22 @@ def caption_category(caption: str | None) -> str:
     return cap.strip("：: ")                                  # 只去空白/冒号，保留正文括号如"(撑)"
 
 
+# 措施项目编码前缀（附录S）。只有措施码的 name 是结构名、不含子类（模板/脚手架…），需 caption 类别补回；
+# 本体码（010xxx）name 已含类别，注入 caption 类别只是冗余噪声、扰动排序（实测 v1 broad 误伤柱本体，见 E10）。
+_MEASURE_PREFIX = "0117"
+
+
+def measure_category(code: str | None, caption: str | None) -> str:
+    """措施项（0117）才注入 caption 子表类别，本体项返回 ""（纯函数，便于单测）。
+
+    参数：code —— 清单 9 位码；caption —— 来源表标题。
+    返回：措施码 → caption_category(caption)；非措施码 → ""。
+    """
+    if (code or "").startswith(_MEASURE_PREFIX):
+        return caption_category(caption)
+    return ""
+
+
 def bill_embed_text(name: str, feature_schema: list[str] | None, chapter: str | None,
                     category: str | None = None) -> str:
     """拼一条清单项的待嵌入文本（纯函数，建库与调试共用）。
@@ -117,7 +133,7 @@ def _fetch_bills(dsn: str | None, doc_ids: list[str] | None = None) -> list[dict
         rows = cur.fetchall()
     for r in rows:                                   # 从 caption/unit 派生现浇预制标记 + 子表类别
         r["cast_type"] = cast_type(r.get("caption"), r.get("unit"))
-        r["category"] = caption_category(r.get("caption"))
+        r["category"] = measure_category(r.get("code"), r.get("caption"))
     return rows
 
 
@@ -148,7 +164,7 @@ def _read_bills_jsonl(path, doc_ids: list[str] | None = None) -> list[dict]:
         bill = {k: rec.get(k) for k in _BILL_FIELDS}
         caption = (rec.get("provenance") or {}).get("caption")
         bill["cast_type"] = cast_type(caption, rec.get("unit"))   # 现浇/预制标记
-        bill["category"] = caption_category(caption)              # 子表类别（补措施子类等）
+        bill["category"] = measure_category(rec.get("code"), caption)  # 措施子表类别
         bills.append(bill)
     bills.sort(key=lambda b: b.get("code") or "")
     return bills

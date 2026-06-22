@@ -3,7 +3,14 @@
 覆盖：嵌入文本拼装（缺项省略、特征/章节并入）+ Milvus 命中整形（字段抽取 + score 取整）。
 真链路（PG 建库 + 向量召回）在服务器跑，本地仅验纯逻辑（torch cu121 本地不可用）。
 """
-from cost.bill_index import bill_embed_text, caption_category, cast_type
+from cost.bill_index import bill_embed_text, caption_category, cast_type, measure_category
+
+
+def test_measure_category_gated():
+    # 措施码(0117) 注入 caption 类别；本体码(010xxx) 不注入（避免冗余噪声扰动本体排序，见 E10）
+    cap = "表 S.2 混凝土模板及支架(撑)(编码:011702)"
+    assert measure_category("011702006", cap) == "混凝土模板及支架(撑)"
+    assert measure_category("010502001", "表 E.2 现浇混凝土柱（编号：010502）") == ""
 
 
 def test_caption_category_measure():

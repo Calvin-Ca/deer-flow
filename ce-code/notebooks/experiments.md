@@ -9,6 +9,25 @@
 
 ---
 
+## E10 ✅ 模板索引文本增强（caption 子表类别注入，门控措施项）（2026-06-18）
+
+→ 详细过程：[`notebooks/2026-06-18-2143-template-index-enrich/`](2026-06-18-2143-template-index-enrich/)
+
+**假设**（承 E9 召回诊断：40 miss 半数是措施码 0117）：措施码 name 是结构名（"矩形梁"）不含"模板"，子类
+（"混凝土模板及支架"）只在 caption、没进嵌入 → 召不回。从 caption 派生子表类别注入嵌入文本可救措施桶召回。
+
+**方法**：`caption_category` 剥表号/编码留子类；`bill_embed_text` 加 category 段；`measure_category(code,caption)`
+**门控只对 0117 措施码注入**（本体码不注入）。重建 2013 collection + 重测。
+
+**数据**：v1 broad（注入所有项）Top-3 43→53% 但误伤本体（柱被噪声挤、Top-1 38→34）；**v2 gated（门控 0117）**
+全面优于基线：**Recall@10 56→60% · Top-3 43→54% · Top-1 38→37(持平) · MRR 0.428→0.461**，措施桶模板码进 top-3。
+
+**结论 ✅（采纳 v2 gated）**：caption 类别对措施码是关键召回信号、对本体码是噪声 → 门控措施项是正解。措施桶
+从"全灭"修到"进 top-3"，零回归。剩余（归排序/任务层）：措施族内部 Top-1（基础梁/矩形梁/有梁板互抢）+ 本体
+underspec（"柱/墙"太泛）→ 任务层 LLM 在 top-k 候选选码；知识层 Recall@10=60% 已把正解送进候选。下一提召回 = sparse 混检。
+
+---
+
 ## E9 ✅🔑 修 cast_type 空格 bug + 召回诊断定位真瓶颈（2026-06-18）
 
 → 详细过程：[`notebooks/2026-06-18-1613-casttype-spacefix/`](2026-06-18-1613-casttype-spacefix/)

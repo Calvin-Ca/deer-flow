@@ -1,82 +1,52 @@
 # ce-services（任务层）· 进度 TODO
 
-> 任务层（生成 + 编排）的执行进度与重构历程。需求/设计见同目录 `PRD.md`；知识层进度见 `../ce-code/TODO.md`。
+> 任务层（生成 + 编排）执行进度。需求/设计见同目录 `PRD.md`；知识层进度见 `../ce-code/TODO.md`。
+>
+> **2026-06-18 重构方向**：项目聚焦**深圳房建组价**。知识层 ce-code 已收窄为组价知识库、移除规范条文检索
+> RAG（防火轨停做）。任务层随之收敛——**CostAgent（选码 + 组价）为唯一主线**；规范 RAG 的消费方
+> `qa/`（/qa）与 `compliance/`（/compliance）**退役**（后端 /search /clause 已删）。
 
 ---
 
-## 阶段 1：code-qa skill 封装（✅ 已完成）
+## 主线：CostAgent —— 构件 → 选码 → 组价（🟡 P1 进行中）
 
-- [x] 结构化输出 + 强制引用（`generation.py`；Qwen3-8B vLLM；强条/推荐性显式区分）
-- [x] 封装为 `skills/public/code-qa/`（SKILL.md + qa.py；端到端验证通过）
+> 知识层只召回候选 + 取数（Recall@10=60%，正解已进 top-k）；CostAgent 在候选内 **LLM 选码** + **确定性组价**
+> + HITL 红线——Top-1 选码本就归任务层（PRD §6）。端到端：
+> **构件描述 → bill_match 候选 → LLM 选码 → price_compose 组价**。
 
-## 阶段 2：项目级合规审查（✅ 已完成）
+### 已就位
+- [x] **造价取数客户端 `common/cost_client.py`**（✅ 2026-06-17，+ 2026-06-18 加 `spec` 必填透传）：
+  `bill_match(query, spec)` / `price_compose(region, code, spec)` / `quota(region, code)`，复用 `KNOWLEDGE_URL`:8100，
+  path 段 `quote` 编码避中文 404。**CostAgent 调用前须向用户确认国标版本（2013/2024）再传 spec。**
 
-- [x] `params.py`：Qwen3 从自由文本提取结构化建筑参数（类型/高度/面积/用途/建筑类别）
-- [x] `queries.py`：规则驱动按合规维度展开 8-16 个检索查询（高层/地下/特殊用途条件触发）
-- [x] `orchestration.py`：端到端编排——并行检索 → 按维度串行去重判定 → 反思校验
-- [x] 封装为 `skills/public/compliance-check/`（SKILL.md + check.py；端到端验证通过）
-- [x] 端到端验证：32m 二类高层住宅 → **85 条强条 / 15 维度**，反思校验正确捕获遗漏维度
-- [x] deer-flow sub-agent 集成：`compliance-checker` 注册为 config.yaml 自定义 agent；skill 含多轮对话编排
-- [x] deer-flow 模型切换为本地 Qwen3-8B（全链路无需 OpenAI API）
+### P1 —— 选码闭环（HTTP 端点，当前任务）
+> 决策（2026-06-18）：P1 只做选码闭环（不组装综合单价）；先 HTTP 端点（不先 deer-flow agent）；退役 qa/compliance。
 
----
+- [ ] **退役 qa/ + compliance/**：`git rm qa/ compliance/ common/knowledge_client.py`（+ skills 里 code-qa/compliance-check）；
+  `main.py` 去两路由、改挂 cost 路由；`call_qwen3` 从 `qa/generation` 抽到 `common/llm.py` 供选码复用。
+- [ ] **`cost/selection.py`**：LLM 选码 `select_code(description, candidates)` → `{code, confidence, reason, need_review, alternatives}`；
+  系统提示钉死「只能从候选里选、不许造码、不确定标 need_review」；Qwen3-8B 直出 JSON（非 function-calling）。
+- [ ] **`cost/orchestration.py`**：`bill_match(spec)` → `select_code` → `price_compose(region,code,spec)` 组装；2013→compose 501 透传「未就绪」。
+- [ ] **`cost/router.py` + `server.py`**：`POST /cost/compose {description, spec, region, top_k}`；异常→状态码（spec 错 400 / 知识服务不可达 503）。`main.py` 挂载、`/health` 更新。
+- [ ] **选码评测**：复用 ce-code `match_gold`，量 **LLM 从 top-k 选中正解的 Top-1**（PRD §6 业务层红线 ≥85%）——把知识层 Recall@10=60% 接到任务层 Top-1，端到端可量化。
+- [ ] **端到端验证**：起 :8101 → `curl /cost/compose` → 选码 + 工料机 + 价（带 no_source）跑通。
 
-## 重构历程（行为保持，不改 schema、不重建索引）
+**红线**：选码 `need_review`（低置信→HITL，只建议不定稿）/ `no_source` 不杜撰、透传缺口 / `spec` 必填 / **P1 不算钱**。
 
-### skill HTTP 服务化（✅）
+### P2 —— 综合单价组装（⬜ 待办）
+- [ ] `cost/pricing.py`：人材机费 →（`fee_rate` 管理费/利润/风险 + `price_composition` 构成规则）→ 综合单价 → 含税造价，**确定性公式**（LLM 不算钱）。
 
-原 skill 在沙箱里 `cd /mnt/nvme/...` + 动态加载 POC 脚本，因 deer-flow 沙箱只挂载 `skills/`（POC venv/脚本/数据均不可见）而崩溃 → 改为常驻 HTTP 服务 + skill 侧退化为**纯标准库 urllib HTTP 客户端**（沙箱内零依赖）。
-
-### v3：任务层迁出知识层（✅ 2026-06-03）
-
-把生成/编排从 ce-code 彻底拆出，落地"一个知识服务，N 个任务服务"拓扑。
-
-- [x] 新建顶层 `ce-services/`（独立 uv 项目，仅 fastapi/uvicorn/requests/pydantic）
-- [x] `common/`：`config.py` + `knowledge_client.py`（打 :8100 `/search`）
-- [x] `qa/generation.py`、`compliance/{orchestration,params,queries}.py` 从 ce-code 平移
-- [x] 关键改动：`orchestration._get_retrieve_fn` 从进程内 `retrieval.engine.search` 改为 `knowledge_client.search`（HTTP）
-- [x] **服务器验证**：`uv sync` 成功；`/health` service 字段正确；`07_eval.py` 召回率不变；六端点 + 两 skill 客户端回归通过
-
-> 此轮拆分后任务层是 qa（:8102）+ compliance（:8101）两个独立进程。
-
-### Docker（✅ 2026-06-04）
-
-- [x] `docker/ce-services/`：任务服务镜像（python:3.12-slim，~200MB）+ 全栈 compose（`include` ce-code + `depends_on: service_healthy`）
-- [x] `network_mode: host` 直连宿主机 Milvus/vLLM
-
-### 任务层合并为单进程单端口（✅ 2026-06-04）
-
-qa（:8102）+ compliance（:8101）两进程合并为单一进程，共用 :8101。
-
-- [x] 新增 `qa/router.py` + `compliance/router.py`（从各自 server.py 提取 APIRouter）
-- [x] 新增 `main.py`（统一入口，`include_router` 两个 router，监听 :8101）
-- [x] `server.py` 退化为独立测试用薄包装（import router）
-- [x] Docker：两个 service → 单个 `tasks` service，CMD 改 `main:app`
-- [x] skill `code-qa/qa.py` 默认地址 8102 → 8101
-- [x] `curl localhost:8101/health` 返回 `service:"tasks", routes:["/qa","/compliance"]`
-- [x] `curl -X POST :8101/qa` 和 `/compliance` 全绿（/qa 实测 43 条全强条 + 结构化回答）
-- [ ] 两 skill 客户端回归通过（最后一项待跑）
-
-**部署变化累积**：起 1 进程 → 2（Phase A）→ 3（v3 拆分）→ **2（本次合并：知识 :8100 + 任务 :8101）**。
+### P3 —— deer-flow agent + skill（⬜ 待办）
+- [ ] 注册 `cost-agent` + skill：多轮追问（缺 spec / 构件描述时问用户），把端点包成可编排复用能力（同 code-qa/compliance-check 旧模式）。
 
 ---
 
-## 阶段 4：算量计价 CostAgent（🟡 进行中 · 当前主线）
+## 退役 · 规范 RAG 消费方（⛔ 2026-06-18，后端已随 ce-code 移除）
 
-> 项目已聚焦算量 + 计价（防火轨停做，见 ce-code TODO）。CostAgent 是知识层造价取数原语
-> （`/bill/match` `/price/compose` `/quota`，均在 :8100）的消费方，组价闭环：
-> **构件描述 → bill_match 拿清单候选 → LLM 在候选内选码 → price_compose 组价**（红线：只建议不定稿、HITL 复核）。
+- [⛔] **阶段1 code-qa skill**（原 `/qa`，Qwen3 结构化生成 + 强制引用）——后端 :8100 `/search` 已删。
+- [⛔] **阶段2 项目级合规审查**（原 `/compliance`，参数提取→并行检索→维度判定→反思）——后端 `/search /clause` 已删。
+- 历史（skill HTTP 服务化 / v3 任务层迁出知识层 / Docker / 单进程合并）随 git 追溯，不再展开。
+  规范条文检索能力日后按需重建时，再评估是否复活相关编排。
 
-- [x] **造价取数客户端 `common/cost_client.py`**（✅ 2026-06-17）：封装 `bill_match`/`price_compose`/`quota`
-  HTTP 客户端（与 `knowledge_client` 同模式，复用 `KNOWLEDGE_URL`:8100；region/code path 段
-  `urllib.parse.quote` 编码避中文 404）。组价闭环「取数 plumbing」就位。
-- [ ] **CostAgent 选码编排**：收构件 → `cost_client.bill_match` 拿 top-k 候选 → Qwen3 在候选内选码
-  （结构化输出 + 出处 + 置信度；红线只建议不定稿）→ `cost_client.price_compose` 组价。
-- [ ] **封装为 skill + deer-flow agent 集成**（与 code-qa/compliance-check 同模式）。
-- [ ] **端到端验证**：给一段已知工程量的构件 → 跑通「清单候选→选码→组价」最小闭环。
-
-## 阶段 3：设计辅助（⬜ 待办）
-
-**目标**：实时给出参数约束（如"此建筑高度下最大防火分区面积"）。
-- [ ] 在 sandbox 中执行规范计算公式（疏散宽度、防火间距等；依赖知识层 Phase B 的 `formulas` 字段）
-- [ ] 与设计工具（CAD/BIM）潜在集成
+## 设计辅助（⬜ 远期，依赖规范检索重建）
+- [ ] sandbox 执行规范计算公式（疏散宽度/防火间距等）——依赖规范条文检索能力（当前已移除），重建后再议。

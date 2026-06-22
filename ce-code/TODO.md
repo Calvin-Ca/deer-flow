@@ -46,6 +46,26 @@ PG `ce_cost`（:5433）已灌齐，组价取数链通（清单→定额→工料
 
 ---
 
+## 四、造价规范问答检索引擎 —— ⏳ 恢复中（2026-06-22 起）
+
+> **2026-06-22 方向调整**：知识层新增第二能力——**造价规范条文检索**（与组价取数并列）。语料为造价类规范
+> （GB 50500/50854/50856、深圳费率/消耗量标准），非防火规范；做法是从 git 历史（`68686329^`）**恢复+适配**
+> 被删的 hybrid 检索引擎，而非从零重写。任务层生成侧见 `../ce-services/TODO.md` Norm-QA 章节。
+
+- [x] **A1 恢复引擎 + 接回包结构**（✅ 2026-06-22，import 层）：`git checkout 68686329^` 恢复
+  `retrieval/`（bm25/dense/hybrid/rrf/graph/service）+ `ir/{context,feature,query,retrieval}` +
+  `index/` + `feature/` + `build.py` + `utils/` + `service/{knowledge_api,retrieve_service}`；
+  适配 `ir.{chunk,document,profile}`→`ingest.ir.*`（16处）、build 的 `parser/splitter`→`ingest.*`、
+  补恢复漏掉的 `ir/feature.py`。全量 py_compile + 静态 import 解析全绿（运行时第三方依赖/Chunk 接口待服务器验）。
+- [ ] **A2 适配 chunk 格式**：chunks.json 字段（`references`/`referenced_by`、无 `granularity`/`is_mandatory`）
+  对齐引擎期望；强条从 content 文本识别（先"标注不截断"，精细区分后置）。验 `ingest.ir.Chunk` 接口与 feature/index 兼容。
+- [ ] **A3 建索引（服务器）**：BM25 + Milvus 灌 9 个造价规范 chunk 树（复用 `cost/embed.py` 同款 embedding）；
+  **新 collection**，与清单库 `bill_index` 隔离。
+- [ ] **A4 检索端点**：`POST /norm/search`（hybrid: bm25+dense+RRF+rerank+引用扩展），挂 `service/cost_api.py`
+  或复用恢复的 `service/knowledge_api.py`。
+
+---
+
 ## 待办（按优先级，详见 `notebooks/BACKLOG.md`）
 
 ### A. 召回提升（不依赖外部数据，可立即做）

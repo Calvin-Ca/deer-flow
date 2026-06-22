@@ -19,13 +19,13 @@ _BODY_SEP = " ‖ "   # 祖先链与本条正文之间（PRD §3.1 示例用此�
 
 
 class ContextAugFeature(Feature):
-    """context_aug 表征：祖先标题链 ‖ 本条正文 + 表 caption/表头（复用 TreeBuilder 算定的 ancestor_titles）。"""
+    """context_aug 表征：祖先标题链 ‖ 本条正文 + 表 caption（复用 TreeBuilder 算定的 ancestor_titles）。"""
 
     kind = "context_aug"
 
     def build(self, chunk: Chunk) -> ChunkFeature:
         ancestors = [t for t in (chunk.ancestor_titles or []) if t]
-        # 表注入仅 caption + 表头（full=False）：同 dense，避免长表撑爆向量上下文。
+        # 表注入仅 caption（full=False）：同 dense，通用表头同质化向量，不注。
         body_parts = [chunk.content.strip() or chunk.title.strip(),
                       render_tables(chunk.tables, full=False)]
         body = "\n".join(p for p in body_parts if p)

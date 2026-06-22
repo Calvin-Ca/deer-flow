@@ -16,12 +16,12 @@ from feature.tables_text import render_tables
 
 
 class DenseFeature(Feature):
-    """dense 表征：待嵌入文本 = title + content + 表 caption/表头（向量留索引期填）。"""
+    """dense 表征：待嵌入文本 = title + content + 表 caption（向量留索引期填）。"""
 
     kind = "dense"
 
     def build(self, chunk: Chunk) -> ChunkFeature:
-        # 表注入仅 caption + 表头（full=False）：bge max ~512 token，长表全注入会截断稀释向量。
+        # 表注入仅 caption（full=False）：表主题入语义召回；通用表头雷同会同质化向量，不注（留给 BM25）。
         parts = [chunk.title.strip(), chunk.content.strip(),
                  render_tables(chunk.tables, full=False)]
         text = "\n".join(p for p in parts if p)

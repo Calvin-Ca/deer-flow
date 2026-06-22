@@ -41,5 +41,9 @@
       "description": "PostgreSQL database access"
     }
   },
-  "skills": {}
+  "skills": {
+    "norm-qa": {
+      "enabled": true
+    }
+  }
 }

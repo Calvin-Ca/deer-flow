@@ -1,43 +1,44 @@
-# 任务层 · CostAgent（ce-services）
+# 任务层 · Norm-QA + CostAgent（ce-services）
 
-知识层（`../ce-code`，深圳房建组价知识库 :8100）的**任务服务**。任务层是知识服务的**纯 HTTP
-客户端**——不 `import retrieval`、不连 Milvus / 向量库 / PG，只打知识服务取数原语，再叠加
-**LLM 选码 + 确定性组价 + HITL 红线**的任务逻辑。
+知识层（`../ce-code`，:8100）的**任务服务**。任务层是知识服务的**纯 HTTP 客户端**——不 `import
+retrieval`、不连 Milvus / PG，只打知识服务原语，再叠加生成 / 选码逻辑。两条主线共进程（:8101）：
 
-> **2026-06-18 收敛**：项目聚焦深圳房建组价。**CostAgent（构件 → 选码 → 组价）为唯一主线**；
-> 原规范 RAG 消费方 `/qa`（code-qa skill）、`/compliance`（compliance-check skill）已退役
-> （知识层后端 /search /clause 已删）。需求/设计见 `PRD.md`，进度见 `TODO.md`。
+> - **Norm-QA（造价规范问答，当前优先）**：打 :8100 `/search` 检索造价规范条文 → Qwen3 带引用作答。
+> - **CostAgent（构件→选码→组价，P1 暂停）**：打 :8100 `/bill/match` 等取组价数据 → LLM 选码 → 组价。
+>
+> 防火 RAG 消费方 `/qa` `/compliance` 已退役。需求/设计见 `PRD.md`，进度见 `TODO.md`。
 
 ## 拓扑
 
 ```
-ce-code 知识服务 :8100  (组价取数原语 /bill/match /price/compose /quota；retrieval+PG+Milvus 唯一 owner)
+ce-code 知识服务 :8100  (统一入口 service.knowledge_api：规范条文检索 /search /expand /clause
+                         + 组价取数 /bill/match /price/compose /quota；retrieval+PG+Milvus 唯一 owner)
         ▲ HTTP
         │
-ce-services 任务服务 :8101  (CostAgent)
-  POST /cost/compose = bill_match 召回候选 → LLM 选码 → price_compose 组价   ← P1 选码闭环（建设中）
+ce-services 任务服务 :8101
+  POST /norm/qa      = /search 检索规范条文 → Qwen3 带引用作答            ← 当前优先（建设中）
+  POST /cost/compose = bill_match 候选 → LLM 选码 → price_compose 组价     ← P1（暂停）
 ```
-
-端到端：**构件描述 → `bill_match` 拿清单候选 → CostAgent 内 LLM 在候选内选码（红线：只建议
-不定稿、低置信 HITL 复核）→ `price_compose` 组价**。知识层只召回候选 + 取数；选码（Top-1）
-本就归任务层（PRD §6）。
 
 | 端点 | 职责 | 状态 |
 |---|---|---|
-| `POST /cost/compose` | 构件描述 → 候选召回 → LLM 选码 → 组价 | 🟡 P1 建设中 |
+| `POST /norm/qa` | 造价规范条文检索 + Qwen3 带引用作答 | ⏳ 建设中 |
+| `POST /cost/compose` | 构件描述 → 候选召回 → LLM 选码 → 组价 | ⏸ P1 暂停 |
 | `GET /health` | 健康检查（含 knowledge_url / llm_url） | ✅ |
 
 ## 目录
 
 ```
 ce-services/
-├── main.py                 # 统一入口 :8101（cost 路由 P1 就位后挂载）
+├── main.py                 # 统一入口 :8101（挂 norm 路由；cost 路由 P1 恢复后挂）
 ├── pyproject.toml          # 独立 uv 项目（仅 fastapi/uvicorn/requests/pydantic）
 ├── common/
 │   ├── config.py           # LLM_URL / LLM_MODEL_ID / KNOWLEDGE_URL（env 可覆盖）
-│   ├── llm.py              # 裸 Qwen3-8B vLLM JSON 直调（call_qwen3，选码复用）
+│   ├── llm.py              # 裸 Qwen3-8B vLLM JSON 直调（call_qwen3，两线复用）
+│   ├── knowledge_client.py # 规范条文检索 HTTP 客户端：search / expand / get_clause
 │   └── cost_client.py      # 造价取数 HTTP 客户端：bill_match / price_compose / quota
-└── cost/                   # P1 建设中：selection.py 选码 / orchestration.py 串链 / router.py 端点
+├── norm/                   # Norm-QA：generation.py 带引用生成 / router.py /norm/qa 端点
+└── cost/                   # P1 暂停：selection.py 选码 / orchestration.py 串链 / router.py 端点
 ```
 
 ## 启动（服务器）
@@ -45,9 +46,14 @@ ce-services/
 全栈需 **2 个进程**：知识服务 :8100（先起，任务层依赖它）+ 任务服务 :8101。
 
 ```bash
-cd ce-code     && uv run python -m retrieval.server   # ① :8100 知识服务（必须先起）
-cd ce-services && uv sync && uv run python main.py    # ② :8101 任务服务（CostAgent）
+cd ce-code     && uv run python -m service.knowledge_api   # ① :8100 知识服务（必须先起）
+cd ce-services && uv sync && uv run python main.py         # ② :8101 任务服务
 # 或 uvicorn 形式：uv run uvicorn main:app --host 0.0.0.0 --port 8101
+```
+
+调用示例（Norm-QA，须带 `standard` 代号）：
+```bash
+curl -s -X POST http://localhost:8101/norm/qa -H 'Content-Type: application/json' -d '{"query":"满堂脚手架工程量怎么计算","standard":"gb50854-2024","top_k":10}'
 ```
 
 > 后台常驻**勿用 nohup**（服务器 Exit 125 静默失败），用 `setsid` 或 tmux。
@@ -55,7 +61,7 @@ cd ce-services && uv sync && uv run python main.py    # ② :8101 任务服务�
 健康检查：
 ```bash
 curl http://localhost:8100/health   # {"status":"ok","service":"retrieval",...}
-curl http://localhost:8101/health   # {"status":"ok","service":"tasks","routes":[...],...}
+curl http://localhost:8101/health   # {"status":"ok","service":"tasks","routes":["/norm/qa"],...}
 ```
 
 ## 配置（env 覆盖，见 common/config.py）

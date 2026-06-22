@@ -5,10 +5,33 @@
 > **2026-06-18 重构方向**：项目聚焦**深圳房建组价**。知识层 ce-code 已收窄为组价知识库、移除规范条文检索
 > RAG（防火轨停做）。任务层随之收敛——**CostAgent（选码 + 组价）为唯一主线**；规范 RAG 的消费方
 > `qa/`（/qa）与 `compliance/`（/compliance）**退役**（后端 /search /clause 已删）。
+>
+> **2026-06-22 优先级调整**：新增**造价规范问答（Norm-QA）为当前优先主线**，**P1 选码闭环暂停**。
+> 与 §2.1「去 RAG」不同——这次复活的检索语料是**造价类规范**（GB 50500/50854/50856、深圳费率/消耗量
+> 标准），非防火规范；做法是从 git 历史**恢复+适配**被删的 hybrid 检索引擎（非从零重写）。跨两层，
+> ce-code 侧进度见 `../ce-code/TODO.md` 同名章节。
 
 ---
 
-## 主线：CostAgent —— 构件 → 选码 → 组价（🟡 P1 进行中）
+## 主线（当前优先）：造价规范问答 Norm-QA —— ⏳ 进行中（2026-06-22 起）
+
+> 构件/计量计价类自然语言问题 → 造价规范条文检索 → Qwen3 带引用作答（强制引用/强条区分/无依据拒答）。
+> 语料已切块就绪（`ce-code/data/structured/chunks/` 9 文档）；旧引擎 + 退役 qa 生成器均可从 git 恢复。
+
+### 任务层 ce-services（生成）
+- [x] **B1 `norm/generation.py`**（✅ 2026-06-22）：造价规范问答生成器——承旧 qa 硬约束（强制引用/
+  无依据拒答/不编造），但**去强条二分**（/search 无 is_mandatory，强条降级 modal 不落响应），改"忠实引用 +
+  条文自带强制性字样则照标"；接 `common/llm.py:call_qwen3`；恢复 `common/knowledge_client.py`（search/expand/clause）。
+- [x] **B2 `norm/router.py` + 挂 main.py`**（✅ 2026-06-22）：`POST /norm/qa {query, standard, top_k}`——
+  `knowledge_client.search`（打 :8100 /search）→ `generation.answer`；零召回不喂空上下文直返"无依据"；
+  异常映射（知识服务 400/503 透传、LLM 不可达 502）。main.py 挂 norm 路由、`/health.routes=["/norm/qa"]`。
+- [ ] **B3 评测**：`ce-code/data/eval_set` 建造价规范问答评测集（条文召回 + 引用准确率）。**待 A3 索引就位后服务器跑。**
+
+> 知识层检索引擎恢复（A1–A4）见 `../ce-code/TODO.md`。
+
+---
+
+## 主线（暂停）：CostAgent —— 构件 → 选码 → 组价（⏸ P1 暂停，待 Norm-QA 跑通后续做）
 
 > 知识层只召回候选 + 取数（Recall@10=60%，正解已进 top-k）；CostAgent 在候选内 **LLM 选码** + **确定性组价**
 > + HITL 红线——Top-1 选码本就归任务层（PRD §6）。端到端：

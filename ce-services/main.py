@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
-"""任务层 CostAgent —— 任务服务统一入口（常驻 HTTP，端口 8101）。
+"""任务层 —— 任务服务统一入口（常驻 HTTP，端口 8101）。
 
-聚焦深圳房建组价：CostAgent（构件 → 选码 → 组价）为唯一主线。规范 RAG 消费方
-qa（/qa）/ compliance（/compliance）已退役（知识层后端 /search /clause 已删）。
+聚焦深圳房建组价，两条主线共进程：**Norm-QA**（造价规范问答，当前优先）+ **CostAgent**
+（构件 → 选码 → 组价，P1 暂停）。均为知识服务 :8100 的纯 HTTP 客户端——Norm-QA 打 /search
+取规范条文，CostAgent 打 /bill/match 等取组价数据。防火 RAG 消费方 qa/compliance 已退役。
 
 端点：
   GET  /health        健康检查（含知识服务 / LLM 地址）
-  POST /cost/compose  构件描述 → 候选召回 → LLM 选码 → 组价（cost-agent）
+  POST /norm/qa       造价规范条文检索 + Qwen3 带引用作答（norm-qa）
+  POST /cost/compose  构件描述 → 候选召回 → LLM 选码 → 组价（cost-agent，P1 暂停）
 
 启动：
   cd ce-services && uv run python main.py
@@ -28,10 +30,12 @@ logging.basicConfig(
 from fastapi import FastAPI  # noqa: E402
 
 from common.config import KNOWLEDGE_URL, LLM_URL  # noqa: E402
+from norm.router import router as norm_router  # noqa: E402
 
-app = FastAPI(title="CostAgent · Task Services", version="4.0.0")
+app = FastAPI(title="CE Task Services · Norm-QA + CostAgent", version="4.0.0")
+app.include_router(norm_router)
 
-# cost 路由在 P1 选码闭环就位后挂载（cost/router.py）：
+# cost 路由在 P1 选码闭环恢复后挂载（cost/router.py）：
 # from cost.router import router as cost_router
 # app.include_router(cost_router)
 
@@ -43,7 +47,7 @@ def health() -> dict:
         "service": "tasks",
         "knowledge_url": KNOWLEDGE_URL,
         "llm_url": LLM_URL,
-        "routes": [],
+        "routes": ["/norm/qa"],
     }
 
 

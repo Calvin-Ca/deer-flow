@@ -1,12 +1,14 @@
-"""知识服务 HTTP 客户端 —— 任务层够到检索原语的唯一通道。
+"""知识服务 HTTP 客户端 —— 任务层够到规范条文检索原语的唯一通道。
 
-任务服务（qa / compliance / 未来算量·审图）不再 ``import retrieval`` 在进程内检索，
-而是统一打 ce-code 知识服务（:8100）的原语端点。好处：retrieval + rerank 模型只在
-知识服务加载一份，索引预热只一处；任务层保持轻量、可独立部署。
+任务层 Norm-QA（造价规范问答）不 ``import retrieval`` 在进程内检索，而是打 ce-code 知识服务
+（:8100）的检索原语 ``/search`` ``/expand`` ``/clause/{standard}/{path}``。好处：retrieval +
+rerank 模型只在知识服务加载一份、索引预热只一处；任务层保持轻量、可独立部署。
 
-注意行为等价：知识服务 ``/search`` 内部按 ``bm25_top_k = vector_top_k = top_k*2``
-调用 ``retrieval.engine.search``，与重构前 orchestration 进程内直调的参数逐字一致，
-因此检索结果（含 RRF 合并、引用扩展、强条不截断）保持不变。
+与造价取数客户端 ``common.cost_client``（/bill/match /price/compose /quota）并列——同一知识服务
+（:8100）的两类原语：本模块取规范条文（Norm-QA），cost_client 取组价数据（CostAgent）。
+
+``standard`` 参数取 ``config.STANDARD_ALIASES`` 的代号（造价规范如 ``gb50854-2024`` /
+``gb50500-2013``，按国标版本隔离），Norm-QA 调用须显式传，不依赖默认。
 """
 from __future__ import annotations
 

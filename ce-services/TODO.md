@@ -63,7 +63,10 @@
   串 `bill_match → select_code → price_compose`；选不出码（code=None）→ 跳过组价、`price_status=skipped(need_review)`；
   spec=2013 组价未就绪 → 捕获 compose 501 **降级**为 `price=None` + `price_status` 说明（保留选码结果）；
   bill_match spec 400 / 知识服务 503 / compose 404·503 不吞、上抛由 router 映射。
-- [ ] **`cost/router.py` + `server.py`**：`POST /cost/compose {description, spec, region, top_k}`；异常→状态码（spec 错 400 / 知识服务不可达 503）。`main.py` 挂载、`/health` 更新。
+- [x] **`cost/router.py` + 挂 main.py**（✅ 2026-06-22）：`POST /cost/compose {description, spec, region, top_k}`
+  → `orchestration.compose`；异常映射（依赖 HTTPError 透传状态码 / 不可达 503 / LLM 非法 JSON 502）；
+  need_review、price_status 原样冒泡供 HITL。main.py 挂 cost+norm 双路由、`/health.routes=["/norm/qa","/cost/compose"]`。
+  （不单建 `server.py`——沿用 norm 模式，main.py 唯一入口。）
 - [ ] **选码评测**：复用 ce-code `match_gold`，量 **LLM 从 top-k 选中正解的 Top-1**（PRD §6 业务层红线 ≥85%）——把知识层 Recall@10=60% 接到任务层 Top-1，端到端可量化。
 - [ ] **端到端验证**：起 :8101 → `curl /cost/compose` → 选码 + 工料机 + 价（带 no_source）跑通。
 

@@ -54,8 +54,11 @@
   + skills/public/{code-qa,compliance-check}；`config.yaml` 去 compliance-checker 自定义 agent、
   `extensions_config.json` 去两 skill 条目；`main.py` 去两路由、`/health.routes=[]` 待挂 cost；
   `call_qwen3` 从 `qa/generation` 抽到 `common/llm.py` 供选码复用；README 重写为 CostAgent 主线。
-- [ ] **`cost/selection.py`**：LLM 选码 `select_code(description, candidates)` → `{code, confidence, reason, need_review, alternatives}`；
-  系统提示钉死「只能从候选里选、不许造码、不确定标 need_review」；Qwen3-8B 直出 JSON（非 function-calling）。
+- [x] **`cost/selection.py`**（✅ 2026-06-22，本地兜底逻辑验证）：`select_code(description, candidates, llm_url, model_id)`
+  → `{code, confidence, reason, need_review, alternatives}`；系统提示钉死三红线 + **代码侧确定性兜底双保险**：
+  ① code∉candidates（造码）→ 作废 null + need_review + 标注；② confidence<0.6 → 强制 need_review；
+  ③ 空候选 → 不调 LLM 直接转人工；alternatives 仅留候选内 code。Qwen3-8B 直出 JSON（复用 `common/llm`）。
+  本地打桩测 5 路径（正常/造码/低置信/自报 review/空候选）全过。
 - [ ] **`cost/orchestration.py`**：`bill_match(spec)` → `select_code` → `price_compose(region,code,spec)` 组装；2013→compose 501 透传「未就绪」。
 - [ ] **`cost/router.py` + `server.py`**：`POST /cost/compose {description, spec, region, top_k}`；异常→状态码（spec 错 400 / 知识服务不可达 503）。`main.py` 挂载、`/health` 更新。
 - [ ] **选码评测**：复用 ce-code `match_gold`，量 **LLM 从 top-k 选中正解的 Top-1**（PRD §6 业务层红线 ≥85%）——把知识层 Recall@10=60% 接到任务层 Top-1，端到端可量化。

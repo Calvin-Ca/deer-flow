@@ -12,19 +12,23 @@ from __future__ import annotations
 from ingest.ir.chunk import Chunk
 from ir.feature import ChunkFeature
 from feature.base import Feature
+from feature.tables_text import render_tables
 
 _PATH_SEP = " / "   # 祖先标题之间
 _BODY_SEP = " ‖ "   # 祖先链与本条正文之间（PRD §3.1 示例用此分隔符）
 
 
 class ContextAugFeature(Feature):
-    """context_aug 表征：祖先标题链 ‖ 本条正文（复用 TreeBuilder 算定的 ancestor_titles）。"""
+    """context_aug 表征：祖先标题链 ‖ 本条正文 + 表 caption/表头（复用 TreeBuilder 算定的 ancestor_titles）。"""
 
     kind = "context_aug"
 
     def build(self, chunk: Chunk) -> ChunkFeature:
         ancestors = [t for t in (chunk.ancestor_titles or []) if t]
-        body = chunk.content.strip() or chunk.title.strip()
+        # 表注入仅 caption + 表头（full=False）：同 dense，避免长表撑爆向量上下文。
+        body_parts = [chunk.content.strip() or chunk.title.strip(),
+                      render_tables(chunk.tables, full=False)]
+        body = "\n".join(p for p in body_parts if p)
         prefix = _PATH_SEP.join(ancestors)
         text = f"{prefix}{_BODY_SEP}{body}" if prefix else body
         return ChunkFeature(kind=self.kind, text=text, meta={"ancestors": len(ancestors)})

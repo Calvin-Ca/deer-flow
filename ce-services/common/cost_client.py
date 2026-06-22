@@ -1,8 +1,7 @@
 """造价取数 HTTP 客户端 —— 任务层 CostAgent 够到组价取数原语的通道。
 
-与 ``knowledge_client``（规范检索 /search /expand /clause）并列：本模块封装 ce-code 知识服务
-（:8100）的**造价取数原语** /bill/match /price/compose /quota，供任务层 CostAgent 以纯 HTTP
-客户端复用（与规范轨同模式——检索/取数逻辑只在知识层一份，任务层保持轻量）。
+本模块封装 ce-code 知识服务（:8100）的**造价取数原语** /bill/match /price/compose /quota，
+供任务层 CostAgent 以纯 HTTP 客户端复用——检索/取数逻辑只在知识层一份，任务层保持轻量。
 
 端到端组价闭环：构件描述 → ``bill_match`` 拿清单候选 → CostAgent 内 LLM 在候选内选码（红线：
 只建议不定稿、HITL 复核）→ ``price_compose`` 组价。本模块只管「取数 plumbing」，选码编排在 CostAgent。

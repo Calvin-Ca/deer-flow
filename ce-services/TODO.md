@@ -22,8 +22,10 @@
 ### P1 —— 选码闭环（HTTP 端点，当前任务）
 > 决策（2026-06-18）：P1 只做选码闭环（不组装综合单价）；先 HTTP 端点（不先 deer-flow agent）；退役 qa/compliance。
 
-- [ ] **退役 qa/ + compliance/**：`git rm qa/ compliance/ common/knowledge_client.py`（+ skills 里 code-qa/compliance-check）；
-  `main.py` 去两路由、改挂 cost 路由；`call_qwen3` 从 `qa/generation` 抽到 `common/llm.py` 供选码复用。
+- [x] **退役 qa/ + compliance/**（✅ 2026-06-22）：`git rm` 掉 qa/ compliance/ common/knowledge_client.py
+  + skills/public/{code-qa,compliance-check}；`config.yaml` 去 compliance-checker 自定义 agent、
+  `extensions_config.json` 去两 skill 条目；`main.py` 去两路由、`/health.routes=[]` 待挂 cost；
+  `call_qwen3` 从 `qa/generation` 抽到 `common/llm.py` 供选码复用；README 重写为 CostAgent 主线。
 - [ ] **`cost/selection.py`**：LLM 选码 `select_code(description, candidates)` → `{code, confidence, reason, need_review, alternatives}`；
   系统提示钉死「只能从候选里选、不许造码、不确定标 need_review」；Qwen3-8B 直出 JSON（非 function-calling）。
 - [ ] **`cost/orchestration.py`**：`bill_match(spec)` → `select_code` → `price_compose(region,code,spec)` 组装；2013→compose 501 透传「未就绪」。

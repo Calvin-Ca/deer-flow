@@ -41,12 +41,5 @@
       "description": "PostgreSQL database access"
     }
   },
-  "skills": {
-    "code-qa": {
-      "enabled": true
-    },
-    "compliance-check": {
-      "enabled": true
-    }
-  }
+  "skills": {}
 }

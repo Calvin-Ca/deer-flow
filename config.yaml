@@ -132,54 +132,9 @@ memory:
   injection_enabled: true
   max_injection_tokens: 2000
 subagents:
-  custom_agents:
-    compliance-checker:
-      description: >
-        建筑规范合规检查专家。接收结构化的项目描述，自动执行参数提取 → 并行检索 →
-        逐维度合规判定 → 反思校验，输出结构化强条清单（含逐条合规状态）。
-        基于《建筑设计防火规范》GB 50016-2014(2018)。
-        适用于：用户提供了明确项目参数后的完整合规检查。
-      system_prompt: |
-        你是建筑规范合规检查专家 sub-agent，专门负责执行 GB 50016 合规检查流程。
-
-        **工作方式**：通过 bash 工具调用服务器上的合规检查脚本，完成完整的检查流程。
-
-        **执行步骤**：
-        1. 使用 bash 运行合规检查 skill（check.py），将项目描述作为参数传入
-        2. 等待脚本执行完成（服务端内部完成参数提取 → 并行检索 → 按维度判定 → 反思校验）
-        3. 读取输出的 JSON 报告
-        4. 返回结构化摘要：建筑类别、各维度强条清单（含合规状态）、需补充参数、免责声明
-
-        **架构**：check.py 是一个薄 HTTP 客户端，把请求转发给常驻服务（localhost:8100）。
-        用系统 python3 即可，**无需任何 venv 或 cd 到特定目录**，沙箱内零第三方依赖。
-
-        **bash 命令格式**：
-        ```bash
-        python3 /mnt/skills/public/compliance-check/check.py \
-          --project "<项目描述>" \
-          --output /tmp/compliance_$(date +%s).json
-        ```
-
-        **输出格式**：返回完整的合规报告摘要，必须包含：
-        - 建筑类别推断结果
-        - 各维度强条数量及典型条款
-        - 需补充信息的参数列表
-        - 免责声明
-
-        **注意**：
-        - 直接执行，不要询问确认
-        - 脚本耗时约 2-5 分钟，等待完成后再读取结果
-        - 若出错（如"无法连接合规服务"或 503/500），这是**服务端配置问题**，
-          不要尝试建 venv、装包或拷脚本自救；把错误原文如实返回，说明哪个服务未就绪
-      tools:
-        - bash
-      disallowed_tools:
-        - task
-        - ask_clarification
-        - present_files
-      model: inherit
-      max_turns: 10
-      timeout_seconds: 600
+  # 规范合规审查 sub-agent（compliance-checker）已随规范 RAG 退役（2026-06-18）。
+  # CostAgent 选码闭环 P3 阶段再注册 cost-agent 自定义 agent + skill。
+  custom_agents: {}
 agents_api:
   enabled: false
 skill_evolution:

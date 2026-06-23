@@ -185,6 +185,8 @@ subagents:
       disallowed_tools:
         - task
         - present_files
+      skills:
+        - cost-agent
       model: inherit
       max_turns: 10
       timeout_seconds: 600
@@ -237,6 +239,8 @@ subagents:
       disallowed_tools:
         - task
         - present_files
+      skills:
+        - norm-qa
       model: inherit
       max_turns: 10
       timeout_seconds: 600

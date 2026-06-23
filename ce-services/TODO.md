@@ -10,8 +10,12 @@
 > - **Norm-QA（造价规范问答）**：A1–A4 + B1–B2 端到端跑通（✅），**B4 已封装为 deer-flow agent + skill
 >   （norm-qa，放开 ask_clarification 缺版本反问，代码就位待服务器验）**；余检索质量调优 + B3 评测（follow-up）。
 > - **CostAgent P1（选码闭环）**：Step 0–3 + 5 完成、端到端跑通（✅）；**Step 4 选码评测脚本就位，prompt 现浇/
->   预制消歧服务器重测完成（2026-06-23）：Top-1 70→80%、候选内 78→89%、高置信错码 3→2，矩形柱已救回**。
+>   预制消歧服务器重测完成（2026-06-23）：Top-1 70→80%、候选内 78→89%、高置信错码 3→2，矩形柱已救回**；
+>   **P3 已封装 deer-flow agent + skill（cost-agent，缺 spec/描述反问 + HITL 红线，注册层闭环待服务器验）**。
 >   余：扩 gold 稳数字 + 残留 2 错码（矩形梁=召回缺口归知识层 / 过梁=选码细粒度）+ **置信度全 0.95 无区分度（治本）**。
+> - **两 agent 编排层共同待办**：norm-qa / cost-agent 的 HTTP 端点(:8101)均已实测，但 **deer-flow agent 编排层
+>   （gateway :8001 加载 custom_agent + qwen-plus 多轮反问）两条都未在服务器跑过**——下一道共同工序。
+>   注：agent 基座=qwen-plus(DashScope，function-calling 可靠)，生成/选码=Qwen3-8B :8099，已规避 Qwen3 调 skill 不稳的坑。
 >
 > Norm-QA 是从 git 历史**恢复+适配**被删的 hybrid 检索引擎接造价类规范语料（GB 50500/50854/50856、深圳费率/
 > 消耗量标准），与 §2.1「去 RAG」无关（非防火）；ce-code 侧进度见 `../ce-code/TODO.md` 同名章节。
@@ -112,8 +116,15 @@
 ### P2 —— 综合单价组装（⬜ 待办）
 - [ ] `cost/pricing.py`：人材机费 →（`fee_rate` 管理费/利润/风险 + `price_composition` 构成规则）→ 综合单价 → 含税造价，**确定性公式**（LLM 不算钱）。
 
-### P3 —— deer-flow agent + skill（⬜ 待办）
-- [ ] 注册 `cost-agent` + skill：多轮追问（缺 spec / 构件描述时问用户），把端点包成可编排复用能力（同 code-qa/compliance-check 旧模式）。
+### P3 —— deer-flow agent + skill（🟢 注册层闭环，待服务器验多轮）
+- [x] **注册 `cost-agent` + skill**（✅ 2026-06-23，代码就位待服务器验）：对标 norm-qa 三件套——
+  `skills/public/cost-agent/{SKILL.md,cost.py}`（纯 stdlib 薄 HTTP 客户端，打 :8101 /cost/compose；
+  `--spec` 必填无默认 + 客户端版本红线拦非法 spec）；`extensions_config.json` 启用 `cost-agent`；
+  `config.yaml` 注册 `subagents.custom_agents.cost-agent`（**放开 `ask_clarification`**——缺国标版本/
+  构件描述不足时反问澄清，多轮闭环；system_prompt 钉死 HITL 红线：need_review 不当定稿 / no_source 不
+  编价 / 2013 未就绪只出选码 / 不算钱）。本地：cost.py py_compile + 三红线冒烟过（非法 spec / 缺 spec /
+  连接失败）；extensions JSON 合法、config.yaml 缩进对齐 norm-qa（本地无 PyYAML，最终解析待服务器）。
+  **待服务器加载 agent + 走一轮多轮组价验证（缺 spec 追问 → 选码 → 组价）。**
 
 ---
 

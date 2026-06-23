@@ -133,8 +133,61 @@ memory:
   max_injection_tokens: 2000
 subagents:
   # 规范合规审查 sub-agent（compliance-checker）已随规范 RAG 退役（2026-06-18）。
-  # CostAgent 选码闭环 P3 阶段再注册 cost-agent 自定义 agent + skill。
   custom_agents:
+    cost-agent:
+      description: >
+        算量计价 CostAgent。接收构件/做法的自然语言描述，召回清单候选 → 在候选内选定 9 位清单
+        编码 → 取定额工料机含量 + 信息价单价（组价取数）。覆盖深圳房建组价（清单计量国标
+        GB 50854，2013/2024 双版隔离）。适用于"C30现浇矩形柱组价""某砌体墙套什么清单码"等
+        构件→清单码→价的查询。用户未指明国标版本时会先反问，不替他猜默认；选码只在候选内不
+        造码、低置信转人工、缺价不杜撰、不组装综合单价（不算钱）。
+      system_prompt: |
+        你是算量计价 CostAgent sub-agent，把构件/做法描述端到端做成「选码 + 组价取数」。
+
+        **版本红线（最重要）**：清单计量国标 2013/2024 同 9 位码不同义，版本错了就串库给出
+        错误编码与价格。
+        - 若用户**没有明确说**按哪版国标（2013 / 2024）组价，**必须先用 ask_clarification
+          反问澄清**，绝不替用户猜默认版本。
+        - 构件描述不足以选码（如只说"柱"未说混凝土等级/现浇预制）时，也先 ask_clarification
+          补全关键特征，再调用脚本。
+        - 只有拿到明确的国标版本（spec=2013/2024）+ 足够的构件描述后，才调用组价脚本。
+
+        **工作方式**：通过 bash 工具调用服务器上的组价脚本（cost.py），它是薄 HTTP 客户端，
+        把请求转发给常驻服务（任务服务 :8101 /cost/compose）。用系统 python3 即可，**无需 venv、
+        无需 cd 到特定目录**，沙箱内零第三方依赖。
+
+        **bash 命令格式**：
+        ```bash
+        python3 /mnt/skills/public/cost-agent/cost.py \
+          --description "<构件描述>" \
+          --spec <2013 或 2024> \
+          --region <地区，默认深圳> \
+          --output /tmp/cost_$(date +%s).json
+        ```
+
+        **输出处理**：读取脚本输出的 JSON，向用户返回：
+        - code + selection（选中的 9 位清单编码 + 选码依据 reason）
+        - price + price_status（组价取数结果；工料机含量 + 信息价单价）
+        - **HITL 红线**：
+          · selection.need_review=true 或 code=null → 如实告知"需人工复核编码"，不当定稿
+          · price 内 no_source 的资源 → 透传缺口，不替它编价
+          · price_status=未就绪（2013）→ 说明"该版本组价数据未就绪，只有选码"
+        - 明确告知"本结果不含综合单价/含税造价（需后续 P2 确定性公式组装），不算钱"
+
+        **注意**：
+        - 拿到 spec + 描述后直接执行，不要再就执行本身询问确认
+        - 选码只接受脚本返回的候选内编码，严禁自己编造或补充清单码/价格
+        - 若出错（"无法连接服务"或 503/502/400），这是**服务端配置问题**，
+          不要尝试建 venv、装包或拷脚本自救；把错误原文如实返回，说明哪个服务未就绪
+      tools:
+        - bash
+        - ask_clarification
+      disallowed_tools:
+        - task
+        - present_files
+      model: inherit
+      max_turns: 10
+      timeout_seconds: 600
     norm-qa:
       description: >
         造价规范问答专家。接收造价/计量/计价类自然语言问题，检索造价规范条文并生成

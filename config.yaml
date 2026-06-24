@@ -246,7 +246,7 @@ subagents:
       max_turns: 10
       timeout_seconds: 600
 agents_api:
-  enabled: false
+  enabled: true
 skill_evolution:
   enabled: false
   moderation_model_name: null

@@ -1,6 +1,7 @@
 import type { Message } from "@langchain/langgraph-sdk";
 import {
   BookOpenTextIcon,
+  ChevronDownIcon,
   CoinsIcon,
   FolderOpenIcon,
   GlobeIcon,
@@ -17,7 +18,6 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ChainOfThought,
   ChainOfThoughtContent,
-  ChainOfThoughtHeader,
   ChainOfThoughtSearchResult,
   ChainOfThoughtSearchResults,
   ChainOfThoughtStep,
@@ -210,9 +210,20 @@ export function MessageGroup({
       open={open}
       onOpenChange={setOpen}
     >
-      <ChainOfThoughtHeader icon={<LightbulbIcon className="size-4" />}>
-        {t.common.thinking}
-      </ChainOfThoughtHeader>
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="text-muted-foreground hover:text-foreground flex items-center gap-1.5 text-sm transition-colors"
+      >
+        <LightbulbIcon className="size-4" />
+        <span>{t.common.thinking}</span>
+        <ChevronDownIcon
+          className={cn(
+            "size-4 transition-transform",
+            open ? "rotate-180" : "rotate-0",
+          )}
+        />
+      </button>
       <ChainOfThoughtContent className="pb-2">
         {steps.flatMap((step, index) => {
           const nodes: React.ReactNode[] = [

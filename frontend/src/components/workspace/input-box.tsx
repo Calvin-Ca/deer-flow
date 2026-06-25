@@ -480,7 +480,7 @@ export function InputBox({
       )}
       <PromptInput
         className={cn(
-          "border-border/60 bg-background/85 rounded-2xl border shadow-lg shadow-black/[0.04] backdrop-blur-sm transition-all duration-300 ease-out *:data-[slot='input-group']:items-stretch *:data-[slot='input-group']:rounded-2xl",
+          "border-border/60 bg-background/85 rounded-2xl border shadow-lg shadow-black/[0.04] backdrop-blur-sm transition-all duration-300 ease-out *:data-[slot='input-group']:rounded-2xl",
           className,
         )}
         disabled={disabled}
@@ -501,7 +501,7 @@ export function InputBox({
         </PromptInputAttachments>
         <PromptInputBody className="absolute top-0 right-0 left-0 z-3">
           <PromptInputTextarea
-            className={cn("size-full min-w-full")}
+            className={cn("size-full")}
             disabled={disabled}
             placeholder={t.inputBox.placeholder}
             autoFocus={autoFocus}

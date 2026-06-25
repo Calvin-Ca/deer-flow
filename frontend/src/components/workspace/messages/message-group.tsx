@@ -1,7 +1,7 @@
 import type { Message } from "@langchain/langgraph-sdk";
 import {
   BookOpenTextIcon,
-  ChevronDownIcon,
+  ChevronRightIcon,
   CoinsIcon,
   FolderOpenIcon,
   GlobeIcon,
@@ -13,7 +13,7 @@ import {
   SquareTerminalIcon,
   WrenchIcon,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 import {
   ChainOfThought,
@@ -54,14 +54,10 @@ export function MessageGroup({
   showTokenDebugSummaries?: boolean;
 }) {
   const { t } = useI18n();
-  // Claude 式：过程随流式默认展开，完成后自动折叠成一行摘要（用户仍可手动展开）。
+  // 中间过程默认折叠成一行摘要，用户可手动展开；流式期间也保持折叠。
   // demo 模式（静态站）保持常开。
   const isDemo = env.NEXT_PUBLIC_STATIC_WEBSITE_ONLY === "true";
-  const [open, setOpen] = useState(isLoading || isDemo);
-  useEffect(() => {
-    if (isDemo) return;
-    setOpen(isLoading);
-  }, [isLoading, isDemo]);
+  const [open, setOpen] = useState(isDemo);
   const steps = useMemo(() => convertToSteps(messages), [messages]);
   const debugStepByMessageId = useMemo(
     () =>
@@ -217,10 +213,10 @@ export function MessageGroup({
       >
         <LightbulbIcon className="size-4" />
         <span>{t.common.thinking}</span>
-        <ChevronDownIcon
+        <ChevronRightIcon
           className={cn(
             "size-4 transition-transform",
-            open ? "rotate-180" : "rotate-0",
+            open ? "rotate-90" : "rotate-0",
           )}
         />
       </button>

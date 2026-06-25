@@ -290,39 +290,28 @@ export function MessageList({
             );
           } else if (group.type === "assistant") {
             return (
-              <div
-                key={group.id}
-                className="group/assistant-turn flex w-full gap-3"
-              >
-                <div
-                  aria-hidden="true"
-                  className="border-border/70 text-foreground/70 mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full border font-serif text-xs leading-none select-none"
-                >
-                  M
-                </div>
-                <div className="min-w-0 flex-1">
-                  {group.messages.map((msg) => (
-                    <MessageListItem
-                      key={`${group.id}/${msg.id}`}
-                      message={msg}
-                      isLoading={thread.isLoading}
-                      threadId={threadId}
-                      showCopyButton={false}
-                    />
-                  ))}
-                  {renderTokenUsage({
-                    messages: group.messages,
-                    turnUsageMessages,
-                  })}
-                  {renderAssistantCopyButton(group.messages)}
-                </div>
+              <div key={group.id} className="group/assistant-turn w-full">
+                {group.messages.map((msg) => (
+                  <MessageListItem
+                    key={`${group.id}/${msg.id}`}
+                    message={msg}
+                    isLoading={thread.isLoading}
+                    threadId={threadId}
+                    showCopyButton={false}
+                  />
+                ))}
+                {renderTokenUsage({
+                  messages: group.messages,
+                  turnUsageMessages,
+                })}
+                {renderAssistantCopyButton(group.messages)}
               </div>
             );
           } else if (group.type === "assistant:clarification") {
             const message = group.messages[0];
             if (message && hasContent(message)) {
               return (
-                <div key={group.id} className="w-full pl-9">
+                <div key={group.id} className="w-full">
                   <MarkdownContent
                     content={extractContentFromMessage(message)}
                     isLoading={thread.isLoading}
@@ -345,7 +334,7 @@ export function MessageList({
               }
             }
             return (
-              <div className="w-full pl-9" key={group.id}>
+              <div className="w-full" key={group.id}>
                 {group.messages[0] && hasContent(group.messages[0]) && (
                   <MarkdownContent
                     content={extractContentFromMessage(group.messages[0])}
@@ -437,7 +426,7 @@ export function MessageList({
             return (
               <div
                 key={"subtask-group-" + group.id}
-                className="relative z-1 flex flex-col gap-2 pl-9"
+                className="relative z-1 flex flex-col gap-2"
               >
                 {results}
                 {renderTokenUsage({
@@ -449,7 +438,7 @@ export function MessageList({
             );
           }
           return (
-            <div key={"group-" + group.id} className="w-full pl-9">
+            <div key={"group-" + group.id} className="w-full">
               <MessageGroup
                 messages={group.messages}
                 isLoading={thread.isLoading}
@@ -468,7 +457,7 @@ export function MessageList({
             </div>
           );
         })}
-        {thread.isLoading && <StreamingIndicator className="my-4 pl-9" />}
+        {thread.isLoading && <StreamingIndicator className="my-4" />}
         <div style={{ height: `${paddingBottom}px` }} />
       </ConversationContent>
       <ConversationScrollButton className="bottom-2 shadow-md" />

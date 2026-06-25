@@ -63,6 +63,33 @@ def get_available_tools(
     Returns:
         List of available tools.
     """
+    # Config 工具加载
+    # 下面的 group 就是config.yaml中的group, 
+    # deer-flow 的工具被分成 4 组:web / file:read / file:write / bash。group 本身不影响工具功能,纯粹是给"按组筛选"用的分类键
+    # 保留 tool.group 落在 groups 列表里的工具。groups=None 表示不筛、全要,默认 lead agent:groups=None → 拿全部工具
+# ┌──────────────┬────────────┬────────────────────────┬────────────────────────────────────────────────────┐
+# │     工具     │   group    │          实现          │                        作用                        │
+# ├──────────────┼────────────┼────────────────────────┼────────────────────────────────────────────────────┤
+# │ web_search   │ web        │ community.ddg_search   │ DuckDuckGo 网页搜索(默认 5 条)                     │
+# ├──────────────┼────────────┼────────────────────────┼────────────────────────────────────────────────────┤
+# │ web_fetch    │ web        │ community.jina_ai      │ 经 Jina reader 抓网页正文                          │
+# ├──────────────┼────────────┼────────────────────────┼────────────────────────────────────────────────────┤
+# │ image_search │ web        │ community.image_search │ 图片搜索                                           │
+# ├──────────────┼────────────┼────────────────────────┼────────────────────────────────────────────────────┤
+# │ ls           │ file:read  │ sandbox.tools          │ 目录列举(tree,≤2 层)                               │
+# ├──────────────┼────────────┼────────────────────────┼────────────────────────────────────────────────────┤
+# │ read_file    │ file:read  │ sandbox.tools          │ 读文件(可指定行范围)                               │
+# ├──────────────┼────────────┼────────────────────────┼────────────────────────────────────────────────────┤
+# │ glob         │ file:read  │ sandbox.tools          │ 按通配符找文件                                     │
+# ├──────────────┼────────────┼────────────────────────┼────────────────────────────────────────────────────┤
+# │ grep         │ file:read  │ sandbox.tools          │ 内容搜索                                           │
+# ├──────────────┼────────────┼────────────────────────┼────────────────────────────────────────────────────┤
+# │ write_file   │ file:write │ sandbox.tools          │ 写/追加文件,自动建目录                             │
+# ├──────────────┼────────────┼────────────────────────┼────────────────────────────────────────────────────┤
+# │ str_replace  │ file:write │ sandbox.tools          │ 子串替换(单个/全部)                                │
+# ├──────────────┼────────────┼────────────────────────┼────────────────────────────────────────────────────┤
+# │ bash         │ bash       │ sandbox.tools          │ 执行命令(LocalSandbox 下默认被剔除,见 tools.py:70) │
+# └──────────────┴────────────┴────────────────────────┴────────────────────────────────────────────────────┘
     config = app_config or get_app_config()
     tool_configs = [tool for tool in config.tools if groups is None or tool.group in groups]
 
@@ -87,6 +114,31 @@ def get_available_tools(
 
     loaded_tools = [_ensure_sync_invocable_tool(t) for _, t in loaded_tools_raw]
 
+    # 内置工具
+    # 始终有:
+    # ┌───────────────────┬──────────────────────────────────────────────────────────┐
+    # │       工具        │                           作用                           │
+    # ├───────────────────┼──────────────────────────────────────────────────────────┤
+    # │ present_files     │ 把产物文件暴露给用户(限 /mnt/user-data/outputs)          │
+    # ├───────────────────┼──────────────────────────────────────────────────────────┤
+    # │ ask_clarification │ 向用户提澄清问题(被 ClarificationMiddleware 拦截 → 中断) │
+    # └───────────────────┴──────────────────────────────────────────────────────────┘
+    # 条件追加(tools.py:91-111):
+    # ┌───────────────────┬────────────────────────────────────────────────────────┐
+    # │       工具        │                        触发条件                        │
+    # ├───────────────────┼────────────────────────────────────────────────────────┤
+    # │ skill_manage_tool │ skill_evolution.enabled                                │
+    # ├───────────────────┼────────────────────────────────────────────────────────┤
+    # │ task              │ subagent_enabled=True(委派子代理,即你前面问的那个)     │
+    # ├───────────────────┼────────────────────────────────────────────────────────┤
+    # │ view_image        │ 当前模型 supports_vision=True                          │
+    # ├───────────────────┼────────────────────────────────────────────────────────┤
+    # │ tool_search       │ MCP 启用 且 tool_search.enabled(用于延迟暴露 MCP 工具) │
+    # ├───────────────────┼────────────────────────────────────────────────────────┤
+    # │ setup_agent       │ 仅 bootstrap 态(新建自定义 agent 时)                   │
+    # ├───────────────────┼────────────────────────────────────────────────────────┤
+    # │ update_agent      │ 自定义 agent 在普通对话里自我更新时                    │
+    # └───────────────────┴─────────────────────────────────────────
     # Conditionally add tools based on config
     builtin_tools = BUILTIN_TOOLS.copy()
     skill_evolution_config = getattr(config, "skill_evolution", None)
@@ -110,6 +162,8 @@ def get_available_tools(
         builtin_tools.append(view_image_tool)
         logger.info(f"Including view_image_tool for model '{model_name}' (supports_vision=True)")
 
+    # MCP 工具
+    # 动态、不固定——取决于你在 extensions_config.json 里启用了哪些 MCP server,每个 server 展开成若干工具。
     # Get cached MCP tools if enabled
     # NOTE: We use ExtensionsConfig.from_file() instead of config.extensions
     # to always read the latest configuration from disk. This ensures that changes
@@ -183,6 +237,7 @@ def get_available_tools(
         except Exception as e:
             logger.error(f"Failed to get cached MCP tools: {e}")
 
+    # ACP 工具
     # Add invoke_acp_agent tool if any ACP agents are configured
     acp_tools: list[BaseTool] = []
     try:

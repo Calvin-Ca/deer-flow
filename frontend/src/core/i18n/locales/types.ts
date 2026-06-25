@@ -48,7 +48,10 @@ export interface Translations {
 
   // Welcome
   welcome: {
-    greeting: string;
+    greeting: (
+      name: string,
+      period: "morning" | "afternoon" | "evening",
+    ) => string;
     description: string;
     createYourOwnSkill: string;
     createYourOwnSkillDescription: string;

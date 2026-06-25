@@ -314,7 +314,7 @@ function MessageContent_({
       <div className={cn("ml-auto flex flex-col gap-2", className)}>
         {filesList}
         {messageResponse && (
-          <AIElementMessageContent className="w-fit">
+          <AIElementMessageContent className="w-fit max-w-[85%] rounded-2xl px-4 py-2.5">
             {messageResponse}
           </AIElementMessageContent>
         )}
@@ -329,7 +329,7 @@ function MessageContent_({
         content={contentToDisplay}
         isLoading={isLoading}
         rehypePlugins={[...rehypePlugins, [rehypeKatex, { output: "html" }]]}
-        className="my-3"
+        className="my-3 leading-7 [&_h1]:mt-8 [&_h1]:mb-4 [&_h2]:mt-8 [&_h2]:mb-3 [&_h3]:mt-6 [&_h3]:mb-2 [&_li]:my-1 [&_ol]:my-4 [&_p]:my-4 [&_ul]:my-4"
         components={components}
       />
     </AIElementMessageContent>

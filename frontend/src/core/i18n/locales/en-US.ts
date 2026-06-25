@@ -60,7 +60,15 @@ export const enUS: Translations = {
 
   // Welcome
   welcome: {
-    greeting: "Hello, again!",
+    greeting: (name, period) => {
+      const word =
+        period === "morning"
+          ? "Good morning"
+          : period === "afternoon"
+            ? "Good afternoon"
+            : "Good evening";
+      return name ? `${word}, ${name}` : word;
+    },
     description: "",
 
     createYourOwnSkill: "Create Your Own Skill",

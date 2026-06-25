@@ -60,7 +60,15 @@ export const zhCN: Translations = {
 
   // Welcome
   welcome: {
-    greeting: "",
+    greeting: (name, period) => {
+      const word =
+        period === "morning"
+          ? "早上好"
+          : period === "afternoon"
+            ? "下午好"
+            : "晚上好";
+      return name ? `${word}，${name}` : word;
+    },
     description: "",
 
     createYourOwnSkill: "创建你自己的 Agent SKill",

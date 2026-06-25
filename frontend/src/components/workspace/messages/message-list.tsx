@@ -260,7 +260,7 @@ export function MessageList({
     <Conversation
       className={cn("flex size-full flex-col justify-center", className)}
     >
-      <ConversationContent className="mx-auto w-full max-w-(--container-width-md) gap-8 pt-8">
+      <ConversationContent className="mx-auto w-full max-w-(--container-width-md) gap-10 pt-8">
         <LoadMoreHistoryIndicator
           isLoading={isHistoryLoading}
           hasMore={hasMoreHistory}
@@ -278,6 +278,14 @@ export function MessageList({
                   group.type === "assistant" && "group/assistant-turn",
                 )}
               >
+                {group.type === "assistant" && (
+                  <div
+                    aria-hidden="true"
+                    className="text-background bg-foreground mb-3 flex size-6 items-center justify-center rounded-md font-serif text-xs leading-none font-bold"
+                  >
+                    M
+                  </div>
+                )}
                 {group.messages.map((msg) => {
                   return (
                     <MessageListItem

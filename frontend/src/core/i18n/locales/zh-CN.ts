@@ -61,8 +61,7 @@ export const zhCN: Translations = {
   // Welcome
   welcome: {
     greeting: "",
-    description:
-      "欢迎使用 MAgent，一个完全开源的超级智能体。通过内置和自定义的 Skills，\nMAgent 可以帮你搜索网络、分析数据，还能为你生成幻灯片、\n图片、视频、播客及网页等，几乎可以做任何事情。",
+    description: "",
 
     createYourOwnSkill: "创建你自己的 Agent SKill",
     createYourOwnSkillDescription:

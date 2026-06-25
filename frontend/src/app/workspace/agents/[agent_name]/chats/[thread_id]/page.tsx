@@ -198,11 +198,8 @@ export default function AgentChatPage() {
             >
               <div
                 className={cn(
-                  "relative w-full",
+                  "relative w-full max-w-(--container-width-md)",
                   isWelcomeMode && "-translate-y-[calc(50vh-96px)]",
-                  isWelcomeMode
-                    ? "max-w-(--container-width-sm)"
-                    : "max-w-(--container-width-md)",
                 )}
               >
                 {hasTodos && (

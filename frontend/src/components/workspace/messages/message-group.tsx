@@ -1,7 +1,6 @@
 import type { Message } from "@langchain/langgraph-sdk";
 import {
   BookOpenTextIcon,
-  ChevronUp,
   CoinsIcon,
   FolderOpenIcon,
   GlobeIcon,
@@ -13,17 +12,17 @@ import {
   SquareTerminalIcon,
   WrenchIcon,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
   ChainOfThought,
   ChainOfThoughtContent,
+  ChainOfThoughtHeader,
   ChainOfThoughtSearchResult,
   ChainOfThoughtSearchResults,
   ChainOfThoughtStep,
 } from "@/components/ai-elements/chain-of-thought";
 import { CodeBlock } from "@/components/ai-elements/code-block";
-import { Button } from "@/components/ui/button";
 import { useI18n } from "@/core/i18n/hooks";
 import { formatTokenCount } from "@/core/messages/usage";
 import type { TokenDebugStep } from "@/core/messages/usage-model";
@@ -37,7 +36,6 @@ import { env } from "@/env";
 import { cn } from "@/lib/utils";
 
 import { useArtifacts } from "../artifacts";
-import { FlipDisplay } from "../flip-display";
 import { Tooltip } from "../tooltip";
 
 import { MarkdownContent } from "./markdown-content";
@@ -56,12 +54,14 @@ export function MessageGroup({
   showTokenDebugSummaries?: boolean;
 }) {
   const { t } = useI18n();
-  const [showAbove, setShowAbove] = useState(
-    env.NEXT_PUBLIC_STATIC_WEBSITE_ONLY === "true",
-  );
-  const [showLastThinking, setShowLastThinking] = useState(
-    env.NEXT_PUBLIC_STATIC_WEBSITE_ONLY === "true",
-  );
+  // Claude 式：过程随流式默认展开，完成后自动折叠成一行摘要（用户仍可手动展开）。
+  // demo 模式（静态站）保持常开。
+  const isDemo = env.NEXT_PUBLIC_STATIC_WEBSITE_ONLY === "true";
+  const [open, setOpen] = useState(isLoading || isDemo);
+  useEffect(() => {
+    if (isDemo) return;
+    setOpen(isLoading);
+  }, [isLoading, isDemo]);
   const steps = useMemo(() => convertToSteps(messages), [messages]);
   const debugStepByMessageId = useMemo(
     () =>
@@ -89,22 +89,6 @@ export function MessageGroup({
     const filteredSteps = steps.filter((step) => step.type === "toolCall");
     return filteredSteps[filteredSteps.length - 1];
   }, [steps]);
-  const aboveLastToolCallSteps = useMemo(() => {
-    if (lastToolCallStep) {
-      const index = steps.indexOf(lastToolCallStep);
-      return steps.slice(0, index);
-    }
-    return [];
-  }, [lastToolCallStep, steps]);
-  const lastReasoningStep = useMemo(() => {
-    if (lastToolCallStep) {
-      const index = steps.indexOf(lastToolCallStep);
-      return steps.slice(index + 1).find((step) => step.type === "reasoning");
-    } else {
-      const filteredSteps = steps.filter((step) => step.type === "reasoning");
-      return filteredSteps[filteredSteps.length - 1];
-    }
-  }, [lastToolCallStep, steps]);
   const rehypePlugins = useRehypeSplitWordsIntoSpans(isLoading);
   const firstEligibleDebugSummaryStepIndexByMessageId = useMemo(() => {
     const firstIndices = new Map<string, number>();
@@ -220,138 +204,42 @@ export function MessageGroup({
     );
   };
 
-  const lastReasoningDebugStep =
-    showTokenDebugSummaries && lastReasoningStep?.messageId
-      ? debugStepByMessageId.get(lastReasoningStep.messageId)
-      : undefined;
-
   return (
     <ChainOfThought
-      className={cn("w-full gap-2", className)}
-      open={true}
+      className={cn("w-full", className)}
+      open={open}
+      onOpenChange={setOpen}
     >
-      {aboveLastToolCallSteps.length > 0 && (
-        <Button
-          key="above"
-          className="w-full items-start justify-start text-left"
-          variant="ghost"
-          onClick={() => setShowAbove(!showAbove)}
-        >
-          <ChainOfThoughtStep
-            label={
-              <span className="opacity-60">
-                {showAbove
-                  ? t.toolCalls.lessSteps
-                  : t.toolCalls.moreSteps(aboveLastToolCallSteps.length)}
-              </span>
-            }
-            icon={
-              <ChevronUp
-                className={cn(
-                  "size-4 opacity-60 transition-transform duration-200",
-                  showAbove ? "rotate-180" : "",
-                )}
-              />
-            }
-          ></ChainOfThoughtStep>
-        </Button>
-      )}
-      {lastToolCallStep && (
-        <ChainOfThoughtContent className="px-4 pb-2">
-          {showAbove &&
-            aboveLastToolCallSteps.flatMap((step) => {
-              const stepIndex = steps.indexOf(step);
-              if (step.type === "reasoning") {
-                return [
-                  renderDebugSummary(step.messageId, stepIndex),
-                  <ChainOfThoughtStep
-                    key={step.id}
-                    label={
-                      <MarkdownContent
-                        content={step.reasoning ?? ""}
-                        isLoading={isLoading}
-                        rehypePlugins={rehypePlugins}
-                      />
-                    }
-                  ></ChainOfThoughtStep>,
-                ];
-              }
-
-              return [
-                renderDebugSummary(step.messageId, stepIndex),
-                renderToolCall(step),
-              ];
-            })}
-          {renderDebugSummary(
-            lastToolCallStep.messageId,
-            steps.indexOf(lastToolCallStep),
-          )}
-          {lastToolCallStep && (
-            <FlipDisplay uniqueKey={lastToolCallStep.id ?? ""}>
-              {renderToolCall(lastToolCallStep, { isLast: true })}
-            </FlipDisplay>
-          )}
-        </ChainOfThoughtContent>
-      )}
-      {lastReasoningStep && (
-        <>
-          {renderDebugSummary(
-            lastReasoningStep.messageId,
-            steps.indexOf(lastReasoningStep),
-          )}
-          <Button
-            key={lastReasoningStep.id}
-            className="w-full items-start justify-start text-left"
-            variant="ghost"
-            onClick={() => setShowLastThinking(!showLastThinking)}
-          >
-            <div className="flex w-full items-center justify-between">
+      <ChainOfThoughtHeader icon={<LightbulbIcon className="size-4" />}>
+        {t.common.thinking}
+      </ChainOfThoughtHeader>
+      <ChainOfThoughtContent className="pb-2">
+        {steps.flatMap((step, index) => {
+          const nodes: React.ReactNode[] = [
+            renderDebugSummary(step.messageId, index),
+          ];
+          if (step.type === "reasoning") {
+            nodes.push(
               <ChainOfThoughtStep
-                className="font-normal"
-                label={
-                  <DebugStepLabel
-                    label={t.common.thinking}
-                    token={shouldInlineThinkingToken({
-                      debugStep: lastReasoningDebugStep,
-                      toolCallCount: lastReasoningStep.messageId
-                        ? (toolCallCountByMessageId.get(
-                            lastReasoningStep.messageId,
-                          ) ?? 0)
-                        : 0,
-                      enabled: showTokenDebugSummaries,
-                      thinkingLabel: t.common.thinking,
-                      t,
-                    })}
-                  />
-                }
+                key={step.id}
                 icon={LightbulbIcon}
-              ></ChainOfThoughtStep>
-              <div>
-                <ChevronUp
-                  className={cn(
-                    "text-muted-foreground size-4",
-                    showLastThinking ? "" : "rotate-180",
-                  )}
-                />
-              </div>
-            </div>
-          </Button>
-          {showLastThinking && (
-            <ChainOfThoughtContent className="px-4 pb-2">
-              <ChainOfThoughtStep
-                key={lastReasoningStep.id}
                 label={
                   <MarkdownContent
-                    content={lastReasoningStep.reasoning ?? ""}
+                    content={step.reasoning ?? ""}
                     isLoading={isLoading}
                     rehypePlugins={rehypePlugins}
                   />
                 }
-              ></ChainOfThoughtStep>
-            </ChainOfThoughtContent>
-          )}
-        </>
-      )}
+              />,
+            );
+          } else {
+            nodes.push(
+              renderToolCall(step, { isLast: step === lastToolCallStep }),
+            );
+          }
+          return nodes;
+        })}
+      </ChainOfThoughtContent>
     </ChainOfThought>
   );
 }
@@ -363,32 +251,6 @@ function formatDebugToken(
   return debugStep.usage
     ? `${formatTokenCount(debugStep.usage.totalTokens)} ${t.tokenUsage.label}`
     : t.tokenUsage.unavailableShort;
-}
-
-function shouldInlineThinkingToken({
-  debugStep,
-  toolCallCount,
-  enabled,
-  thinkingLabel,
-  t,
-}: {
-  debugStep?: TokenDebugStep;
-  toolCallCount: number;
-  enabled: boolean;
-  thinkingLabel: string;
-  t: ReturnType<typeof useI18n>["t"];
-}) {
-  if (
-    !enabled ||
-    !debugStep ||
-    debugStep.sharedAttribution ||
-    toolCallCount > 0 ||
-    debugStep.label !== thinkingLabel
-  ) {
-    return null;
-  }
-
-  return formatDebugToken(debugStep, t);
 }
 
 function DebugStepLabel({

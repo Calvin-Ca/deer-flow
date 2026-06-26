@@ -423,9 +423,11 @@ LangSmith and Langfuse are both supported. The wiring lives in two layers:
 | `langfuse_session_id` | LangGraph `thread_id`                         |
 | `langfuse_user_id`    | `get_effective_user_id()` (`default` in no-auth) |
 | `langfuse_trace_name` | `RunRecord.assistant_id` / client `agent_name` (defaults to `lead-agent`) |
-| `langfuse_tags`       | `env:<DEER_FLOW_ENV>` + `model:<model_name>`  |
+| `langfuse_tags`       | `env:<DEER_FLOW_ENV>` + `model:<model_name>` + `variant:<prompt_variant>` |
 
-Returns `{}` when Langfuse is not in the enabled providers — LangSmith-only deployments are unaffected. Set `DEER_FLOW_ENV` (or `ENVIRONMENT`) to tag traces by deployment environment. Tests live in `tests/test_tracing_factory.py`, `tests/test_tracing_metadata.py`, `tests/test_worker_langfuse_metadata.py`, and `tests/test_client_langfuse_metadata.py`.
+Returns `{}` when Langfuse is not in the enabled providers — LangSmith-only deployments are unaffected. Set `DEER_FLOW_ENV` (or `ENVIRONMENT`) to tag traces by deployment environment.
+
+**Prompt-variant tagging**: `resolve_active_prompt_variant(app_config)` derives a short label from the active `lead_agent.system_prompt_path` (file stem, or `default` for the built-in template). `inject_langfuse_metadata(..., variant=...)` writes it **provider-agnostically** — `config["metadata"]["variant"]` plus a `variant:<label>` entry in `config["tags"]` (both read by LangSmith) — so the label lands even on LangSmith-only deployments where the Langfuse block no-ops; for Langfuse the same label also flows through `langfuse_tags`. This lets prompt-ablation runs and production traffic be filtered/grouped by prompt version directly in the tracing UI, decoupling request generation from offline scoring. Tests live in `tests/test_tracing_factory.py`, `tests/test_tracing_metadata.py`, `tests/test_worker_langfuse_metadata.py`, and `tests/test_client_langfuse_metadata.py`.
 
 ### Config Schema
 
@@ -436,6 +438,7 @@ Returns `{}` when Langfuse is not in the enabled providers — LangSmith-only de
 - `tool_groups[]` - Logical groupings for tools
 - `sandbox.use` - Sandbox provider class path
 - `skills.path` / `skills.container_path` - Host and container paths to skills directory
+- `lead_agent.system_prompt_path` - Optional path to a system-prompt template file for the default lead agent (relative to project root or absolute). `null` (default) uses the built-in `SYSTEM_PROMPT_TEMPLATE`. Resolved per request in `apply_prompt_template()` via `_resolve_system_prompt_template()`, so editing it swaps the prompt variant on the next message (hot-reloadable; no restart). A missing/unreadable file logs a warning and falls back to the built-in default. The override file may only use `{placeholders}` that are a subset of `apply_prompt_template`'s format kwargs.
 - `title` - Auto-title generation (enabled, max_words, max_chars, prompt_template)
 - `summarization` - Context summarization (enabled, trigger conditions, keep policy)
 - `subagents.enabled` - Master switch for subagent delegation

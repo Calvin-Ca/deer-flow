@@ -15,6 +15,7 @@ from deerflow.config.checkpointer_config import CheckpointerConfig, load_checkpo
 from deerflow.config.database_config import DatabaseConfig
 from deerflow.config.extensions_config import ExtensionsConfig
 from deerflow.config.guardrails_config import GuardrailsConfig, load_guardrails_config_from_dict
+from deerflow.config.lead_agent_config import LeadAgentConfig
 from deerflow.config.loop_detection_config import LoopDetectionConfig
 from deerflow.config.memory_config import MemoryConfig, load_memory_config_from_dict
 from deerflow.config.model_config import ModelConfig
@@ -90,6 +91,7 @@ class AppConfig(BaseModel):
     tools: list[ToolConfig] = Field(default_factory=list, description="Available tools")
     tool_groups: list[ToolGroupConfig] = Field(default_factory=list, description="Available tool groups")
     skills: SkillsConfig = Field(default_factory=SkillsConfig, description="Skills configuration")
+    lead_agent: LeadAgentConfig = Field(default_factory=LeadAgentConfig, description="Lead-agent configuration (system prompt template override)")
     skill_evolution: SkillEvolutionConfig = Field(default_factory=SkillEvolutionConfig, description="Agent-managed skill evolution configuration")
     extensions: ExtensionsConfig = Field(default_factory=ExtensionsConfig, description="Extensions configuration (MCP servers and skills state)")
     tool_search: ToolSearchConfig = Field(default_factory=ToolSearchConfig, description="Tool search / deferred loading configuration")

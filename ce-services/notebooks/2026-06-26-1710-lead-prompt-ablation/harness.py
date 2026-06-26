@@ -5,10 +5,12 @@
 「路由率 / 红线遵守率 / web 兜底率 / 越界拒答率」四项编排层指标，产出逐变体指标表与
 逐条 trace，供 PROBLEM.md 第 6 节「提示词优化」候选方案做 A/B 选型。
 
-变体切换机制：monkeypatch `deerflow.agents.lead_agent.prompt.SYSTEM_PROMPT_TEMPLATE`
-（模块全局，被 `apply_prompt_template()` 读取）+ `DeerFlowClient.reset_agent()` 强制
-重建 agent。三个变体的占位符集都是当前 `apply_prompt_template` 已在传的 kwargs 子集，
-故可被同一框架直接 format。
+变体切换机制：复用**生产同款**配置开关——把 `get_app_config().lead_agent.system_prompt_path`
+指向当前变体文件 + `DeerFlowClient.reset_agent()` 强制重建 agent。`apply_prompt_template()`
+内的 `_resolve_system_prompt_template()` 会按该路径读模板（app_config 为 None 时回退全局
+单例，故 DeerFlowClient 路径同样生效）。这条路径与正式环境改 config.yaml 切版本完全一致，
+不再 monkeypatch 框架内部。三个变体的占位符集都是当前 `apply_prompt_template` 已在传的
+kwargs 子集，故可被同一框架直接 format。
 
 判定口径（基于 `DeerFlowClient.stream` 的 StreamEvent）：
 - clarified  = 出现 name=="ask_clarification" 的 tool call
@@ -32,17 +34,19 @@ WEB_TOOLS = {"web_search", "web_fetch", "image_search"}
 SCRIPT_MARKERS = ("qa.py", "cost.py")
 
 
-def load_variants(prompts_dir: Path) -> dict[str, str]:
+def load_variants(prompts_dir: Path) -> dict[str, Path]:
     """加载 prompts/ 目录下的全部提示词变体。
 
     参数：
         prompts_dir: 存放 v*_*.txt 变体文件的目录。
     返回：
-        {变体名(去扩展名): 模板原文字符串}，按文件名排序，保证 v0/v1/v2 顺序稳定。
+        {变体名(去扩展名): 变体文件路径}，按文件名排序，保证 v0/v1/v2 顺序稳定。
+        返回路径而非原文：切变体走 config.lead_agent.system_prompt_path（生产同款），
+        由框架自己读文件，harness 不再持有/注入模板文本。
     """
-    variants: dict[str, str] = {}
+    variants: dict[str, Path] = {}
     for path in sorted(prompts_dir.glob("*.txt")):
-        variants[path.stem] = path.read_text(encoding="utf-8")
+        variants[path.stem] = path.resolve()
     if not variants:
         raise FileNotFoundError(f"未在 {prompts_dir} 找到任何 *.txt 提示词变体")
     return variants
@@ -64,20 +68,21 @@ def load_eval(path: Path) -> list[dict]:
     return cases
 
 
-def _apply_variant(template: str, client) -> None:
-    """把某个提示词变体注入框架并重建 agent。
+def _apply_variant(variant_path: Path, client) -> None:
+    """把某个提示词变体经生产同款配置开关注入框架并重建 agent。
 
     参数：
-        template: 变体模板原文（含 {agent_name} 等占位符）。
-        client:   DeerFlowClient 实例，注入后调用其 reset_agent() 生效。
+        variant_path: 变体模板文件路径。
+        client:       DeerFlowClient 实例，注入后调用其 reset_agent() 生效。
     返回：
-        无（副作用：改写 prompt 模块全局变量并清缓存）。
+        无（副作用：改写全局 AppConfig 的 lead_agent.system_prompt_path 并重建 agent）。
     """
-    import deerflow.agents.lead_agent.prompt as prompt_mod
+    from deerflow.config import get_app_config
 
-    prompt_mod.SYSTEM_PROMPT_TEMPLATE = template
-    # skills 段有 lru_cache，变体即使不动 skills 也清一次确保干净
-    prompt_mod._get_cached_skills_prompt_section.cache_clear()
+    # 与正式环境改 config.yaml 同一条路径：apply_prompt_template 的
+    # _resolve_system_prompt_template 会按此 path 读模板（client 路径 app_config=None
+    # 时回退到这个全局单例）。harness 单进程内不触发 config 重载，故就地改持续生效。
+    get_app_config().lead_agent.system_prompt_path = str(variant_path)
     client.reset_agent()
 
 
@@ -208,9 +213,9 @@ def main() -> int:
     per_variant: dict[str, dict] = {}
     raw_path = args.out / "raw_traces.jsonl"
     with raw_path.open("w", encoding="utf-8") as raw_f:
-        for vname, template in variants.items():
+        for vname, variant_path in variants.items():
             print(f"\n===== 变体 {vname} =====", flush=True)
-            _apply_variant(template, client)
+            _apply_variant(variant_path, client)
             results = []
             for case in cases:
                 res = eval_case(client, case)

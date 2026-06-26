@@ -363,6 +363,68 @@ def test_clear_cache_does_not_spawn_parallel_refresh_workers(monkeypatch, tmp_pa
         _set_skills_cache_state()
 
 
+def test_resolve_system_prompt_template_defaults_when_global_config_unavailable(monkeypatch):
+    def boom():
+        raise RuntimeError("no config.yaml")
+
+    monkeypatch.setattr("deerflow.config.get_app_config", boom)
+
+    assert prompt_module._resolve_system_prompt_template(None) is prompt_module.SYSTEM_PROMPT_TEMPLATE
+
+
+def test_resolve_system_prompt_template_falls_back_to_global_config(monkeypatch, tmp_path):
+    override = tmp_path / "variant.txt"
+    override.write_text("GLOBAL VARIANT", encoding="utf-8")
+    config = SimpleNamespace(lead_agent=SimpleNamespace(system_prompt_path=str(override)))
+    monkeypatch.setattr("deerflow.config.get_app_config", lambda: config)
+
+    assert prompt_module._resolve_system_prompt_template(None) == "GLOBAL VARIANT"
+
+
+def test_resolve_system_prompt_template_defaults_when_path_unset():
+    config = SimpleNamespace(lead_agent=SimpleNamespace(system_prompt_path=None))
+
+    assert prompt_module._resolve_system_prompt_template(config) is prompt_module.SYSTEM_PROMPT_TEMPLATE
+
+
+def test_resolve_system_prompt_template_reads_override_file(tmp_path):
+    override = tmp_path / "variant.txt"
+    override.write_text("VARIANT for {agent_name}", encoding="utf-8")
+    config = SimpleNamespace(lead_agent=SimpleNamespace(system_prompt_path=str(override)))
+
+    assert prompt_module._resolve_system_prompt_template(config) == "VARIANT for {agent_name}"
+
+
+def test_resolve_system_prompt_template_falls_back_on_missing_file(tmp_path, caplog):
+    config = SimpleNamespace(lead_agent=SimpleNamespace(system_prompt_path=str(tmp_path / "does-not-exist.txt")))
+
+    with caplog.at_level("WARNING"):
+        result = prompt_module._resolve_system_prompt_template(config)
+
+    assert result is prompt_module.SYSTEM_PROMPT_TEMPLATE
+    assert "Failed to read lead-agent system prompt override" in caplog.text
+
+
+def test_apply_prompt_template_uses_override_template(monkeypatch, tmp_path):
+    override = tmp_path / "variant.txt"
+    override.write_text("OVERRIDE PROMPT for {agent_name}", encoding="utf-8")
+    config = SimpleNamespace(
+        sandbox=SimpleNamespace(mounts=[]),
+        skills=SimpleNamespace(container_path="/mnt/skills"),
+        lead_agent=SimpleNamespace(system_prompt_path=str(override)),
+    )
+    monkeypatch.setattr("deerflow.config.get_app_config", lambda: config)
+    monkeypatch.setattr(prompt_module, "_get_enabled_skills", lambda: [])
+    monkeypatch.setattr(prompt_module, "get_deferred_tools_prompt_section", lambda **kwargs: "")
+    monkeypatch.setattr(prompt_module, "_build_acp_section", lambda **kwargs: "")
+    monkeypatch.setattr(prompt_module, "_get_memory_context", lambda agent_name=None, **kwargs: "")
+    monkeypatch.setattr(prompt_module, "get_agent_soul", lambda agent_name=None: "")
+
+    prompt = prompt_module.apply_prompt_template(app_config=config, agent_name="CostBot")
+
+    assert prompt == "OVERRIDE PROMPT for CostBot"
+
+
 def test_warm_enabled_skills_cache_logs_on_timeout(monkeypatch, caplog):
     event = threading.Event()
     monkeypatch.setattr(prompt_module, "_ensure_enabled_skills_cache", lambda: event)

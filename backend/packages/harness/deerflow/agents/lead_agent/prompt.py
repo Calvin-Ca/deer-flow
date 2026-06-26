@@ -7,6 +7,7 @@ from functools import lru_cache
 from typing import TYPE_CHECKING
 
 from deerflow.config.agents_config import load_agent_soul
+from deerflow.config.runtime_paths import resolve_path
 from deerflow.skills.storage import get_or_new_skill_storage
 from deerflow.skills.types import Skill, SkillCategory
 from deerflow.subagents import get_available_subagent_names
@@ -616,6 +617,44 @@ def _build_custom_mounts_section(*, app_config: AppConfig | None = None) -> str:
     return f"\n**Custom Mounted Directories:**\n{mounts_list}\n- If the user needs files outside `/mnt/user-data`, use these absolute container paths directly when they match the requested directory"
 
 
+def _resolve_system_prompt_template(app_config: AppConfig | None) -> str:
+    """Return the lead-agent system-prompt template, honouring a config override.
+
+    When ``app_config.lead_agent.system_prompt_path`` is set, the template is read
+    from that file (relative paths resolve against the project root); otherwise the
+    built-in ``SYSTEM_PROMPT_TEMPLATE`` is used. A missing/unreadable override file
+    logs a warning and falls back to the built-in default so a bad path never takes
+    the agent down in production.
+
+    The override file must only use ``{placeholders}`` that are a subset of the
+    kwargs passed to ``SYSTEM_PROMPT_TEMPLATE.format`` below, or ``.format`` raises
+    ``KeyError``.
+
+    When ``app_config`` is None (e.g. the embedded ``DeerFlowClient`` path, which
+    does not thread an explicit config), the global ``get_app_config()`` singleton
+    is consulted so the override is honoured uniformly across the gateway and
+    embedded paths.
+    """
+    config = app_config
+    if config is None:
+        try:
+            from deerflow.config import get_app_config
+
+            config = get_app_config()
+        except Exception:
+            return SYSTEM_PROMPT_TEMPLATE
+
+    lead_agent_config = getattr(config, "lead_agent", None)
+    template_path = getattr(lead_agent_config, "system_prompt_path", None)
+    if not template_path:
+        return SYSTEM_PROMPT_TEMPLATE
+    try:
+        return resolve_path(template_path).read_text(encoding="utf-8")
+    except OSError:
+        logger.warning("Failed to read lead-agent system prompt override at %s; falling back to built-in template", template_path, exc_info=True)
+        return SYSTEM_PROMPT_TEMPLATE
+
+
 def apply_prompt_template(
     subagent_enabled: bool = False,
     max_concurrent_subagents: int = 3,
@@ -661,7 +700,7 @@ def apply_prompt_template(
     # Memory and current date are injected per-turn via DynamicContextMiddleware
     # as a <system-reminder> in the first HumanMessage, keeping this prompt
     # identical across users and sessions for maximum prefix-cache reuse.
-    return SYSTEM_PROMPT_TEMPLATE.format(
+    return _resolve_system_prompt_template(app_config).format(
         agent_name=agent_name or "DeerFlow 2.0",
         soul=get_agent_soul(agent_name),
         self_update_section=_build_self_update_section(agent_name),

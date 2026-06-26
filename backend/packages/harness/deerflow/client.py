@@ -43,7 +43,7 @@ from deerflow.config.paths import get_paths
 from deerflow.models import create_chat_model
 from deerflow.runtime.user_context import get_effective_user_id
 from deerflow.skills.storage import get_or_new_skill_storage
-from deerflow.tracing import build_tracing_callbacks, inject_langfuse_metadata
+from deerflow.tracing import build_tracing_callbacks, inject_langfuse_metadata, resolve_active_prompt_variant
 from deerflow.uploads.manager import (
     claim_unique_filename,
     delete_file_safe,
@@ -605,6 +605,7 @@ class DeerFlowClient:
             assistant_id=self._agent_name or "lead-agent",
             model_name=configurable.get("model_name") or self._model_name,
             environment=self._environment or os.environ.get("DEER_FLOW_ENV") or os.environ.get("ENVIRONMENT"),
+            variant=resolve_active_prompt_variant(),
         )
 
         self._ensure_agent(config)

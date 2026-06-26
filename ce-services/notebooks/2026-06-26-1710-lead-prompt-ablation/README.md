@@ -19,7 +19,7 @@
 - **数据**：`ce-services/eval/agent_routing_eval.jsonl`（17 条；分组 `no_version`/`with_version`/`boundary`）。
 - **模型**：`qwen3-8b`（评测口径见 `ce-services/eval/README.md`：在 flash/thinking/pro 档跑，避开 ultra 的 task 双脑歧义）。
 - **服务依赖**：:8099 LLM / :8100 知识 / :8101 任务（DeerFlowClient in-process，无需 Gateway）。
-- **切变体机制**：harness monkeypatch `prompt.SYSTEM_PROMPT_TEMPLATE` + `DeerFlowClient.reset_agent()`（三变体占位符集均为当前 `apply_prompt_template` kwargs 子集，可被同一框架 format）。
+- **切变体机制**：复用生产同款配置开关——harness 把 `get_app_config().lead_agent.system_prompt_path` 指向当前变体文件 + `DeerFlowClient.reset_agent()` 重建 agent（与正式环境改 `config.yaml` 切版本同一条代码路径，不再 monkeypatch）。三变体占位符集均为当前 `apply_prompt_template` kwargs 子集，可被同一框架 format。
 
 ## 3. 运行脚本
 
@@ -60,5 +60,6 @@ bash ce-services/notebooks/2026-06-26-1710-lead-prompt-ablation/run.sh
 - **对照**（待补）：V2 vs V1 路由率 delta 来自哪（no_version 第二轮是否还退 web？）；V0 红线遵守率是否如预期塌方（佐证常驻红线价值）。
 - **结论**（待补）：✅采纳 V2 / 🟡 部分 / ⛔ 负结果 + 一句话。
 - **下一步**（待补）：若 V2 达标 → 把 `<skill_runbook>` 落进 `prompt.py` 线上模板；若仍不达标 → 升级 A2（skill 包成真 tool）/ A3（qwen-plus）。
+- **离线 trace 评测入口（已就位）**：每次请求的 trace 现按 `variant:<变体名>` 打标（源自 `lead_agent.system_prompt_path` 文件名，内置默认为 `variant:default`），LangSmith/Langfuse 可直接按变体过滤。harness 批量出指标表是当前主路径；将来「批量发请求 + 按 trace 离线评分（含语义判据/LLM-judge）」时，靠这个标签把请求按变体归桶，无需 harness 在进程内判定。
 
 > 跑完同步：在 `../experiments.md` 顶部把 E1 从 🟡 改成结论，并回链本文件夹。

@@ -33,7 +33,7 @@ from deerflow.config.app_config import AppConfig
 from deerflow.runtime.serialization import serialize
 from deerflow.runtime.stream_bridge import StreamBridge
 from deerflow.runtime.user_context import get_effective_user_id
-from deerflow.tracing import inject_langfuse_metadata
+from deerflow.tracing import inject_langfuse_metadata, resolve_active_prompt_variant
 
 from .manager import RunManager, RunRecord
 from .naming import resolve_root_run_name
@@ -244,6 +244,7 @@ async def run_agent(
             assistant_id=record.assistant_id,
             model_name=record.model_name,
             environment=os.environ.get("DEER_FLOW_ENV") or os.environ.get("ENVIRONMENT"),
+            variant=resolve_active_prompt_variant(ctx.app_config),
         )
 
         # Resolve after runtime context installation so context/configurable reflect

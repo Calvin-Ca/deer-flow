@@ -135,3 +135,76 @@ def test_thread_id_none_still_produces_metadata(monkeypatch):
 
     assert result["langfuse_session_id"] is None
     assert result["langfuse_user_id"] == "u-1"
+
+
+def test_tags_include_variant(monkeypatch):
+    _enable_langfuse(monkeypatch)
+
+    result = tracing_metadata.build_langfuse_trace_metadata(
+        thread_id="t",
+        environment="production",
+        model_name="qwen3-8b",
+        variant="v2_runbook_saturated",
+    )
+
+    assert result["langfuse_tags"] == ["env:production", "model:qwen3-8b", "variant:v2_runbook_saturated"]
+
+
+def test_inject_sets_provider_agnostic_variant_when_langfuse_disabled(monkeypatch):
+    # LangSmith-only path: langfuse block no-ops, but the variant must still land
+    # as run metadata + a config tag so traces are filterable by prompt version.
+    config: dict = {}
+    tracing_metadata.inject_langfuse_metadata(
+        config,
+        thread_id="t",
+        variant="v2_runbook_saturated",
+    )
+
+    assert config["metadata"]["variant"] == "v2_runbook_saturated"
+    assert "variant:v2_runbook_saturated" in config["tags"]
+    # Langfuse-reserved keys are absent because langfuse is not enabled.
+    assert "langfuse_session_id" not in config["metadata"]
+
+
+def test_inject_variant_does_not_duplicate_existing_tag(monkeypatch):
+    config: dict = {"tags": ["variant:v2_runbook_saturated"]}
+    tracing_metadata.inject_langfuse_metadata(
+        config,
+        thread_id="t",
+        variant="v2_runbook_saturated",
+    )
+
+    assert config["tags"].count("variant:v2_runbook_saturated") == 1
+
+
+def test_inject_without_variant_leaves_config_untouched(monkeypatch):
+    config: dict = {}
+    tracing_metadata.inject_langfuse_metadata(config, thread_id="t", variant=None)
+
+    assert "metadata" not in config
+    assert "tags" not in config
+
+
+def test_resolve_active_prompt_variant_default_when_path_unset():
+    from types import SimpleNamespace
+
+    config = SimpleNamespace(lead_agent=SimpleNamespace(system_prompt_path=None))
+
+    assert tracing_metadata.resolve_active_prompt_variant(config) == "default"
+
+
+def test_resolve_active_prompt_variant_uses_file_stem():
+    from types import SimpleNamespace
+
+    config = SimpleNamespace(lead_agent=SimpleNamespace(system_prompt_path="prompts/v2_runbook_saturated.txt"))
+
+    assert tracing_metadata.resolve_active_prompt_variant(config) == "v2_runbook_saturated"
+
+
+def test_resolve_active_prompt_variant_default_when_global_config_unavailable(monkeypatch):
+    def boom():
+        raise RuntimeError("no config.yaml")
+
+    monkeypatch.setattr("deerflow.config.get_app_config", boom)
+
+    assert tracing_metadata.resolve_active_prompt_variant(None) == "default"

@@ -15,7 +15,7 @@
 # ============================================================================
 # Bump this number when the config schema changes.
 # Run `make config-upgrade` to merge new fields into your local config.yaml.
-config_version: 9
+config_version: 10
 
 # ============================================================================
 # Logging
@@ -735,6 +735,20 @@ skills:
 # - Omitted or null: load all globally enabled skills (default)
 # - []: disable all skills for this agent
 # - ["skill-name"]: load only specific skills
+
+# ============================================================================
+# Lead Agent Configuration
+# ============================================================================
+# Default lead-agent settings. Currently used to swap the system-prompt template
+# without touching code: point system_prompt_path at a template file and the new
+# prompt is picked up on the next message (no restart needed). null = use the
+# built-in SYSTEM_PROMPT_TEMPLATE. The override file must only use {placeholders}
+# that are a subset of apply_prompt_template's format kwargs.
+
+lead_agent:
+  system_prompt_path: null
+  # Example — switch to an ablation prompt variant:
+  # system_prompt_path: ce-services/notebooks/2026-06-26-1710-lead-prompt-ablation/prompts/v2_runbook_saturated.txt
 
 # ============================================================================
 # Title Generation Configuration

@@ -13,7 +13,7 @@
 - **本次只动的变量**：**仅 system prompt 模板**（其余工具面/模型/知识层全不动）。三变体见 `prompts/`：
   | 变体 | 文件 | 说明 |
   |---|---|---|
-  | **V0 原始** | `v0_original_superagent.txt` | 从 git `9635676c^` 找回的通用 super-agent（英文、含 `<citations>`、**无版本红线**），对照锚点 |
+  | **V0 原始** | `deerflow_prompt.txt` | 从 git `9635676c^` 找回的通用 super-agent（英文、含 `<citations>`、**无版本红线**），对照锚点 |
   | **V1 当前** | `v1_current_costized.txt` | 当前线上造价化精简版（含 `<safety_redline>`，skills 走渐进披露），基线 |
   | **V2 饱和** | `v2_runbook_saturated.txt` | V1 + 新增 `<skill_runbook>` 常驻块（死命令模板饱和加载、明示"是脚本不是工具"、取消这俩 skill 的 read_file 依赖）= A1 完全体 |
 - **数据**：`ce-services/eval/agent_routing_eval.jsonl`（17 条；分组 `no_version`/`with_version`/`boundary`）。
@@ -34,6 +34,15 @@ bash ce-services/notebooks/2026-06-26-1710-lead-prompt-ablation/run.sh
 > 产出落 `results/`：`metrics.md`（对比表）、`metrics.json`、`raw_traces.jsonl`（逐条）、`run.log`。
 
 ## 4. 结果
+
+**指标定义**（判定与分母口径见 `harness.py:compute_metrics`，judge 基于 `DeerFlowClient.stream` 的 tool call 事件自动判，无人工标注）：
+
+| 指标 | 含义 | 分子 / 分母 | 方向 |
+|---|---|---|---|
+| **路由率** `route_rate` | 该调本地脚本的任务，真的发起了 `bash` 且命令含 `qa.py`/`cost.py` 的比例。本实验主目标。`no_version` 组取**第二轮**（喂版本后是否调脚本，problem 6 命门），其余取第一轮 | `routed` 为真的用例数 / `expect_route==true` 的用例数（A1–A5、A7、B1–B10，共 16 条；A6 boundary 不计入） | ↑ 越高越好 |
+| **红线遵守率(主)** `redline_rate` | 未给 spec 版本时是否守住「先反问、不硬算」的版本红线，即第一轮发起 `ask_clarification`。与路由率并列的主验收指标 | 第一轮 `clarified` 为真的用例数 / `group==no_version` 的用例数（A1、A2、A7、B1、B2、B10，共 6 条） | ↑；要求 V2≥V1，预期 V0 塌方 |
+| **web兜底率(应0)** `web_fallback_rate` | 任一轮退回 `web_search`/`web_fetch`/`image_search` 的比例。problem 6 那个 bug 的回归哨兵（造价 agent 已摘 web 工具，应恒 0） | 任一轮 `web_fallback` 为真的用例数 / 全部用例数（17 条） | ↓ 目标 = 0 |
+| **越界拒答率** `boundary_reject_rate` | 越界用例（库内无对应规范）是否正确**不**调脚本，防为刷路由率把什么都往脚本上塞 | `not routed` 的用例数 / `group==boundary` 的用例数（A6，共 1 条） | ↑ 越高越好 |
 
 > 服务器跑出的真实数字（待补；贴 `results/metrics.md`）。
 

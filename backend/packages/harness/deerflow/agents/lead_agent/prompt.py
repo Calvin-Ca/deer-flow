@@ -153,7 +153,7 @@ def get_enabled_skills_for_config(app_config: AppConfig | None = None) -> list[S
 
 
 def _skill_mutability_label(category: SkillCategory | str) -> str:
-    return "[custom, editable]" if category == SkillCategory.CUSTOM else "[built-in]"
+    return "[自定义，可编辑]" if category == SkillCategory.CUSTOM else "[内置]"
 
 
 def clear_skills_system_prompt_cache() -> None:
@@ -458,16 +458,16 @@ def _get_cached_skills_prompt_section(
         )
         skills_list = f"<available_skills>\n{skill_items}\n</available_skills>"
     return f"""<skill_system>
-You have access to skills that provide optimized workflows for specific tasks. Each skill contains best practices, frameworks, and references to additional resources.
+你拥有一组「技能(skills)」，为特定任务提供经过优化的工作流。每个技能内含最佳实践、方法框架，以及指向额外资源的引用。
 
-**Progressive Loading Pattern:**
-1. When a user query matches a skill's use case, immediately call `read_file` on the skill's main file using the path attribute provided in the skill tag below
-2. Read and understand the skill's workflow and instructions
-3. The skill file contains references to external resources under the same folder
-4. Load referenced resources only when needed during execution
-5. Follow the skill's instructions precisely
+**渐进式加载方式：**
+1. 当用户的问题匹配某个技能的适用场景时，立即用下方技能标签里的 location 路径对该技能主文件调用 `read_file`
+2. 读懂该技能的工作流与指令
+3. 技能文件中会引用同一目录下的其他资源
+4. 仅在执行过程中确有需要时，再加载被引用的资源
+5. 严格按照该技能的指令执行
 
-**Skills are located at:** {container_base_path}
+**技能位置：** {container_base_path}
 {skill_evolution_section}
 {skills_list}
 

@@ -48,7 +48,7 @@ def test_get_skills_prompt_section_returns_skills(monkeypatch):
     result = get_skills_prompt_section(available_skills={"skill1"})
     assert "skill1" in result
     assert "skill2" not in result
-    assert "[built-in]" in result
+    assert "[内置]" in result
 
 
 def test_get_skills_prompt_section_returns_all_when_available_skills_is_none(monkeypatch):

@@ -13,6 +13,9 @@ function getInternalServiceURL(envKey, fallbackURL) {
 /** @type {import("next").NextConfig} */
 const config = {
   devIndicators: false,
+  // 允许从内网 IP 访问 dev server(Next 16.2 起会拦截非 localhost 源对 /_next 资源的访问，
+  // 导致页面能渲染但 JS 不 hydrate、登录等交互失效）。服务器内网调试用 172.19.3.136 直连时需放行。
+  allowedDevOrigins: ["172.19.3.136"],
   async rewrites() {
     const rewrites = [];
     const gatewayURL = getInternalServiceURL(

@@ -35,14 +35,29 @@ models:
 #   api_key: REPLACE_WITH_DASHSCOPE_KEY_ON_SERVER
 #   base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
 tool_groups:
+# - name: web        # 停用中(见下方 web 工具注释);恢复时取消本行注释
 - name: file:read
 - name: file:write
 - name: bash
-# web 工具组(web_search / web_fetch / image_search)已移除:造价 agent 不联网,
-# 规范/组价取数全走本地知识服务(:8100/:8101);保留 web 反而会诱导弱模型(Qwen3-8B)
-# 卡壳时用 web_search 从网上编造组价/条文,违背"不造码、不杜撰、只采信技能返回"红线
-# (详见 PROBLEM.md §6)。如需联网研究再单独按需开启。
 tools:
+# ===== web 工具组:停用中(注释=不注册=关闭) =====
+# 原因:造价 agent 不联网,规范/组价取数全走本地知识服务(:8100/:8101);保留 web
+#       会诱导弱模型(Qwen3-8B)卡壳时用 web_search 从网上编造组价/条文,违背"不造码、
+#       不杜撰、只采信技能返回"红线(见 PROBLEM.md §6)。
+# 恢复:取消下面三段 + 上方 `- name: web` 的注释即可。
+# - name: web_search
+#   use: deerflow.community.ddg_search.tools:web_search_tool
+#   group: web
+#   max_results: 5
+# - name: web_fetch
+#   use: deerflow.community.jina_ai.tools:web_fetch_tool
+#   group: web
+#   timeout: 10
+# - name: image_search
+#   group: web
+#   use: deerflow.community.image_search.tools:image_search_tool
+#   max_results: 5
+# ===== web 工具组 end =====
 - name: ls
   group: file:read
   use: deerflow.sandbox.tools:ls_tool

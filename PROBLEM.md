@@ -112,12 +112,14 @@
 - **B. web_search 是有害逃生口**:模型卡壳时有联网工具兜底 → 会从网上扒/编造组价,直接违背"不造码、不杜撰、只采信技能返回"红线。**工具面收窄不只是降噪,更是安全问题。**
 
 **候选方案**:
-- 针对 A:**A1 prompt 常驻"死命令模板"**(把 `cost.py`/`qa.py` 的 bash 命令直接写进 prompt + 明示"不是工具是脚本",消除 read_file 间接 + 纠正工具先验,轻量);**A2 把 skill 包成真正的 tool**(在 config.yaml 注册 `cost_compose`/`norm_qa` 工具内部打 :8101,迎合弱模型"找工具就调"的先验,最契合根因,但要写工具封装);**A3 换 qwen-plus**(容量解法,兜底)。
+- 针对 A(**提示词优化路线**,把能力从"文档面"抬到"resident prompt 面"):**A1 prompt 常驻"死命令模板"**(把 `cost.py`/`qa.py` 的 bash 命令直接写进 prompt + 明示"不是工具是脚本",消除 read_file 间接 + 纠正工具先验,轻量);**A1′ 完全体「饱和加载」**(更进一步:把两技能的红线+死命令+参数整段抬进常驻 `<skill_runbook>` 块、取消这俩 skill 的渐进披露依赖——渐进披露只在 skill 多时省 token,问题 5 砍到只剩 2 个后已无收益);**A2 把 skill 包成真正的 tool**(在 config.yaml 注册 `cost_compose`/`norm_qa` 工具内部打 :8101,迎合弱模型"找工具就调"的先验,最契合根因,但要写工具封装,且必须兜住"工具诱导填参绕过版本红线"的副作用);**A3 换 qwen-plus**(容量解法,兜底)。
 - 针对 B:**B 摘掉 web 工具组**(`web_search/web_fetch/image_search`),堵死逃生口。摘除方式又有候选:删除 vs **注释停用**(`ToolConfig` 无 `enabled` 开关、默认 lead 拿全部工具,故方案 0 下用注释作可逆开关;per-agent 级开关需走方案 A 的 `tool_groups`)。
 
 对比:B 治"走偏"(安全)但治不了"不会调";A1 最轻、对症"间接+先验";A2 最根治但成本高;A3 抬容量但要动基座。
 
-**解决**:**B 已落**(web 工具组**注释停用**,保留配置可一行恢复);**A1 进行中**;A2/A3 作为评测仍不达标时的升级路径。
+**解决**:**B 已落**(web 工具组**注释停用**,保留配置可一行恢复);**A1/A1′ 进行中**;A2/A3 作为评测仍不达标时的升级路径。
+
+> **实验数据存放位置**:A1/A1′ 提示词优化的 A/B 选型用专门的消融实验验证,存放于 **`ce-services/notebooks/2026-06-26-1710-lead-prompt-ablation/`**——含 `prompts/` 三变体原文(V0 = git `9635676c^` 找回的原始通用 super-agent / V1 = 当前线上造价化精简版 / V2 = 饱和加载 `<skill_runbook>` 完全体)、自动评测 `harness.py`(monkeypatch `SYSTEM_PROMPT_TEMPLATE` + 解析 stream tool call 判路由/反问/兜底)、`run.sh` 与 `results/` 跑分。指标口径(路由率/红线遵守率/web兜底率/越界拒答率)对接 `ce-services/eval/agent_routing_eval.jsonl`;结论时间线见 `ce-services/notebooks/experiments.md` E1。
 
 **收获**:给弱模型的能力调用要**写死、前置**,不能依赖它自行发现多跳工作流;**移除会诱导走偏的工具**与"提供正确工具"同样重要;摘工具优先用**可逆开关**(注释/分组),别直接删。
 

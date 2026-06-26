@@ -184,7 +184,7 @@ stop_all() {
     _kill_repo_nginx
     # Force-kill any survivors still holding the service ports
     _kill_repo_port 8001
-    _kill_repo_port 3100
+    _kill_repo_port 3000
     ./scripts/cleanup-containers.sh deer-flow-sandbox 2>/dev/null || true
     echo "✓ All services stopped"
 }
@@ -216,7 +216,7 @@ fi
 
 # Frontend command
 if $DEV_MODE; then
-    FRONTEND_CMD="PORT=3100 pnpm run dev"
+    FRONTEND_CMD="pnpm run dev"
 else
     if command -v python3 >/dev/null 2>&1; then
         PYTHON_BIN="python3"
@@ -226,7 +226,7 @@ else
         echo "Python is required to generate BETTER_AUTH_SECRET."
         exit 1
     fi
-    FRONTEND_CMD="env PORT=3100 BETTER_AUTH_SECRET=$($PYTHON_BIN -c 'import secrets; print(secrets.token_hex(16))') pnpm run preview"
+    FRONTEND_CMD="env BETTER_AUTH_SECRET=$($PYTHON_BIN -c 'import secrets; print(secrets.token_hex(16))') pnpm run preview"
 fi
 
 # Extra flags for uvicorn
@@ -311,7 +311,7 @@ echo "  Mode: $MODE_LABEL"
 echo ""
 echo "  Services:"
 echo "    Gateway     → localhost:8001  (REST API + agent runtime)"
-echo "    Frontend    → localhost:3100  (Next.js)"
+echo "    Frontend    → localhost:3000  (Next.js)"
 echo "    Nginx       → localhost:2026  (reverse proxy)"
 echo ""
 
@@ -370,7 +370,7 @@ run_service "Gateway" \
 # 2. Frontend
 run_service "Frontend" \
     "cd frontend && $FRONTEND_CMD > ../logs/frontend.log 2>&1" \
-    3100 120
+    3000 120
 
 # 3. Nginx
 run_service "Nginx" \

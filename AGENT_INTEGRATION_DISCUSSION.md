@@ -182,6 +182,44 @@ subagent(纯执行器,无需 clarification)
 
 ---
 
+## 7. 新增 subagent 的开发步骤(ultra 模式)
+
+> 适用于"要把某个**参数已齐、自主跑完、不与用户交互**的子任务做成 subagent"。subagent 仅在 **ultra** 可达(`subagent_enabled`,§3.3),由 lead agent 经 `task` 委派。
+> 关联代码:`config.yaml` `subagents.custom_agents`(定义来源)、`subagents/config.py::SubagentConfig`(字段 schema)、`subagents/executor.py::SubagentExecutor._create_agent`(执行)、现有样例 `cost-agent`/`norm-qa`(config.yaml:143 起)。
+
+### 7.1 三条硬约束(设计前先记住)
+
+1. **subagent 不能反问用户**(§3.2):`ClarificationMiddleware` 仅在 lead 链;subagent 后台 `astream` 自主跑完,**即使配了 `ask_clarification` 也是空操作**。→ 必须做成「参数已齐的纯执行器」,所有澄清提到 lead 层先做完(方案 D)。
+2. **仅 ultra 可达**(§3.3):flash/thinking/pro 下 lead 没有 `task` 工具,subagent 不可达。要降档常开得改 `subagent_enabled` 来源(动前端 mode 映射或 agent.py)。
+3. **两跳 + 弱模型**:lead 发 `task` + subagent 执行串联,Qwen3-8B 上更不稳。缓解见 7.4。
+
+### 7.2 开发步骤
+
+1. **先做 skill(底层能力单元)**:`skills/public/{name}/SKILL.md` + 薄客户端脚本(纯 urllib 零依赖,沙箱内 `bash` 直接 `python3` 调,转发给常驻服务)。随 git;`extensions_config.json` 里置 `enabled`。
+2. **在 `config.yaml` 注册** `subagents.custom_agents.{name}`(照 cost-agent/norm-qa 抄),字段见 7.3。`skills: [{name}]` 指向第 1 步的 skill。
+3. **commit/push → 服务器 `git pull`**。**无需物化拷贝**——config.yaml 本身随 git,不撞 `.deer-flow/` gitignore(这是 subagent 相对方案 A 独立 lead agent 的开发优势,§3.4)。
+4. **验证**(ultra 模式):① 先用「参数已齐」样例,看 lead 是否经 `task` 委派、subagent 是否带对参数调脚本;② 若该任务需澄清,单测 lead 层先 `ask_clarification` 收齐参数、再 `task` 下发(方案 D 链路)。
+
+### 7.3 `SubagentConfig` 字段(照抄即可)
+
+| 字段 | 作用 | 给弱模型的建议 |
+|---|---|---|
+| `description` | **lead 路由依据**——"什么时候该委派给我" | 写清触发场景,别写人格 |
+| `system_prompt` | subagent 执行指令(**第 1 轮就常驻**,无渐进披露) | 极度指令化 + 给死 bash 命令模板 |
+| `tools` | 工具白名单(如 `[bash]`) | 只给必需的 |
+| `disallowed_tools` | 黑名单(现有都禁 `task`/`present_files`) | 至少禁 `task` 防递归 |
+| `skills` | skill 白名单 | **一个 subagent 只挂一个 skill** |
+| `model` | `inherit` 或具体模型名 | 不稳就单独指 `qwen-plus` |
+| `max_turns` / `timeout_seconds` | 轮数 / 超时(默认 900s) | 取数类 10 轮 / 600s 够用 |
+
+### 7.4 可靠性要点
+
+- subagent 只当「参数已齐的脚本执行器」,完美契合其"自主跑完、不交互"定位;凡需反问的逻辑一律提到 lead 层(方案 D)。
+- 单 skill、锁死工具(白名单 + `disallowed_tools`)、bash 命令给模板;实在不稳给该 subagent 单独 `model: qwen-plus`(不动默认助手)。
+- 并发上限 3、默认 15 分钟超时(见 `backend/CLAUDE.md` Subagent System);取数类任务按 7.3 收紧 `max_turns`/`timeout_seconds`。
+
+---
+
 > 决策记录:
 > - **最小复杂度优先**:agent 比 skill 重,能 skill 解决就不升级 agent。**skill-only(方案 0)定为基线**,A/B/C/D 均为"基线不达标时的升级路径";是否升级由 evaluation(路由率 + 红线遵守率)决定,不默认做 agent。
 > - skill-only 在弱模型上的唯一实质短板是"红线强制力"(渐进披露 vs agent 常驻 SOUL.md);版本红线安全攸关,故以**红线遵守率**为主判据。

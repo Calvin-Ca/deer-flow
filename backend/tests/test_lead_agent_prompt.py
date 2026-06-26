@@ -410,11 +410,12 @@ def test_apply_prompt_template_uses_override_template(monkeypatch, tmp_path):
     override.write_text("OVERRIDE PROMPT for {agent_name}", encoding="utf-8")
     config = SimpleNamespace(
         sandbox=SimpleNamespace(mounts=[]),
-        skills=SimpleNamespace(container_path="/mnt/skills"),
         lead_agent=SimpleNamespace(system_prompt_path=str(override)),
     )
-    monkeypatch.setattr("deerflow.config.get_app_config", lambda: config)
-    monkeypatch.setattr(prompt_module, "_get_enabled_skills", lambda: [])
+    # Explicit app_config bypasses the _get_enabled_skills path and hits skill
+    # storage directly, so stub the section builders that would otherwise read
+    # real config; the test only asserts the override template is the one used.
+    monkeypatch.setattr(prompt_module, "get_skills_prompt_section", lambda *args, **kwargs: "")
     monkeypatch.setattr(prompt_module, "get_deferred_tools_prompt_section", lambda **kwargs: "")
     monkeypatch.setattr(prompt_module, "_build_acp_section", lambda **kwargs: "")
     monkeypatch.setattr(prompt_module, "_get_memory_context", lambda agent_name=None, **kwargs: "")

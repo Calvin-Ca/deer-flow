@@ -19,7 +19,7 @@ python3 /mnt/skills/public/cost-agent/cost.py \
   --description "<构件/做法描述>" \
   --spec <2013|2024> \
   --region <地区，默认深圳> \
-  --output /tmp/cost_$(date +%s).json
+  --output /mnt/user-data/workspace/cost_$(date +%s).json
 ```
 
 ## 能力
@@ -83,8 +83,8 @@ python3 /mnt/skills/public/cost-agent/cost.py \
   --description "MU10标准砖240厚实心砖墙M5水泥砂浆" \
   --spec 2024 \
   --region 深圳 \
-  --output /tmp/cost_result.json \
-&& cat /tmp/cost_result.json
+  --output /mnt/user-data/workspace/cost_result.json \
+&& cat /mnt/user-data/workspace/cost_result.json
 ```
 
 ## 输出格式

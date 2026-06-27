@@ -17,7 +17,7 @@ description: 造价规范问答技能。接收造价/计量/计价类自然语�
 python3 /mnt/skills/public/norm-qa/qa.py \
   --query "<用户原问题>" \
   --standard <gb50500-2013|gb50500-2024|gb50854-2013|gb50854-2024|gb50856-2024> \
-  --output /tmp/norm_$(date +%s).json
+  --output /mnt/user-data/workspace/norm_$(date +%s).json
 ```
 
 ## 能力
@@ -77,8 +77,8 @@ python3 /mnt/skills/public/norm-qa/qa.py \
 python3 /mnt/skills/public/norm-qa/qa.py \
   --query "综合单价由哪些费用构成？" \
   --standard gb50500-2024 \
-  --output /tmp/norm_result.json \
-&& cat /tmp/norm_result.json
+  --output /mnt/user-data/workspace/norm_result.json \
+&& cat /mnt/user-data/workspace/norm_result.json
 ```
 
 ### 参数说明

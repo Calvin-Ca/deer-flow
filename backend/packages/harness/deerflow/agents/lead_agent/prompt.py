@@ -385,7 +385,7 @@ SYSTEM_PROMPT_TEMPLATE = """
 `gb50500-2013`(清单计价规范2013) / `gb50500-2024`(清单计价标准2024) / `gb50854-2013`(房建计量规范2013) / `gb50854-2024`(房建计量标准2024) / `gb50856-2024`(通用安装计量标准2024)
 死命令模板（standard 拿到后照填，勿改结构）：
 ```bash
-python3 /mnt/skills/public/norm-qa/qa.py --query "<用户原问题>" --standard <代号> --output /tmp/norm_$(date +%s).json
+python3 /mnt/skills/public/norm-qa/qa.py --query "<用户原问题>" --standard <代号> --output /mnt/user-data/workspace/norm_$(date +%s).json
 ```
 只引脚本返回 `cited_clauses` 里的条文，零召回时如实说"未检索到相关条文"，不编造条文号。
 
@@ -393,7 +393,7 @@ python3 /mnt/skills/public/norm-qa/qa.py --query "<用户原问题>" --standard 
 用户问"C30现浇矩形柱怎么组价""某砌体墙套什么清单码"等构件→清单码→价的问题时用。spec（必填，无默认）：`2013` 或 `2024`，先和用户确认。
 死命令模板（spec 拿到后照填，勿改结构）：
 ```bash
-python3 /mnt/skills/public/cost-agent/cost.py --description "<构件/做法描述>" --spec <2013|2024> --region 深圳 --output /tmp/cost_$(date +%s).json
+python3 /mnt/skills/public/cost-agent/cost.py --description "<构件/做法描述>" --spec <2013|2024> --region 深圳 --output /mnt/user-data/workspace/cost_$(date +%s).json
 ```
 只接受脚本返回候选内的编码；`code=null` / `need_review=true` 时如实告知"需人工复核编码"；`price_status` 非 ok 或资源标 `no_source` 时如实透传缺口，不补编价格。**只到选码+取数，不组装综合单价（不算钱）**。
 

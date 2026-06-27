@@ -439,6 +439,10 @@ def test_default_template_embeds_skill_runbook():
     # 纠正"一任务一工具"先验 + 禁止退回联网搜索（problem 6 命门）
     assert "不是工具表里的工具" in template
     assert "严禁用联网搜索代替脚本" in template
+    # 死命令模板的 --output 必须落沙箱可写区（/mnt/user-data/...），不得用 /tmp（沙箱拒写，
+    # 会逼模型多耗一轮自纠）——前端实测回归点。
+    assert "--output /mnt/user-data/workspace/" in template
+    assert "/tmp/" not in template
 
 
 def test_apply_prompt_template_default_includes_runbook(monkeypatch):

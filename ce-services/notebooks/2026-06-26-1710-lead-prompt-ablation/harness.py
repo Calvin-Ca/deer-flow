@@ -32,6 +32,9 @@ from pathlib import Path
 
 WEB_TOOLS = {"web_search", "web_fetch", "image_search"}
 SCRIPT_MARKERS = ("qa.py", "cost.py")
+# 走子 agent 工具（而非 bash 直跑脚本）触达本地 skill 的路径：V0 通用 prompt 的典型行为，
+# 也是 problem 6「把 skill 当工具表里的工具」反模式。单列一项指标，不并入 route_rate（直跑）。
+SUBAGENT_TOOLS = {"norm-qa", "cost-agent"}
 
 
 def load_variants(prompts_dir: Path) -> dict[str, Path]:
@@ -87,17 +90,25 @@ def _apply_variant(variant_path: Path, client) -> None:
 
 
 def run_one(client, thread_id: str, message: str) -> dict:
-    """跑单轮对话，解析这一轮 agent 发起的 tool call，归纳三个布尔判定。
+    """跑单轮对话，**先聚合整轮全部 tool-call 的 name 与 args**，再归纳判定。
+
+    为何先聚合：LangGraph 流式下同一个 tool call 的 `name` 和 `args` 会落在不同
+    chunk —— 带 `name=="bash"` 的 chunk 其 args 常为空 `{}`，命令文本在随后
+    `name==""` 的 chunk 才补齐。旧逻辑「在 name=="bash" 的同一 chunk 上查 args 含
+    qa.py」永远匹配不到，导致 route 判定恒 False。改为把整轮所有 args 拼成一个 blob、
+    所有非空 name 收成一串后统一判，规避 name/args 跨 chunk 分裂。
 
     参数：
         client:    DeerFlowClient 实例。
         thread_id: 线程 id（同一用例多轮用同一个，靠 checkpointer 续上下文）。
         message:   本轮发给 agent 的用户文本。
     返回：
-        {clarified, routed, web_fallback, tool_calls:[name...]} —— 本轮判定与原始 tool 名序列。
+        {clarified, routed, routed_subagent, web_fallback, tool_calls:[name...], args_preview}
+        - routed          直跑脚本：聚合 args 里出现 qa.py / cost.py（仅 bash 调脚本会带此路径）。
+        - routed_subagent 走 norm-qa / cost-agent 子 agent 工具触达本地 skill（problem 6 反模式）。
     """
     tool_names: list[str] = []
-    clarified = routed = web_fallback = False
+    args_chunks: list[str] = []
 
     for ev in client.stream(message, thread_id=thread_id):
         if ev.type != "messages-tuple":
@@ -107,15 +118,27 @@ def run_one(client, thread_id: str, message: str) -> dict:
             continue
         for tc in data.get("tool_calls", []) or []:
             name = tc.get("name", "")
-            tool_names.append(name)
-            args_blob = json.dumps(tc.get("args", {}), ensure_ascii=False)
-            if name == "ask_clarification":
-                clarified = True
-            elif name == "bash" and any(m in args_blob for m in SCRIPT_MARKERS):
-                routed = True
-            elif name in WEB_TOOLS:
-                web_fallback = True
-    return {"clarified": clarified, "routed": routed, "web_fallback": web_fallback, "tool_calls": tool_names}
+            if name:
+                tool_names.append(name)
+            args = tc.get("args", {})
+            if args:
+                args_chunks.append(json.dumps(args, ensure_ascii=False))
+
+    args_blob = " ".join(args_chunks)
+    clarified = "ask_clarification" in tool_names
+    # 直跑脚本：脚本路径（含 qa.py / cost.py）只可能出现在 bash 命令 args 里——
+    # read_file 读的是 SKILL.md（路径不含 .py），故聚合 args 命中 marker 即真正发起了脚本调用。
+    routed = any(m in args_blob for m in SCRIPT_MARKERS)
+    routed_subagent = any(n in SUBAGENT_TOOLS for n in tool_names)
+    web_fallback = any(n in WEB_TOOLS for n in tool_names)
+    return {
+        "clarified": clarified,
+        "routed": routed,
+        "routed_subagent": routed_subagent,
+        "web_fallback": web_fallback,
+        "tool_calls": tool_names,
+        "args_preview": args_blob[:600],  # 留证供回看实际命令
+    }
 
 
 def eval_case(client, case: dict) -> dict:
@@ -125,21 +148,24 @@ def eval_case(client, case: dict) -> dict:
         client: DeerFlowClient 实例（变体已注入）。
         case:   一条评测用例 dict。
     返回：
-        在原 case 上补 {r1, r2, clarified, routed, web_fallback} 的结果 dict。
+        在原 case 上补 {r1, r2, clarified, routed, routed_subagent, web_fallback} 的结果 dict。
         - clarified  取第一轮（红线在第一轮反问）。
-        - routed     no_version 取第二轮（拿到版本后是否调脚本）；其余取第一轮。
+        - routed / routed_subagent  no_version 取第二轮（拿到版本后是否调脚本/子 agent）；其余取第一轮。
         - web_fallback 任一轮出现即 True。
     """
     thread_id = f"ablate-{case['id']}-{uuid.uuid4().hex[:8]}"
     r1 = run_one(client, thread_id, case["query"])
     r2 = None
     routed = r1["routed"]
+    routed_subagent = r1["routed_subagent"]
     if case.get("group") == "no_version" and case.get("gold"):
         # 第二轮喂澄清后的版本，模拟用户回答；problem 6 的命门在这一轮
         r2 = run_one(client, thread_id, str(case["gold"]))
         routed = r2["routed"]
+        routed_subagent = r2["routed_subagent"]
     web_fallback = r1["web_fallback"] or (bool(r2) and r2["web_fallback"])
-    return {**case, "r1": r1, "r2": r2, "clarified": r1["clarified"], "routed": routed, "web_fallback": web_fallback}
+    return {**case, "r1": r1, "r2": r2, "clarified": r1["clarified"],
+            "routed": routed, "routed_subagent": routed_subagent, "web_fallback": web_fallback}
 
 
 def compute_metrics(results: list[dict]) -> dict:
@@ -159,9 +185,14 @@ def compute_metrics(results: list[dict]) -> dict:
 
     return {
         "route_rate": rate(sum(r["routed"] for r in R), len(R)),
+        # 直跑(routed)或走子 agent(routed_subagent)任一触达本地 skill 即算「未退 web」，
+        # 该项与 route_rate 的差就是 V0 那种「把 skill 当不透明子 agent 工具」的占比。
+        "subagent_route_rate": rate(sum(r["routed_subagent"] for r in R), len(R)),
+        "reach_skill_rate": rate(sum(r["routed"] or r["routed_subagent"] for r in R), len(R)),
         "redline_rate": rate(sum(r["clarified"] for r in C), len(C)),
         "web_fallback_rate": rate(sum(r["web_fallback"] for r in results), len(results)),
-        "boundary_reject_rate": rate(sum(not r["routed"] for r in B), len(B)),
+        # 越界须既不直跑也不走子 agent（两条触达 skill 的路都不能走）
+        "boundary_reject_rate": rate(sum(not (r["routed"] or r["routed_subagent"]) for r in B), len(B)),
         "n_total": len(results), "n_route": len(R), "n_no_version": len(C), "n_boundary": len(B),
     }
 
@@ -174,9 +205,15 @@ def render_metrics_md(per_variant: dict[str, dict]) -> str:
     返回：
         Markdown 字符串。
     """
-    lines = ["| 变体 | 路由率 | 红线遵守率(主) | web兜底率(应0) | 越界拒答率 |", "|---|---|---|---|---|"]
+    lines = [
+        "| 变体 | 路由率(直跑) | 子agent路由率 | 触达skill率 | 红线遵守率(主) | web兜底率(应0) | 越界拒答率 |",
+        "|---|---|---|---|---|---|---|",
+    ]
     for name, m in per_variant.items():
-        lines.append(f"| {name} | {m['route_rate']} | {m['redline_rate']} | {m['web_fallback_rate']} | {m['boundary_reject_rate']} |")
+        lines.append(
+            f"| {name} | {m['route_rate']} | {m['subagent_route_rate']} | {m['reach_skill_rate']} | "
+            f"{m['redline_rate']} | {m['web_fallback_rate']} | {m['boundary_reject_rate']} |"
+        )
     return "\n".join(lines) + "\n"
 
 

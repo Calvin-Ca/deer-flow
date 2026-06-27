@@ -21,6 +21,7 @@ export interface Translations {
     loadMore: string;
     download: string;
     thinking: string;
+    intermediateProcess: string;
     artifacts: string;
     public: string;
     custom: string;

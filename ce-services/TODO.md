@@ -129,7 +129,11 @@
   main.py `/health.routes` 加该路由；② `/cost/compose` 加可选 `rates` 块（管理费/利润/风险率 + 取费基数 + 税率），
   给定则末步 `orchestration._price_unit_prices` 对每条定额按**定额基价**算综合单价（缺基价→`missing_base` 不杜撰），
   缺 `rates` 维持 P1 行为（仅选码 + 取数、不算钱）——复合入口非 chokepoint，原语亦可单独打。本地验证算价 + 缺基价 guard。
-- [ ] **服务器联调**：起 :8101 实打 `/cost/unit-price`（验 422 闸门）+ `/cost/compose` 带 rates（验末步算价）。
+- [x] **服务器联调**（✅ 2026-06-27，:8101 实测）：`POST /cost/unit-price` 正常路径数字精确命中
+  （unit_price=199.5 / 管理费=13.0 / 利润=6.5 / total=399.0 / tax=35.91 / 含税=434.91）+ 负金额→422 闸门生效。
+  （坑：旧实例占 :8101 致新进程 Exit 1 静默失败、health 仍显旧 routes；`lsof -ti:8101 | xargs -r kill` 后重起即好。）
+- [ ] **`/cost/compose` 带 rates 末步算价待真验**：实测 C30现浇矩形柱选到 010502025 零星现浇构件、`quota_count=0`
+  无映射定额 → 无 quota 可挂 unit_price（选码错 + 该码无定额映射=主线二已知缺口，非 P2）；需换能召回带定额的正确码再看 unit_price 字段（接线逻辑本地已验 + missing_base guard 已验）。
 - [ ] **价差精算（follow-up）**：当前综合单价以**定额基价**为人材机口径；信息价价差调整（amount 基）属后续精算，未做。
 
 ### 原语 / 复合入口的 tool·MCP 暴露（⬜ 待办，方案见 DEV）

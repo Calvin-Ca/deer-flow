@@ -211,7 +211,6 @@ export function MessageGroup({
         onClick={() => setOpen(!open)}
         className="text-muted-foreground hover:text-foreground flex items-center gap-1.5 text-sm transition-colors"
       >
-        <LightbulbIcon className="size-4" />
         <span>{t.common.intermediateProcess}</span>
         <ChevronRightIcon
           className={cn(

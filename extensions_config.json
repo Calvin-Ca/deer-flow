@@ -39,6 +39,12 @@
       ],
       "env": {},
       "description": "PostgreSQL database access"
+    },
+    "ce-cost": {
+      "enabled": true,
+      "type": "http",
+      "url": "http://localhost:8100/mcp",
+      "description": "深圳房建组价取数原语：bill_match / quota_lookup / price_compose（按国标版本 spec 隔离 2013/2024）"
     }
   },
   "skills": {

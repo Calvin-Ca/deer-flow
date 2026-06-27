@@ -124,15 +124,22 @@ PG `ce_cost`（:5433）已灌齐，组价取数链通（清单→定额→工料
 - [ ] 如需"查计价规则原文"，以干净模块重建条文检索（不复活旧 RAG）；当前 `price_composition` 结构化表已覆盖
   费用构成查询需求。
 
-### F. 取数原语 MCP 化（⬜ 方案见 `DEV.md §7`）
+### F. 取数原语 MCP 化（🟢 代码就位待服务器验，方案见 `DEV.md §7`）
 > 方案：`DEV.md §7`「原语对外暴露：HTTP + MCP 双 façade」+ 全局分层 `../ce-services/DEV.md`「组价能力对外暴露」。
 > 目的：三原语成为横切共享底座（算量/审图/FM 直接以 tool 调），服务中间步请求 + 将来强模型自由编排。
 - [x] **确认 deer-flow MCP 注册方式**（✅ 2026-06-27，核实 `backend/.../deerflow/mcp`）：配 `extensions_config.json`
   `mcpServers`（同文件已注册 skills）；`MultiServerMCPClient`(`langchain-mcp-adapters`) 启动加载缓存；transport
   选 `http`(FastMCP streamable-HTTP)；`tool_name_prefix=True` → 工具名带 `{server_name}_` 前缀。**纠正**：`type:http`
   是 MCP 协议非任意 REST，现有 :8100 REST 不能直接当 MCP server。详见 `DEV.md §7`。
-- [ ] 用 **FastMCP（http transport）** 起 MCP server，把 `bill_match` / `quota_lookup`(/quota) / `price_compose`
-  包成 `@mcp.tool`（**复用现有取数函数 `search_bill`/`compose_price`/quota，不动取数内核，不反代 REST**）；
-  挂 :8100 `/mcp` 或同址旁挂；`extensions_config.json` `mcpServers` 加 `ce-cost` 条目。HTTP REST 保留供任务层编排（零改动）。
-- [ ] **红线复述进 MCP schema**（原语自带护栏，不依赖上层编排）：`spec` 必填无默认 / `price_compose` 缺价
-  `no_source` 不杜撰 / 2013 `supports_compose=False`→501 / `bill_match` 只给候选不定 Top-1。
+- [x] 用 **FastMCP（streamable-HTTP）** 起 MCP server（✅ 代码就位，`service/mcp_server.py`）：把 `bill_match` /
+  `quota_lookup` / `price_compose` 包成 `@mcp.tool`（**复用 `search_bill`/`get_quota`/`compose_price`，不动取数内核，
+  不反代 REST**）；server 名 `ce-cost`（工具名 → `ce-cost_*`）；`stateless_http=True` 只读无 session；随
+  `service.knowledge_api` 挂 :8100 `/mcp`（`app.mount("/", streamable_http_app())` + 父 lifespan 跑 session_manager，
+  Starlette 不自动跑挂载子应用 lifespan）。`extensions_config.json` `mcpServers` 已加 `ce-cost`（type:http）。
+  HTTP REST `service.cost_api` 保留供任务层编排（零改动）。`pyproject.toml` 加 `mcp>=1.27`。
+- [x] **红线复述进 MCP schema**（✅ 原语自带护栏，不依赖上层编排）：`spec` 必填无默认（`resolve_spec`，缺省/未知→
+  `ToolError`）/ `price_compose` 缺价 `no_source` 不杜撰（取数内核保证）/ 2013 `supports_compose=False`→`price_compose`
+  与 `quota_lookup` 结构化拒答（`_require_compose_ready`）/ `bill_match` 只给候选不定 Top-1（docstring 明示）。
+- [ ] **服务器验证**：① `cd ce-code && uv sync`（装 `mcp`）；② 重起 :8100（`.venv/bin/python -m service.knowledge_api`），
+  `curl :8100/health` 仍 OK；③ 重起 deer-flow gateway，确认 agent 加载到 `ce-cost_bill_match` / `ce-cost_quota_lookup`
+  / `ce-cost_price_compose` 三工具；④ 实调一次 `bill_match`（spec=2024）+ `price_compose`（缺价资源应见 `no_source`）。

@@ -22,6 +22,7 @@
 """
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
@@ -30,6 +31,7 @@ from pydantic import BaseModel, Field
 from config import DEFAULTS, STANDARD_ALIASES
 from ir.query import RetrievalQuery
 from service.cost_api import router as cost_router
+from service.mcp_server import mcp as cost_mcp
 from service.retrieve_service import KnowledgeRetrieveService
 
 # data/ 路径由本文件位置推出（service/knowledge_api.py → 上两级即 ce-code 根），与 cwd 无关
@@ -38,7 +40,20 @@ _VECTOR_STORE = _ROOT / "data" / "vector_store"
 
 _service = KnowledgeRetrieveService(_VECTOR_STORE)
 
-app = FastAPI(title="Building Code RAG · Retrieval Service", version="3.0.0")
+
+@asynccontextmanager
+async def _lifespan(_: FastAPI):
+    """启动期手动跑组价 MCP 的 StreamableHTTP session manager。
+
+    Starlette 不会自动执行 ``app.mount`` 子应用的 lifespan，故 MCP session manager 必须由父
+    应用 lifespan 显式启动（否则挂在 /mcp 的 streamable-HTTP 端点不可用）。见 service.mcp_server。
+    """
+    async with cost_mcp.session_manager.run():
+        yield
+
+
+app = FastAPI(title="Building Code RAG · Retrieval Service", version="3.0.0",
+              lifespan=_lifespan)
 app.include_router(cost_router)                  # 造价取数原语（PG，依赖隔离，见 service.cost_api）
 
 
@@ -115,6 +130,14 @@ def clause_endpoint(standard: str, node_path: str) -> dict:
     if resp["clause"] is None:
         raise HTTPException(status_code=404, detail=f"条款 {node_path} 不存在于 {resp['standard']}")
     return resp
+
+
+# ── 组价取数原语 MCP façade（streamable-HTTP，url=/mcp）──────────────────────────
+# 必须在所有 @app.* 路由与 include_router 之后挂载：FastAPI 按注册顺序匹配，本服务自有端点
+# （/health /search /expand /clause + cost_router）先注册先匹配；MCP 子应用内部路由就是 /mcp
+# （见 mcp_server 的 streamable_http_path 默认值），故挂在根 "/"，最终对外即 :8100/mcp。
+# 注册：extensions_config.json mcpServers 加 ce-cost（type:http, url:http://localhost:8100/mcp）。
+app.mount("/", cost_mcp.streamable_http_app())
 
 
 if __name__ == "__main__":

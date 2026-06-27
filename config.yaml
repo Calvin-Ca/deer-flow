@@ -269,3 +269,21 @@ run_events:
   backend: jsonl
   max_trace_content: 10240
   track_token_usage: true
+channels:
+  # 频道统一回连本机 Gateway（非 Docker 部署用 localhost 即可）
+  langgraph_url: http://localhost:8001/api
+  gateway_url: http://localhost:8001
+  wechat:
+    enabled: true
+    # 首次没有 bot_token，用扫码绑定个人微信机器人；
+    # 二维码内容打到 Gateway 日志（[WeChat] QR login required / qrcode_img_content）
+    qrcode_login_enabled: true
+    # 已有 token 时改为直接填，注释掉 qrcode_login_enabled：
+    # bot_token: $WECHAT_BOT_TOKEN
+    # token / 长轮询游标持久化目录（Docker 部署务必挂卷，否则重启丢 token 要重扫）
+    state_dir: ./.deer-flow/wechat/state
+    # 访问白名单：空 = 任何加机器人的人都能用 agent（消耗额度+能跑沙箱）。
+    # 先空跑一次，从日志 [Manager] received inbound: channel=wechat ... chat_id=xxx
+    # 抓到对方 iLink user id 再填进来收紧。
+    allowed_users: []
+    polling_timeout: 35

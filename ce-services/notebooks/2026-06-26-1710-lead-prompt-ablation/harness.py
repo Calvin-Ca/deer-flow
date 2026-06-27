@@ -12,13 +12,16 @@
 不再 monkeypatch 框架内部。三个变体的占位符集都是当前 `apply_prompt_template` 已在传的
 kwargs 子集，故可被同一框架直接 format。
 
-判定口径（基于 `DeerFlowClient.stream` 的 StreamEvent）：
-- clarified  = 出现 name=="ask_clarification" 的 tool call
-- routed     = 出现 name=="bash" 且命令含 qa.py / cost.py 的 tool call
-- web_fallback = 出现 web_search / web_fetch / image_search 的 tool call（B 摘 web 后应恒 False，留作回归哨兵）
+判定口径（**跑完后从 checkpointer 最终 state 的 AIMessage.tool_calls 读完整 args**，
+不再从流事件判——流式 delta 把 name/args 切碎且 values 完整 message 被跳过，拼不回命令）：
+- clarified       = 出现 name=="ask_clarification" 的 tool call
+- routed          = 出现 bash 命令含 qa.py / cost.py（直跑脚本）
+- routed_subagent = 走 norm-qa / cost-agent 子 agent 工具触达 skill（problem 6「把 skill 当工具」反模式）
+- web_fallback    = 出现 web_search / web_fetch / image_search（B 摘 web 后应恒 False，留作回归哨兵）
 
 多轮：no_version 用例第一轮应反问，第二轮喂 gold 版本后再判是否调脚本（这是 problem 6
-「拿到版本后退回 web」现象的命门），故 routed 对 no_version 取**第二轮**。
+「拿到版本后退回 web」现象的命门），故 routed/routed_subagent 对 no_version 取**第二轮**
+（用 since_idx 把第二轮新增消息从历史里切出来单判）。
 
 只跑得动在服务器（需 config.yaml 指向 Qwen3-8B + 四服务起齐）；本地仅 `py_compile` 自检。
 """
@@ -89,55 +92,70 @@ def _apply_variant(variant_path: Path, client) -> None:
     client.reset_agent()
 
 
-def run_one(client, thread_id: str, message: str) -> dict:
-    """跑单轮对话，**先聚合整轮全部 tool-call 的 name 与 args**，再归纳判定。
+def _scan_tool_calls(messages: list, since_idx: int) -> tuple[list[str], str]:
+    """从最终 messages 的 `messages[since_idx:]` 段收集 AIMessage 的**完整** tool_calls。
 
-    为何先聚合：LangGraph 流式下同一个 tool call 的 `name` 和 `args` 会落在不同
-    chunk —— 带 `name=="bash"` 的 chunk 其 args 常为空 `{}`，命令文本在随后
-    `name==""` 的 chunk 才补齐。旧逻辑「在 name=="bash" 的同一 chunk 上查 args 含
-    qa.py」永远匹配不到，导致 route 判定恒 False。改为把整轮所有 args 拼成一个 blob、
-    所有非空 name 收成一串后统一判，规避 name/args 跨 chunk 分裂。
+    为何不从流事件判：DeerFlowClient.stream 用 LangGraph `messages` 模式逐 token 发
+    delta，每个 delta 的 `.tool_calls` 只是分片（name 先到、args 后到且被半解析成碎片
+    dict），而 `values` 模式的完整 message 对已 streamed 的 id 会被跳过——故流事件里拼不
+    回完整命令，route 判定恒失真。改为跑完后从 checkpointer 的最终 state 读 messages，
+    其 AIMessage.tool_calls 带完整 args。
+
+    参数：
+        messages:  agent 最终 state 里的 BaseMessage 列表（含全部历史轮）。
+        since_idx: 只看这个下标起的新消息（多轮用例靠它把 r2 与 r1 切开）。
+    返回：
+        (names, args_blob) —— 该段内全部 tool-call 名列表 + 其 args 拼成的一个串。
+    """
+    names: list[str] = []
+    args_chunks: list[str] = []
+    for msg in messages[since_idx:]:
+        for tc in getattr(msg, "tool_calls", None) or []:
+            name = tc.get("name", "") if isinstance(tc, dict) else getattr(tc, "name", "")
+            if name:
+                names.append(name)
+            args = (tc.get("args", {}) if isinstance(tc, dict) else getattr(tc, "args", {})) or {}
+            if args:
+                args_chunks.append(json.dumps(args, ensure_ascii=False, default=str))
+    return names, " ".join(args_chunks)
+
+
+def run_one(client, thread_id: str, message: str, since_idx: int = 0) -> dict:
+    """跑单轮对话，**跑完后从最终 state 读完整 tool_calls** 再归纳判定。
 
     参数：
         client:    DeerFlowClient 实例。
         thread_id: 线程 id（同一用例多轮用同一个，靠 checkpointer 续上下文）。
         message:   本轮发给 agent 的用户文本。
+        since_idx: 本轮判定只看 `messages[since_idx:]`（多轮把 r2 与 r1 切开）。
     返回：
-        {clarified, routed, routed_subagent, web_fallback, tool_calls:[name...], args_preview}
-        - routed          直跑脚本：聚合 args 里出现 qa.py / cost.py（仅 bash 调脚本会带此路径）。
+        {clarified, routed, routed_subagent, web_fallback, tool_calls, args_preview, msg_count}
+        - routed          直跑脚本：完整 args 里出现 qa.py / cost.py（仅 bash 调脚本会带此路径）。
         - routed_subagent 走 norm-qa / cost-agent 子 agent 工具触达本地 skill（problem 6 反模式）。
+        - msg_count       跑完后 state 内消息总数，供调用方作下一轮 since_idx。
     """
-    tool_names: list[str] = []
-    args_chunks: list[str] = []
+    # 仅消费流以推进 graph 执行；判定不再依赖流事件（见 _scan_tool_calls 注释）。
+    for _ in client.stream(message, thread_id=thread_id):
+        pass
 
-    for ev in client.stream(message, thread_id=thread_id):
-        if ev.type != "messages-tuple":
-            continue
-        data = ev.data or {}
-        if data.get("type") != "ai":
-            continue
-        for tc in data.get("tool_calls", []) or []:
-            name = tc.get("name", "")
-            if name:
-                tool_names.append(name)
-            args = tc.get("args", {})
-            if args:
-                args_chunks.append(json.dumps(args, ensure_ascii=False))
+    state = client._agent.get_state({"configurable": {"thread_id": thread_id}})
+    messages = (state.values or {}).get("messages", []) if state else []
+    names, args_blob = _scan_tool_calls(messages, since_idx)
 
-    args_blob = " ".join(args_chunks)
-    clarified = "ask_clarification" in tool_names
+    clarified = "ask_clarification" in names
     # 直跑脚本：脚本路径（含 qa.py / cost.py）只可能出现在 bash 命令 args 里——
-    # read_file 读的是 SKILL.md（路径不含 .py），故聚合 args 命中 marker 即真正发起了脚本调用。
+    # read_file 读的是 SKILL.md（路径不含 .py），故 args 命中 marker 即真正发起了脚本调用。
     routed = any(m in args_blob for m in SCRIPT_MARKERS)
-    routed_subagent = any(n in SUBAGENT_TOOLS for n in tool_names)
-    web_fallback = any(n in WEB_TOOLS for n in tool_names)
+    routed_subagent = any(n in SUBAGENT_TOOLS for n in names)
+    web_fallback = any(n in WEB_TOOLS for n in names)
     return {
         "clarified": clarified,
         "routed": routed,
         "routed_subagent": routed_subagent,
         "web_fallback": web_fallback,
-        "tool_calls": tool_names,
+        "tool_calls": names,
         "args_preview": args_blob[:600],  # 留证供回看实际命令
+        "msg_count": len(messages),
     }
 
 
@@ -159,8 +177,9 @@ def eval_case(client, case: dict) -> dict:
     routed = r1["routed"]
     routed_subagent = r1["routed_subagent"]
     if case.get("group") == "no_version" and case.get("gold"):
-        # 第二轮喂澄清后的版本，模拟用户回答；problem 6 的命门在这一轮
-        r2 = run_one(client, thread_id, str(case["gold"]))
+        # 第二轮喂澄清后的版本，模拟用户回答；problem 6 的命门在这一轮。
+        # since_idx 取 r1 跑完后的消息总数，使 r2 判定只看第二轮新增消息。
+        r2 = run_one(client, thread_id, str(case["gold"]), since_idx=r1["msg_count"])
         routed = r2["routed"]
         routed_subagent = r2["routed_subagent"]
     web_fallback = r1["web_fallback"] or (bool(r2) and r2["web_fallback"])

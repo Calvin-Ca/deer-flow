@@ -146,6 +146,71 @@ unit_factor；按 region + 时效取，on_date 命中期优先、缺省取最新
 
 ---
 
+## 7. 原语对外暴露：HTTP + MCP 双 façade（方案，2026-06-27）
+
+> 全局分层（skill / tool / MCP 的区别、7 步映射、四条设计原则）见 `../ce-services/DEV.md`「组价能力对外暴露」。
+> 本节只定义**知识层这一侧**：把三个取数原语在现有 HTTP 之外加 MCP 暴露，成为可被多消费方（算量/审图/FM）
+> 直接以 tool 调用的**横切共享底座**。
+
+### 双轨暴露（HTTP 不动，加 MCP façade）
+
+| 轨 | 形态 | 消费方 | 用途 |
+|---|---|---|---|
+| HTTP REST（现状） | `:8100` `/bill/match` `/quota` `/price/compose` | 任务层编排服务（service-to-service） | 确定性编排串原语，**不需要 function-calling**，保留 |
+| MCP façade（新增） | 三原语包成**真正讲 MCP 协议的 server**，注册进 deer-flow `extensions_config.json` | 任意 agent 直接作 tool 调 | 应对**中间步 / 部分请求**（"只查价"/"只选码候选"）+ 将来强模型自由编排 |
+
+> ⚠️ **关键纠正（2026-06-27 核实 backend `deerflow/mcp`）**：MCP 的 `type:http` 指 **MCP-over-HTTP（streamable
+> HTTP）协议，不是任意 REST**。**现有 FastAPI :8100 REST 端点本身不是 MCP server，不能在 `mcpServers` 里直接指
+> url 接上**。MCP façade 必须**新写一个讲 MCP 协议的 server**（用已装的 `mcp` 包 / FastMCP），把三原语函数包成
+> `@mcp.tool`——但**复用同一份 PG/Milvus 取数实现**（`cost.bill_match.search_bill` / `cost.query.compose_price` /
+> quota 直取），不重写取数逻辑。
+
+### deer-flow MCP 注册机制（核实结论）
+
+- **配置位置**：项目根 `extensions_config.json` 的 `mcpServers` 映射（同文件 `skills` 段已注册 cost-agent/norm-qa）。
+  启动时 `deerflow.mcp.initialize_mcp_tools()` 经 `MultiServerMCPClient`(`langchain-mcp-adapters`) 加载并缓存
+  （按 config 文件 mtime 刷新），`get_available_tools(include_mcp=True)` 并入 agent。依赖 `mcp`+`langchain_mcp_adapters`（已装）。
+- **transport 三选一**（`McpServerConfig`）：`stdio`(`command`/`args`/`env`，deer-flow 起子进程) ｜ `http`/`sse`(`url`/`headers`，+ 可选 OAuth/`mcpInterceptors`)。
+- **选 `http`（FastMCP streamable-HTTP）**：:8100 本就常驻、原语带 Milvus/PG/embedding 重依赖、要被多消费方共享 →
+  起常驻 MCP 端点各客户端走 `url` 连，比 stdio（每客户端 spawn 子进程）更契合共享底座。原语无状态只读，不需 session_pool。
+- **工具命名**：`tool_name_prefix=True` → 工具名自动加 `{server_name}_` 前缀（如 server 名 `ce-cost` → agent 见
+  `ce-cost_bill_match`）。命名 server 时注意这点。
+- **配置范例**（拟加入 `mcpServers`）：
+
+  ```json
+  "ce-cost": {
+    "enabled": true,
+    "type": "http",
+    "url": "http://localhost:8100/mcp",
+    "description": "深圳房建组价取数原语：bill_match / quota_lookup / price_compose"
+  }
+  ```
+
+### 三原语（粒度按用户操作边界，与现有端点一一对应，不新造语义）
+
+| MCP 工具 | 对应端点 | 入参（schema 强制） | 出参要点 |
+|---|---|---|---|
+| `bill_match` | `/bill/match` | `description`, **`spec` 必填**, `region=深圳`, `top_k=10` | 清单候选（知识层只给候选，选码归任务层） |
+| `quota_lookup` | `/quota` | `region`, `code`, **`spec` 必填** | 定额子目 + 人材机含量直取 |
+| `price_compose` | `/price/compose` | `region`, `code`, **`spec` 必填** | 含量 ⋈ 信息价；未命中价 `no_source` |
+
+### 红线落原语边界（不依赖上层编排）
+
+一旦允许 agent 直接打单个原语，复合 skill 就不再是唯一守门人 → 既有服务端约束（§3.2 / §4）即原语自带护栏，
+**MCP schema 须把强制项复述清楚**：
+
+- **`spec` 必填、无默认**（`config.SPEC_REGISTRY` + `resolve_spec`）：逼调用方选版本，杜绝 2013/2024 串库。
+- **`price_compose` 未命中信息价 → `unit_price=None` + `price_status="no_source"`，绝不杜撰**（§4.2）。
+- **2013 `supports_compose=False`**：`price_compose?spec=2013` → 501 / 结构化拒答（组价数据未就绪，仅 `bill_match` 可用）。
+- **`bill_match` 只召回候选、不定 Top-1**：选码（含"不造码/低置信转人工"）归任务层（§4.1），原语不越界做选码。
+
+> 落地顺序（注册方式已核实，见上）：① 用 FastMCP 起 MCP server（http transport），三原语 `@mcp.tool` 包装、
+> 复用现有取数函数、schema 复述红线；② 端点挂上 :8100（如 `/mcp`）或同址旁挂常驻；③ `extensions_config.json`
+> `mcpServers` 加 `ce-cost` 条目（范例见上）；④ 服务器重启 gateway 验证 agent 加载到 `ce-cost_*` 工具。
+> 任务层编排继续走 HTTP REST（零改动）。新增工作量集中在 façade 包装 + schema 红线复述，**不动取数内核**。
+
+---
+
 ## 附录 · 关键决策速查
 
 - **造价取数一律走 PG**（不走 chunks.json）：chunks 只是抽取的中间产物，单一事实源是 PG。

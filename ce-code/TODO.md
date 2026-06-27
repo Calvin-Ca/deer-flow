@@ -123,3 +123,16 @@ PG `ce_cost`（:5433）已灌齐，组价取数链通（清单→定额→工料
 ### E. 规范条文检索（已移除，按需重建）
 - [ ] 如需"查计价规则原文"，以干净模块重建条文检索（不复活旧 RAG）；当前 `price_composition` 结构化表已覆盖
   费用构成查询需求。
+
+### F. 取数原语 MCP 化（⬜ 方案见 `DEV.md §7`）
+> 方案：`DEV.md §7`「原语对外暴露：HTTP + MCP 双 façade」+ 全局分层 `../ce-services/DEV.md`「组价能力对外暴露」。
+> 目的：三原语成为横切共享底座（算量/审图/FM 直接以 tool 调），服务中间步请求 + 将来强模型自由编排。
+- [x] **确认 deer-flow MCP 注册方式**（✅ 2026-06-27，核实 `backend/.../deerflow/mcp`）：配 `extensions_config.json`
+  `mcpServers`（同文件已注册 skills）；`MultiServerMCPClient`(`langchain-mcp-adapters`) 启动加载缓存；transport
+  选 `http`(FastMCP streamable-HTTP)；`tool_name_prefix=True` → 工具名带 `{server_name}_` 前缀。**纠正**：`type:http`
+  是 MCP 协议非任意 REST，现有 :8100 REST 不能直接当 MCP server。详见 `DEV.md §7`。
+- [ ] 用 **FastMCP（http transport）** 起 MCP server，把 `bill_match` / `quota_lookup`(/quota) / `price_compose`
+  包成 `@mcp.tool`（**复用现有取数函数 `search_bill`/`compose_price`/quota，不动取数内核，不反代 REST**）；
+  挂 :8100 `/mcp` 或同址旁挂；`extensions_config.json` `mcpServers` 加 `ce-cost` 条目。HTTP REST 保留供任务层编排（零改动）。
+- [ ] **红线复述进 MCP schema**（原语自带护栏，不依赖上层编排）：`spec` 必填无默认 / `price_compose` 缺价
+  `no_source` 不杜撰 / 2013 `supports_compose=False`→501 / `bill_match` 只给候选不定 Top-1。

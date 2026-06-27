@@ -115,6 +115,16 @@
 
 ### P2 —— 综合单价组装（⬜ 待办）
 - [ ] `cost/pricing.py`：人材机费 →（`fee_rate` 管理费/利润/风险 + `price_composition` 构成规则）→ 综合单价 → 含税造价，**确定性公式**（LLM 不算钱）。
+  按 tool/MCP 分层方案（DEV「组价能力对外暴露」），做成**带 `args_schema` 校验的确定性 tool `compute_unit_price`**——
+  动钱那步要 pydantic 闸门，无论谁/哪条路径调用都拦在边界；既供复合入口内部调用，也可单独暴露给 agent。
+
+### 原语 / 复合入口的 tool·MCP 暴露（⬜ 待办，方案见 DEV）
+> 方案：`DEV.md`「组价能力对外暴露：skill / tool / MCP 分层方案」+ `../ce-code/DEV.md §7`。
+> 原则：原语 first-class（独立可调）/ 复合入口非 chokepoint / 红线下沉原语边界 / 能力分级。
+- [ ] **知识层三原语加 MCP façade**（`bill_match` / `quota_lookup` / `price_compose`）：归 ce-code，见 `../ce-code/TODO.md`。
+- [ ] **复合入口 `cost_compose` 保持并列、非 chokepoint**：`/cost/compose` + `cost-agent` skill 已就位，确认中间步请求
+  （只查价 / 只选码候选）能直接打原语、不被迫走复合入口。
+- [ ] **`compute_unit_price` tool**（见上 P2）：P2 落地时一并按 tool 形态暴露。
 
 ### P3 —— deer-flow agent + skill（🟢 注册层闭环，待服务器验多轮）
 - [x] **注册 `cost-agent` + skill**（✅ 2026-06-23，代码就位待服务器验）：对标 norm-qa 三件套——

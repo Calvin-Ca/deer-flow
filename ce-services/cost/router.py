@@ -15,10 +15,26 @@ from pydantic import BaseModel, Field
 
 from common.config import LLM_MODEL_ID, LLM_URL
 from cost import orchestration
+from cost.pricing import UnitPriceInput, compute_unit_price
 
 logger = logging.getLogger("ce-services.cost")
 
 router = APIRouter(tags=["cost-agent"])
+
+
+class PricingRates(BaseModel):
+    """组价费率块（可选）—— 给定则 ``/cost/compose`` 末步对每条定额算综合单价（确定性、不入 LLM）。
+
+    字段：management_fee_rate / profit_rate —— 管理费率 / 利润率（%，库内无须 HITL 给定）；
+      risk_rate —— 风险费率（%，默认 0）；fee_base —— 取费基数（labor / labor_machine / lmm，必填）；
+      tax_rate —— 增值税率（%，可选）。缺该块时 ``/cost/compose`` 维持 P1 行为（仅选码 + 取数，不算钱）。
+    """
+
+    management_fee_rate: float = Field(..., description="管理费率 %")
+    profit_rate: float = Field(..., description="利润率 %")
+    risk_rate: float = Field(0.0, description="风险费率 %，默认 0")
+    fee_base: str = Field(..., description="取费基数：labor / labor_machine / lmm")
+    tax_rate: float | None = Field(None, description="增值税率 %，可选")
 
 
 class CostComposeRequest(BaseModel):
@@ -29,12 +45,14 @@ class CostComposeRequest(BaseModel):
         spec —— 国标版本（2013/2024）；**必填**，按版本隔离清单库/组价取数，不设默认避免错版串库。
         region —— 地区（如「深圳」），用于信息价/定额取数。
         top_k —— 清单候选召回数。
+        rates —— 可选费率块（``PricingRates``）；给定则末步算综合单价，否则维持 P1 仅选码+取数。
     """
 
     description: str = Field(..., description="构件/做法描述")
     spec: str = Field(..., description="国标版本 2013/2024")
     region: str = Field("深圳", description="地区，默认深圳")
     top_k: int = 10
+    rates: PricingRates | None = Field(None, description="可选费率块，给定则算综合单价")
 
 
 @router.post("/cost/compose")
@@ -50,6 +68,7 @@ def cost_compose_endpoint(req: CostComposeRequest) -> dict:
     try:
         result = orchestration.compose(
             req.description, req.spec, req.region, LLM_URL, LLM_MODEL_ID, top_k=req.top_k,
+            rates=req.rates.model_dump() if req.rates else None,
         )
     except requests.HTTPError as exc:
         code = exc.response.status_code if exc.response is not None else 503
@@ -66,3 +85,15 @@ def cost_compose_endpoint(req: CostComposeRequest) -> dict:
                 result.get("selection", {}).get("need_review"), result.get("price_status"), elapsed_ms)
     result["meta"] = {"elapsed_ms": round(elapsed_ms), "top_k": req.top_k}
     return result
+
+
+@router.post("/cost/unit-price")
+def cost_unit_price_endpoint(req: UnitPriceInput) -> dict:
+    """综合单价计算原语（P2 ``compute_unit_price`` 的 HTTP 表面）——人材机费 + 费率 → 综合单价 →（可选）含税。
+
+    参数：req —— ``UnitPriceInput``；FastAPI 据其 pydantic schema 自动校验，非法入参（负数 / NaN/Inf /
+      缺取费基数 / 多余字段）直接 422——这就是「算钱那步的 pydantic 闸门」，无论谁/哪条路径调用都被拦在边界。
+    返回：``compute_unit_price`` 结果（综合单价 + 六项构成 + 综合合价 + 可选含税 + 溯源 + 红线声明）。
+      纯确定性、不入 LLM；费率由调用方给定，本端点不杜撰、不内置地区默认。
+    """
+    return compute_unit_price(req)

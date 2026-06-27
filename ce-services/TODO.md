@@ -113,10 +113,24 @@
 
 **红线**：选码 `need_review`（低置信→HITL，只建议不定稿）/ `no_source` 不杜撰、透传缺口 / `spec` 必填 / **P1 不算钱**。
 
-### P2 —— 综合单价组装（⬜ 待办）
-- [ ] `cost/pricing.py`：人材机费 →（`fee_rate` 管理费/利润/风险 + `price_composition` 构成规则）→ 综合单价 → 含税造价，**确定性公式**（LLM 不算钱）。
-  按 tool/MCP 分层方案（DEV「组价能力对外暴露」），做成**带 `args_schema` 校验的确定性 tool `compute_unit_price`**——
-  动钱那步要 pydantic 闸门，无论谁/哪条路径调用都拦在边界；既供复合入口内部调用，也可单独暴露给 agent。
+### P2 —— 综合单价组装（🟢 tool + 端点 + 复合入口接线就位，本地验证；待服务器联调）
+- [x] **`cost/pricing.py` `compute_unit_price`**（✅ 2026-06-27，本地验证）：纯确定性算钱器，按 GB 50500
+  §2.0.9「综合单价 = 人工费 + 材料费 + 施工机具使用费 + 管理费 + 利润 + 风险费用（不含增值税）」。
+  **pydantic 闸门 `UnitPriceInput`**（`extra=forbid`、金额/费率 `ge=0` + `allow_inf_nan=False`、`quantity>0`、
+  `fee_base` 必填枚举 labor/labor_machine/lmm）——动钱那步无论谁/哪条路径调用都被这道 schema 拦在边界。
+  管理费/利润/风险=**取费基数 × 费率**，Decimal `ROUND_HALF_UP` 逐项量化到分；可选 `tax_rate` → 含税合价。
+  本地 4 路径验证：正常+含税、lmm 基数无税、ROUND_HALF_UP（2.345→2.35 非 banker's）、闸门 7 例全拦。
+  - **🔴 红线落地（不杜撰动钱）**：费率库 `fee_rate` **只收录**安文措施费/夜间/赶工/总包/增值税/附加税/工程
+    保险费，**不含管理费、利润率**；定额 `base_price` 亦为净人材机基价。故管理费/利润率**一律由调用方（HITL）
+    按工程类别给定**，工具绝不内置默认；取费基数 `fee_base` 亦显式声明、不按地区猜——本工具不替任何动钱
+    数字填默认（填了即杜撰）。**待办**：知识层补抽管理费/利润率表（深圳消耗量标准/费率标准），方可由复合入口自动喂率。
+- [x] **暴露为 tool（HTTP 表面）+ 接入复合入口**（✅ 2026-06-27，本地验证）：
+  ① 独立端点 `POST /cost/unit-price`（body=`UnitPriceInput`，FastAPI 据 schema 自动 422=pydantic 闸门），
+  main.py `/health.routes` 加该路由；② `/cost/compose` 加可选 `rates` 块（管理费/利润/风险率 + 取费基数 + 税率），
+  给定则末步 `orchestration._price_unit_prices` 对每条定额按**定额基价**算综合单价（缺基价→`missing_base` 不杜撰），
+  缺 `rates` 维持 P1 行为（仅选码 + 取数、不算钱）——复合入口非 chokepoint，原语亦可单独打。本地验证算价 + 缺基价 guard。
+- [ ] **服务器联调**：起 :8101 实打 `/cost/unit-price`（验 422 闸门）+ `/cost/compose` 带 rates（验末步算价）。
+- [ ] **价差精算（follow-up）**：当前综合单价以**定额基价**为人材机口径；信息价价差调整（amount 基）属后续精算，未做。
 
 ### 原语 / 复合入口的 tool·MCP 暴露（⬜ 待办，方案见 DEV）
 > 方案：`DEV.md`「组价能力对外暴露：skill / tool / MCP 分层方案」+ `../ce-code/DEV.md §7`。
@@ -124,7 +138,8 @@
 - [ ] **知识层三原语加 MCP façade**（`bill_match` / `quota_lookup` / `price_compose`）：归 ce-code，见 `../ce-code/TODO.md`。
 - [ ] **复合入口 `cost_compose` 保持并列、非 chokepoint**：`/cost/compose` + `cost-agent` skill 已就位，确认中间步请求
   （只查价 / 只选码候选）能直接打原语、不被迫走复合入口。
-- [ ] **`compute_unit_price` tool**（见上 P2）：P2 落地时一并按 tool 形态暴露。
+- [x] **`compute_unit_price` tool**（✅ 2026-06-27，见上 P2）：已按 tool 形态暴露——独立端点 `POST /cost/unit-price`
+  （pydantic 闸门）+ 复合入口 `/cost/compose` 内部可选调用，两路并列、红线（不杜撰费率/取费基数显式）在原语边界自带。
 
 ### P3 —— deer-flow agent + skill（🟢 注册层闭环，待服务器验多轮）
 - [x] **注册 `cost-agent` + skill**（✅ 2026-06-23，代码就位待服务器验）：对标 norm-qa 三件套——

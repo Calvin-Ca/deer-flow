@@ -17,7 +17,37 @@ from typing import Any
 import requests
 
 from common import cost_client
+from cost.pricing import UnitPriceInput, compute_unit_price
 from cost.selection import select_code
+
+
+def _price_unit_prices(price: dict[str, Any], rates: dict[str, Any]) -> None:
+    """对组价取数结果的每条定额，按定额基价 + 费率算综合单价，原地挂到各 quota（确定性、不入 LLM）。
+
+    参数：price —— ``price_compose`` 结果（含 quotas[].labor_cost/material_cost/machine_cost 定额基价）；
+      rates —— 费率块（management_fee_rate/profit_rate/risk_rate/fee_base/tax_rate）。
+    返回：None（原地为每条 quota 增 ``unit_price``：算成则为 compute_unit_price 结果，
+      定额缺人材机基价则 ``{"status": "missing_base"}``——绝不拿缺失基价杜撰）。
+    口径：以**定额基价**（净人材机，不含信息价价差调整）为人材机费；价差调整属后续精算，不在此步。
+    """
+    for quota in price.get("quotas", []):
+        labor = quota.get("labor_cost")
+        material = quota.get("material_cost")
+        machine = quota.get("machine_cost")
+        if labor is None or material is None or machine is None:
+            quota["unit_price"] = {"status": "missing_base"}
+            continue
+        inp = UnitPriceInput(
+            labor_cost=float(labor),
+            material_cost=float(material),
+            machine_cost=float(machine),
+            management_fee_rate=rates["management_fee_rate"],
+            profit_rate=rates["profit_rate"],
+            risk_rate=rates.get("risk_rate", 0.0),
+            fee_base=rates["fee_base"],
+            tax_rate=rates.get("tax_rate"),
+        )
+        quota["unit_price"] = compute_unit_price(inp)
 
 
 def compose(
@@ -27,12 +57,15 @@ def compose(
     llm_url: str,
     model_id: str,
     top_k: int = 10,
+    rates: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """构件描述 → 候选 → 选码 → 组价取数，组装端到端结果。
 
     参数：
         description —— 构件/做法描述；spec —— 国标版本（2013/2024，必填）；region —— 地区（如「深圳」）；
-        llm_url / model_id —— Qwen3 vLLM 配置；top_k —— 候选召回数。
+        llm_url / model_id —— Qwen3 vLLM 配置；top_k —— 候选召回数；
+        rates —— 可选费率块（management_fee_rate/profit_rate/risk_rate/fee_base/tax_rate）；给定且组价取数 ok
+        时为每条定额算综合单价（P2，确定性不入 LLM），缺则维持 P1 行为（仅选码 + 取数，不算钱）。
     返回：
         ``{description, spec, region, candidates_count, selection, code, price, price_status}``：
         - selection —— select_code 全量结果（code/confidence/reason/need_review/alternatives）；
@@ -67,7 +100,11 @@ def compose(
 
     # ④ 组价取数；spec=2013 未就绪（501）降级透传，不丢选码结果
     try:
-        result["price"] = cost_client.price_compose(region, code, spec)
+        price = cost_client.price_compose(region, code, spec)
+        # ⑤（可选）给定费率块 → 末步对每条定额算综合单价（确定性、不入 LLM）
+        if rates is not None:
+            _price_unit_prices(price, rates)
+        result["price"] = price
         result["price_status"] = "ok"
     except requests.HTTPError as exc:
         status = exc.response.status_code if exc.response is not None else None

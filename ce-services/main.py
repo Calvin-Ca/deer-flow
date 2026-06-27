@@ -8,7 +8,8 @@
 端点：
   GET  /health        健康检查（含知识服务 / LLM 地址）
   POST /norm/qa       造价规范条文检索 + Qwen3 带引用作答（norm-qa）
-  POST /cost/compose  构件描述 → 候选召回 → LLM 选码 → 组价取数（cost-agent，P1 选码闭环）
+  POST /cost/compose  构件描述 → 候选召回 → LLM 选码 → 组价取数（cost-agent，P1 选码闭环；传 rates 则算综合单价）
+  POST /cost/unit-price 综合单价计算原语（P2，确定性算钱、pydantic 闸门、不入 LLM）
 
 启动：
   cd ce-services && uv run python main.py
@@ -45,7 +46,7 @@ def health() -> dict:
         "service": "tasks",
         "knowledge_url": KNOWLEDGE_URL,
         "llm_url": LLM_URL,
-        "routes": ["/norm/qa", "/cost/compose"],
+        "routes": ["/norm/qa", "/cost/compose", "/cost/unit-price"],
     }
 
 

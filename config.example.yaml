@@ -746,9 +746,11 @@ skills:
 # that are a subset of apply_prompt_template's format kwargs.
 
 lead_agent:
+  # null = built-in SYSTEM_PROMPT_TEMPLATE, which already embeds the <skill_runbook>
+  # block adopted from the 2026-06-26 prompt-ablation E1 (V2). No override needed for prod.
   system_prompt_path: null
-  # Example — switch to an ablation prompt variant:
-  # system_prompt_path: ce-services/notebooks/2026-06-26-1710-lead-prompt-ablation/prompts/v2_runbook_saturated.txt
+  # Example — only to A/B an alternative ablation variant against the default:
+  # system_prompt_path: ce-services/notebooks/2026-06-26-1710-lead-prompt-ablation/prompts/v1_current_costized.txt
 
 # ============================================================================
 # Title Generation Configuration

@@ -426,6 +426,42 @@ def test_apply_prompt_template_uses_override_template(monkeypatch, tmp_path):
     assert prompt == "OVERRIDE PROMPT for CostBot"
 
 
+def test_default_template_embeds_skill_runbook():
+    """内置默认模板已固化 <skill_runbook>（E1 消融采纳 V2）：脚本直跑契约 + 反退网兜底。"""
+    template = prompt_module.SYSTEM_PROMPT_TEMPLATE
+
+    assert '<skill_runbook priority="高">' in template
+    assert "</skill_runbook>" in template
+    # 两个脚本的死命令模板与代号必须在常驻 prompt 面可见（无需先 read_file）
+    assert "/mnt/skills/public/norm-qa/qa.py" in template
+    assert "/mnt/skills/public/cost-agent/cost.py" in template
+    assert "gb50854-2024" in template
+    # 纠正"一任务一工具"先验 + 禁止退回联网搜索（problem 6 命门）
+    assert "不是工具表里的工具" in template
+    assert "严禁用联网搜索代替脚本" in template
+
+
+def test_apply_prompt_template_default_includes_runbook(monkeypatch):
+    """默认路径（system_prompt_path 未设）渲染出的 prompt 含 runbook，且 .format 不因花括号报错。"""
+    config = SimpleNamespace(
+        sandbox=SimpleNamespace(mounts=[]),
+        skills=SimpleNamespace(container_path="/mnt/skills"),
+        lead_agent=SimpleNamespace(system_prompt_path=None),
+    )
+    monkeypatch.setattr("deerflow.config.get_app_config", lambda: config)
+    monkeypatch.setattr(prompt_module, "_get_enabled_skills", lambda: [])
+    monkeypatch.setattr(prompt_module, "get_deferred_tools_prompt_section", lambda **kwargs: "")
+    monkeypatch.setattr(prompt_module, "_build_acp_section", lambda **kwargs: "")
+    monkeypatch.setattr(prompt_module, "_get_memory_context", lambda agent_name=None, **kwargs: "")
+    monkeypatch.setattr(prompt_module, "get_agent_soul", lambda agent_name=None: "")
+
+    prompt = prompt_module.apply_prompt_template()
+
+    assert "<skill_runbook" in prompt
+    assert "python3 /mnt/skills/public/cost-agent/cost.py" in prompt
+    assert "照 runbook 调脚本" in prompt
+
+
 def test_warm_enabled_skills_cache_logs_on_timeout(monkeypatch, caplog):
     event = threading.Event()
     monkeypatch.setattr(prompt_module, "_ensure_enabled_skills_cache", lambda: event)

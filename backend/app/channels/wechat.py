@@ -148,6 +148,9 @@ class WechatChannel(Channel):
     DEFAULT_QRCODE_BOT_TYPE = 3
     DEFAULT_API_TIMEOUT = 15.0
     DEFAULT_CONFIG_TIMEOUT = 10.0
+    # get_qrcode_status 是服务端长轮询（实测 hold ~30s 才返回 wait/confirmed），
+    # 客户端超时必须盖过该窗口，否则每次 10s 就 ReadTimeout、二维码被反复重生成无法扫描。
+    DEFAULT_QRCODE_STATUS_TIMEOUT = 60.0
     DEFAULT_CDN_TIMEOUT = 30.0
     DEFAULT_IMAGE_DOWNLOAD_DIRNAME = "downloads"
     DEFAULT_MAX_IMAGE_BYTES = 20 * 1024 * 1024
@@ -677,6 +680,7 @@ class WechatChannel(Channel):
             status_data = await self._request_public_get_json(
                 "/ilink/bot/get_qrcode_status",
                 params={"qrcode": qrcode},
+                timeout=self.DEFAULT_QRCODE_STATUS_TIMEOUT,
             )
             status = str(status_data.get("status") or "").strip().lower()
             if status == "confirmed":

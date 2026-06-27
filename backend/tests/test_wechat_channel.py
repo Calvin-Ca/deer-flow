@@ -1244,6 +1244,8 @@ def test_qrcode_login_binds_and_persists_auth_state(monkeypatch, tmp_path: Path)
         assert channel._ilink_bot_id == "bot-99"
         assert get_calls[0]["url"].endswith("/ilink/bot/get_bot_qrcode")
         assert get_calls[1]["url"].endswith("/ilink/bot/get_qrcode_status")
+        # get_qrcode_status 是服务端长轮询（~30s），客户端超时必须盖过该窗口
+        assert get_calls[1].get("timeout", 0) >= 30
 
         auth_state = json.loads((state_dir / "wechat-auth.json").read_text(encoding="utf-8"))
         assert auth_state["status"] == "confirmed"

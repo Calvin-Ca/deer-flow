@@ -104,17 +104,38 @@ def resume(task_id: str, decision: dict[str, Any]) -> dict[str, Any]:
     return _format(task_id, result)
 
 
+def _pending_interrupt(snapshot: Any) -> Any:
+    """从图快照里提取**当前挂起的 interrupt 闸 payload**（供按 task_id 恢复渲染当前闸）。
+
+    参数：snapshot —— ``graph.get_state`` 的 StateSnapshot。
+    返回：第一个挂起 task 的首个 interrupt 的 value（即闸 payload）；无挂起 → None。
+    langgraph 把暂停点挂在 ``snapshot.tasks[*].interrupts``，``invoke`` 的 ``__interrupt__`` 不落 state，
+    故重新读 state（如前端内嵌组件按 task_id 拉当前闸 / 进程重启后恢复）须从这里取。
+    """
+    if not snapshot:
+        return None
+    for task in getattr(snapshot, "tasks", ()) or ():
+        interrupts = getattr(task, "interrupts", ()) or ()
+        if interrupts:
+            return interrupts[0].value
+    return None
+
+
 def get_state(task_id: str) -> dict[str, Any]:
     """读会话当前持久化状态（不推进图）。
 
-    参数：task_id。返回：``{task_id, status, next, values}``——values 为完整 §5.4 状态文档
-      （含已钉 code/quota、overrides、audit_log）；next 为待跑节点（空=已完成）。
+    参数：task_id。返回：``{task_id, status, interrupt, next, values}``——values 为完整 §5.4 状态文档
+      （含已钉 code/quota、overrides、audit_log）；next 为待跑节点（空=已完成）；
+      interrupt 为当前挂起的闸 payload（非空即 ``status=awaiting_input``，供按 task_id 恢复渲染当前闸）。
     """
     snapshot = _graph.get_state(_config(task_id))
     values = snapshot.values if snapshot else {}
+    interrupt = _pending_interrupt(snapshot)
+    status = "awaiting_input" if interrupt is not None else values.get("status", "unknown")
     return {
         "task_id": task_id,
-        "status": values.get("status", "unknown"),
+        "status": status,
+        "interrupt": interrupt,
         "next": list(snapshot.next) if snapshot else [],
         "values": values,
     }

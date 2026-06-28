@@ -1,6 +1,6 @@
 ---
 name: cost-agent
-description: 算量计价 CostAgent 技能。接收构件/做法的自然语言描述做组价。两种模式：① 一次性「选码+组价取数」（compose，快速查清单码/取数）；② 可中断 HITL 完整组价流程（start/resume，逐闸：编码→定额→信息价→费率→参数→总造价复核，每个需人介入点用 ask_clarification 停下来等用户确认/录入，最后出总造价）。覆盖深圳房建组价（清单计量国标 GB 50854 2013/2024 双版隔离）。适用于"C30现浇矩形柱组价""走完整组价流程算到总造价""某砌体墙套什么清单码"。强制：版本不猜先反问、选码只在候选内不造码、低置信转人工、缺价不杜撰、费率/税率等政策数由用户给不替填默认。
+description: 算量计价 CostAgent 技能。接收构件/做法的自然语言描述做组价。两种模式：① 一次性「选码+组价取数」（compose，快速查清单码/取数）；② 可中断 HITL 完整组价（start：agent 起会话并吐 cost-hitl marker，前端据此内嵌交互控件，用户在控件里逐闸确认编码/定额/价格/费率→出总造价，agent 不逐闸驱动）。覆盖深圳房建组价（清单计量国标 GB 50854 2013/2024 双版隔离）。适用于"C30现浇矩形柱组价""走完整组价流程算到总造价""某砌体墙套什么清单码"。强制：版本不猜先反问、选码只在候选内不造码、低置信转人工、缺价不杜撰、费率/税率等政策数由用户给不替填默认、HITL 闸交互交给内嵌控件不替用户决策。
 ---
 
 # 算量计价 CostAgent（cost-agent）
@@ -40,76 +40,50 @@ python3 /mnt/skills/public/cost-agent/cost.py compose \
 
 ---
 
-## 模式二：可中断 HITL 完整组价（start / resume）—— 对话驱动
+## 模式二：可中断 HITL 完整组价（start）—— 内嵌交互控件，你只「点火」
 
-**核心循环**：`start` 拿到第一个闸 → 把闸呈现给用户、用 `ask_clarification` 收他的决策 → 把决策转成 JSON 调 `resume` → 拿到下一个闸 → 重复，直到 `status=done`（出总造价）或 `blocked`。
+**重要：你（agent）不逐闸驱动、不替用户做决策。** 你只做两件事：① 确认版本后 `cost.py start` 起会话；
+② 把 start 输出的 `cost-hitl` 代码块**原样贴进回复**。之后前端会据此**内嵌渲染交互式组价控件**，
+用户在控件里逐闸点选/录入（编码确认、定额确认、缺价录入、费率、参数、总造价复核），控件直接驱动会话——
+**全程不再经过你**。这就把「弱模型不当编排器」的红线交还给了结构化控件。
 
-### 步骤 0：先确认版本（红线 1），再起会话
+### 步骤 0：先确认版本（红线 1）+ 描述够（红线 2）
+
+### 步骤 1：起会话
 
 ```bash
 python3 /mnt/skills/public/cost-agent/cost.py start \
   --description "C30现浇矩形柱" --spec 2024 --region 深圳
 ```
 
-返回精简视图：
-```json
-{"task_id": "abc123...", "status": "awaiting_input", "gate": { ...闸 payload... }}
+stdout 会输出一个 marker 代码块，形如：
+
+````
+```cost-hitl
+{"task_id": "abc123..."}
 ```
-**记住 `task_id`**——后面每次 `resume` 都要用同一个（它在你这次 start 的输出里，务必回看）。
+````
 
-### 步骤 1：循环——按 `gate.gate_type` 呈现闸 + 收决策 + resume
+### 步骤 2：把 marker 原样贴进回复，然后停
 
-读 `gate.gate_type`，分三类处理。**每类都先用 `ask_clarification` 把闸内容如实呈现给用户**（带依据，不替用户决定），拿到用户回答后转成 decision JSON，调：
+- **把那个 ```cost-hitl 代码块一字不改地放进你的回复**（别翻译、别改成 JSON 描述、别替换成表格）。前端识别它后会内嵌出组价控件。
+- 配一句话引导即可，例如：「已为你起好 C30 现浇矩形柱（2024）的组价会话，请在下面的控件里逐步确认编码、定额、价格与费率。」
+- **然后停下**。不要再调 `resume`、不要用 `ask_clarification` 逐闸问、不要替用户在控件里做选择——这些都由内嵌控件 + 用户完成。
 
+> 为什么这样：组价 13 步里每个数字错一个就是真金白银，弱模型逐闸转译用户意图易出错。把闸做成结构化控件
+> 由用户直接操作（依据卡、备选按钮、字段录入都从结构化 payload 渲染），既准确又可审计——你只负责把会话点起来。
+
+### 备用：无内嵌控件时的纯命令行兜底（一般用不到）
+
+若环境没有前端控件（如纯 API/curl 调试），可用 `resume` 手动逐闸推进（decision 为 JSON）：
 ```bash
-python3 /mnt/skills/public/cost-agent/cost.py resume \
-  --task <task_id> --decision '<decision JSON>'
+python3 /mnt/skills/public/cost-agent/cost.py resume --task <task_id> --decision '<decision JSON>'
 ```
-
-resume 返回的又是 `{task_id, status, gate}`——`status` 还是 `awaiting_input` 就继续下一闸，`done` 就到步骤 2。
-
-#### 闸类型 A：`confirm`（编码 / 定额）
-
-`gate` 含 `proposal`（系统建议值）、`evidence`（来源 + 置信度，**务必转达给用户做判断依据**）、`alternatives`（候选内备选）。
-用 `ask_clarification` 问用户：通过 / 选哪个备选 / 还是手动改。decision 三选一：
-
-| 用户意思 | decision JSON |
-|---|---|
-| 认可系统建议 | `{"action":"approve"}` |
-| 选某个备选 | `{"action":"select_alternative","value":"<alternatives 里的 code>"}` |
-| 手动改成别的 | `{"action":"manual_override","value":"<用户给的编码/子目号>"}` |
-
-#### 闸类型 B：`input`（setup / 缺价录入 / 费率 / 参数）
-
-`gate` 含 `fields`（每项 `{key,type,label,options?,required?}`），可能含 `context`（如缺价材料的名称/规格/消耗量，呈现给用户帮他报价）。
-用 `ask_clarification` 把每个字段问清楚（`type=enum` 给出 `options` 让用户选；`required` 的必须有值），decision = **字段 key→用户给的值** 的 dict：
-
-- 缺价录入（单字段）：`{"value": 5.5}`（用户报的单价）
-- 综合单价费率：`{"management_fee_rate": 10, "profit_rate": 5, "risk_rate": 0, "fee_base": "labor_machine"}`
-- 项目级参数：`{"measure_fee": 1000, "other_fee": 0, "fee_levy": 500, "tax_rate": 9}`
-
-> ⛔ 红线 4：费率/税率这些**必须用用户给的值**。用户没给就继续 `ask_clarification` 追问，**绝不自己填默认**。
-
-#### 闸类型 C：`review`（总造价末尾复核）
-
-`gate.rollup` 是总造价明细（分部分项/措施/规费/税金/总造价）。呈现给用户复核，确认无误后：
-```json
-{"action":"approve"}
-```
-
-### 步骤 2：终态
-
-- `status=done`：返回里有 `rollup`（总造价明细）+ `audit_count`/`override_count`。把总造价 + 关键明细呈现给用户，说明哪些是用户录入/确认的（可审计）。
-- `status=blocked`：选不出码且用户也没给值 → 如实告知"未能定编码，需人工处理"，不硬编。
-
-### 完整一轮示例（对话节奏）
-
-1. 用户：「帮我把 C30 现浇矩形柱按 2024 走完整组价算到总造价」
-2. agent：`cost.py start -d "C30现浇矩形柱" --spec 2024` → 拿到 task_id + 编码 confirm 闸
-3. agent：`ask_clarification`「系统建议编码 010502006（依据：…，置信 …），有备选 …。通过/选备选/手改？」
-4. 用户：「就用 010502006」→ agent：`resume --task <id> --decision '{"action":"approve"}'` → 定额闸
-5. …（定额 confirm → 缺价 input 逐条 → 费率 input → 参数 input → 总造价 review）…
-6. `status=done` → agent 呈现总造价明细 + 审计说明
+- confirm 闸：`{"action":"approve"}` / `{"action":"select_alternative","value":"<code>"}` / `{"action":"manual_override","value":"<code/子目号>"}`
+- input 闸（缺价/费率/参数）：字段值 dict，如 `{"value":5.5}` / `{"management_fee_rate":10,"profit_rate":5,"fee_base":"labor_machine"}` / `{"measure_fee":1000,"fee_levy":500,"tax_rate":9}`
+- review 闸：`{"action":"approve"}`
+- 读当前态：`cost.py state --task <task_id>`
+> ⛔ 即便走兜底，费率/税率仍**必须用用户给的值，不替填默认**（红线 4）。
 
 ---
 
@@ -144,9 +118,9 @@ resume 返回的又是 `{task_id, status, gate}`——`status` 还是 `awaiting_
 
 ## 使用原则（速查）
 
-1. 版本不猜 → 先 `ask_clarification`
-2. HITL 模式：你只「呈现闸 + 收决策 + resume」，**不替用户做闸内决策、不跳闸**（红线 5）
-3. confirm 闸务必把 `evidence`（来源/置信）转达用户做判断
-4. input 闸的费率/税率**用用户给的值，不填默认**（红线 4）
+1. 版本不猜 → 先 `ask_clarification`；描述不足也先反问
+2. HITL 模式：你只「起会话 + 把 cost-hitl marker 原样贴进回复」，**不逐闸 resume、不替用户做闸内决策**（红线 5）——闸交互由内嵌控件 + 用户完成
+3. marker 代码块**一字不改**地放进回复（别翻译/别改格式），否则前端识别不出、控件不出现
+4. 费率/税率等政策数**用用户给的值，不填默认**（红线 4）——即便走命令行兜底也一样
 5. `need_review` / `no_source` / `blocked` 如实透传，不杜撰、不当定稿
-6. 全程用同一个 `task_id`
+6. compose 一次性模式不算钱；要算到总造价走 HITL（start）

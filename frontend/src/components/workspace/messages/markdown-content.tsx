@@ -7,10 +7,12 @@ import {
   MessageResponse,
   type MessageResponseProps,
 } from "@/components/ai-elements/message";
+import { extractCostHitlMarker } from "@/core/cost/marker";
 import { streamdownPlugins } from "@/core/streamdown";
 import { cn } from "@/lib/utils";
 
 import { CitationLink } from "../citations/citation-link";
+import { CostHitlInline } from "../cost/cost-hitl-inline";
 
 function isExternalUrl(href: string | undefined): boolean {
   return !!href && /^https?:\/\//.test(href);
@@ -63,14 +65,24 @@ export function MarkdownContent({
 
   if (!content) return null;
 
+  // Upgrade an inline cost-HITL marker into an interactive gate widget (the rest
+  // of the message renders as normal markdown). No-op when the marker is absent.
+  const costMarker = extractCostHitlMarker(content);
+  const text = costMarker ? costMarker.cleaned : content;
+
   return (
-    <MessageResponse
-      className={className}
-      remarkPlugins={remarkPlugins}
-      rehypePlugins={rehypePlugins}
-      components={components}
-    >
-      {content}
-    </MessageResponse>
+    <>
+      {text && (
+        <MessageResponse
+          className={className}
+          remarkPlugins={remarkPlugins}
+          rehypePlugins={rehypePlugins}
+          components={components}
+        >
+          {text}
+        </MessageResponse>
+      )}
+      {costMarker && <CostHitlInline taskId={costMarker.taskId} />}
+    </>
   );
 }

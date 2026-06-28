@@ -140,16 +140,27 @@ def cmd_compose(args: argparse.Namespace) -> None:
 
 
 def cmd_start(args: argparse.Namespace) -> None:
-    """起 HITL 会话：/cost/session/start → 跑到首个闸或 done，返回 task_id + 闸。"""
+    """起 HITL 会话：/cost/session/start → 跑到首个闸，**stdout 吐 cost-hitl marker 供 agent 原样转贴**。
+
+    前端识别该 marker 后内嵌渲染交互式组价控件、直接驱动会话（逐闸确认/录入不再经 agent）。
+    详细视图（task_id/status/gate）打 stderr 便于调试；--output 落完整原始响应。
+    """
     _check_spec(args.spec)
     url = args.service_url.rstrip("/") + "/cost/session/start"
     payload = {"feature": args.description, "spec": args.spec, "region": args.region}
     result = _call(url, payload, args.service_url, args.timeout)
     view = _session_view(result)
+    task_id = view.get("task_id")
     gate = view.get("gate") or {}
-    _emit(view, args.output,
-          summary=f"  task_id={view.get('task_id')} status={view.get('status')} "
-                  f"gate={gate.get('gate_type')}:{gate.get('node')}")
+    # stdout = marker（agent 须原样贴进回复，前端据此内嵌组价控件）
+    marker = "```cost-hitl\n" + json.dumps({"task_id": task_id}, ensure_ascii=False) + "\n```"
+    print(marker)
+    print(f"  [hint] 把上面的 ```cost-hitl 代码块原样贴进回复，组价控件会内嵌出现；"
+          f"task_id={task_id} status={view.get('status')} gate={gate.get('gate_type')}:{gate.get('node')}",
+          file=sys.stderr)
+    if args.output:
+        with open(args.output, "w", encoding="utf-8") as f:
+            f.write(json.dumps(result, ensure_ascii=False, indent=2))
 
 
 def cmd_resume(args: argparse.Namespace) -> None:

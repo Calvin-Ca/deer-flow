@@ -1,4 +1,8 @@
-import type { CostDecision, CostSessionResponse } from "./types";
+import type {
+  CostDecision,
+  CostInterrupt,
+  CostSessionResponse,
+} from "./types";
 
 /**
  * Thin client for the cost HITL session API, going through the same-origin
@@ -45,21 +49,22 @@ export function resumeSession(
   return postJSON<CostSessionResponse>(`session/${taskId}/resume`, { decision });
 }
 
-/** Read the persisted session state without advancing the graph. */
-export async function getSessionState(taskId: string): Promise<{
+/** Persisted session state (incl. the currently pending gate, for resuming by task_id). */
+export interface CostSessionState {
   task_id: string;
   status: string;
+  interrupt: CostInterrupt | null;
   next: string[];
   values: Record<string, unknown>;
-}> {
+}
+
+/** Read the persisted session state without advancing the graph. */
+export async function getSessionState(
+  taskId: string,
+): Promise<CostSessionState> {
   const res = await fetch(`${BASE}/session/${taskId}/state`);
   if (!res.ok) {
     throw new Error(`cost state failed (${res.status})`);
   }
-  return (await res.json()) as {
-    task_id: string;
-    status: string;
-    next: string[];
-    values: Record<string, unknown>;
-  };
+  return (await res.json()) as CostSessionState;
 }

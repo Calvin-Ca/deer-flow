@@ -164,7 +164,7 @@
 
 ---
 
-## 主线三：HITL 可中断组价编排（🟢 图骨架服务器跑通，前半链路实测；待全链路 + 后续节点）
+## 主线三：HITL 可中断组价编排（🟢 图骨架端到端全绿含持久化；待信息价过滤 + 后续节点）
 
 > 设计见 `HITL_DESIGN.md`、开发见 `DEV.md`「HITL 可中断组价图」。判断：13 步组价装不进 `cost.py` 黑盒
 > （不能暂停 / 不能发中间态），编排上提成 ce-services 独立 langgraph 图——每数字带 provenance 信封、
@@ -197,8 +197,19 @@
   = 选错码带出的下游空洞**如实透传**（非图 bug）。
 - [x] **修空定额 approve IndexError**（commit e1db6b68）：空 `quotas` 时 `apply_confirm_decision` approve 取 `quotas[0]` 崩溃，
   改为空列表回退 `main_value=None`（不崩、交下游/审计）。本地纯函数复验通过。
-- [ ] **全链路实测（待）**：起新会话、编码闸 `manual_override` 到**有定额映射的码** → 看全 `定额闸 → 信息价缺价逐项闸 →
-  state 钉值/override/audit` 链路；**重启进程后 state 仍在**（SqliteSaver 持久化 = 验原则 4）。前置：知识服务 :8100 + LLM :8099。
+- [x] **全链路实测端到端全绿**（✅ 2026-06-28，:8101 实测，会话 bb52418c）：编码闸 `manual_override→010503001`（钉值
+  locked/override/audit）→ compose → 定额闸 `approve`（子目 010006-15 钉值）→ 信息价闸：**命中(matched)材料自动过且带数**
+  （松杂枋板材 value=1904.0 / 涂胶模板 49.0，source_ref=「信息价 [2026-05-01,2026-06-01)」），**仅 no_source 逐项停**录入。
+  终态 `status:done`、materials 20=命中3+录入17+缺0、overrides 18、audit 19，数字自洽。
+- [x] **跨进程持久化验证**（✅ 2026-06-28，原则 4）：`lsof kill` 重启 :8101 后读同一 task_id → `status:done`、
+  materials 20、audit 19 与重启前一致 = SqliteSaver 落盘生效，HITL 可跨会话恢复。
+- [x] **实测修两 bug**：① 空定额 approve IndexError（commit e1db6b68）；② 信息价命中态判定——知识层命中字面量为
+  `"matched"` 非 `"ok"`，致命中材料误判 no_source、单价未取（commit ec803d83：`{ok,matched}` 算命中、取 `unit_price` 转
+  float、source_ref 用价类+期段）。
+- [ ] **⚠️ 信息价闸过度提示（待修）**：当前把**人工费/机械费/「其他材料费 %」也当信息价材料**送进缺价闸（实测 17 项录入里
+  多数是人工/机械）。但这些不走信息价——人工/机械费在定额基价（labor_cost/machine_cost）、百分比项是费率调整。
+  **拟修**：`from_price_compose` 只把 `category=="材料"` 且 `unit!="%"` 的资源纳入信息价闸；人工/机械/百分比标
+  `status:"from_quota_base"`（不计闸、价来自定额基价），缺价闸只停真·缺信息价的实物材料。
 - [ ] **补后续节点**：综合单价费率录入闸（§8，挂现成 `compute_unit_price`）/ 措施·其他（§10⑪）/ 规费税金（§12）/ 末尾 review（§13）。
 - [ ] **接前端**：依据卡（events provenance）+ 两类控件（confirm/input payload）——本期无头，前端后续接。
 - [ ] **知识层补 `source_ref`**：信息价期号+行号 / 定额库号 / 清单条文号回填原语返回（设计 §9 步1 后续，去 `TODO(knowledge-layer)` 标记）。

@@ -164,7 +164,7 @@
 
 ---
 
-## 主线三：HITL 可中断组价编排（🟢 图骨架端到端全绿含持久化；待信息价过滤 + 后续节点）
+## 主线三：HITL 可中断组价编排（🟢 图骨架端到端全绿含持久化 + 信息价过滤；待后续节点）
 
 > 设计见 `HITL_DESIGN.md`、开发见 `DEV.md`「HITL 可中断组价图」。判断：13 步组价装不进 `cost.py` 黑盒
 > （不能暂停 / 不能发中间态），编排上提成 ce-services 独立 langgraph 图——每数字带 provenance 信封、
@@ -206,10 +206,12 @@
 - [x] **实测修两 bug**：① 空定额 approve IndexError（commit e1db6b68）；② 信息价命中态判定——知识层命中字面量为
   `"matched"` 非 `"ok"`，致命中材料误判 no_source、单价未取（commit ec803d83：`{ok,matched}` 算命中、取 `unit_price` 转
   float、source_ref 用价类+期段）。
-- [ ] **⚠️ 信息价闸过度提示（待修）**：当前把**人工费/机械费/「其他材料费 %」也当信息价材料**送进缺价闸（实测 17 项录入里
-  多数是人工/机械）。但这些不走信息价——人工/机械费在定额基价（labor_cost/machine_cost）、百分比项是费率调整。
-  **拟修**：`from_price_compose` 只把 `category=="材料"` 且 `unit!="%"` 的资源纳入信息价闸；人工/机械/百分比标
-  `status:"from_quota_base"`（不计闸、价来自定额基价），缺价闸只停真·缺信息价的实物材料。
+- [x] **信息价闸过度提示已修**（✅ 2026-06-28，commit 7114d73b，:8101 实测）：`from_price_compose` 对
+  `category!=材料` 或 `unit==%` 的资源标 `status:"from_quota_base"`（价在定额基价、不计闸）；`should_pause_price`
+  仅 `no_source`（或命中但单价缺失的 ok）才停。**实测**：缺价闸首停由「技工人工费」改为实物材料「对拉螺栓」；
+  终态 materials 20 = from_quota_base:8 + ok(命中):3 + user_input:9，no_source 清零、录入数 17→9。
+- [x] **（小）缺价闸 context 补 category/spec/consumption**（✅ 2026-06-28）：`price_gate_node` interrupt context
+  补全这几个字段（前端缺价录入卡展示用）。
 - [ ] **补后续节点**：综合单价费率录入闸（§8，挂现成 `compute_unit_price`）/ 措施·其他（§10⑪）/ 规费税金（§12）/ 末尾 review（§13）。
 - [ ] **接前端**：依据卡（events provenance）+ 两类控件（confirm/input payload）——本期无头，前端后续接。
 - [ ] **知识层补 `source_ref`**：信息价期号+行号 / 定额库号 / 清单条文号回填原语返回（设计 §9 步1 后续，去 `TODO(knowledge-layer)` 标记）。

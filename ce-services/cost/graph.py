@@ -196,7 +196,8 @@ def price_gate_node(state: CostTaskState) -> dict[str, Any]:
                     f"信息价缺失，请录入「{m.get('std') or m.get('raw')}」单价",
                     [{"key": "value", "type": "number", "label": "单价（元）", "required": True}],
                     context={"raw": m.get("raw"), "std": m.get("std"), "unit": m.get("unit"),
-                             "price_status": price.get("status")},
+                             "category": m.get("category"), "spec": m.get("spec"),
+                             "consumption": m.get("consumption"), "price_status": price.get("status")},
                 )
             )
             val = (data or {}).get("value")

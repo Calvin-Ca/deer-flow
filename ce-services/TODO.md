@@ -183,7 +183,7 @@
 
 ---
 
-## 主线三：HITL 可中断组价编排（🟢 全 13 步图服务器端到端全绿：编码/定额/信息价/费率/参数/总造价六类闸 + 跨进程持久化；待前端接）
+## 主线三：HITL 可中断组价编排（🟢 全 13 步图 + 前端页面 + 对话内嵌卡片均服务器验通；🔴 余两阻塞：cost-agent 基座 qwen3-8b 不可靠 / 知识层定额覆盖缺口）
 
 > 设计见 `HITL_DESIGN.md`、开发见 `DEV.md`「HITL 可中断组价图」。判断：13 步组价装不进 `cost.py` 黑盒
 > （不能暂停 / 不能发中间态），编排上提成 ce-services 独立 langgraph 图——每数字带 provenance 信封、
@@ -293,7 +293,24 @@
   - **C · skill**：`cost.py start` 改为 stdout 吐 `cost-hitl` marker（task_id）；`SKILL.md` 改成「确认版本 → start → 把 marker
     原样贴进回复 → 停」，**不再逐闸 ask_clarification/resume**（保留纯命令行兜底节供 curl 调试）。
   - 红线复位关键：闸的 confirm/input/review 都由内嵌控件从**结构化 payload 渲染**、点击直传 decision，弱模型不转译用户意图；
-    费率/税率必填由控件校验（不靠 LLM 自觉）。**待服务器：拉 ce-services+前端重启/重建 + gateway 刷 skill 缓存，对话发一句走 H1。**
+    费率/税率必填由控件校验（不靠 LLM 自觉）。
+  - **服务器联调（2026-06-28）**：
+    - [x] **修代理路由 `/api/cost`→`/ce-cost`**（commit 69f10823）：next.config 有 afterFiles catch-all `/api/:path*`→网关，
+      afterFiles 改写优先于动态(catch-all)路由，导致 `/api/cost/[...path]` 被影子化、请求落网关 → 401（curl 实测）。
+      移出 `/api/` 命名空间到 `/ce-cost` 解决；dev-direct + nginx 都适用。**注：`/api/memory` 那个 Next 路由同理是死的、网关接管。**
+    - [x] **UX 修**（commit 911c410f）：① `cost.py start` 去 stderr hint（bash 工具会把 stderr 显进聊天=噪音）；
+      ② `CostHitlInline` done 态从「只显总价」改为**可复核明细**（总造价构成 + 编码/定额 + 录入项 + 审计数，靠 get_state 重建、重开对话可复看）。
+    - [x] **Tier 2 链路服务器验通**：对话发「走完整组价」→ agent `start` → 贴 marker → **内嵌卡片渲染** → 卡片拉 `/ce-cost` state（200）
+      → 编码闸（手动覆盖）→ … → done 显明细。source_ref 精确、置信校准生效（confidence 0）、缺口诚实透传（missing_base）全在真链路验到。
+    - [ ] **🔴 阻塞1 · cost-agent 基座 = qwen3-8b 不可靠**：对话框「起会话+原样贴 marker」这步实测**三次三种翻车**
+      （compose+幻觉置信95% / 问无关尺寸 / 复述闸不贴 marker），逐字下命令也不听。**根治=cost-agent 基座换 qwen-plus**
+      （config.yaml 取消注释 gateway-llm + `api_key:$DASHSCOPE_API_KEY` + cost-agent `model:gateway-llm`；服务器 export key + 重启网关）。
+      `/workspace/cost` 页面入口不依赖 agent、已稳，可先用页面。
+    - [ ] **🔴 阻塞2 · 知识层定额覆盖缺口（归 ce-code）**：正解码 `010502006`（现浇矩形柱）在 `bill_quota_map` **无定额映射**
+      → quota 空 → 综合单价 missing_base → 算不出真总价（系统如实标「无映射定额子目」「missing_base」，未杜撰=红线对）。
+      `bill_quota_map` 仅覆盖 ~53 清单码；有定额的 010503001 反是预制+模板措施码。**需 ce-code 补 010502006→现浇柱本体定额 映射**才能端到端出真总价。
+- [ ] **HITL 数据缺失应停而非算假总价（guard，待办）**：compose「未就绪（2013）」/ quota 空（无定额映射）两种情况现在仍继续走
+  费率/rollup、算出 missing_base 的空假总价（误导）。应路由到明确终态「无定额数据，无法组价到总价」，不再往下算。graph.py + 单测。
 - [ ] **门控阈值调参**：τ 从保守（多停）逐步放松（§6）。
 
 **红线**：弱模型不驱动流程（跳闸判断在图代码）/ provenance 是字段不口述 / override 钉值不重跑 LLM / 缺口（no_source/need_review/501）如实透传不杜撰。

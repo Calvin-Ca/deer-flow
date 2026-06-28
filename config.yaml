@@ -195,6 +195,13 @@ subagents:
       tools:
         - bash
         - ask_clarification
+        # ce-cost MCP 三原语（extensions_config.json 注册，名=server 名前缀 + 工具名）。
+        # 放进 allow-list 才对本 agent 可见（executor._filter_tools 精确名过滤）；
+        # tool_search 未开 → MCP 工具直接加载、非 deferred。中间步请求（只召回候选/只查价/
+        # 只查含量）可直接调，端到端组价仍走 cost.py skill（system_prompt 未改，仍引导走 skill）。
+        - ce-cost_bill_match
+        - ce-cost_quota_lookup
+        - ce-cost_price_compose
       disallowed_tools:
         - task
         - present_files

@@ -164,7 +164,7 @@
 
 ---
 
-## 主线三：HITL 可中断组价编排（🟢 全 13 步图打通：编码/定额/信息价/费率/参数/总造价六类闸 + 持久化；待前端接 + 服务器联调后段）
+## 主线三：HITL 可中断组价编排（🟢 全 13 步图服务器端到端全绿：编码/定额/信息价/费率/参数/总造价六类闸 + 跨进程持久化；待前端接）
 
 > 设计见 `HITL_DESIGN.md`、开发见 `DEV.md`「HITL 可中断组价图」。判断：13 步组价装不进 `cost.py` 黑盒
 > （不能暂停 / 不能发中间态），编排上提成 ce-services 独立 langgraph 图——每数字带 provenance 信封、
@@ -227,7 +227,16 @@
   - 状态扩 `params`/`rollup` 字段；`session._format` 透出 `rates`/`params`/`rollup`。
   - **本地验证**：8 文件 py_compile 过；新增纯函数单测 22 项（rollup_cost 数字/HALF_UP/闸门 + 费率参数门控 +
     _unit_price_for + _compute_rollup）+ **全图 e2e 冒烟 14 项**（monkeypatch 取数原语，验 price→rates→params→rollup
-    四闸 interrupt/resume 链路 + 总造价数字自洽 515.03 + 审计/override 链全）全过。**待服务器真链路联调。**
+    四闸 interrupt/resume 链路 + 总造价数字自洽 515.03 + 审计/override 链全）全过。
+- [x] **服务器真链路联调全 13 步**（✅ 2026-06-28，:8101 实测，会话 0d2a43ba）：start{C30现浇矩形柱/2024/深圳}
+  → 编码闸 `manual_override→010503001` → 定额闸 2 子目 `approve→010006-15`（人 5806.33/材 1645.82/机 8.17 基价齐）
+  → 缺价闸 9 条 no_source 逐项录入（命中项不问）→ **费率闸**（管理10%/利润5%/风险0/基数 labor_machine）算出
+  **综合单价 8332.5**，六项精确（管理费 581.45=5814.5×10% / 利润 290.73=×5% HALF_UP / 不含税）→ **参数闸**
+  （措施1000/规费500/税率9%）→ **末尾 review** 汇总 `税前9832.5→税金884.93→总造价10717.43`、`missing_unit_price_items=0`
+  → `approve` → **done**。终态 audit 6 类全（list_coding/quota/price_query/unit_price/project_params/rollup）、
+  override 4 类全（code/price/rates/params）。`/cost/rollup` 端点单测数字精确（1286.2）+ 负金额 422 闸生效。
+- [x] **跨进程持久化复验**（✅ 2026-06-28）：`lsof kill` 重启 :8101 后读同一 task_id → `status=done`、
+  `total=10717.43`、audit_count=14 与重启前一致 = SqliteSaver 落盘生效，后段节点状态同样可跨会话恢复。
 - [ ] **接前端**：依据卡（events provenance）+ 两类控件（confirm/input payload）——本期无头，前端后续接。
 - [ ] **知识层补 `source_ref`**：信息价期号+行号 / 定额库号 / 清单条文号回填原语返回（设计 §9 步1 后续，去 `TODO(knowledge-layer)` 标记）。
 - [ ] **门控阈值调参**：τ 从保守（多停）逐步放松（§6）。

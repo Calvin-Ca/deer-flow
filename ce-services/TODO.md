@@ -12,7 +12,8 @@
 > - **CostAgent P1（选码闭环）**：Step 0–3 + 5 完成、端到端跑通（✅）；**Step 4 选码评测脚本就位，prompt 现浇/
 >   预制消歧服务器重测完成（2026-06-23）：Top-1 70→80%、候选内 78→89%、高置信错码 3→2，矩形柱已救回**；
 >   **P3 已封装 deer-flow agent + skill（cost-agent，缺 spec/描述反问 + HITL 红线，注册层闭环待服务器验）**。
->   余：扩 gold 稳数字 + 残留 2 错码（矩形梁=召回缺口归知识层 / 过梁=选码细粒度）+ **置信度全 0.95 无区分度（治本）**。
+>   余：扩 gold 稳数字 + 残留 2 错码（矩形梁=召回缺口归知识层 / 过梁=选码细粒度）+ **置信度无区分度（路 2 外部信号校准已落地，
+>   待服务器调参）** + 多模型 benchmark（8B vs 32B-AWQ，工具就位待跑）。
 > - **两 agent 编排层共同待办**：norm-qa / cost-agent 的 HTTP 端点(:8101)均已实测，但 **deer-flow agent 编排层
 >   （gateway :8001 加载 custom_agent + qwen-plus 多轮反问）两条都未在服务器跑过**——下一道共同工序。
 >   注：agent 基座=qwen-plus(DashScope，function-calling 可靠)，生成/选码=Qwen3-8B :8099，已规避 Qwen3 调 skill 不稳的坑。
@@ -102,10 +103,19 @@
     高置信错码 3→2、Recall@10=90%**。① 现浇矩形柱 ✅ 已救回（010502006）；② 现浇矩形梁仍 ✗（金标
     010502011 **未召回**，LLM 在无正解候选里高置信选 010502025 → **召回缺口归知识层 bill/match**）；
     ③ 现浇过梁仍 ✗（金标 010502023 **已召回**但选了相邻 010502025，零星/过梁细粒度语义 → **选码层未覆盖**）。
-- [ ] **⚠️ 置信度全 0.95 无区分度（红线可达性·治本）**：重测 10 条 confidence **全为 0.95**，
+- [~] **⚠️ 置信度全 0.95 无区分度（红线可达性·治本）**：重测 10 条 confidence **全为 0.95**，
   代码侧 `confidence<0.6 强制 review` 兜底从未触发、HITL 安全网形同虚设；"高置信错码须为 0" 在 LLM 永远
-  自报 0.95 下**结构性难达**。需让 LLM 在候选都不够贴切时真降置信，或代码侧用 rerank/语义距离辅助置信校准。
-  **前置=扩 gold 到 30–50 条**（n=10 无统计依据，校准会过拟合）。
+  自报 0.95 下**结构性难达**。
+  - [x] **路 2 外部信号校准（✅ 2026-06-28，本地 21 项纯函数单测全过）**：不信 LLM 自报，用 `bill_match`
+    cosine score 算客观置信、与自报**保守取 min**（只拉低不抬高）。`cost/calibration.py`：两信号取 min——
+    **绝对贴合度**（选中候选 cosine [FLOOR,CEIL] 线性映射）∧ **间距**（比次优高出多少；逆检索而选→负间距→0）；
+    `select_code` 取 chosen/runner-up score 算 `effective=min(自报,外部)` 驱动 `need_review`，输出加
+    `llm_confidence`/`external_confidence` 供审计/benchmark。打桩验证：自报 0.95 在「候选挤/逆检索」时被拉到 0.4→
+    **need_review 复活**；分离清晰则维持高置信自动定稿；无 score 回退自报不惩罚。参数 `CE_SELECT_SCORE_{FLOOR,CEIL}`/
+    `CE_SELECT_MARGIN_FULL`（config，env 可调，**默认保守偏多停**）。
+  - [ ] **服务器验 + 调参**：默认 FLOOR0.35/CEIL0.65/MARGIN0.10 是盲拍（cosine 量纲随 embedder 变），需用 benchmark
+    暴露的真实 score 分布（选对 vs 选错的 chosen_score）精调，使「高置信错码→0」且不过度转人工。**前置=扩 gold 到 30–50 条**
+    （n=10 无统计依据；2013 已有 n=91 可先用）。换大模型（32B）能否自带置信区分度亦由 benchmark 对比。
 - [x] **多模型 benchmark Phase 1（选码）**（✅ 2026-06-28，本地纯函数验证；服务器待跑）：`tools/benchmark.py`
   编排多模型跑同一选码评测（复用 `eval_select.run_eval`）→ 并排对比表 + JSON 存档，支撑「Qwen3-8B 基线 vs
   Qwen3-32B-AWQ」换模型决策。**置信度分布列**（avg/min/max/**distinct**）直接量化上面这条「无区分度」：

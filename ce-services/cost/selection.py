@@ -15,10 +15,26 @@ from __future__ import annotations
 
 from typing import Any
 
+from common.config import (
+    CE_SELECT_MARGIN_FULL,
+    CE_SELECT_SCORE_CEIL,
+    CE_SELECT_SCORE_FLOOR,
+)
 from common.llm import call_qwen3
+from cost.calibration import calibrate
 
-# 置信阈值：LLM 自评 confidence < 此值 → 强制 need_review（转人工复核）。
+# 置信阈值：**校准后**有效 confidence < 此值 → 强制 need_review（转人工复核）。
 CONFIDENCE_THRESHOLD = 0.6
+
+
+def _coerce_score(raw: Any) -> float | None:
+    """候选 cosine score 容错转 float；缺/非法 → None（不参与校准、不惩罚）。"""
+    if raw is None:
+        return None
+    try:
+        return float(raw)
+    except (TypeError, ValueError):
+        return None
 
 SYSTEM_PROMPT = """\
 你是建设工程造价清单选码助手。给定一段构件/做法描述和一组**候选清单项**（来自清单库召回），从候选中选出最匹配的一项清单编码。
@@ -97,10 +113,12 @@ def select_code(
         description —— 构件/做法描述；candidates —— /bill/match 候选列表；
         llm_url / model_id —— Qwen3 vLLM 配置。
     返回：
-        ``{code, confidence, reason, need_review, alternatives}``：
+        ``{code, confidence, llm_confidence, external_confidence, reason, need_review, alternatives}``：
+        - confidence —— **校准后**有效置信 = min(LLM 自报, 外部信号)（路 2，下游闸门/阈值用这个）；
+        - llm_confidence —— LLM 自报原值；external_confidence —— 检索几何外部置信（None=无 score 可校准）；
         - 候选为空 → 直接 need_review（code=None），不调 LLM；
         - LLM 选的 code 不在候选（造码/越界）→ 作废为 code=None + need_review，reason 标注；
-        - confidence < CONFIDENCE_THRESHOLD → 强制 need_review；
+        - 有效 confidence < CONFIDENCE_THRESHOLD → 强制 need_review；
         - alternatives 仅保留候选内的 code。
         LLM 非 2xx 经 requests.HTTPError、非法 JSON 经 json.JSONDecodeError 上抛（由 router 映射状态码）。
     """
@@ -111,6 +129,8 @@ def select_code(
         return {
             "code": None,
             "confidence": 0.0,
+            "llm_confidence": 0.0,
+            "external_confidence": None,
             "reason": "知识库未召回任何清单候选，无法选码，转人工复核。",
             "need_review": True,
             "alternatives": [],
@@ -137,13 +157,32 @@ def select_code(
     # 选不出 code → 必转人工。
     if code is None:
         need_review = True
-    # 低置信 → 转人工（即便选了码也只建议不定稿）。
-    if confidence < CONFIDENCE_THRESHOLD:
+
+    # ── 路 2：外部信号校准置信（用候选 cosine score，保守取 min；不信 LLM 自报恒高）──
+    chosen_score: float | None = None
+    runner_up_score: float | None = None
+    if code is not None:
+        by_code = {str(c.get("code", "")).strip(): c for c in candidates if c.get("code")}
+        chosen_score = _coerce_score((by_code.get(code) or {}).get("score"))
+        others = [s for c in candidates
+                  if str(c.get("code", "")).strip() != code
+                  and (s := _coerce_score(c.get("score"))) is not None]
+        runner_up_score = max(others) if others else None
+    effective_conf, external_conf = calibrate(
+        confidence, chosen_score, runner_up_score,
+        floor=CE_SELECT_SCORE_FLOOR, ceil=CE_SELECT_SCORE_CEIL, margin_full=CE_SELECT_MARGIN_FULL,
+    )
+
+    # 低置信（校准后）→ 转人工（即便选了码也只建议不定稿）。这一步现在真会触发——
+    # 外部信号把 LLM 虚高的自报拉低，HITL 安全网与「高置信错码须为 0」红线得以重新生效。
+    if effective_conf < CONFIDENCE_THRESHOLD:
         need_review = True
 
     return {
         "code": code,
-        "confidence": confidence,
+        "confidence": effective_conf,
+        "llm_confidence": confidence,
+        "external_confidence": external_conf,
         "reason": reason,
         "need_review": need_review,
         "alternatives": alternatives,

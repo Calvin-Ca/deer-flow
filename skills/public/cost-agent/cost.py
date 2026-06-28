@@ -152,12 +152,12 @@ def cmd_start(args: argparse.Namespace) -> None:
     view = _session_view(result)
     task_id = view.get("task_id")
     gate = view.get("gate") or {}
-    # stdout = marker（agent 须原样贴进回复，前端据此内嵌组价控件）
+    # stdout = 仅 marker（agent 须原样贴进回复，前端据此内嵌组价控件）。
+    # 不再往 stderr 打提示——deer-flow bash 工具会把 stderr 显进聊天，造成噪音；
+    # 「原样贴 marker」的指令在 cost-agent system_prompt 里，不靠这里。
     marker = "```cost-hitl\n" + json.dumps({"task_id": task_id}, ensure_ascii=False) + "\n```"
     print(marker)
-    print(f"  [hint] 把上面的 ```cost-hitl 代码块原样贴进回复，组价控件会内嵌出现；"
-          f"task_id={task_id} status={view.get('status')} gate={gate.get('gate_type')}:{gate.get('node')}",
-          file=sys.stderr)
+    _ = gate  # gate 细节供 --output 落盘调试用，不入 stdout
     if args.output:
         with open(args.output, "w", encoding="utf-8") as f:
             f.write(json.dumps(result, ensure_ascii=False, indent=2))

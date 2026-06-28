@@ -264,7 +264,7 @@ export function InputGate({
   );
 }
 
-const ROLLUP_LABELS: Record<string, string> = {
+export const ROLLUP_LABELS: Record<string, string> = {
   subtotal: "分部分项合价",
   measure_fee: "措施项目费",
   other_fee: "其他项目费",

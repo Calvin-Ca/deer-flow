@@ -139,9 +139,16 @@
 ### 原语 / 复合入口的 tool·MCP 暴露（⬜ 待办，方案见 DEV）
 > 方案：`DEV.md`「组价能力对外暴露：skill / tool / MCP 分层方案」+ `../ce-code/DEV.md §7`。
 > 原则：原语 first-class（独立可调）/ 复合入口非 chokepoint / 红线下沉原语边界 / 能力分级。
-- [ ] **知识层三原语加 MCP façade**（`bill_match` / `quota_lookup` / `price_compose`）：归 ce-code，见 `../ce-code/TODO.md`。
-- [ ] **复合入口 `cost_compose` 保持并列、非 chokepoint**：`/cost/compose` + `cost-agent` skill 已就位，确认中间步请求
-  （只查价 / 只选码候选）能直接打原语、不被迫走复合入口。
+- [x] **知识层三原语加 MCP façade**（✅ 2026-06-28，前端实测调通）：`ce-cost_bill_match` /
+  `ce-cost_quota_lookup` / `ce-cost_price_compose` 经 :8100/mcp 暴露，前端对话已能直接调、中间过程可见。
+  踩坑链（治本要点，已存记忆 [[project_mcp_tool_exposure]]）：① cost-agent 的 `tools` 是**精确名 allow-list**，
+  MCP 注册在 extensions_config.json≠该 agent 可用，须把 `ce-cost_*` 三名加进 `config.yaml` agent 的 `tools`；
+  ② 仅放行白名单不够——cost-agent prompt「一切走 cost.py 脚本」会让弱模型(qwen-plus)把 MCP 工具**当脚本 bash 执行**，
+  须在 system_prompt 区分「中间步直调工具 / 端到端走 cost.py、且钉死『是工具不是脚本』」；③ 旧 :8100 进程早于 MCP
+  commit→/mcp 404，须 `git pull` + `uv sync`(装 mcp>=1.27) + 重启 knowledge_api；④ gateway MCP 缓存按
+  extensions_config.json mtime 失效，:8100/mcp 起来后须 `touch extensions_config.json` 逼其重新发现工具。
+- [x] **复合入口 `cost_compose` 保持并列、非 chokepoint**（✅ 2026-06-28）：`/cost/compose` + `cost-agent` skill
+  就位；前端实测「只要候选别选码」中间步请求已能直接调 `ce-cost_bill_match` 原语、不被迫走复合入口。
 - [x] **`compute_unit_price` tool**（✅ 2026-06-27，见上 P2）：已按 tool 形态暴露——独立端点 `POST /cost/unit-price`
   （pydantic 闸门）+ 复合入口 `/cost/compose` 内部可选调用，两路并列、红线（不杜撰费率/取费基数显式）在原语边界自带。
 

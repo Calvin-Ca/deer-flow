@@ -282,7 +282,17 @@
     ① `quota_item.chapter` 章节归属抽错（矩形柱模板被归「2 实心砖墙」）；② 信息价 `doc_id` 用通配占位 `SZ-JGXX-PRICE`
     未落具体期文件号。**信息价「行号」级定位**同归 ce-code（`resource_price` 需加行号列，重抽时落库）。
 - [ ] **门控阈值调参**：τ 从保守（多停）逐步放松（§6）。
-- [ ] **接 agent（远期）**：lead_agent/cost-agent 只做意图路由触发会话，不当逐步编排器（§1.2）。
+- [~] **接 agent（对话驱动 HITL，先跑通版）**（✅ 2026-06-28 代码就位待服务器验）：cost-agent skill 扩成驱动 HITL
+  会话——`skills/public/cost-agent/cost.py` 加 `start/resume/state` 子命令打 `/cost/session/*`（输出精简成
+  `{task_id,status,gate}` 供逐闸驱动；保留 `compose` 一次性路）；`SKILL.md` 加「对话驱动 HITL」playbook：
+  start → 按 `gate.gate_type`（confirm/input/review）用 `ask_clarification` 呈现闸+收用户决策 → 转 decision JSON
+  → resume → 循环到 done/blocked。复用对话已有的 `ask_clarification` interrupt 机制，**零改上游 backend/frontend**，
+  全在 skills/（git 同步）。本地：cost.py py_compile + 子命令/spec 红线/decision JSON 校验/连接错误冒烟过。
+  - ⚠️ **刻意偏离 §1.2 红线（用户决策「先跑通」）**：此版**agent（弱模型）当逐步编排器**驱动 start→闸→resume 循环，
+    与「弱模型不当编排器」相悖。接受理由=先跑通对话形态、编排大模型以后可换（qwen-plus/32B）。**治理路径**（后续）：
+    ① 换可靠 function-calling 大模型当 cost-agent 基座降低乱跳/乱填风险；② 或把闸渲染做成结构化卡片（前端内嵌
+    聊天气泡，控件直传 decision，不经弱模型转译）回归红线。**待服务器加载 skill 走一轮多轮对话验证。**
+- [ ] **门控阈值调参**：τ 从保守（多停）逐步放松（§6）。
 
 **红线**：弱模型不驱动流程（跳闸判断在图代码）/ provenance 是字段不口述 / override 钉值不重跑 LLM / 缺口（no_source/need_review/501）如实透传不杜撰。
 

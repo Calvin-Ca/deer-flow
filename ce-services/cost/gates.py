@@ -107,7 +107,12 @@ def apply_confirm_decision(env: dict[str, Any], decision: dict[str, Any]) -> tup
     action = (decision or {}).get("action", "approve")
     prov = dict(env.get("provenance", {}))
     result = env.get("result", {})
-    main_value = result.get("code") if "code" in result else result.get("quotas", [{}])[0].get("子目号")
+    if "code" in result:
+        main_value = result.get("code")
+    else:
+        # 定额信封：可能空子目（选错码无定额映射），approve 时取首子目，空则 None（不崩、交下游/审计）。
+        quotas = result.get("quotas") or []
+        main_value = quotas[0].get("子目号") if quotas else None
 
     if action == "manual_override":
         return decision.get("value"), {"source_type": "user_input", "source_ref": "用户录入", "confidence": None}, action

@@ -263,7 +263,10 @@
    `setup → 编码 → 定额 → 信息价` + interrupt/resume + SqliteSaver checkpointer 持久化；会话端点
    `/cost/session/{start,resume,state}`。**compute/gate 双拆**避免 resume 重跑 LLM。待服务器联调。
 4. **⬜ 接前端**：依据卡 + 两类控件，从 §5.2/5.3 payload 渲染。
-5. **⬜ 补全费率/措施/规费税金录入闸 + 末尾 review**，跑通 13 步（图 `done` 前已留挂点）。
+5. **🟢 补全费率/措施/规费税金录入闸 + 末尾 review**（本地全图 e2e 验证 2026-06-28）：图补到
+   `… price_gate → rates_gate(§8) → params_gate(§10⑪§12) → rollup(§13 末尾 review) → done`。后段三节点确定性算钱
+   （`compute_unit_price` / `rollup_cost`，无 LLM）：费率/参数走录入闸（缺政策数停、不杜撰），rollup 始终暂停做总造价复核。
+   综合单价**不含税**、税金在 rollup 一次性计（§2.0.9）。待服务器真链路联调。
 6. **⬜ 门控阈值调参**：从保守（多停）逐步放松（`CE_HITL_CONFIDENCE_TAU` 默认 0.75）。
 
 > 实现细节（模块职责、端点、跑法、依赖）见 `DEV.md`「HITL 可中断组价图」；进度见 `TODO.md`「主线三」。

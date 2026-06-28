@@ -23,9 +23,11 @@ class CostTaskState(TypedDict, total=False):
         task_id —— 任务唯一标识（thread_id）。
         spec_version / region / period —— 国标版本 / 地区 / 计价期号（setup 闸采集）。
         price_source —— 信息价来源策略（local / online / manual，setup 一次性选定，§7）。
-        rates —— 费率块（管理费/利润/风险/税率，可选；本期不接综合单价节点，仅透传）。
+        rates —— 综合单价费率块（管理费/利润/风险/取费基数，§8 费率闸采集；给定则末步算综合单价）。
+        params —— 项目级费用块（措施/其他/规费/税金率，§10⑪/§12 参数闸采集）。
+        rollup —— 末尾汇总结果（§13：分部分项 + 措施 + 其他 + 规费 + 税金 → 总造价）。
         feature —— 本期单构件/做法描述（入口输入）。
-        items —— §5.4 items：每项含 code/quota/materials，确认后 locked。
+        items —— §5.4 items：每项含 code/quota/quota_basis/materials/unit_price，确认后 locked。
         overrides —— 用户覆盖轨迹（§5.4）。
         audit_log —— 审计时间线（哪步谁改了什么）。
         events —— 逐节点 provenance 事件（前端依据卡数据源，无论是否暂停每节点都发）。
@@ -38,6 +40,8 @@ class CostTaskState(TypedDict, total=False):
     period: str | None
     price_source: str
     rates: dict[str, Any] | None
+    params: dict[str, Any] | None
+    rollup: dict[str, Any] | None
     feature: str
     items: list[dict[str, Any]]
     overrides: Annotated[list[dict[str, Any]], operator.add]

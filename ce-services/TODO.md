@@ -164,7 +164,7 @@
 
 ---
 
-## 主线三：HITL 可中断组价编排（🟢 图骨架端到端全绿含持久化 + 信息价过滤；待后续节点）
+## 主线三：HITL 可中断组价编排（🟢 全 13 步图打通：编码/定额/信息价/费率/参数/总造价六类闸 + 持久化；待前端接 + 服务器联调后段）
 
 > 设计见 `HITL_DESIGN.md`、开发见 `DEV.md`「HITL 可中断组价图」。判断：13 步组价装不进 `cost.py` 黑盒
 > （不能暂停 / 不能发中间态），编排上提成 ce-services 独立 langgraph 图——每数字带 provenance 信封、
@@ -212,7 +212,22 @@
   终态 materials 20 = from_quota_base:8 + ok(命中):3 + user_input:9，no_source 清零、录入数 17→9。
 - [x] **（小）缺价闸 context 补 category/spec/consumption**（✅ 2026-06-28）：`price_gate_node` interrupt context
   补全这几个字段（前端缺价录入卡展示用）。
-- [ ] **补后续节点**：综合单价费率录入闸（§8，挂现成 `compute_unit_price`）/ 措施·其他（§10⑪）/ 规费税金（§12）/ 末尾 review（§13）。
+- [x] **补后续节点全 13 步**（✅ 2026-06-28，本地全图 e2e 验证）：图链路补到
+  `price_gate → rates_gate → params_gate → rollup → done`，后段三节点均**确定性算钱、无 LLM**（resume 重跑无漂移，
+  故 interrupt 与计算同节点、不必双拆）：
+  - **§8 综合单价费率闸 `rates_gate_node`**（挂现成 `compute_unit_price`）：门控 `gates.should_pause_rates`——
+    费率块缺管理费率/利润率/取费基数（政策数、库内无）则停闸录入，齐则自动过；钉率后用 `quota_gate` 保留的
+    **定额基价**（新增 `item["quota_basis"]`）算综合单价（**不含税**，税金在 rollup 一次性计，GB 50500 §2.0.9）；
+    手填/越界子目无基价 → `unit_price.status=missing_base`（不杜撰）。
+  - **§10⑪§12 项目级费用闸 `params_gate_node`**：录入措施/其他/规费 + 税金率；门控 `should_pause_params`——
+    税金率（政策数）缺则停，措施/其他/规费可缺省 0。本节点只采集、不算钱。
+  - **§13 末尾 review `rollup_node`**（新增原语 `pricing.rollup_cost` + `RollupInput` pydantic 闸门）：
+    确定性汇总「分部分项(Σ综合合价) + 措施 + 其他 + 规费 →(税前)→ +税金 = 总造价」后**始终暂停**复核
+    （§6「末尾 review 始终暂停」），resume(approve) → done；缺综合单价的 item 计 `missing_unit_price_items`、不计金额。
+  - 状态扩 `params`/`rollup` 字段；`session._format` 透出 `rates`/`params`/`rollup`。
+  - **本地验证**：8 文件 py_compile 过；新增纯函数单测 22 项（rollup_cost 数字/HALF_UP/闸门 + 费率参数门控 +
+    _unit_price_for + _compute_rollup）+ **全图 e2e 冒烟 14 项**（monkeypatch 取数原语，验 price→rates→params→rollup
+    四闸 interrupt/resume 链路 + 总造价数字自洽 515.03 + 审计/override 链全）全过。**待服务器真链路联调。**
 - [ ] **接前端**：依据卡（events provenance）+ 两类控件（confirm/input payload）——本期无头，前端后续接。
 - [ ] **知识层补 `source_ref`**：信息价期号+行号 / 定额库号 / 清单条文号回填原语返回（设计 §9 步1 后续，去 `TODO(knowledge-layer)` 标记）。
 - [ ] **门控阈值调参**：τ 从保守（多停）逐步放松（§6）。

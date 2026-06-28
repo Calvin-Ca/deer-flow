@@ -15,7 +15,7 @@ from pydantic import BaseModel, Field
 
 from common.config import LLM_MODEL_ID, LLM_URL
 from cost import orchestration
-from cost.pricing import UnitPriceInput, compute_unit_price
+from cost.pricing import RollupInput, UnitPriceInput, compute_unit_price, rollup_cost
 
 logger = logging.getLogger("ce-services.cost")
 
@@ -182,3 +182,14 @@ def cost_unit_price_endpoint(req: UnitPriceInput) -> dict:
       纯确定性、不入 LLM；费率由调用方给定，本端点不杜撰、不内置地区默认。
     """
     return compute_unit_price(req)
+
+
+@router.post("/cost/rollup")
+def cost_rollup_endpoint(req: RollupInput) -> dict:
+    """总造价汇总原语（§13 ``rollup_cost`` 的 HTTP 表面）——分部分项 + 措施/其他/规费 →（可选税金）总造价。
+
+    参数：req —— ``RollupInput``；FastAPI 据 pydantic schema 自动校验，负金额/NaN/Inf/多余字段 → 422 闸门。
+    返回：``rollup_cost`` 结果（税前造价 + 可选税金/总造价 + 溯源 + 红线声明）。纯确定性、不入 LLM；
+      税率与项目级费用由调用方给定，本端点不杜撰、不内置默认（不替用户定政策数）。
+    """
+    return rollup_cost(req)

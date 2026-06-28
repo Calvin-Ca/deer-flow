@@ -35,8 +35,9 @@ def _format(task_id: str, result: dict[str, Any]) -> dict[str, Any]:
     """把 ``invoke`` 返回值整形成会话响应。
 
     参数：task_id；result —— graph.invoke 返回的状态快照（暂停时含 ``__interrupt__``）。
-    返回：``{task_id, status, interrupt, events, items, overrides, audit_log}``：
+    返回：``{task_id, status, interrupt, events, items, overrides, audit_log, rates, params, rollup}``：
       暂停 → status=awaiting_input、interrupt=闸 payload；否则取 state.status（done/blocked）、interrupt=None。
+      rollup 在末尾 review/done 后非空（总造价明细）；rates/params 为已确认的费率与项目级费用。
     """
     interrupts = result.get("__interrupt__")
     if interrupts:
@@ -53,6 +54,9 @@ def _format(task_id: str, result: dict[str, Any]) -> dict[str, Any]:
         "items": result.get("items", []),
         "overrides": result.get("overrides", []),
         "audit_log": result.get("audit_log", []),
+        "rates": result.get("rates"),
+        "params": result.get("params"),
+        "rollup": result.get("rollup"),
     }
 
 

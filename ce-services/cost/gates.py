@@ -13,6 +13,11 @@ from typing import Any
 # 用户在 confirm 闸可选的动作（§5.2）
 CONFIRM_ACTIONS = ["approve", "select_alternative", "manual_override"]
 
+# §8 综合单价费率：管理费率/利润率/取费基数为政策数（库内无），必须由人工给定方可算综合单价。
+RATE_REQUIRED = ("management_fee_rate", "profit_rate", "fee_base")
+# §12 税金率：政策数，须显式录入（措施/其他/规费可缺省 0，唯税率不杜撰、不默认）。
+PARAM_REQUIRED = ("tax_rate",)
+
 
 def should_pause_coding(env: dict[str, Any], tau: float) -> bool:
     """编码闸门控（§6）：是否暂停等人工确认编码。
@@ -58,6 +63,30 @@ def should_pause_price(price: dict[str, Any]) -> bool:
     """
     status = price.get("status")
     return status == "no_source" or (status == "ok" and price.get("value") is None)
+
+
+def should_pause_rates(rates: dict[str, Any] | None) -> bool:
+    """综合单价费率闸门控（§6/§8）：是否暂停等人工录入费率。
+
+    参数：rates —— 费率块 ``{management_fee_rate, profit_rate, risk_rate?, fee_base, tax_rate?}`` 或 None。
+    返回：True=暂停。规则（§6「已有项目默认值自动过、首次无默认值暂停」）：缺费率块或管理费率/利润率/取费基数
+      任一为 None → 停（这三项是政策数、库内无，绝不杜撰）；齐全 → 自动过。
+    """
+    if not rates:
+        return True
+    return any(rates.get(k) is None for k in RATE_REQUIRED)
+
+
+def should_pause_params(params: dict[str, Any] | None) -> bool:
+    """项目级费用闸门控（§6/§10⑪/§12）：是否暂停等人工录入措施/其他/规费/税金率。
+
+    参数：params —— ``{measure_fee?, other_fee?, fee_levy?, tax_rate}`` 或 None。
+    返回：True=暂停。规则：缺 params 块或税金率为 None → 停（税率是政策数、不替用户定）；
+      措施/其他/规费可缺省 0、不单独触发停。齐（税率已给）→ 自动过。
+    """
+    if not params:
+        return True
+    return any(params.get(k) is None for k in PARAM_REQUIRED)
 
 
 def confirm_payload(node: str, env: dict[str, Any], title: str) -> dict[str, Any]:

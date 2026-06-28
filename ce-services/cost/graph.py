@@ -1,14 +1,17 @@
-"""可中断组价状态机（langgraph）—— HITL 图骨架（设计 §3.1 前四节点 + 收尾）。
+"""可中断组价状态机（langgraph）—— HITL 全 13 步图（设计 §3.1）。
 
-链路：``setup → list_match → list_gate →（有码?）compose → quota_gate → price_gate → done``。
+链路：``setup → list_match → list_gate →（有码?）compose → quota_gate → price_gate →
+       rates_gate → params_gate → rollup → done``。
 - **compute / gate 双拆**：原语调用（list_match / compose，含 LLM 与知识层取数）放「compute 节点」，
   暂停闸放「gate 节点」。因 langgraph 的 ``interrupt()`` 在 resume 时**会从节点头部重跑**——把昂贵且
   非确定性的 LLM 调用单独放上游 compute 节点（节点间有 checkpoint，跑且仅跑一次），gate 节点只读 state +
-  interrupt（幂等、便宜），避免 resume 重跑 LLM 漂移（原则 3）。
+  interrupt（幂等、便宜），避免 resume 重跑 LLM 漂移（原则 3）。后段费率/参数/汇总均为**确定性算钱**
+  （``compute_unit_price`` / ``rollup_cost``，无 LLM），故 interrupt 与计算同节点、resume 重跑无漂移。
 - 每个节点完成都往 ``state["events"]`` 追加一条 provenance 事件（前端依据卡数据源），无论是否暂停。
 - 是否跳闸的判断全在 ``gates`` 代码里，弱模型不驱动流程（§1.2 / §10）。
 
-本期是骨架：``done`` 之前预留综合单价 / 措施 / 规费 / 末尾 review 节点挂点（§3.1 后续节点）。
+后段三节点（§8 综合单价费率 / §10⑪§12 项目级费用 / §13 末尾 review）：费率/参数走录入闸（缺政策数则停、
+不杜撰），rollup 始终暂停做总造价复核（§6「末尾 review 始终暂停」）。
 """
 from __future__ import annotations
 
@@ -21,6 +24,7 @@ from langgraph.types import interrupt
 
 from common.config import HITL_CONFIDENCE_TAU, LLM_MODEL_ID, LLM_URL
 from cost import gates, provenance
+from cost.pricing import RollupInput, UnitPriceInput, compute_unit_price, rollup_cost
 from cost.state import (
     CostTaskState,
     audit_entry,
@@ -170,6 +174,9 @@ def quota_gate_node(state: CostTaskState) -> dict[str, Any]:
         prov, action, by = env["provenance"], "auto_pass", "model"
 
     item["quota"] = lock_value(value, prov, by=by)
+    # 保留所选子目的定额基价（人材机净价）供 §8 综合单价计算；手填/越界子目无对应基价 → None（下游 missing_base 透传）。
+    quotas = env.get("result", {}).get("quotas", [])
+    item["quota_basis"] = next((q for q in quotas if str(q.get("子目号")) == str(value)), None)
     return {
         "items": [item],
         "audit_log": [audit_entry("quota", action, {"子目号": value}, by=by)],
@@ -219,9 +226,154 @@ def price_gate_node(state: CostTaskState) -> dict[str, Any]:
     return out
 
 
+def _unit_price_for(basis: dict[str, Any] | None, rates: dict[str, Any]) -> dict[str, Any]:
+    """按定额基价 + 费率算单条综合单价（确定性，复用 ``compute_unit_price``）。
+
+    参数：basis —— 所选定额子目的人材机净价 ``{labor_cost, material_cost, machine_cost}`` 或 None；
+      rates —— 费率块（管理费/利润/风险率 + 取费基数）。
+    返回：``compute_unit_price`` 结果；缺基价（手填子目/未就绪）→ ``{"status":"missing_base"}``（不杜撰基价）。
+    口径：以定额基价为人材机费，综合单价**不含税**（税金在 §13 rollup 一次性计，GB 50500 §2.0.9）。
+    """
+    if not basis or any(basis.get(k) is None for k in ("labor_cost", "material_cost", "machine_cost")):
+        return {"status": "missing_base"}
+    inp = UnitPriceInput(
+        labor_cost=float(basis["labor_cost"]),
+        material_cost=float(basis["material_cost"]),
+        machine_cost=float(basis["machine_cost"]),
+        management_fee_rate=rates["management_fee_rate"],
+        profit_rate=rates["profit_rate"],
+        risk_rate=rates.get("risk_rate", 0.0),
+        fee_base=rates["fee_base"],
+        tax_rate=None,  # 综合单价不含税，税金在 rollup
+    )
+    return compute_unit_price(inp)
+
+
+def rates_gate_node(state: CostTaskState) -> dict[str, Any]:
+    """综合单价费率录入闸（§3⑧/§6）：有费率自动过、缺政策数（管理费/利润/取费基数）停闸录入；钉率后算综合单价。
+
+    参数：state。返回：state.rates 钉值 + item.unit_price（compute_unit_price 结果）+ 审计/override。
+    费率是政策数（库内无），缺则停（gates.should_pause_rates）；齐则自动过。算钱确定性、不入 LLM（resume 重跑无漂移）。
+    """
+    rates = state.get("rates")
+    paused = gates.should_pause_rates(rates)
+    if paused:
+        rates = interrupt(
+            gates.input_payload(
+                "rates",
+                "请录入综合单价费率（库内无管理费/利润，须按工程类别给定）",
+                [
+                    {"key": "management_fee_rate", "type": "number", "label": "管理费率（%）", "required": True},
+                    {"key": "profit_rate", "type": "number", "label": "利润率（%）", "required": True},
+                    {"key": "risk_rate", "type": "number", "label": "风险费率（%）", "default": 0},
+                    {"key": "fee_base", "type": "enum", "label": "取费基数（labor=人工费 / labor_machine=人工+机械 / lmm=人材机）",
+                     "options": ["labor", "labor_machine", "lmm"], "required": True},
+                ],
+            )
+        )
+
+    item = _item(state)
+    unit_price = _unit_price_for(item.get("quota_basis"), rates)
+    item["unit_price"] = unit_price
+    by = "user" if paused else "model"
+    out: dict[str, Any] = {
+        "rates": rates,
+        "items": [item],
+        "audit_log": [audit_entry("unit_price", "input" if paused else "auto_pass",
+                                  {"rates": rates, "unit_price_status": unit_price.get("status", "ok")}, by=by)],
+        "events": [{"step": "compute_unit_price", "status": unit_price.get("status", "ok"),
+                    "provenance": unit_price.get("provenance"), "result": unit_price, "paused": paused}],
+    }
+    if paused:
+        out["overrides"] = [override_entry("rates", 0, rates, by="user")]
+    return out
+
+
+def params_gate_node(state: CostTaskState) -> dict[str, Any]:
+    """项目级费用录入闸（§3⑩⑪⑫/§6）：有参数自动过、缺税金率停闸录入措施/其他/规费/税金率。
+
+    参数：state。返回：state.params 钉值 + 审计/override。税金率是政策数须显式给（gates.should_pause_params），
+      措施/其他/规费可缺省 0。本节点只采集、不算钱（汇总在 rollup）。
+    """
+    params = state.get("params")
+    paused = gates.should_pause_params(params)
+    if paused:
+        params = interrupt(
+            gates.input_payload(
+                "params",
+                "请录入项目级费用（措施/其他/规费）与税金率",
+                [
+                    {"key": "measure_fee", "type": "number", "label": "措施项目费（元）", "default": 0},
+                    {"key": "other_fee", "type": "number", "label": "其他项目费（元）", "default": 0},
+                    {"key": "fee_levy", "type": "number", "label": "规费（元）", "default": 0},
+                    {"key": "tax_rate", "type": "number", "label": "税金率（%）", "required": True},
+                ],
+            )
+        )
+    by = "user" if paused else "model"
+    out: dict[str, Any] = {
+        "params": params,
+        "audit_log": [audit_entry("project_params", "input" if paused else "auto_pass", {"params": params}, by=by)],
+    }
+    if paused:
+        out["overrides"] = [override_entry("params", 0, params, by="user")]
+    return out
+
+
+def _compute_rollup(state: CostTaskState) -> dict[str, Any]:
+    """汇总各 item 综合合价 + 项目级费用 → 总造价（确定性，复用 ``rollup_cost``）。
+
+    参数：state（含 items[].unit_price 与 params）。返回：rollup_cost 结果（含 missing 计数提示）。
+    分部分项合价 = Σ 各 item 综合合价（total_price）；缺综合单价（missing_base）的 item 计入 missing、不计金额（不杜撰）。
+    """
+    subtotal = 0.0
+    missing = 0
+    for it in state.get("items") or []:
+        up = it.get("unit_price") or {}
+        total = up.get("total_price")
+        if total is not None:
+            subtotal += total
+        else:
+            missing += 1
+    params = state.get("params") or {}
+    result = rollup_cost(RollupInput(
+        subtotal=subtotal,
+        measure_fee=float(params.get("measure_fee") or 0),
+        other_fee=float(params.get("other_fee") or 0),
+        fee_levy=float(params.get("fee_levy") or 0),
+        tax_rate=params.get("tax_rate"),
+    ))
+    result["missing_unit_price_items"] = missing
+    return result
+
+
+def rollup_node(state: CostTaskState) -> dict[str, Any]:
+    """末尾 review（§3⑬/§6）：确定性汇总总造价后**始终暂停**复核，resume(approve) → done。
+
+    参数：state。返回：state.rollup（总造价明细）+ status=done + 审计。
+    §6「末尾 review 始终暂停」：总造价定稿前必看，故无条件 interrupt（汇总确定性、resume 重跑无漂移）。
+    """
+    rollup = _compute_rollup(state)
+    interrupt({
+        "gate_type": "review",
+        "node": "rollup",
+        "title": "请复核总造价",
+        "rollup": rollup,
+        "actions": ["approve"],
+    })
+    return {
+        "rollup": rollup,
+        "status": "done",
+        "audit_log": [audit_entry("rollup", "final_review", {"total": rollup.get("total"),
+                                  "pre_tax_total": rollup.get("pre_tax_total")}, by="user")],
+        "events": [{"step": "rollup", "status": "ok", "provenance": rollup.get("provenance"),
+                    "result": rollup, "paused": True}],
+    }
+
+
 def done_node(state: CostTaskState) -> dict[str, Any]:
-    """收尾（§3⑬挂点）：置 done。本期不接综合单价/rollup，留作后续节点挂点。"""
-    return {"status": "done"}
+    """收尾（§3⑬）：终态置 done；选不出码的 blocked 分支直达此节点（跳过算钱）时保留 blocked，不掩盖缺口。"""
+    return {"status": "blocked" if state.get("status") == "blocked" else "done"}
 
 
 def _has_code(state: CostTaskState) -> str:
@@ -243,6 +395,9 @@ def build_graph(checkpointer: Any):
     g.add_node("compose", compose_node)
     g.add_node("quota_gate", quota_gate_node)
     g.add_node("price_gate", price_gate_node)
+    g.add_node("rates_gate", rates_gate_node)
+    g.add_node("params_gate", params_gate_node)
+    g.add_node("rollup", rollup_node)
     g.add_node("done", done_node)
 
     g.add_edge(START, "setup")
@@ -251,7 +406,10 @@ def build_graph(checkpointer: Any):
     g.add_conditional_edges("list_gate", _has_code, {"compose": "compose", "done": "done"})
     g.add_edge("compose", "quota_gate")
     g.add_edge("quota_gate", "price_gate")
-    g.add_edge("price_gate", "done")
+    g.add_edge("price_gate", "rates_gate")
+    g.add_edge("rates_gate", "params_gate")
+    g.add_edge("params_gate", "rollup")
+    g.add_edge("rollup", "done")
     g.add_edge("done", END)
 
     return g.compile(checkpointer=checkpointer)

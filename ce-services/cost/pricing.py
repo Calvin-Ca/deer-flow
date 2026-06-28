@@ -173,3 +173,69 @@ def compute_unit_price(inp: UnitPriceInput) -> dict[str, Any]:
             "取费基数（fee_base）由调用方显式声明，不按地区猜测。",
         ],
     }
+
+
+# 工程造价构成（GB 50500，§13 末尾汇总）—— 不杜撰精确 §号，用通用条文名做溯源
+_ROLLUP_CLAUSE = "GB 50500 工程造价构成"
+_ROLLUP_COMPONENTS = ["分部分项费", "措施项目费", "其他项目费", "规费", "税金"]
+
+
+class RollupInput(BaseModel):
+    """``rollup_cost`` 的入参 schema（§13 总造价汇总闸门）。
+
+    字段（金额单位元、税率单位 %）：
+      subtotal —— 分部分项合价（Σ各清单综合合价），≥0。
+      measure_fee / other_fee / fee_levy —— 措施项目费 / 其他项目费 / 规费（项目级，由调用方录入），默认 0、均 ≥0。
+      tax_rate —— 税金率（%），可选；给定则在税前造价上计税金 + 总造价（GB 50500：税金 = 税前造价 × 税率）。
+    校验：金额非负且有限（拒 NaN/Inf）；``extra=forbid`` 拒多余字段——动钱那步无论谁调用都被这道 schema 拦在边界。
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    subtotal: float = Field(..., ge=0, allow_inf_nan=False, description="分部分项合价（元）")
+    measure_fee: float = Field(0.0, ge=0, allow_inf_nan=False, description="措施项目费（元）")
+    other_fee: float = Field(0.0, ge=0, allow_inf_nan=False, description="其他项目费（元）")
+    fee_levy: float = Field(0.0, ge=0, allow_inf_nan=False, description="规费（元）")
+    tax_rate: float | None = Field(None, ge=0, allow_inf_nan=False, description="税金率 %，给定则算税金+总造价")
+
+
+def rollup_cost(inp: RollupInput) -> dict[str, Any]:
+    """分部分项 + 措施 + 其他 + 规费 →（可选税金）总造价，确定性汇总（GB 50500，§13）。
+
+    参数：inp —— ``RollupInput``（已过 pydantic 闸门：金额非负有限、不收多余字段）。
+    返回：``{subtotal, measure_fee, other_fee, fee_levy, pre_tax_total, tax, total, formula, provenance, notes}``：
+      - pre_tax_total —— 税前造价 = 分部分项 + 措施 + 其他 + 规费（各项 Decimal 量化到分后求和）；
+      - tax / total —— 仅当 tax_rate 给定时非空（税金 = 税前造价 × 税率%、总造价 = 税前 + 税金）；
+      - provenance —— 造价构成溯源；notes —— 红线声明（不杜撰税率、项目级费用由调用方录入）。
+    红线：本工具只做带溯源的确定性汇总，**不替用户定政策数**（税率/措施/其他/规费均由调用方给定，不内置默认）。
+    """
+    sub = Decimal(str(inp.subtotal)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    measure = Decimal(str(inp.measure_fee)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    other = Decimal(str(inp.other_fee)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    levy = Decimal(str(inp.fee_levy)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    pre_tax = sub + measure + other + levy  # 已量化各项之和，无累加误差
+
+    tax: float | None = None
+    total: float | None = None
+    if inp.tax_rate is not None:
+        tax_dec = (pre_tax * Decimal(str(inp.tax_rate)) / Decimal("100")).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP
+        )
+        tax = float(tax_dec)
+        total = _money(pre_tax + tax_dec)
+
+    return {
+        "subtotal": float(sub),
+        "measure_fee": float(measure),
+        "other_fee": float(other),
+        "fee_levy": float(levy),
+        "pre_tax_total": float(pre_tax),
+        "tax": tax,
+        "total": total,
+        "formula": "税前造价 = 分部分项 + 措施项目费 + 其他项目费 + 规费；总造价 = 税前造价 + 税金（税前 × 税率）",
+        "provenance": {"clause": _ROLLUP_CLAUSE, "components": _ROLLUP_COMPONENTS},
+        "notes": [
+            "税金 = 税前造价 × 税率（GB 50500）；税率由调用方给定，不内置默认、不杜撰。",
+            "措施/其他/规费为项目级费用，由调用方（HITL）录入，本工具只做带溯源的确定性汇总，不替用户定政策数。",
+        ],
+    }

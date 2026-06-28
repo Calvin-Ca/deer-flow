@@ -10,6 +10,7 @@
   POST /norm/qa       造价规范条文检索 + Qwen3 带引用作答（norm-qa）
   POST /cost/compose  构件描述 → 候选召回 → LLM 选码 → 组价取数（cost-agent，P1 选码闭环；传 rates 则算综合单价）
   POST /cost/unit-price 综合单价计算原语（P2，确定性算钱、pydantic 闸门、不入 LLM）
+  POST /cost/rollup     总造价汇总原语（§13，分部分项+措施/其他/规费→可选税金→总造价，确定性、pydantic 闸门）
   POST /cost/session/start          可中断组价 HITL 会话：跑到首个闸或 done（langgraph 图 + provenance 信封）
   POST /cost/session/{id}/resume    以用户决策续跑会话到下个闸或 done
   GET  /cost/session/{id}/state     读会话持久化状态（已钉编码 / override / audit_log，可跨会话恢复）
@@ -53,7 +54,7 @@ def health() -> dict:
         "knowledge_url": KNOWLEDGE_URL,
         "llm_url": LLM_URL,
         "routes": [
-            "/norm/qa", "/cost/compose", "/cost/unit-price",
+            "/norm/qa", "/cost/compose", "/cost/unit-price", "/cost/rollup",
             "/cost/session/start", "/cost/session/{id}/resume", "/cost/session/{id}/state",
         ],
     }

@@ -47,8 +47,10 @@
 
 ## HITL 可中断组价图（langgraph，2026-06-28）
 
-> 设计见 `HITL_DESIGN.md`。本期落地 §9 路径**步1（provenance 信封）+ 步3（图骨架）**：
-> `setup → 编码 → 定额 → 信息价` 四节点 + interrupt/resume + checkpointer，curl 驱动无头闭环；前端后续接。
+> 设计见 `HITL_DESIGN.md`。已落地 §9 路径**步1（provenance 信封）+ 步3（图骨架）+ 步5（后段全节点）**：
+> 全 13 步链路 `setup → 编码 → 定额 → 信息价 → 费率 → 项目参数 → 总造价(末尾 review)` + interrupt/resume +
+> checkpointer，curl 驱动无头闭环；前端后续接。后段三节点（§8 费率 / §10⑪§12 参数 / §13 rollup）均**确定性算钱、
+> 无 LLM**（`compute_unit_price` / `rollup_cost`），故 interrupt 与计算同节点、resume 重跑无漂移（不必双拆）。
 
 **为什么独立成图**：13 步组价的两类刚需（展示决策依据 / 中途等输入再继续）黑盒 `cost.py` 都做不到——
 编排上提成**可中断 langgraph 状态机**，每数字带结构化来源（provenance 信封），每介入点是可暂停可恢复的闸门。
@@ -60,8 +62,9 @@
 | `provenance.py` | §5.1 信封 + 原语适配器（原地包现有 `bill_match`/`select_code`/`price_compose`，不重写）|
 | `state.py` | §5.4 任务状态 schema（`CostTaskState` TypedDict）+ 纯函数 helper（lock_value/audit/override）|
 | `gates.py` | §6 门控（是否跳闸，全在代码、不交弱模型）+ §5.2/5.3 interrupt payload + 决策落值 |
-| `graph.py` | langgraph StateGraph：compute/gate **双拆**（LLM 调用放上游 compute 节点，避免 resume 重跑漂移）|
-| `session.py` | 图 + SqliteSaver 单例 + start/resume/get_state |
+| `graph.py` | langgraph StateGraph：上游 compute/gate **双拆**（LLM 调用放 compute 节点避免 resume 漂移）；后段费率/参数/汇总确定性算钱、同节点 interrupt |
+| `pricing.py` | 确定性算钱原语：`compute_unit_price`（§8 综合单价）+ `rollup_cost`（§13 总造价汇总），各带 pydantic 闸门、不杜撰费率/税率 |
+| `session.py` | 图 + SqliteSaver 单例 + start/resume/get_state（透出 rates/params/rollup）|
 
 **新增依赖**（服务器侧落锁，本地不提交 uv.lock）：
 `cd ce-services && uv add langgraph langgraph-checkpoint-sqlite`

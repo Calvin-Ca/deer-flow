@@ -82,16 +82,18 @@ def get_quota(conn: psycopg.Connection, region: str, code: str) -> dict | None:
 _COMPOSE_SQL = (
     "SELECT q.quota_code, m.quota_doc_id, q.name AS quota_name, q.unit AS quota_unit, "
     "       q.base_price, q.labor_cost, q.material_cost, q.machine_cost, "
+    "       q.chapter AS quota_chapter, q.spec_version AS quota_spec_version, "
     "       m.confidence, m.source, "
     "       r.category, r.name AS res_name, r.spec, r.unit AS res_unit, qr.consumption, "
-    "       p.price AS unit_price, p.effective_period, p.price_type, p.factor AS unit_factor "
+    "       p.price AS unit_price, p.effective_period, p.price_type, p.factor AS unit_factor, "
+    "       p.price_doc_id "
     "FROM bill_quota_map m "
     "JOIN quota_item q ON q.quota_code = m.quota_code AND q.doc_id = m.quota_doc_id "
     "JOIN quota_resource qr ON qr.quota_id = q.id "
     "JOIN resource r ON r.id = qr.resource_id "
     "LEFT JOIN resource_price_map rm ON rm.quota_resource_id = r.id "
     "LEFT JOIN LATERAL ("
-    "    SELECT rp.price, rp.effective_period, rp.price_type, "
+    "    SELECT rp.price, rp.effective_period, rp.price_type, rp.doc_id AS price_doc_id, "
     "           CASE WHEN rp.resource_id = r.id THEN 1.0 ELSE rm.unit_factor END AS factor "
     "    FROM resource_price rp "
     "    WHERE rp.resource_id IN (r.id, rm.price_resource_id) AND rp.region = %(region)s "
@@ -124,10 +126,12 @@ def compose_price(conn: psycopg.Connection, region: str, code: str,
         ["GB/T 50854-2024","GB/T 50856-2024"]，2013→["GB/T 50854-2013"]）；同 9 位码跨版本共存时
         据此选版本，避免串库（见 config.SPEC_REGISTRY）。None=不限版本（仅单版本库时安全）。
     返回：``{"bill": {...清单字段...}, "region", "on_date", "quota_count",
-          "quotas": [{quota_code, name, unit, confidence, source, 人材机费,
+          "quotas": [{quota_code, quota_doc_id, name, unit, confidence, source, 人材机费,
+                      chapter, spec_version,   # 定额溯源：库号(quota_doc_id)+版本+章节，供 HITL 依据卡定位子目来源
                       "resources": [{category,name,spec,unit,consumption,unit_price,unit_factor,
-                                     price_period,price_type,price_status,amount}...]}...]}``；
+                                     price_period,price_type,price_doc_id,price_status,amount}...]}...]}``；
           price_status: matched（信息价命中）/ no_source（信息价无此料→HITL 询价）；
+          price_doc_id: 命中信息价的来源文件标识（如 SZ-JGXX-PRICE），与 price_period 期段共定位（行号待 ingest 补）；
           清单项不存在→None；存在但无映射定额→quotas 为空列表（200，供任务层感知覆盖缺口）。
     """
     with conn.cursor() as cur:
@@ -162,6 +166,9 @@ def compose_price(conn: psycopg.Connection, region: str, code: str,
                 "labor_cost": row["labor_cost"],
                 "material_cost": row["material_cost"],
                 "machine_cost": row["machine_cost"],
+                # 定额溯源（HITL 依据卡用）：库号 quota_doc_id + 版本 + 章节定位到具体子目来源
+                "chapter": row["quota_chapter"],
+                "spec_version": row["quota_spec_version"],
                 "confidence": row["confidence"],
                 "source": row["source"],
                 "resources": [],
@@ -183,6 +190,8 @@ def compose_price(conn: psycopg.Connection, region: str, code: str,
             "unit_factor": float(factor) if price is not None else None,
             "price_period": str(period) if period is not None else None,
             "price_type": row["price_type"],
+            # 信息价溯源（HITL 依据卡用）：来源文件 price_doc_id + 期段 price_period 定位到具体价（行号待 ingest 补）
+            "price_doc_id": row["price_doc_id"] if price is not None else None,
             "price_status": "matched" if price is not None else "no_source",
             "amount": amount,
         })

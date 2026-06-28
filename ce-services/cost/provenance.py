@@ -6,9 +6,10 @@
 把它们已有的结构化输出（candidate.score/chapter、select_code.confidence/alternatives、
 resource.price_status）裹进信封，供图节点与前端依据卡直接渲染。
 
-诚实边界：现有 ``price_compose`` 未必返回「信息价文件名+行号」级 ``source_ref``。本期用现有可得字段
-（期号/区域/price_status）best-effort 填，缺的标 ``TODO(knowledge-layer)``——知识层补抽精确 source_ref
-是设计 §9 步1 的后续，不阻塞图骨架。
+来源精度（2026-06-28 知识层补 source_ref 后）：``compose_price`` 已返回定额 ``quota_doc_id/spec_version/chapter``
+与信息价 ``price_doc_id/price_period``、``bill_match`` 已带 ``doc_id/spec_version/chapter``，故清单条文 / 定额库号 /
+信息价来源文件+期段均可精确拼出（见 ``_join_ref``）。**仅剩信息价「行号」级定位待 ingest 补**（resource_price 表
+无行号列，需重抽时落库）——其余 ``TODO(knowledge-layer)`` 标记已去除。
 """
 from __future__ import annotations
 
@@ -37,6 +38,12 @@ def _coerce_price(raw: Any) -> float | None:
         return float(raw)
     except (TypeError, ValueError):
         return None
+
+
+def _join_ref(*parts: Any) -> str | None:
+    """把多段来源字段（库号/版本/章节/期段…）拼成一行 source_ref；全空 → None（不杜撰）。"""
+    joined = " ".join(str(p).strip() for p in parts if p is not None and str(p).strip())
+    return joined or None
 
 
 def envelope(
@@ -111,9 +118,11 @@ def list_match(
         for a in sel.get("alternatives", [])
     ]
     status = STATUS_NEED_REVIEW if (sel.get("need_review") or not code) else STATUS_OK
-    source_ref = (chosen or {}).get("chapter") if chosen else None
+    # 清单溯源：库号(doc_id) + 国标版本 + 分部章节，定位条文（bill_match 已带这三字段；page 待 bill 索引补）。
+    source_ref = _join_ref((chosen or {}).get("doc_id"), (chosen or {}).get("spec_version"),
+                           (chosen or {}).get("chapter")) if chosen else None
     if source_ref is None:
-        source_ref = "TODO(knowledge-layer): 清单条文号待知识层补抽"
+        source_ref = "清单条文：召回候选未带章节/版本"  # 诚实：召回缺字段，非杜撰
 
     return envelope(
         "list_match",
@@ -150,16 +159,23 @@ def from_price_compose(region: str, code: str, spec: str) -> dict[str, Any]:
             "labor_cost": q.get("labor_cost"),
             "material_cost": q.get("material_cost"),
             "machine_cost": q.get("machine_cost"),
+            # 定额溯源：库号(quota_doc_id) + 版本 + 章节 + 子目号，定位到具体子目（知识层 compose_price 已补这几字段）。
+            "source_ref": _join_ref(
+                q.get("quota_doc_id"), q.get("spec_version"), q.get("chapter"),
+                f"子目 {q.get('quota_code')}" if q.get("quota_code") else None,
+            ),
         }
         for q in quotas
     ]
     quota_status = STATUS_OK if quota_items else STATUS_NEED_REVIEW
+    # 信封级 source_ref 取首子目精确引用；无映射子目则诚实标缺口（不杜撰库号）。
+    quota_source_ref = quota_items[0]["source_ref"] if quota_items else f"{region}定额 spec={spec} code={code}（无映射定额子目）"
     quota_envelope = envelope(
         "pick_quota",
         quota_status,
         {"quotas": quota_items, "count": len(quota_items)},
         source_type="quota_lib",
-        source_ref=f"{region}定额 / spec={spec} / code={code}",
+        source_ref=quota_source_ref,
         confidence=None,
         alternatives=[],
     )
@@ -200,10 +216,10 @@ def from_price_compose(region: str, code: str, spec: str) -> dict[str, Any]:
                 "status": STATUS_OK if ok else STATUS_NO_SOURCE,
                 "provenance": {
                     "source_type": "price_book",
-                    # 命中：来源 = 价类 + 期段（知识层已带 price_type/price_period）；未命中：无来源标 TODO。
+                    # 命中：来源 = 价类 + 来源文件(price_doc_id) + 期段（行号待 ingest 补）；未命中：诚实标无源、交人工询价。
                     "source_ref": (
-                        f"{r.get('price_type') or '信息价'} {r.get('price_period')}"
-                        if ok else "TODO(knowledge-layer): 无命中信息价来源"
+                        _join_ref(r.get("price_type") or "信息价", r.get("price_doc_id"), r.get("price_period"))
+                        if ok else "无命中信息价（建议人工询价，不杜撰）"
                     ),
                     "price_status": price_status or "unknown",
                 },

@@ -238,7 +238,16 @@
 - [x] **跨进程持久化复验**（✅ 2026-06-28）：`lsof kill` 重启 :8101 后读同一 task_id → `status=done`、
   `total=10717.43`、audit_count=14 与重启前一致 = SqliteSaver 落盘生效，后段节点状态同样可跨会话恢复。
 - [ ] **接前端**：依据卡（events provenance）+ 两类控件（confirm/input payload）——本期无头，前端后续接。
-- [ ] **知识层补 `source_ref`**：信息价期号+行号 / 定额库号 / 清单条文号回填原语返回（设计 §9 步1 后续，去 `TODO(knowledge-layer)` 标记）。
+- [x] **知识层补 `source_ref`**（✅ 2026-06-28，本地纯函数验证；行号待 ingest）：去掉 `provenance.py` 里的
+  `TODO(knowledge-layer)` 标记——库里本就有的来源字段全部回填精确 source_ref：
+  - **ce-code `cost/query.py` `compose_price`**：SELECT 增 `q.chapter/q.spec_version`（定额库号溯源）+
+    `rp.doc_id AS price_doc_id`（信息价来源文件），回填进 quota 块（chapter/spec_version）与 resource 块（price_doc_id）。
+  - **ce-services `cost/provenance.py`**：① 清单条文 source_ref = `doc_id + spec_version + chapter`（bill_match 已带）；
+    ② 定额 source_ref = `quota_doc_id + spec_version + chapter + 子目号`（精确到子目，每 quota item 亦带）；
+    ③ 信息价命中 source_ref = `价类 + price_doc_id + 期段`；④ 缺价/缺章节由 TODO 改诚实文案（非杜撰）。新增 `_join_ref` helper。
+  - 本地：2 文件 py_compile + 10 项纯函数单测（_join_ref + 定额/命中/缺价/人工 from_quota_base source_ref）全过；
+    `compose_price` 含 PG 不本地跑，SQL/取数行为待服务器验。
+  - **仅剩信息价「行号」级定位待 ingest 补**：`resource_price` 表无行号列，需重抽信息价时落库（已在 query.py 注释标注）。
 - [ ] **门控阈值调参**：τ 从保守（多停）逐步放松（§6）。
 - [ ] **接 agent（远期）**：lead_agent/cost-agent 只做意图路由触发会话，不当逐步编排器（§1.2）。
 

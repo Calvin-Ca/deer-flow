@@ -466,6 +466,31 @@ def test_apply_prompt_template_default_includes_runbook(monkeypatch):
     assert "照 runbook 调脚本" in prompt
 
 
+def test_default_template_embeds_routing_block():
+    """方案 A：内置模板固化 <routing> 显式意图分类块（norm/cost/both/clarify/chat）。"""
+    template = prompt_module.SYSTEM_PROMPT_TEMPLATE
+
+    assert '<routing priority="高">' in template
+    assert "</routing>" in template
+    # 五类主意图齐备（模板里花括号需转义为 {{ }}，渲染后才是单括号，避免 .format KeyError）
+    assert "{{ norm | cost | both | clarify | chat }}" in template
+    # routing 在 skill_runbook 之前（先分类、后进入能力块执行）；用带 priority 的真实区块标签定位，
+    # 避免撞到 safety_redline / routing 正文里对 <skill_runbook> 的文本引用
+    assert template.index('<routing priority="高">') < template.index('<skill_runbook priority="高">')
+
+
+def test_version_clarification_is_pushed_down_to_per_capability_gate():
+    """版本澄清下沉：safety_redline 不再写死"必须先问版本"，改由各能力块「版本闸门」承载。"""
+    template = prompt_module.SYSTEM_PROMPT_TEMPLATE
+
+    redline = template[template.index("<safety_redline") : template.index("</safety_redline>")]
+    # 全局红线只保留指针，不再写笼统的"必须先调用 ask_clarification 反问澄清版本"
+    assert "版本闸门" in redline
+    assert "必须先调用 `ask_clarification` 反问澄清版本" not in redline
+    # norm 与 cost 两条路由各自持有版本闸门（出现两次）
+    assert template.count("**版本闸门**") == 2
+
+
 def test_warm_enabled_skills_cache_logs_on_timeout(monkeypatch, caplog):
     event = threading.Event()
     monkeypatch.setattr(prompt_module, "_ensure_enabled_skills_cache", lambda: event)

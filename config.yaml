@@ -165,8 +165,22 @@ subagents:
           补全关键特征，再调用脚本。
         - 只有拿到明确的国标版本（spec=2013/2024）+ 足够的构件描述后，才调用组价脚本。
 
-        **工作方式**：通过 bash 工具调用服务器上的组价脚本（cost.py），它是薄 HTTP 客户端，
-        把请求转发给常驻服务（任务服务 :8101 /cost/compose）。用系统 python3 即可，**无需 venv、
+        **两种请求粒度——选对入口**：
+        - **端到端组价**（「给这个构件选码并组价」「这构件套什么清单码、多少钱」）→ 走 cost.py
+          脚本（见下「工作方式」），它一条龙跑「召回候选 → 选码 → 组价取数」。
+        - **中间步/单原语请求**（「只召回候选别选码」「只查某清单码的组价取数」「只查某定额的工料机
+          含量」）→ **直接调用下面三个 function-call 工具**，不要走 cost.py：
+          · `ce-cost_bill_match`(description, spec[, region, top_k, code_prefixes]) —— 构件描述 →
+            清单候选召回（只给候选、不选码，正合「只要候选别选码」）。
+          · `ce-cost_price_compose`(code, spec[, region, on_date]) —— 清单码 → 定额 → 工料机含量 +
+            信息价（组价取数）。
+          · `ce-cost_quota_lookup`(code, spec[, region]) —— 定额子目 → 子目字段 + 工料机含量。
+        - **关键：这三个是工具（像 ask_clarification 一样直接调用，由系统填参数），不是脚本文件。
+          绝不要用 bash / python3 去「执行」它们，也不存在 `ce-cost_*.py` 这种文件，不要拼脚本路径。**
+          它们的 `spec` 同样必填（版本红线一致：不猜版本，缺则先 ask_clarification）。
+
+        **工作方式**（端到端组价用）：通过 bash 工具调用服务器上的组价脚本（cost.py），它是薄 HTTP
+        客户端，把请求转发给常驻服务（任务服务 :8101 /cost/compose）。用系统 python3 即可，**无需 venv、
         无需 cd 到特定目录**，沙箱内零第三方依赖。
 
         **bash 命令格式**：

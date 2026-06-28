@@ -52,9 +52,12 @@ def should_pause_price(price: dict[str, Any]) -> bool:
     """信息价逐项例外闸门控（§6/§7）：单条材料价是否需人工录入。
 
     参数：price —— 材料的 price 块 ``{value, status, provenance}``。
-    返回：True=暂停（缺价 / 状态非 ok）。命中信息价（status==ok 且有值）→ 自动过，绝不逐材料问（§7 反例）。
+    返回：True=暂停。规则：``no_source``（缺信息价）→ 停；命中（``ok`` 且有值）→ 过；
+      ``from_quota_base``（人工/机械/百分比，价在定额基价）→ 过，**不逐条误问**（§7 反例）。
+      边界：状态 ok 但值缺失（命中但单价解析失败）→ 仍停，避免带空价过闸。
     """
-    return price.get("status") != "ok" or price.get("value") is None
+    status = price.get("status")
+    return status == "no_source" or (status == "ok" and price.get("value") is None)
 
 
 def confirm_payload(node: str, env: dict[str, Any], title: str) -> dict[str, Any]:

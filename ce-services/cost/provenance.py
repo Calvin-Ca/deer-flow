@@ -22,6 +22,8 @@ STATUS_OK = "ok"
 STATUS_NEED_REVIEW = "need_review"
 STATUS_NO_SOURCE = "no_source"
 STATUS_ERROR = "error"
+# 人工/机械/百分比项：钱来自定额基价，不走信息价、不计缺价闸。
+STATUS_FROM_QUOTA = "from_quota_base"
 
 # 知识层 price_compose 资源的「命中」状态字面量（实测 = "matched"，非 "ok"）。
 _PRICE_HIT = {"ok", "matched"}
@@ -166,32 +168,46 @@ def from_price_compose(region: str, code: str, spec: str) -> dict[str, Any]:
     materials: list[dict[str, Any]] = []
     for q in quotas:
         for r in (q.get("resources", []) or []):
+            category = (r.get("category") or "").strip()
+            unit = (r.get("unit") or "").strip()
             price_status = (r.get("price_status") or "").strip().lower()
-            ok = price_status in _PRICE_HIT  # 知识层命中态为 "matched"
-            value = _coerce_price(r.get("unit_price")) if ok else None
-            materials.append(
-                {
-                    "raw": r.get("name"),
-                    "std": r.get("name"),
-                    "category": r.get("category"),
-                    "spec": r.get("spec"),
-                    "unit": r.get("unit"),
-                    "consumption": r.get("consumption"),
-                    "price": {
-                        "value": value,
-                        "status": STATUS_OK if ok else STATUS_NO_SOURCE,
-                        "provenance": {
-                            "source_type": "price_book",
-                            # 命中：来源 = 价类 + 期段（知识层已带 price_type/price_period）；
-                            # 未命中：无来源，标 TODO——缺价逐项闸据此触发（设计 §7）。
-                            "source_ref": (
-                                f"{r.get('price_type') or '信息价'} {r.get('price_period')}"
-                                if ok else "TODO(knowledge-layer): 无命中信息价来源"
-                            ),
-                            "price_status": price_status or "unknown",
-                        },
+            base = {
+                "raw": r.get("name"),
+                "std": r.get("name"),
+                "category": r.get("category"),
+                "spec": r.get("spec"),
+                "unit": r.get("unit"),
+                "consumption": r.get("consumption"),
+            }
+            # 人工 / 机械 / 百分比项：钱在定额基价（labor_cost/machine_cost）或属费率调整，**不走信息价闸**——
+            # 标 from_quota_base，缺价逐项闸只停真·缺信息价的实物材料（设计 §7：来源是策略，不逐条误问）。
+            if category != "材料" or unit == "%":
+                base["price"] = {
+                    "value": None,
+                    "status": STATUS_FROM_QUOTA,
+                    "provenance": {
+                        "source_type": "quota_lib",
+                        "source_ref": "定额基价（人工/机械/百分比项，不取信息价）",
+                        "price_status": price_status or "n/a",
                     },
                 }
-            )
+                materials.append(base)
+                continue
+            # 实物材料：按信息价命中（matched）/ 缺价（no_source）分流。
+            ok = price_status in _PRICE_HIT
+            base["price"] = {
+                "value": _coerce_price(r.get("unit_price")) if ok else None,
+                "status": STATUS_OK if ok else STATUS_NO_SOURCE,
+                "provenance": {
+                    "source_type": "price_book",
+                    # 命中：来源 = 价类 + 期段（知识层已带 price_type/price_period）；未命中：无来源标 TODO。
+                    "source_ref": (
+                        f"{r.get('price_type') or '信息价'} {r.get('price_period')}"
+                        if ok else "TODO(knowledge-layer): 无命中信息价来源"
+                    ),
+                    "price_status": price_status or "unknown",
+                },
+            }
+            materials.append(base)
 
     return {"quota_envelope": quota_envelope, "materials": materials, "raw": raw}

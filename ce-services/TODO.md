@@ -237,7 +237,17 @@
   override 4 类全（code/price/rates/params）。`/cost/rollup` 端点单测数字精确（1286.2）+ 负金额 422 闸生效。
 - [x] **跨进程持久化复验**（✅ 2026-06-28）：`lsof kill` 重启 :8101 后读同一 task_id → `status=done`、
   `total=10717.43`、audit_count=14 与重启前一致 = SqliteSaver 落盘生效，后段节点状态同样可跨会话恢复。
-- [ ] **接前端**：依据卡（events provenance）+ 两类控件（confirm/input payload）——本期无头，前端后续接。
+- [x] **接前端**（✅ 2026-06-28，集成进上游 deer-flow `frontend/`，`pnpm check` 全过）：POC 无独立 ce-frontend，
+  控件落上游 Next.js（对标 §8 设计：全从结构化 payload 渲染、不解析模型自然语言）：
+  - **同源代理** `frontend/src/app/api/cost/[...path]/route.ts` → ce-services `:8101/cost/*`（对标 `api/memory`，
+    env `NEXT_PUBLIC_CE_SERVICES_BASE_URL` 默认 `127.0.0.1:8101`）；浏览器打 `/api/cost/*` 无 CORS。
+  - **客户端 + 类型** `frontend/src/core/cost/{types,client,format}.ts`：会话/三类 interrupt/events 类型 +
+    start/resume/getState + `displayValue` 安全格式化（避 `[object Object]`）。
+  - **三类闸控件 + 依据卡** `frontend/src/components/workspace/cost/{gates,cost-hitl-panel}.tsx`：confirm（编码/定额：
+    proposal+依据卡+备选+✓/手改）/ input（setup/缺价/费率/参数：按字段类型渲染 enum·number·text·month + context + 必填校验）/
+    review（总造价明细+复核定稿）；依据时间线逐节点 provenance（含暂停标记）；起会话表单 + 状态/审计。
+  - **入口** `frontend/src/app/workspace/cost/page.tsx` + sidebar nav「智能组价」+ i18n `sidebar.cost`（en/zh/types）。
+  - **待真连**：需 ce-services :8101 在跑 + 前端 dev/build 起来后，浏览器走一轮 start→各闸→done 真链路联调（前端真跑在服务器）。
 - [x] **知识层补 `source_ref`**（✅ 2026-06-28，本地纯函数验证；行号待 ingest）：去掉 `provenance.py` 里的
   `TODO(knowledge-layer)` 标记——库里本就有的来源字段全部回填精确 source_ref：
   - **ce-code `cost/query.py` `compose_price`**：SELECT 增 `q.chapter/q.spec_version`（定额库号溯源）+

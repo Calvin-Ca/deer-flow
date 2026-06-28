@@ -1,8 +1,0 @@
-# IFC 原件与解析索引（本地存储后端落盘处；不入 git，模型版权/体积敏感）
-data/
-
-# Python
-__pycache__/
-*.pyc
-.venv/
-uv.lock

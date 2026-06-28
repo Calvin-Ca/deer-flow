@@ -23,6 +23,19 @@ STATUS_NEED_REVIEW = "need_review"
 STATUS_NO_SOURCE = "no_source"
 STATUS_ERROR = "error"
 
+# 知识层 price_compose 资源的「命中」状态字面量（实测 = "matched"，非 "ok"）。
+_PRICE_HIT = {"ok", "matched"}
+
+
+def _coerce_price(raw: Any) -> float | None:
+    """信息价单价（知识层返回字符串如 "1904"）→ float；空/非法 → None（不杜撰）。"""
+    if raw is None:
+        return None
+    try:
+        return float(raw)
+    except (TypeError, ValueError):
+        return None
+
 
 def envelope(
     step: str,
@@ -154,21 +167,26 @@ def from_price_compose(region: str, code: str, spec: str) -> dict[str, Any]:
     for q in quotas:
         for r in (q.get("resources", []) or []):
             price_status = (r.get("price_status") or "").strip().lower()
-            ok = price_status == "ok"
-            unit_price = r.get("unit_price") if r.get("unit_price") is not None else r.get("price")
+            ok = price_status in _PRICE_HIT  # 知识层命中态为 "matched"
+            value = _coerce_price(r.get("unit_price")) if ok else None
             materials.append(
                 {
-                    "raw": r.get("name") or r.get("raw"),
-                    "std": r.get("std") or r.get("name"),
+                    "raw": r.get("name"),
+                    "std": r.get("name"),
+                    "category": r.get("category"),
+                    "spec": r.get("spec"),
                     "unit": r.get("unit"),
+                    "consumption": r.get("consumption"),
                     "price": {
-                        "value": unit_price if ok else None,
+                        "value": value,
                         "status": STATUS_OK if ok else STATUS_NO_SOURCE,
                         "provenance": {
                             "source_type": "price_book",
+                            # 命中：来源 = 价类 + 期段（知识层已带 price_type/price_period）；
+                            # 未命中：无来源，标 TODO——缺价逐项闸据此触发（设计 §7）。
                             "source_ref": (
-                                r.get("price_source")
-                                or "TODO(knowledge-layer): 信息价期号+行号待知识层补抽"
+                                f"{r.get('price_type') or '信息价'} {r.get('price_period')}"
+                                if ok else "TODO(knowledge-layer): 无命中信息价来源"
                             ),
                             "price_status": price_status or "unknown",
                         },

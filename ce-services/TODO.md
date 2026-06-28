@@ -245,9 +245,13 @@
   - **ce-services `cost/provenance.py`**：① 清单条文 source_ref = `doc_id + spec_version + chapter`（bill_match 已带）；
     ② 定额 source_ref = `quota_doc_id + spec_version + chapter + 子目号`（精确到子目，每 quota item 亦带）；
     ③ 信息价命中 source_ref = `价类 + price_doc_id + 期段`；④ 缺价/缺章节由 TODO 改诚实文案（非杜撰）。新增 `_join_ref` helper。
-  - 本地：2 文件 py_compile + 10 项纯函数单测（_join_ref + 定额/命中/缺价/人工 from_quota_base source_ref）全过；
-    `compose_price` 含 PG 不本地跑，SQL/取数行为待服务器验。
-  - **仅剩信息价「行号」级定位待 ingest 补**：`resource_price` 表无行号列，需重抽信息价时落库（已在 query.py 注释标注）。
+  - 本地：2 文件 py_compile + 10 项纯函数单测（_join_ref + 定额/命中/缺价/人工 from_quota_base source_ref）全过。
+  - **服务器联调验证**（✅ 2026-06-28，:8100 `/price/compose/深圳/010503001?spec=2024` 实测）：回填取数链端到端通——
+    quota 带 `quota_doc_id=SZ-SJG171`/`spec_version=SJG 171-2024`；命中材料（松杂枋板材 1904/涂胶模板 49）带
+    `price_doc_id`/`price_period=[2026-05-01,2026-06-01)`/`status=matched`；缺价/人工/% 项 `price_doc_id=null`（不杜撰）。
+  - **真数据暴露 2 条知识层 ingest 数据质量问题**（已记 `../ce-code/TODO.md §D`，回填层如实搬运不猜对错）：
+    ① `quota_item.chapter` 章节归属抽错（矩形柱模板被归「2 实心砖墙」）；② 信息价 `doc_id` 用通配占位 `SZ-JGXX-PRICE`
+    未落具体期文件号。**信息价「行号」级定位**同归 ce-code（`resource_price` 需加行号列，重抽时落库）。
 - [ ] **门控阈值调参**：τ 从保守（多停）逐步放松（§6）。
 - [ ] **接 agent（远期）**：lead_agent/cost-agent 只做意图路由触发会话，不当逐步编排器（§1.2）。
 

@@ -118,6 +118,14 @@ PG `ce_cost`（:5433）已灌齐，组价取数链通（清单→定额→工料
 ### D. 数据精修
 - [ ] 定额单位 `$m^3$` LaTeX 残留（`quota.py` 抽取遗留，污染 quota_item/resource 的 unit）→ 清洗后重抽 SJG。
 - [ ] SJG `chapter`/`ancestor_titles` 偏弱（无规整目录），入库后抽查。
+- [ ] **🔴 `quota_item.chapter` 章节归属抽错（2026-06-28，HITL source_ref 联调暴露）**：`010006-15 矩形柱 木模板`
+  的 `chapter="2 实心砖墙"`（矩形柱模板被归到实心砖墙章），致 `/price/compose` 回填的定额 source_ref 误导
+  （拼出「… 2 实心砖墙 子目 010006-15」）。属 SJG 定额 ingest 章节归属 bug，回填层如实搬运不猜对错（任务层已确认
+  不在编排侧兜数据质量）；重抽 SJG 时修章节归属。
+- [ ] **信息价 `resource_price.doc_id` 用通配占位 `SZ-JGXX-PRICE`（2026-06-28，同上联调暴露）**：未落到具体信息价期
+  文件号，致命中价 source_ref 来源文件段是占位符（期段 `effective_period` 是真的，可用）。重抽信息价时把 doc_id
+  落成实际期文件标识（如 `SZ-JG2605-PRICE`）；**行号级定位**亦在此并办（`resource_price` 无行号列，需加列落库）——
+  与任务层 `ce-services` provenance 的「信息价行号待 ingest 补」是同一条。
 - [ ] 历史工程库 `hist_bill`（脱敏 + 质量标注，供相似案例对标；[可缓]）。
 
 ### E. 规范条文检索（已移除，按需重建）

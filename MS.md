@@ -104,7 +104,8 @@ Orchestrator 用大 MoE(强推理,省钱不划算);组价 agent 用中端 dense/
 
 # 简述提示词工程及项目中的调优方法
 
-# subagent、skill、tool、mcp、acp,解释它们的概念、联系和区别
+# skill、tool、mcp、acp、subagent,解释它们的概念、联系和区别
+最好从agent的发展来讲
 
 # 哪些工具适合用 tool_calling，哪些适合封装在skill中用bash，谈谈你的看法
 deer-flow 用 tool_calling 真正暴露的工具（全是原语）：bash / ls / glob / grep / read_file / write_file / str_replace（文件&shell 原语）+ ask_clarification / present_file / view_image / task(subagent) / setup_agent / update_agent（harness 控制原语）+ MCP 工具 + tool_search（延迟加载）。
@@ -166,3 +167,16 @@ norm-qa / cost-agent 现在是 skill，我认为这个选择对，但理由要�
 - norm-qa / cost-agent 这层 skill 保留方法论与编排，内部可以调那个 MCP 工具，也可以继续 curl——但领域知识留在 skill。
 
 一句话收尾我的看法：原子、通用、需要校验/护栏的 → tool_calling；多变体、多步、富流程知识、重型外部流水线的 → skill。 在 Qwen-8B 这种弱 function-calling 模型上，这条线还要再往 skill 那边挪一点，因为"一条 bash 字符串"比"一个合 schema 的嵌套 args"好生成得多。
+
+# 在项目中如何对用户的意图进行有效的识别，考虑哪些因素？
+规则优先、LLM兜底，原因：
+1. 意图空间极小、判别词高度领域化。不是通用闲聊分类（那种才必须上模型），是窄域术语判别，正则/关键词命中率会很高。真正要路由的就 norm vs cost 两条道，而且两边的触发词在造价领域几乎不重叠：
+  - norm 侧：计量规则、工程量计算规则、项目特征、按什么计算、综合单价包含哪些费用、条文、规范怎么规定……
+  - cost 侧：组价、套定额、套什么清单码、9 位编码、工料机含量、信息价……
+2. 确定性 + 可测试，正好踩中你们的工程约定。后端是强制 TDD 的。规则路由可以写 test_intent_router.py，喂一批 query 断言路由结果——而 LLM 路由你没法稳定测（同样输入可能飘）。你们 prompt 里那一堆"死命令模板/红线"本身就是"能确定就别交给模型"的哲学，路由用规则是一致的。
+3. 不给弱模型增加新的失败面。你自己记忆里就记着 Qwen3-8B function-calling 不可靠。让它多做一步"先分类"，等于又押注它的弱项。规则路由是把这个决策从模型手里拿走，反而更稳。
+4. 零延迟、零 token 成本、可解释。分错了能直接看是哪条规则命中的，改一行就行；模型分错你只能调 prompt 再赌。
+
+编码会在哪卡住（所以不能纯规则）
+1. 裸描述 / 无动词的输入。用户直接贴 "C30 现浇矩形柱"，没有任何疑问词——他是想查计量规则还是想组价？规则只能靠"默认值"猜（合理默认：裸构件描述→cost）。这能兜住大部分，但总有歧义残留。
+2. "信息是否充分"这一步规则做不了。判断"构件描述够不够细以致要不要 ask_clarification"是语义判断，关键词命中不了。不过——这一步本来就不该规则化，交给 ask_clarification 的现有流程即可，和意图路由解耦。

@@ -164,7 +164,7 @@
 
 ---
 
-## 主线三：HITL 可中断组价编排（🟢 信封 + 图骨架本地就位，待服务器联调）
+## 主线三：HITL 可中断组价编排（🟢 图骨架服务器跑通，前半链路实测；待全链路 + 后续节点）
 
 > 设计见 `HITL_DESIGN.md`、开发见 `DEV.md`「HITL 可中断组价图」。判断：13 步组价装不进 `cost.py` 黑盒
 > （不能暂停 / 不能发中间态），编排上提成 ce-services 独立 langgraph 图——每数字带 provenance 信封、
@@ -186,10 +186,19 @@
   不影响 `/cost/compose` 简单路径）。`main.py` /health.routes、`config.py`（DB 路径 + τ）、`.gitignore`、`pyproject.toml` 同步。
 - [x] **本地验证**：8 文件 `py_compile` 过；门控阈值边界 / 决策三动作 / lock/audit/override / payload 结构 21 项纯函数单测全过。
 
-### 待办（服务器 + 后续节点）
-- [ ] **服务器联调**：`uv add langgraph langgraph-checkpoint-sqlite` → 起 :8101 → curl 走
-  start（C30现浇矩形柱/2024/深圳）→ 编码闸 resume approve → 定额/信息价闸 → state 看已钉 code+override+audit；
-  **重启进程后 state 仍在**（SqliteSaver 持久化 = 验原则 4）。前置：知识服务 :8100 起 + LLM :8099。
+### 服务器联调（🟡 2026-06-28，前半链路实测通过）
+- [x] **依赖 + 起服务**：服务器 `uv add langgraph langgraph-checkpoint-sqlite` 成功；:8101 起服务 /health 显三条 session 路由。
+  （坑：旧实例占 :8101 致新进程 bind errno 98 静默回滚，`lsof -ti:8101 | xargs -r kill` 后重起即好——同 P2 坑。）
+- [x] **start → 编码闸**：`start{C30现浇矩形柱/2024/深圳}` → `awaiting_input`，返回编码 confirm 闸 + provenance 信封。
+  **门控实测正确**：confidence=0.95（≥τ 0.75）但因有备选候选 → 命中「多候选并列→停」规则停闸，**没静默放过错码**
+  （模型自动挑了 `010502025 零星现浇构件` 错码，被闸门拦下交人工 = HITL 价值印证；选码错本身是选码层已知缺口，非图职责）。
+- [x] **编码 approve → compose → 定额闸**：approve 钉码（`code.locked:true`/`by:user`/audit 有 approve 记录/events 累积）；
+  compose 对 `010502025` 取数 `quotas=[]`（该错码无定额映射）→ `pick_quota status:need_review` → 定额闸因「无子目」停闸
+  = 选错码带出的下游空洞**如实透传**（非图 bug）。
+- [x] **修空定额 approve IndexError**（commit e1db6b68）：空 `quotas` 时 `apply_confirm_decision` approve 取 `quotas[0]` 崩溃，
+  改为空列表回退 `main_value=None`（不崩、交下游/审计）。本地纯函数复验通过。
+- [ ] **全链路实测（待）**：起新会话、编码闸 `manual_override` 到**有定额映射的码** → 看全 `定额闸 → 信息价缺价逐项闸 →
+  state 钉值/override/audit` 链路；**重启进程后 state 仍在**（SqliteSaver 持久化 = 验原则 4）。前置：知识服务 :8100 + LLM :8099。
 - [ ] **补后续节点**：综合单价费率录入闸（§8，挂现成 `compute_unit_price`）/ 措施·其他（§10⑪）/ 规费税金（§12）/ 末尾 review（§13）。
 - [ ] **接前端**：依据卡（events provenance）+ 两类控件（confirm/input payload）——本期无头，前端后续接。
 - [ ] **知识层补 `source_ref`**：信息价期号+行号 / 定额库号 / 清单条文号回填原语返回（设计 §9 步1 后续，去 `TODO(knowledge-layer)` 标记）。

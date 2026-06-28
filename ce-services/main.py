@@ -10,6 +10,12 @@
   POST /norm/qa       造价规范条文检索 + Qwen3 带引用作答（norm-qa）
   POST /cost/compose  构件描述 → 候选召回 → LLM 选码 → 组价取数（cost-agent，P1 选码闭环；传 rates 则算综合单价）
   POST /cost/unit-price 综合单价计算原语（P2，确定性算钱、pydantic 闸门、不入 LLM）
+  POST /cost/session/start          可中断组价 HITL 会话：跑到首个闸或 done（langgraph 图 + provenance 信封）
+  POST /cost/session/{id}/resume    以用户决策续跑会话到下个闸或 done
+  GET  /cost/session/{id}/state     读会话持久化状态（已钉编码 / override / audit_log，可跨会话恢复）
+
+三条 session 端点 = HITL 主线：编排为 ce-services 独立 langgraph 图（可暂停可恢复），每数字带结构化来源
+（provenance），闸门处暂停等人介入；与 /cost/compose 端到端「简单场景」旧路并存（判据=是否需 HITL/可审计）。
 
 启动：
   cd ce-services && uv run python main.py
@@ -46,7 +52,10 @@ def health() -> dict:
         "service": "tasks",
         "knowledge_url": KNOWLEDGE_URL,
         "llm_url": LLM_URL,
-        "routes": ["/norm/qa", "/cost/compose", "/cost/unit-price"],
+        "routes": [
+            "/norm/qa", "/cost/compose", "/cost/unit-price",
+            "/cost/session/start", "/cost/session/{id}/resume", "/cost/session/{id}/state",
+        ],
     }
 
 

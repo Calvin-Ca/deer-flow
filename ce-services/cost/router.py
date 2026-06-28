@@ -87,6 +87,91 @@ def cost_compose_endpoint(req: CostComposeRequest) -> dict:
     return result
 
 
+class SessionStartRequest(BaseModel):
+    """HITL 组价会话起始请求体。
+
+    字段：feature —— 构件/做法描述（必填）；spec —— 国标版本 2013/2024（缺则首个闸为 setup 录入）；
+      region —— 地区（默认深圳）；period —— 信息价期号；price_source —— 信息价来源（local/online/manual）；
+      rates —— 可选费率块（本期透传、不接综合单价节点）。
+    """
+
+    feature: str = Field(..., description="构件/做法描述")
+    spec: str | None = Field(None, description="国标版本 2013/2024，缺则 setup 闸采集")
+    region: str = Field("深圳", description="地区，默认深圳")
+    period: str | None = Field(None, description="信息价期号（年月）")
+    price_source: str | None = Field(None, description="信息价来源 local/online/manual")
+    rates: dict | None = Field(None, description="可选费率块")
+
+
+class SessionResumeRequest(BaseModel):
+    """HITL 会话恢复请求体 —— 闸的用户决策。
+
+    字段：decision —— confirm 闸传 ``{action: approve|select_alternative|manual_override, value?}``；
+      input 闸（setup/缺价录入）传字段值 dict（如 ``{value: 480}`` 或 ``{spec_version:"2024", ...}``）。
+    """
+
+    decision: dict = Field(..., description="confirm 动作或 input 字段值")
+
+
+def _map_session_exc(exc: Exception) -> HTTPException:
+    """把会话推进时底层原语的异常映射成 HTTPException（沿用 compose 端点同款映射）。"""
+    if isinstance(exc, requests.HTTPError):
+        code = exc.response.status_code if exc.response is not None else 503
+        detail = exc.response.text if exc.response is not None else str(exc)
+        return HTTPException(status_code=code, detail=f"依赖服务返回错误: {detail}")
+    if isinstance(exc, requests.RequestException):
+        return HTTPException(status_code=503, detail=f"依赖服务不可达（知识服务 :8100 / LLM :8099）: {exc}")
+    if isinstance(exc, ValueError):
+        return HTTPException(status_code=502, detail=f"LLM 选码输出非合法 JSON: {exc}")
+    raise exc
+
+
+@router.post("/cost/session/start")
+def cost_session_start_endpoint(req: SessionStartRequest) -> dict:
+    """起一个可中断组价 HITL 会话，跑到首个闸或 done。
+
+    参数：req —— ``SessionStartRequest``。返回：``{task_id, status, interrupt, events, items, overrides, audit_log}``；
+      首个 interrupt 通常是编码确认闸（低置信/多候选时），或 spec 缺失时的 setup 录入闸；高置信可一路自动过。
+      底层原语异常（知识服务 / LLM）按 compose 端点同款状态码映射。
+    """
+    from cost import session  # 懒加载：隔离 langgraph 依赖，不影响 /cost/compose 简单路径
+    try:
+        result = session.start(req.feature, spec=req.spec, region=req.region,
+                               period=req.period, price_source=req.price_source, rates=req.rates)
+    except (requests.RequestException, ValueError) as exc:
+        raise _map_session_exc(exc) from exc
+    logger.info("/cost/session/start task=%s status=%s feature=%s", result.get("task_id"),
+                result.get("status"), req.feature)
+    return result
+
+
+@router.post("/cost/session/{task_id}/resume")
+def cost_session_resume_endpoint(task_id: str, req: SessionResumeRequest) -> dict:
+    """以用户决策续跑会话到下个闸或 done。
+
+    参数：task_id —— 会话标识；req.decision —— 闸的用户输入。
+    返回：会话响应（下个 interrupt 或终态）；未知 task_id 由 langgraph 视为新线程、状态空（next 为 START）。
+    """
+    from cost import session
+    try:
+        result = session.resume(task_id, req.decision)
+    except (requests.RequestException, ValueError) as exc:
+        raise _map_session_exc(exc) from exc
+    logger.info("/cost/session/%s/resume status=%s", task_id, result.get("status"))
+    return result
+
+
+@router.get("/cost/session/{task_id}/state")
+def cost_session_state_endpoint(task_id: str) -> dict:
+    """读会话当前持久化状态（不推进图）。
+
+    参数：task_id。返回：``{task_id, status, next, values}``——values 为完整 §5.4 状态文档；
+      task_id 不存在 → status="unknown"、values 空（langgraph 无该线程 checkpoint）。
+    """
+    from cost import session
+    return session.get_state(task_id)
+
+
 @router.post("/cost/unit-price")
 def cost_unit_price_endpoint(req: UnitPriceInput) -> dict:
     """综合单价计算原语（P2 ``compute_unit_price`` 的 HTTP 表面）——人材机费 + 费率 → 综合单价 →（可选）含税。

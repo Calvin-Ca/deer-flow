@@ -164,6 +164,42 @@
 
 ---
 
+## 主线三：HITL 可中断组价编排（🟢 信封 + 图骨架本地就位，待服务器联调）
+
+> 设计见 `HITL_DESIGN.md`、开发见 `DEV.md`「HITL 可中断组价图」。判断：13 步组价装不进 `cost.py` 黑盒
+> （不能暂停 / 不能发中间态），编排上提成 ce-services 独立 langgraph 图——每数字带 provenance 信封、
+> 每介入点是可暂停可恢复闸门。本期 = §9 路径**步1（信封）+ 步3（图骨架）**，curl 驱动无头。
+
+### 本期落地（✅ 2026-06-28，本地 py_compile + 纯函数单测）
+- [x] **provenance 信封 + 原语适配器** `cost/provenance.py`：§5.1 `{step,status,result,provenance}` 信封；
+  `list_match`（bill_match+select_code 包一层）/ `from_price_compose`（一次取数拆定额块+信息价材料块）。
+  **原地包**现有原语不重写；信息价文件名+行号级 `source_ref` 知识层暂未返回，best-effort 填 + 标 `TODO(knowledge-layer)`。
+- [x] **任务状态 §5.4** `cost/state.py`：`CostTaskState` TypedDict（events/audit_log/overrides 用 `operator.add` reducer）
+  + 纯函数 helper（`lock_value` 钉值 locked=True、`audit_entry`、`override_entry`）。
+- [x] **门控 §6 + payload §5.2/5.3** `cost/gates.py`：`should_pause_coding/quota/price`（是否跳闸全在代码、不交弱模型）；
+  `confirm_payload`/`input_payload`；`apply_confirm_decision`（approve/select_alternative/manual_override，越界备选回退主值）。
+- [x] **可中断图** `cost/graph.py`：`setup→list_match→list_gate→(有码?)compose→quota_gate→price_gate→done`。
+  **compute/gate 双拆**——LLM（select_code）放上游 compute 节点跑且仅跑一次，gate 只读 state+interrupt，
+  避免 langgraph resume 重跑节点头部导致 LLM 漂移（原则 3）。`done` 前留综合单价/措施/规费/末尾 review 挂点。
+- [x] **会话门面 + 端点** `cost/session.py`（图+SqliteSaver 单例，thread_id=task_id）+ `cost/router.py` 三端点：
+  `POST /cost/session/start`、`POST /cost/session/{id}/resume`、`GET /cost/session/{id}/state`（懒加载隔离 langgraph 依赖，
+  不影响 `/cost/compose` 简单路径）。`main.py` /health.routes、`config.py`（DB 路径 + τ）、`.gitignore`、`pyproject.toml` 同步。
+- [x] **本地验证**：8 文件 `py_compile` 过；门控阈值边界 / 决策三动作 / lock/audit/override / payload 结构 21 项纯函数单测全过。
+
+### 待办（服务器 + 后续节点）
+- [ ] **服务器联调**：`uv add langgraph langgraph-checkpoint-sqlite` → 起 :8101 → curl 走
+  start（C30现浇矩形柱/2024/深圳）→ 编码闸 resume approve → 定额/信息价闸 → state 看已钉 code+override+audit；
+  **重启进程后 state 仍在**（SqliteSaver 持久化 = 验原则 4）。前置：知识服务 :8100 起 + LLM :8099。
+- [ ] **补后续节点**：综合单价费率录入闸（§8，挂现成 `compute_unit_price`）/ 措施·其他（§10⑪）/ 规费税金（§12）/ 末尾 review（§13）。
+- [ ] **接前端**：依据卡（events provenance）+ 两类控件（confirm/input payload）——本期无头，前端后续接。
+- [ ] **知识层补 `source_ref`**：信息价期号+行号 / 定额库号 / 清单条文号回填原语返回（设计 §9 步1 后续，去 `TODO(knowledge-layer)` 标记）。
+- [ ] **门控阈值调参**：τ 从保守（多停）逐步放松（§6）。
+- [ ] **接 agent（远期）**：lead_agent/cost-agent 只做意图路由触发会话，不当逐步编排器（§1.2）。
+
+**红线**：弱模型不驱动流程（跳闸判断在图代码）/ provenance 是字段不口述 / override 钉值不重跑 LLM / 缺口（no_source/need_review/501）如实透传不杜撰。
+
+---
+
 ## 退役 · 规范 RAG 消费方（⛔ 2026-06-18，后端已随 ce-code 移除）
 
 - [⛔] **阶段1 code-qa skill**（原 `/qa`，Qwen3 结构化生成 + 强制引用）——后端 :8100 `/search` 已删。

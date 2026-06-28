@@ -24,12 +24,14 @@
 | `BCRAG_KNOWLEDGE_URL` | `http://localhost:8100` | 知识服务地址 |
 | `BCRAG_LLM_URL` | `http://localhost:8099` | Qwen3-8B vLLM 地址 |
 | `BCRAG_LLM_MODEL_ID` | `qwen3-8b` | LLM model_id |
+| `CE_HITL_CHECKPOINT_DB` | `ce-services/.hitl_checkpoints.db` | HITL 图 SqliteSaver 持久化文件（gitignore，可重生成）|
+| `CE_HITL_CONFIDENCE_TAU` | `0.75` | 编码闸置信阈值 τ：≥τ 且无多候选才自动过（保守起步偏高）|
 
 ---
 
 ## 开发环境要点（任务层专属）
 
-- **独立 uv 项目**：依赖极轻（仅 `fastapi`/`uvicorn`/`requests`/`pydantic`），首次 `cd ce-services && uv sync`
+- **独立 uv 项目**：依赖较轻（`fastapi`/`uvicorn`/`requests`/`pydantic` + HITL 图的 `langgraph`/`langgraph-checkpoint-sqlite`），首次 `cd ce-services && uv sync`
 - **不依赖 GPU / torch / Milvus 客户端**：镜像可极轻量（Docker tasks 镜像 ~200MB）
 - **包管理**：`uv add` 管理依赖，**严禁 `uv pip install`** 绕过 `pyproject.toml`
 
@@ -40,6 +42,37 @@
 ## 起服务
 
 任务服务（:8101，`/qa` + `/compliance` 共进程）启动命令（含 Docker 全栈）见 `README.md`。**前置：知识服务 :8100 必须先起。**
+
+---
+
+## HITL 可中断组价图（langgraph，2026-06-28）
+
+> 设计见 `HITL_DESIGN.md`。本期落地 §9 路径**步1（provenance 信封）+ 步3（图骨架）**：
+> `setup → 编码 → 定额 → 信息价` 四节点 + interrupt/resume + checkpointer，curl 驱动无头闭环；前端后续接。
+
+**为什么独立成图**：13 步组价的两类刚需（展示决策依据 / 中途等输入再继续）黑盒 `cost.py` 都做不到——
+编排上提成**可中断 langgraph 状态机**，每数字带结构化来源（provenance 信封），每介入点是可暂停可恢复的闸门。
+与 `/cost/compose` 端到端旧路**并存**（判据=是否需 HITL/可审计）。
+
+**模块**（均在 `cost/`）：
+| 文件 | 职责 |
+|---|---|
+| `provenance.py` | §5.1 信封 + 原语适配器（原地包现有 `bill_match`/`select_code`/`price_compose`，不重写）|
+| `state.py` | §5.4 任务状态 schema（`CostTaskState` TypedDict）+ 纯函数 helper（lock_value/audit/override）|
+| `gates.py` | §6 门控（是否跳闸，全在代码、不交弱模型）+ §5.2/5.3 interrupt payload + 决策落值 |
+| `graph.py` | langgraph StateGraph：compute/gate **双拆**（LLM 调用放上游 compute 节点，避免 resume 重跑漂移）|
+| `session.py` | 图 + SqliteSaver 单例 + start/resume/get_state |
+
+**新增依赖**（服务器侧落锁，本地不提交 uv.lock）：
+`cd ce-services && uv add langgraph langgraph-checkpoint-sqlite`
+
+**端点 / 跑法**（:8101）：
+- `POST /cost/session/start`（body `{feature, spec, region, period?, price_source?, rates?}`）→ 跑到首个闸或 done。
+- `POST /cost/session/{task_id}/resume`（body `{decision}`）→ 续到下个闸或 done。
+- `GET  /cost/session/{task_id}/state` → 读持久化状态（已钉编码/override/audit_log；重启进程仍在）。
+
+**本地验证边界**：langgraph/服务/LLM 本地不全 → 本地只 `python3 -m py_compile cost/*.py` + `gates`/`state` 纯函数单测；
+图 + 取数真跑在服务器。
 
 ---
 

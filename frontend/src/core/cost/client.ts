@@ -6,11 +6,11 @@ import type {
 
 /**
  * Thin client for the cost HITL session API, going through the same-origin
- * Next.js proxy at ``/api/cost/*`` (see ``app/api/cost/[...path]/route.ts``),
- * which forwards to ce-services :8101. No auth/CSRF needed — the proxy is a
- * local Next route, not the gateway.
+ * Next.js proxy at ``/ce-cost/*`` (see ``app/ce-cost/[...path]/route.ts``),
+ * which forwards to ce-services :8101. Deliberately off ``/api/*`` — next.config
+ * rewrites ``/api/:path*`` to the gateway, which would shadow an /api proxy route.
  */
-const BASE = "/api/cost";
+const BASE = "/ce-cost";
 
 async function postJSON<T>(path: string, body: unknown): Promise<T> {
   const res = await fetch(`${BASE}/${path}`, {

@@ -106,6 +106,15 @@
   代码侧 `confidence<0.6 强制 review` 兜底从未触发、HITL 安全网形同虚设；"高置信错码须为 0" 在 LLM 永远
   自报 0.95 下**结构性难达**。需让 LLM 在候选都不够贴切时真降置信，或代码侧用 rerank/语义距离辅助置信校准。
   **前置=扩 gold 到 30–50 条**（n=10 无统计依据，校准会过拟合）。
+- [x] **多模型 benchmark Phase 1（选码）**（✅ 2026-06-28，本地纯函数验证；服务器待跑）：`tools/benchmark.py`
+  编排多模型跑同一选码评测（复用 `eval_select.run_eval`）→ 并排对比表 + JSON 存档，支撑「Qwen3-8B 基线 vs
+  Qwen3-32B-AWQ」换模型决策。**置信度分布列**（avg/min/max/**distinct**）直接量化上面这条「无区分度」：
+  distinct=1 即该模型置信恒定值、门控 τ 与高置信错码红线在其上结构性失效——换模型能否带来置信区分度是本
+  benchmark 核心问题。模型注册走 `--models-file`（JSON 列表，避免长命令粘服务器折行；样例见
+  `tools/models.example.json`）；默认单模型基线开箱跑。gold 默认按 spec 选（2013→`match_gold_2013.jsonl` **n=91**
+  统计力强 / 2024→n=10）。本地 11 项纯函数单测（confidence_stats 无区分度判定 / _load_models / 对比表渲染含
+  失败行）全过。**跑（服务器）**：`python -m tools.benchmark --models-file models.json --spec 2013 --json bench.json`。
+  - **Phase 2/3 待办**：norm-qa 评测（需先建造价规范 QA gold：条文召回 + 引用准确率）/ 生成质量（LLM-judge）——“都覆盖”路线后续。
 - [x] **端到端验证**（✅ 2026-06-22，服务器跑通）：`curl /cost/compose {"description":"C30现浇矩形柱","spec":"2024","region":"深圳"}`
   → 选码 `010503001 矩形柱`（confidence 0.95、need_review false、reason 有据）+ 组价取数（2 条模板定额 + 工料机含量
   + 信息价 matched/no_source）。三红线守住（高置信不 review、no_source 不杜撰）。**P1 选码闭环端到端打通。**

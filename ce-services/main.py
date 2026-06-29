@@ -36,6 +36,7 @@ logging.basicConfig(
 )
 
 from fastapi import FastAPI  # noqa: E402
+from fastapi.routing import APIRoute  # noqa: E402
 
 from common.config import KNOWLEDGE_URL, LLM_URL  # noqa: E402
 from cost.router import router as cost_router  # noqa: E402
@@ -48,15 +49,21 @@ app.include_router(cost_router)
 
 @app.get("/health")
 def health() -> dict:
+    """健康检查 + 路由清单。
+
+    返回：``{status, service, knowledge_url, llm_url, routes}``——routes 从 ``app.routes`` **动态生成**
+      （含真实 path 参数名如 ``{task_id}``），新增端点自动出现、不再手维护漏列（如曾漏 rewind）。
+    """
+    routes = sorted(
+        r.path for r in app.routes
+        if isinstance(r, APIRoute) and r.path not in ("/health", "/openapi.json")
+    )
     return {
         "status": "ok",
         "service": "tasks",
         "knowledge_url": KNOWLEDGE_URL,
         "llm_url": LLM_URL,
-        "routes": [
-            "/norm/qa", "/cost/compose", "/cost/unit-price", "/cost/rollup",
-            "/cost/session/start", "/cost/session/{id}/resume", "/cost/session/{id}/state",
-        ],
+        "routes": routes,
     }
 
 

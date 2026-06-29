@@ -1,7 +1,7 @@
 # 智能体开发文档
 
-> 文档定位：从 `AGENT_PRD.md`（需求/路由权威）落到实现态的开发记录。本篇聚焦 **HITL（人介入）方案**——现状盘点、与 PRD 的契合/冲突评估、改造方案。
-> 关联：需求见 `AGENT_PRD.md`；HITL 图实现见 `ce-services/cost/`（`graph.py` / `session.py` / `gates.py`）；HITL 设计细节见 `ce-services/HITL_DESIGN.md`。
+> 文档定位：从 `AGENT_PRD.md`（需求/路由权威）落到实现态的开发记录。**§1–7 为 HITL（人介入）方案**——现状盘点、与 PRD 的契合/冲突评估、改造方案；**§8 为「深圳·2013 口径收窄 + 规范问答联网兜底」落地方案**（对应 AGENT_PROBLEM 问题 9「智能体能力有界」、AGENT_PRD commit 52ac6008）。
+> 关联：需求见 `AGENT_PRD.md`；HITL 图实现见 `ce-services/cost/`（`graph.py` / `session.py` / `gates.py`）；HITL 设计细节见 `ce-services/HITL_DESIGN.md`；问题复盘见 `AGENT_PROBLEM.md`。
 
 ---
 
@@ -118,3 +118,71 @@ ce-services 任务层 `:8101`，挂在 `cost_router`（`main.py:46`，无额外 
 **HITL 侧无改动需求**；上述两项作为 ce-code 定额映射/信息价补全的输入。
 
 **用法备忘（resume 各闸 decision 格式）**：confirm/review（list_coding/quota/rollup）→ `{"action":"approve"}`；input：feature→`{<fields[].key>:值}`、quantity→`{"quantity":N}`、price_item→`{"value":N}`、params→`{"measure_fee","other_fee","fee_levy","tax_rate"}`。
+
+---
+
+## 8. 深圳·2013 口径收窄 + 规范问答联网兜底（落地方案，待开工）
+
+> 对应 AGENT_PROBLEM 问题 9「智能体能力有界」、AGENT_PRD（commit 52ac6008）C-02 分侧 / C-05 版本固定 / §4.0 口径归一 / FR-K07 联网兜底 / EH-05 会话粘性反问。
+> 核心思想：**边界内权威作答、边界处按"答案是否唯一"决定要不要反问、边界外诚实告知或非权威降级兜底**。落地 = 在既有 norm-qa / cost-agent / `:8101` 骨架上做 6 处定向改造,不是重写。
+
+### 8.1 现状 vs PRD 差距
+
+| PRD 要求 | 现状（代码位置） | 差距 |
+|---|---|---|
+| 组价缺版本**不反问**,默认深圳2013（场景 A） | cost-agent **强制 `ask_clarification` 反问版本**（`config.yaml` cost-agent system_prompt「版本红线」） | ⚠️ **行为反转**:去掉版本反问,默认 2013 |
+| 规范问答缺口径 **B1 会话粘性反问** | norm-qa **每次都反问**（`config.yaml` norm-qa system_prompt） | 改为会话内仅首次 |
+| FR-K07 规范问答**联网兜底**（三道闸） | `/norm/qa` 零召回**直接拒答**（`ce-services/norm/router.py:65` `if not clauses:`） | **全新构建** |
+| C-05 版本固定 2013 默认 | `spec`/`standard` 必填无默认（`norm/router.py` `NormQARequest`、`cost.py --spec`） | 默认值改 2013 |
+| 口径声明 / 拒答给出路 / 降级标注 | 无 | 输出模板新增 |
+| web_search 工具 | `config.yaml` 注释未启用（`# deerflow.community.ddg_search` / `# jina web_fetch`,约第 69/73 行） | 启用 |
+
+### 8.2 六块改造方案
+
+| 块 | 优先级 | 内容 | 文件 | 对应 PRD |
+|---|---|---|---|---|
+| **块1 · 默认口径=深圳2013** | 高（含行为反转） | cost-agent system_prompt 删「缺版本必反问」→「`spec` 缺省 2013、`region` 缺省深圳,**不就版本反问**」;`ask_clarification` **只留给特征缺失**;`cost.py --spec` 默认 `2013`;输出加**口径声明行**「口径:深圳·2013」（会话内首次） | `config.yaml`(cost-agent)、`skills/public/cost-agent/cost.py` | 场景A·C-05·§4.0 |
+| **块2 · 规范问答联网兜底主体** | 高（核心工作量） | `norm/router.py:65` 零召回分支改为调新模块 `norm/web_fallback.py`;**三道闸**(详 §8.3)。仅 `/norm/qa` 开,`/cost/*` 不碰 | 新建 `ce-services/norm/web_fallback.py`、改 `norm/router.py`、`norm/generation.py`(加 web 降级变体) | FR-K07·C-02·C-03 |
+| **块3 · B1 会话粘性反问** | 中 | norm-qa system_prompt 改:「本会话已说明地区+版本则沿用、不再问;仅会话内**首次**缺口径才 `ask_clarification` 问"哪个地区+哪个版本"」。**软实现**——靠 agent 多轮上下文(规范问答信息性、不动钱,软度可接受;要更硬再加 thread 级口径缓存) | `config.yaml`(norm-qa) | EH-05·§4.0 |
+| **块4 · 输出模板** | 中 | 组价跨地域(北京)→ 体面告知「仅深圳2013,建议用 XX」(不联网);规范问答跨地域→ B1 确认后走块2;拒答统一带「已查范围 + 建议渠道」 | `cost.py`/`qa.py` 输出层 + 两 agent prompt | EH-03·C-03 拒答给出路 |
+| **块5 · 启用 web 基础设施** | 中（块2 前置） | 取消注释 ddg_search + jina web_fetch（或 ce-services 直连搜索 API,见 §8.5 决策） | `config.yaml` tools 段 | FR-K07 |
+| **块6 · 评测** | 低（收尾） | 路由评测集补 EH-05 / FR-K07 用例;新增指标 | `ce-services/eval/agent_routing_eval.jsonl`、`ce-code/data/eval_set/` | §8 验收 |
+
+### 8.3 块2 联网兜底三道闸（详设）
+
+**关键架构选择:三道闸放服务端 `ce-services`,不交给弱模型 agent** —— 同 HITL「红线不经弱模型」原则(§5/§6)。让 agent 自由 web_search = 把「查询口径约束 / 可信度筛查」交给 qwen-plus 即兴发挥 = 污染源(联网正是把 2024/他省口径捞回来的最大入口)。故 `web_fallback.py` 内确定性执行,LLM 只做带降级标注的总结。
+
+`norm/web_fallback.py` 流程（接 `router.py:65` 零召回分支）:
+1. **查询带口径约束**:口径内注入 `深圳 2013`/`GB 50500-2013`;口径外(EH-05 已确认北京/2024)按问题自身口径。
+2. 调 search backend(§8.5 决策)→ 候选 URL。
+3. **域名白名单分级**:住建部 / 深圳住建局·造价站 / 省标官网 > 行业站 > 博客·文库(最低层或排除)。
+4. **结果筛查**:口径内筛掉 2024/他省杂质(挡污染);口径外整段打降级标注。
+5. 喂 `generation`(新 web 变体)→ 强制 Tier-2 头部 `⚠️ 非本系统深圳·2013权威口径,联网检索结果,请人工核验` + URL + 访问日期溯源。
+6. 仍无可信源 → **C-03 拒答给出路**(说明已查范围 + 建议渠道)。
+
+来源分级（PRD FR-K07 表，呈现层契约）:Tier-1 本地权威(标准号+版本+条款号,直接答) / Tier-2 联网(URL+访问日期,降级标注) / Tier-3 无可信命中(拒答给出路)。
+
+### 8.4 需拍板的决策点（开工前）
+
+1. **搜索后端**:① DDG 社区工具(repo 已有、免费、质量一般) ② Bing/Serper API(要 key、质量好) ③ Jina(repo 已有,擅长 fetch 原文)。**倾向 DDG 召回 + Jina 取原文**(都在 repo、零额外 key)。
+2. **会话粘性强度**:块3 软实现(agent 上下文,够用) vs 硬实现(thread 级口径缓存,工程量大)。**倾向先软**。
+3. **块1 组价默认 2013 不反问 = 行为反转**,确认按场景 A 决定执行?(silent 默认 2013 的错版风险由口径声明显著化兜底)
+
+### 8.5 落地顺序与任务清单
+
+顺序:块1(配置) → 块3(prompt) → 块5(启用工具) → 块2(联网兜底主体,核心) → 块4(模板) → 块6(评测)。
+
+- [ ] T9-1 块1:`config.yaml` cost-agent 去版本反问 + 默认深圳2013;`cost.py --spec` 默认 2013;口径声明行
+- [ ] T9-2 块3:`config.yaml` norm-qa 改 B1 会话粘性反问措辞
+- [ ] T9-3 块5:`config.yaml` 启用 ddg_search + jina web_fetch（按 §8.5 决策）
+- [ ] T9-4 块2:新建 `norm/web_fallback.py`(三道闸)+ 改 `norm/router.py:65` 零召回分支 + `norm/generation.py` web 降级变体
+- [ ] T9-5 块4:`cost.py`/`qa.py` + 两 agent prompt 输出模板(跨地域告知 / 拒答给出路 / 降级标注)
+- [ ] T9-6 块6:评测集补 EH-05 / FR-K07;指标=Tier-2 降级标注覆盖率、域名白名单分级正确率、会话粘性「仅首次反问」达成率、**组价/价格联网调用=0**
+- [ ] T9-7 服务器端到端验证(参照 §7 真 LLM + :8100/:8101)
+
+### 8.6 红线（落地必守）
+
+- **组价/价格(FR-P/FR-I)不开联网**:块1 的 cost-agent `tools` 不加 web_search;验收「组价/价格联网调用=0」。
+- **联网结果一律 Tier-2 降级标注**:绝不冒充深圳2013 权威口径(块2 强制,不靠 LLM 自觉)。
+- **联网兜底 ≠ 替代拒答**:联网无可信源仍走 C-03,不把「不知道」包装成「有链接的答案」。
+- **三道闸在服务端确定性执行**,弱模型不碰查询口径/可信度筛查(同 HITL)。

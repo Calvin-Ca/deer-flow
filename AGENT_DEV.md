@@ -97,3 +97,24 @@ ce-services 任务层 `:8101`，挂在 `cost_router`（`main.py:46`，无额外 
 | **多构件**（PRD §5.2 FR-P05） | **外层循环**：`current_item` 标当前在办件，per-item 闸（list_match→…→quantity_gate）只动 `items[current_item]`（`_put_item` 写回保留其余件），`advance` 推进到下一件；办完所有件才进**项目级**收尾——`rates_gate` 一套费率给每件算综合单价、`rollup` 汇总 Σ 各件。单个坏件（选不出码/缺 Q）`skip` 跳过、不拖死整单，`done_node` 仅当全无综合合价才整单 blocked。入口 `start(features=[...])` / `SessionStartRequest.features`。`clarify_rounds` 移至 item（各件独立计澄清预算） | `cost/graph.py`（`_put_item`/`advance_node`/`_after_advance`/`rates_gate` 项目级化）+ `cost/state.py`（`current_item`）+ `cost/session.py`/`router.py`（`features` 入口） |
 
 验证（本地 mock，全过）：双构件各自 Q（×3/×5）、各算综合合价、`subtotal=Σ`、项目级费率一套管全单、rollup approve→done；单构件回归（特征澄清回环 + rewind）不受影响。
+
+---
+
+## 7. P0 服务器端到端验证（真 LLM Qwen3-8B + 知识服务 :8100，2026-06-29）
+
+环境：:8100 知识 + :8101 任务 + :8099 LLM，经 curl 走真实 `start/resume/rewind/state`。结论：**HITL 主线五项全绿**。
+
+| 场景 | 命令链 | 结果 |
+|---|---|---|
+| 充分描述单构件（实心砖墙） | start→list_coding→quota→price_item×9→quantity→rates(自动)→params→rollup | ✅ `total=1278139.45`，精确 = 综合单价 `11726.05`×Q`100`×(1+税率`9%`)，`missing:0`、`done` |
+| rewind 回退 | 对上单 `rewind→params_gate` | ✅ 回到 params 闸（字段正确）、丢弃其后垃圾值、重答后正常定稿 |
+| 特征澄清 + 回环（改 1 核心） | `feature="砌筑"` → feature 闸 | ✅ 真 LLM 触发，抽出 `masonry_type`/`mortar_grade`，`why` **基于召回候选**给理由；补全后 feat 追加、`clarify_rounds` 累加、回 list_match 重匹配；重匹配仍低置信→第 2 轮再问，`MAX_CLARIFY_ROUNDS=2` 截断放行 |
+| 多构件（FR-P05） | `features=[C30现浇柱, 实心砖墙]` | ✅ `items:2` 逐件走闸；砖墙算出 `1172605`（与单跑一致）；柱 `null` 计入 `missing:1`、`subtotal` 只算好件、整单 `done`（坏件不拖死） |
+
+**真跑暴露的数据层问题（非 HITL 编排 bug，归 ce-code）**：
+1. **现浇柱定额映射缺口**：`010502006`（C30 现浇矩形柱）选到码但 `price_compose` 取不到定额子目 → `quota_basis` 缺 → 综合单价 `missing_base`。即 commit `c1e0a5e8` 标注的 HITL demo 已知阻塞。
+2. **砂浆口径/材料缺信息价**：砖墙定额子目用「干混砌筑砂浆 M7.5」而描述是「M5 水泥砂浆」口径不齐；同名材料（铁钉/干混砂浆）在多子目重复且均无命中信息价（9 项缺价逐项停 price 闸）。
+
+**HITL 侧无改动需求**；上述两项作为 ce-code 定额映射/信息价补全的输入。
+
+**用法备忘（resume 各闸 decision 格式）**：confirm/review（list_coding/quota/rollup）→ `{"action":"approve"}`；input：feature→`{<fields[].key>:值}`、quantity→`{"quantity":N}`、price_item→`{"value":N}`、params→`{"measure_fee","other_fee","fee_levy","tax_rate"}`。

@@ -20,7 +20,7 @@ Task decomposition timing(任务分解时机):plan-ahead(先规划全局再执�
     animation-duration: 0.25s;
     animation-timing-function: cubic-bezier(0.19, 1, 0.22, 1);
   }
-![img.png](img.png)
+![Topology 拓扑形态](assets/agent-topology.png)
 VvisualizeVvisualize show_widget几点说明:链式确定、可审计但不灵活;supervisor(= orchestrator-workers)是多 agent 生产系统最常用的形态,协调权集中、好调试;网状(swarm)peer 之间自由通信,灵活但状态共享和可观测性极差,生产环境慎用;分层(图里没画)= supervisor 的 supervisor,适合任务可分解成多层子任务的大系统。
 
 三、常见架构模式 = 维度的具体组合
@@ -45,7 +45,7 @@ ReAct 层:只在真正需要工具循环和动态推理的子任务(如组价的
 Workflow 端:开发者把流程图写死在代码里。LLM 只在固定节点上被调用,负责产出一个值——分类一个类别、抽取字段、生成一段文本,这就是"填空"。但"填完空之后走哪条边",是代码里的 if-else / 固定 edge 决定的,LLM 不掌握控制权。
 Agent 端:开发者只给 LLM 一组工具和一个目标,不预设路径。LLM 每一步自己决定:调哪个工具、填什么参数、拿到结果要不要再来一轮、什么时候算完成。控制流是 LLM 在运行时生成出来的,而不是开发者提前写好的。
 而且这不是二选一,是一条连续谱:越往右越灵活,能处理预料外的情况;但也越不可预测、loop 成本越高、越难调试和审计。中间的 Routing 是个很好的折中点:LLM 决定走哪个分支(让渡一部分控制权),但分支集合是你预定义的(控制权没完全放手)。
-![img_1.png](img_1.png)
+![Workflow↔Agent 控制流谱](assets/workflow-vs-agent.png)
 用你自己的组价场景做对比,这个区别会立刻具体起来——同一个任务,两种做法:
 - Workflow 版组价(控制流在代码里):
 解析清单项 → 规则/embedding 匹配定额

@@ -1,0 +1,2 @@
+{"id": "QA-0001", "question": "防火墙上的门窗洞口有什么规定？", "gold_contexts": [{"std": "GB50016", "version": "2014", "clause": "6.1.5"}], "gold_answer_points": ["不应设置普通门窗", "确需设置应采用甲级防火门窗"], "ragas_metrics": ["faithfulness", "context_precision", "context_recall", "answer_relevancy", "citation_accuracy"], "expect_refuse": false, "split": "test"}
+{"id": "QA-0002", "question": "深圳2013定额里钢筋的损耗率是多少？", "gold_contexts": [], "gold_answer_points": [], "ragas_metrics": ["faithfulness", "citation_accuracy"], "expect_refuse": true, "split": "test"}

@@ -26,6 +26,26 @@ models:
     extra_body:
       chat_template_kwargs:
         enable_thinking: false
+# ── 服务器 vLLM Qwen3-32B-AWQ（新增接入，暂不启用）────────────────────────
+#    另一台服务器 172.19.2.2 上的 vLLM，OpenAI 兼容端点 :8001/v1，模型 id 即权重路径
+#    /models/Qwen3-32B-AWQ；同为 Qwen3 系（带 <think>），沿用 VllmChatModel 走 thinking 开关。
+#    ⚠️ 暂不启用：仅写入配置备测。要启用就取消本段注释，并把它放到 models 列表第一项
+#       （或注释掉上面 qwen3-8b 段），列表第一项才是 agent 默认模型。
+# - name: qwen3-32b-awq
+#   display_name: Qwen3-32B-AWQ (172.19.2.2)
+#   use: deerflow.models.vllm_provider:VllmChatModel
+#   model: /models/Qwen3-32B-AWQ
+#   api_key: none
+#   base_url: http://172.19.2.2:8001/v1
+#   supports_thinking: true
+#   when_thinking_enabled:
+#     extra_body:
+#       chat_template_kwargs:
+#         enable_thinking: true
+#   when_thinking_disabled:
+#     extra_body:
+#       chat_template_kwargs:
+#         enable_thinking: false
 # ── 阿里云百炼 / 通义千问（云端，临时注释；要切回云端：取消下面注释 + 注释掉上面本地 vLLM 段）──────────
 #    api_key 是占位符；服务器上换成真实 sk- 后那份 config.yaml 别再 commit（否则 push 会把 key 带回 GitHub）。
 # - name: gateway-llm

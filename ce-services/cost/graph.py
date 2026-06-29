@@ -1,7 +1,7 @@
 """可中断组价状态机（langgraph）—— HITL 全 13 步图（设计 §3.1）。
 
 链路：``setup → list_match → list_gate →（有码?）compose → quota_gate → price_gate →
-       rates_gate → params_gate → rollup → done``。
+       quantity_gate → rates_gate → params_gate → rollup → done``。
 - **compute / gate 双拆**：原语调用（list_match / compose，含 LLM 与知识层取数）放「compute 节点」，
   暂停闸放「gate 节点」。因 langgraph 的 ``interrupt()`` 在 resume 时**会从节点头部重跑**——把昂贵且
   非确定性的 LLM 调用单独放上游 compute 节点（节点间有 checkpoint，跑且仅跑一次），gate 节点只读 state +
@@ -226,13 +226,54 @@ def price_gate_node(state: CostTaskState) -> dict[str, Any]:
     return out
 
 
-def _unit_price_for(basis: dict[str, Any] | None, rates: dict[str, Any]) -> dict[str, Any]:
-    """按定额基价 + 费率算单条综合单价（确定性，复用 ``compute_unit_price``）。
+def quantity_gate_node(state: CostTaskState) -> dict[str, Any]:
+    """工程量录入闸（§3⑨/§6/§2 步骤 9）：Q 已给定自动过，缺则停闸录入；钉 Q 供综合合价计算。
+
+    参数：state。返回：item.quantity 钉值 + 审计/override。无定额基价（未就绪/选错码无映射）→ 跳过
+      （此时综合单价必为 missing_base，问 Q 无意义）。Q 是用户输入、非本系统计算（BIM 算量范围外），
+      缺则显式录入、绝不静默按 1 计（原则 3 / §10 不杜撰）。
+    """
+    item = _item(state)
+    if item.get("quota_basis") is None:  # 无基价，Q 喂下去也算不出综合单价，跳过本闸
+        return {"status": state.get("status", "running")}
+
+    quantity = item.get("quantity")
+    if gates.should_pause_quantity(quantity):
+        data = interrupt(
+            gates.input_payload(
+                "quantity",
+                "请录入工程量（清单数量）",
+                [{"key": "quantity", "type": "number", "label": "工程量 Q", "required": True}],
+                context={"feature": item.get("feature"), "code": (item.get("code") or {}).get("value"),
+                         "unit": (item.get("quota_basis") or {}).get("单位")},
+            )
+        )
+        quantity = (data or {}).get("quantity")
+        action, by = "input", "user"
+    else:
+        action, by = "auto_pass", "model"
+
+    item["quantity"] = quantity
+    out: dict[str, Any] = {
+        "items": [item],
+        "audit_log": [audit_entry("quantity", action, {"quantity": quantity}, by=by)],
+    }
+    if by == "user":
+        out["overrides"] = [override_entry("quantity", 0, quantity, by="user")]
+    if quantity is None:
+        out["status"] = "blocked"  # 要 Q 而用户未给 → 阻塞，不静默按 1 算（§10）
+    return out
+
+
+def _unit_price_for(basis: dict[str, Any] | None, rates: dict[str, Any], quantity: float) -> dict[str, Any]:
+    """按定额基价 + 费率 + 工程量算单条综合单价/综合合价（确定性，复用 ``compute_unit_price``）。
 
     参数：basis —— 所选定额子目的人材机净价 ``{labor_cost, material_cost, machine_cost}`` 或 None；
-      rates —— 费率块（管理费/利润/风险率 + 取费基数）。
-    返回：``compute_unit_price`` 结果；缺基价（手填子目/未就绪）→ ``{"status":"missing_base"}``（不杜撰基价）。
-    口径：以定额基价为人材机费，综合单价**不含税**（税金在 §13 rollup 一次性计，GB 50500 §2.0.9）。
+      rates —— 费率块（管理费/利润/风险率 + 取费基数）；quantity —— 工程量 Q（清单数量，>0，由 quantity_gate 录入）。
+    返回：``compute_unit_price`` 结果（含 ``total_price = 综合单价 × Q``）；缺基价（手填子目/未就绪）→
+      ``{"status":"missing_base"}``（不杜撰基价）。
+    口径：以定额基价为人材机费，综合单价**不含税**（税金在 §13 rollup 一次性计，GB 50500 §2.0.9）；
+      Q 必由上游 quantity_gate 显式给定，不在此默认（默认 1 会算出错误总价）。
     """
     if not basis or any(basis.get(k) is None for k in ("labor_cost", "material_cost", "machine_cost")):
         return {"status": "missing_base"}
@@ -244,6 +285,7 @@ def _unit_price_for(basis: dict[str, Any] | None, rates: dict[str, Any]) -> dict
         profit_rate=rates["profit_rate"],
         risk_rate=rates.get("risk_rate", 0.0),
         fee_base=rates["fee_base"],
+        quantity=float(quantity),  # 工程量 Q：综合合价 = 综合单价 × Q（§2 步骤 9）
         tax_rate=None,  # 综合单价不含税，税金在 rollup
     )
     return compute_unit_price(inp)
@@ -273,7 +315,12 @@ def rates_gate_node(state: CostTaskState) -> dict[str, Any]:
         )
 
     item = _item(state)
-    unit_price = _unit_price_for(item.get("quota_basis"), rates)
+    quantity = item.get("quantity")
+    basis = item.get("quota_basis")
+    # 有基价却缺 Q（quantity_gate 已置 blocked）→ 标 missing_quantity，不静默按 1 计；
+    # 无基价（未就绪/选错码）→ 交 _unit_price_for 返回 missing_base（Q 与否都算不出综合单价）。
+    unit_price = ({"status": "missing_quantity"} if basis is not None and quantity is None
+                  else _unit_price_for(basis, rates, quantity))
     item["unit_price"] = unit_price
     by = "user" if paused else "model"
     out: dict[str, Any] = {
@@ -395,6 +442,7 @@ def build_graph(checkpointer: Any):
     g.add_node("compose", compose_node)
     g.add_node("quota_gate", quota_gate_node)
     g.add_node("price_gate", price_gate_node)
+    g.add_node("quantity_gate", quantity_gate_node)
     g.add_node("rates_gate", rates_gate_node)
     g.add_node("params_gate", params_gate_node)
     g.add_node("rollup", rollup_node)
@@ -406,7 +454,8 @@ def build_graph(checkpointer: Any):
     g.add_conditional_edges("list_gate", _has_code, {"compose": "compose", "done": "done"})
     g.add_edge("compose", "quota_gate")
     g.add_edge("quota_gate", "price_gate")
-    g.add_edge("price_gate", "rates_gate")
+    g.add_edge("price_gate", "quantity_gate")
+    g.add_edge("quantity_gate", "rates_gate")
     g.add_edge("rates_gate", "params_gate")
     g.add_edge("params_gate", "rollup")
     g.add_edge("rollup", "done")

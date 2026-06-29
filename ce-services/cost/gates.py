@@ -65,6 +65,17 @@ def should_pause_price(price: dict[str, Any]) -> bool:
     return status == "no_source" or (status == "ok" and price.get("value") is None)
 
 
+def should_pause_quantity(quantity: Any) -> bool:
+    """工程量闸门控（§6/§2 步骤 9）：是否暂停等人工录入工程量 Q。
+
+    参数：quantity —— item 上已有的工程量（清单数量）或 None。
+    返回：True=暂停。规则：Q 缺失（None）→ 停录入；已给定（start 透传 / 已确认）→ 自动过。
+      Q 是用户提供的输入（非本系统几何计算，BIM 算量在范围外），缺则必须显式录入——
+      绝不静默按 1 计（否则分部分项费=Q×综合单价 会算成「每条仅 1 个单位」的错误总价）。
+    """
+    return quantity is None
+
+
 def should_pause_rates(rates: dict[str, Any] | None) -> bool:
     """综合单价费率闸门控（§6/§8）：是否暂停等人工录入费率。
 

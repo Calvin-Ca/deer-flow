@@ -67,18 +67,23 @@ def start(
     period: str | None = None,
     price_source: str | None = None,
     rates: dict[str, Any] | None = None,
+    quantity: float | None = None,
 ) -> dict[str, Any]:
     """起一个组价 HITL 会话，跑到首个闸或 done。
 
-    参数：feature —— 构件/做法描述；spec —— 国标版本（缺则 setup 闸采集）；region/period/price_source/rates —— setup 口径。
+    参数：feature —— 构件/做法描述；spec —— 国标版本（缺则 setup 闸采集）；region/period/price_source/rates —— setup 口径；
+      quantity —— 可选工程量 Q（给定则 quantity_gate 自动过，缺则停闸录入）。
     返回：会话响应（含 task_id；首个 interrupt 通常是编码确认闸，或 spec 缺失时的 setup 录入闸）。
     """
     task_id = uuid.uuid4().hex
+    item: dict[str, Any] = {"feature": feature}
+    if quantity is not None:
+        item["quantity"] = quantity
     initial: dict[str, Any] = {
         "task_id": task_id,
         "feature": feature,
         "region": region,
-        "items": [{"feature": feature}],
+        "items": [item],
         "status": "running",
     }
     if spec:

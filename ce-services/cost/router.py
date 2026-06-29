@@ -92,7 +92,7 @@ class SessionStartRequest(BaseModel):
 
     字段：feature —— 构件/做法描述（必填）；spec —— 国标版本 2013/2024（缺则首个闸为 setup 录入）；
       region —— 地区（默认深圳）；period —— 信息价期号；price_source —— 信息价来源（local/online/manual）；
-      rates —— 可选费率块（本期透传、不接综合单价节点）。
+      rates —— 可选费率块（给定则末步算综合单价）；quantity —— 可选工程量 Q（给定则 quantity_gate 自动过）。
     """
 
     feature: str = Field(..., description="构件/做法描述")
@@ -101,6 +101,7 @@ class SessionStartRequest(BaseModel):
     period: str | None = Field(None, description="信息价期号（年月）")
     price_source: str | None = Field(None, description="信息价来源 local/online/manual")
     rates: dict | None = Field(None, description="可选费率块")
+    quantity: float | None = Field(None, gt=0, description="可选工程量 Q（清单数量，>0），缺则 quantity_gate 录入")
 
 
 class SessionResumeRequest(BaseModel):
@@ -137,7 +138,8 @@ def cost_session_start_endpoint(req: SessionStartRequest) -> dict:
     from cost import session  # 懒加载：隔离 langgraph 依赖，不影响 /cost/compose 简单路径
     try:
         result = session.start(req.feature, spec=req.spec, region=req.region,
-                               period=req.period, price_source=req.price_source, rates=req.rates)
+                               period=req.period, price_source=req.price_source, rates=req.rates,
+                               quantity=req.quantity)
     except (requests.RequestException, ValueError) as exc:
         raise _map_session_exc(exc) from exc
     logger.info("/cost/session/start task=%s status=%s feature=%s", result.get("task_id"),

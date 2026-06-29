@@ -27,7 +27,8 @@ class CostTaskState(TypedDict, total=False):
         params —— 项目级费用块（措施/其他/规费/税金率，§10⑪/§12 参数闸采集）。
         rollup —— 末尾汇总结果（§13：分部分项 + 措施 + 其他 + 规费 + 税金 → 总造价）。
         feature —— 本期单构件/做法描述（入口输入）。
-        items —— §5.4 items：每项含 code/quota/quota_basis/materials/unit_price，确认后 locked。
+        items —— §5.4 items：每项含 code/quota/quota_basis/materials/quantity/unit_price，确认后 locked
+          （quantity=工程量 Q，用户录入，综合合价 = 综合单价 × Q，§2 步骤 9）。
         overrides —— 用户覆盖轨迹（§5.4）。
         audit_log —— 审计时间线（哪步谁改了什么）。
         events —— 逐节点 provenance 事件（前端依据卡数据源，无论是否暂停每节点都发）。

@@ -116,6 +116,16 @@ class SessionResumeRequest(BaseModel):
     decision: dict = Field(..., description="confirm 动作或 input 字段值")
 
 
+class SessionRewindRequest(BaseModel):
+    """HITL 会话回退请求体 —— 回到某个已过的闸重答。
+
+    字段：to_node —— 目标闸节点名（setup / feature_gate / list_gate / quota_gate / price_gate /
+      quantity_gate / rates_gate / params_gate / rollup）；其后的已钉值随回退作废、重新确认。
+    """
+
+    to_node: str = Field(..., description="回退目标闸节点名")
+
+
 def _map_session_exc(exc: Exception) -> HTTPException:
     """把会话推进时底层原语的异常映射成 HTTPException（沿用 compose 端点同款映射）。"""
     if isinstance(exc, requests.HTTPError):
@@ -164,6 +174,23 @@ def cost_session_resume_endpoint(task_id: str, req: SessionResumeRequest) -> dic
     except (requests.RequestException, ValueError) as exc:
         raise _map_session_exc(exc) from exc
     logger.info("/cost/session/%s/resume status=%s", task_id, result.get("status"))
+    return result
+
+
+@router.post("/cost/session/{task_id}/rewind")
+def cost_session_rewind_endpoint(task_id: str, req: SessionRewindRequest) -> dict:
+    """回退会话到某个已过的闸重答（丢弃其后已钉值），重新停在该闸。
+
+    参数：task_id —— 会话标识；req.to_node —— 目标闸节点名。
+    返回：会话响应（重新停在该闸的 interrupt）；to_node 非法/未到达 → status=error（业务错误，非 HTTP 错误）。
+      底层 langgraph 时间旅行（``get_state_history`` + 从历史 checkpoint 重 invoke）；上游 compute 不重跑。
+    """
+    from cost import session
+    try:
+        result = session.rewind(task_id, req.to_node)
+    except (requests.RequestException, ValueError) as exc:
+        raise _map_session_exc(exc) from exc
+    logger.info("/cost/session/%s/rewind to=%s status=%s", task_id, req.to_node, result.get("status"))
     return result
 
 

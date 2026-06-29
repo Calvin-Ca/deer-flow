@@ -31,6 +31,22 @@ def _config(task_id: str) -> dict[str, Any]:
     return {"configurable": {"thread_id": task_id}}
 
 
+# 可回退到的闸节点（gate 节点，会 interrupt 等人）；compute 节点（list_match/compose）不可作回退目标。
+REWINDABLE_GATES = frozenset({
+    "setup", "feature_gate", "list_gate", "quota_gate",
+    "price_gate", "quantity_gate", "rates_gate", "params_gate", "rollup",
+})
+
+
+def _error(task_id: str, message: str) -> dict[str, Any]:
+    """构造一个与 ``_format`` 同形的错误响应（status=error + error 文案），供 rewind 非法入参返回。"""
+    return {
+        "task_id": task_id, "status": "error", "interrupt": None, "error": message,
+        "events": [], "items": [], "overrides": [], "audit_log": [],
+        "rates": None, "params": None, "rollup": None,
+    }
+
+
 def _format(task_id: str, result: dict[str, Any]) -> dict[str, Any]:
     """把 ``invoke`` 返回值整形成会话响应。
 
@@ -128,6 +144,26 @@ def _pending_interrupt(snapshot: Any) -> Any:
         if interrupts:
             return interrupts[0].value
     return None
+
+
+def rewind(task_id: str, to_node: str) -> dict[str, Any]:
+    """回退到指定闸重答（langgraph 时间旅行）——丢弃该闸之后的已钉值，从其前序 checkpoint 重跑到该闸暂停。
+
+    参数：task_id —— 会话标识；to_node —— 目标闸节点名（须 ∈ ``REWINDABLE_GATES``）。
+    返回：会话响应（重新停在该闸的 interrupt，供用户改答）；to_node 非法 / 历史无该闸前序检查点 →
+      status=error + error 文案（不抛、不污染线程）。
+    语义（呼应 §8.2「可回退」）：定位「该闸即将执行」的最近一次 checkpoint（``snapshot.next`` 含 to_node），
+      从它重新 ``invoke(None)``——上游 compute（含 LLM 选码/取数）不重跑（checkpoint 已存、原则 3），
+      该闸**之后**的锁值（编码/定额/价/Q/费率/参数）随回退作废，由用户重新确认。改答后照常走 ``resume``。
+    """
+    if to_node not in REWINDABLE_GATES:
+        return _error(task_id, f"不可回退到 {to_node!r}（仅支持闸节点：{sorted(REWINDABLE_GATES)}）")
+    config = _config(task_id)
+    target = next((s for s in _graph.get_state_history(config) if to_node in (s.next or ())), None)
+    if target is None:
+        return _error(task_id, f"历史中无 {to_node!r} 的前序检查点，无法回退（该闸可能尚未到达）")
+    result = _graph.invoke(None, config=target.config)
+    return _format(task_id, result)
 
 
 def get_state(task_id: str) -> dict[str, Any]:

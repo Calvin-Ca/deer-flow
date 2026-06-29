@@ -192,6 +192,19 @@ function FieldControl({
 }
 
 /** 录入型闸（setup / 缺价 / 费率 / 参数）—— 按字段类型渲染，提交字段值 dict。 */
+/** Friendly Chinese labels for input-gate context keys (feature-clarify / 缺价 闸). */
+const CONTEXT_LABELS: Record<string, string> = {
+  feature: "当前描述",
+  code: "已选编码",
+  unit: "单位",
+  raw: "材料",
+  std: "标准材料",
+  category: "类别",
+  spec: "规格",
+  consumption: "消耗量",
+  price_status: "信息价状态",
+};
+
 export function InputGate({
   interrupt,
   busy,
@@ -232,15 +245,36 @@ export function InputGate({
       </CardHeader>
       <CardContent className="space-y-3">
         {interrupt.context && (
-          <div className="bg-muted/40 rounded-md border p-2 text-xs">
+          <div className="bg-muted/40 space-y-1 rounded-md border p-2 text-xs">
             {Object.entries(interrupt.context)
-              .filter(([, v]) => v != null && v !== "")
+              .filter(([k, v]) => k !== "why" && v != null && v !== "")
               .map(([k, v]) => (
                 <div key={k}>
-                  <span className="text-muted-foreground">{k}：</span>
+                  <span className="text-muted-foreground">
+                    {CONTEXT_LABELS[k] ?? k}：
+                  </span>
                   <span className="font-mono">{displayValue(v)}</span>
                 </div>
               ))}
+            {Array.isArray(
+              (interrupt.context as Record<string, unknown>).why,
+            ) && (
+              <div className="space-y-0.5">
+                <div className="text-muted-foreground">为什么要补这些：</div>
+                {(
+                  (interrupt.context as {
+                    why: Array<{ label?: string; why?: string }>;
+                  }).why
+                ).map((w, i) => (
+                  <div key={i} className="pl-2">
+                    · {w.label && <span className="font-medium">{w.label}</span>}
+                    {w.why && (
+                      <span className="text-muted-foreground"> —— {w.why}</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
         {interrupt.fields.map((f) => (

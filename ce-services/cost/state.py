@@ -86,6 +86,29 @@ def override_entry(node: str, item_idx: int, value: Any, by: str = "user") -> di
     return {"node": node, "item": item_idx, "by": by, "value": value, "at": _now()}
 
 
+def gate_event(node: str, *, paused: bool, confidence: float | None = None, tau: float | None = None,
+               provenance: dict[str, Any] | None = None, detail: dict[str, Any] | None = None) -> dict[str, Any]:
+    """构造一条「门控决策事件」——让停闸/自动采纳都进依据时间线，自动过附「为什么没问你」。
+
+    参数：node —— 门控节点名；paused —— 是否停闸等人（False=自动采纳）；confidence —— 决策置信度
+      （编码闸有，余 None）；tau —— 自动过的置信阈值（仅编码闸：confidence≥tau 故自动采纳）；
+      provenance —— 来源信封 provenance 块；detail —— 落值细节（如 ``{code}`` / ``{quantity}``）。
+    返回：``{step, status(auto_pass/paused), auto_pass, confidence, tau, provenance, result, paused, at}``——
+      前端据 ``auto_pass`` 标「自动采纳」，据 ``tau``/``confidence`` 显示「置信 X ≥ 阈值 τ」。
+    """
+    return {
+        "step": node,
+        "status": "paused" if paused else "auto_pass",
+        "auto_pass": not paused,
+        "confidence": confidence,
+        "tau": tau,
+        "provenance": provenance,
+        "result": detail,
+        "paused": paused,
+        "at": _now(),
+    }
+
+
 def provenance_event(envelope: dict[str, Any], *, paused: bool) -> dict[str, Any]:
     """从原语信封派生一条「节点 provenance 事件」（前端依据卡数据源）。
 

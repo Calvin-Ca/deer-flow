@@ -24,6 +24,12 @@ export interface CostEvent {
   provenance?: Provenance | null;
   result?: Record<string, unknown> | null;
   paused?: boolean;
+  /** Gate auto-passed without asking the user (依据时间线标「自动采纳」). */
+  auto_pass?: boolean;
+  /** Decision confidence (coding gate only; null elsewhere). */
+  confidence?: number | null;
+  /** Auto-pass confidence threshold τ (coding gate only) — renders 「置信 X ≥ 阈值 τ」. */
+  tau?: number | null;
   at?: string;
 }
 

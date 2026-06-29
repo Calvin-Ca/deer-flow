@@ -28,6 +28,7 @@ from cost.pricing import RollupInput, UnitPriceInput, compute_unit_price, rollup
 from cost.state import (
     CostTaskState,
     audit_entry,
+    gate_event,
     lock_value,
     override_entry,
     provenance_event,
@@ -115,6 +116,10 @@ def list_gate_node(state: CostTaskState) -> dict[str, Any]:
     out: dict[str, Any] = {
         "items": [item],
         "audit_log": [audit_entry("list_coding", action, {"code": value}, by=by)],
+        # 门控决策入依据时间线：自动过时带 confidence/τ，让「为什么没问你」可见（≥τ 故自动采纳）。
+        "events": [gate_event("list_gate", paused=pause,
+                              confidence=env.get("provenance", {}).get("confidence"),
+                              tau=HITL_CONFIDENCE_TAU, provenance=prov, detail={"code": value})],
     }
     if by == "user" and action in ("manual_override", "select_alternative"):
         out["overrides"] = [override_entry("code", 0, value, by="user")]
@@ -165,7 +170,8 @@ def quota_gate_node(state: CostTaskState) -> dict[str, Any]:
     if env is None:  # compose 未就绪/无定额块，跳过本闸
         return {"status": state.get("status", "running")}
 
-    if gates.should_pause_quota(env):
+    paused = gates.should_pause_quota(env)
+    if paused:
         decision = interrupt(gates.confirm_payload("quota", env, "请确认套用定额子目"))
         value, prov, action = gates.apply_confirm_decision(env, decision)
         by = "user"
@@ -180,6 +186,8 @@ def quota_gate_node(state: CostTaskState) -> dict[str, Any]:
     return {
         "items": [item],
         "audit_log": [audit_entry("quota", action, {"子目号": value}, by=by)],
+        # 自动过=唯一子目，无 LLM 置信（tau=None）；停闸=多子目人工选。
+        "events": [gate_event("quota_gate", paused=paused, provenance=prov, detail={"子目号": value})],
     }
 
 
@@ -257,6 +265,8 @@ def quantity_gate_node(state: CostTaskState) -> dict[str, Any]:
     out: dict[str, Any] = {
         "items": [item],
         "audit_log": [audit_entry("quantity", action, {"quantity": quantity}, by=by)],
+        # 自动过=start 已预供 Q（缺口 1：让 quantity_gate 也进依据时间线）。
+        "events": [gate_event("quantity_gate", paused=(by == "user"), detail={"quantity": quantity})],
     }
     if by == "user":
         out["overrides"] = [override_entry("quantity", 0, quantity, by="user")]
@@ -329,7 +339,8 @@ def rates_gate_node(state: CostTaskState) -> dict[str, Any]:
         "audit_log": [audit_entry("unit_price", "input" if paused else "auto_pass",
                                   {"rates": rates, "unit_price_status": unit_price.get("status", "ok")}, by=by)],
         "events": [{"step": "compute_unit_price", "status": unit_price.get("status", "ok"),
-                    "provenance": unit_price.get("provenance"), "result": unit_price, "paused": paused}],
+                    "provenance": unit_price.get("provenance"), "result": unit_price,
+                    "paused": paused, "auto_pass": not paused}],
     }
     if paused:
         out["overrides"] = [override_entry("rates", 0, rates, by="user")]
@@ -361,6 +372,8 @@ def params_gate_node(state: CostTaskState) -> dict[str, Any]:
     out: dict[str, Any] = {
         "params": params,
         "audit_log": [audit_entry("project_params", "input" if paused else "auto_pass", {"params": params}, by=by)],
+        # 自动过=已带 params（税率已给）（缺口 1：让 params_gate 也进依据时间线）。
+        "events": [gate_event("params_gate", paused=paused, detail={"params": params})],
     }
     if paused:
         out["overrides"] = [override_entry("params", 0, params, by="user")]

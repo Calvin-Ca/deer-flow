@@ -73,13 +73,23 @@ function EventTimeline({ events }: { events: CostEvent[] }) {
                         暂停
                       </Badge>
                     )}
+                    {ev.auto_pass && (
+                      <Badge variant="secondary" className="text-[10px]">
+                        自动采纳
+                      </Badge>
+                    )}
                     <span className="text-muted-foreground">{ev.status}</span>
                   </span>
                 </div>
+                {ev.auto_pass && ev.tau != null && ev.confidence != null && (
+                  <div className="text-muted-foreground mb-1 text-[10px]">
+                    置信 {ev.confidence.toFixed(2)} ≥ 阈值 {ev.tau.toFixed(2)}，故未打断、自动采纳
+                  </div>
+                )}
                 <EvidenceCard
                   sourceType={ev.provenance?.source_type}
                   sourceRef={ev.provenance?.source_ref}
-                  confidence={ev.provenance?.confidence}
+                  confidence={ev.provenance?.confidence ?? ev.confidence}
                 />
               </div>
             ))}

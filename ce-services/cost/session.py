@@ -61,29 +61,33 @@ def _format(task_id: str, result: dict[str, Any]) -> dict[str, Any]:
 
 
 def start(
-    feature: str,
+    feature: str | None = None,
     spec: str | None = None,
     region: str = "深圳",
     period: str | None = None,
     price_source: str | None = None,
     rates: dict[str, Any] | None = None,
     quantity: float | None = None,
+    features: list[str] | None = None,
 ) -> dict[str, Any]:
-    """起一个组价 HITL 会话，跑到首个闸或 done。
+    """起一个组价 HITL 会话，跑到首个闸或 done（支持单/多构件）。
 
-    参数：feature —— 构件/做法描述；spec —— 国标版本（缺则 setup 闸采集）；region/period/price_source/rates —— setup 口径；
-      quantity —— 可选工程量 Q（给定则 quantity_gate 自动过，缺则停闸录入）。
+    参数：feature —— 单构件描述；features —— 多构件描述列表（给定则按外层循环逐件办，优先于 feature）；
+      spec —— 国标版本（缺则 setup 闸采集）；region/period/price_source/rates —— setup 口径；
+      quantity —— 可选工程量 Q（仅单构件时预供 items[0]；多构件各件经 quantity_gate 录入）。
     返回：会话响应（含 task_id；首个 interrupt 通常是编码确认闸，或 spec 缺失时的 setup 录入闸）。
     """
     task_id = uuid.uuid4().hex
-    item: dict[str, Any] = {"feature": feature}
-    if quantity is not None:
-        item["quantity"] = quantity
+    descs = [f for f in (features or []) if f] or ([feature] if feature else [])
+    items: list[dict[str, Any]] = [{"feature": d} for d in descs]
+    if quantity is not None and len(items) == 1:  # Q 预供仅对单构件无歧义
+        items[0]["quantity"] = quantity
     initial: dict[str, Any] = {
         "task_id": task_id,
-        "feature": feature,
+        "feature": descs[0] if descs else None,
         "region": region,
-        "items": [item],
+        "current_item": 0,
+        "items": items,
         "status": "running",
     }
     if spec:

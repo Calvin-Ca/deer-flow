@@ -55,10 +55,9 @@
 | 改 2 · 补 Q 录入闸 | 高 · **已落地** | 在 `price_gate` 之后、`rates_gate` 之前新增 `quantity_gate` input 闸收工程量 Q，透传 `_unit_price_for(..., quantity=Q)` → `compute_unit_price`，修掉「静默 Q=1 出错误总价」。无基价时跳闸、有基价缺 Q 标 `missing_quantity`/blocked、不静默按 1 计。可经 `SessionStartRequest.quantity` 预供则自动过。总造价段保留（合规、不违 C-04）。代码见 `cost/{graph,gates,session,router,state}.py` | §2.2 之 3 |
 | 改 3 · 架构归位 | 中 | 这条线性图应是 Orchestrator 路由后**组价 Agent 内部**的一种 pipeline 形态，意图路由（§4.3）置于其上 | §2.2 之 4 |
 
-### 3.1 回退能力（与改 1 配套，二选一）
+### 3.1 回退能力（与改 1 配套）· **已落地**
 
-- **轻量**：前端发现要改前面时 `start` 新会话重来（最简，丢已填数据）。
-- **正经回退**：`session.py` 加 `rewind(task_id, to_gate)`，用 langgraph `update_state` 回到目标闸 checkpoint 再 `resume`——保留之前输入、只重跑被改节点及下游。配合改 1 的「回填重走门控」语义一致，推荐此条。
+`session.py::rewind(task_id, to_node)` —— langgraph 时间旅行：`get_state_history` 定位「目标闸即将执行」的最近 checkpoint（`snapshot.next` 含 to_node），从它重 `invoke(None)`。上游 compute（含 LLM 选码/取数）不重跑（checkpoint 已存），目标闸**之后**的锁值（编码/定额/价/Q/费率/参数）随回退作废、由用户重答。`to_node` 仅限闸节点（`REWINDABLE_GATES`，compute 节点拦截为 error）。端点 `POST /cost/session/{task_id}/rewind {to_node}`。验证：回退作废后续锁值、重答生效、非法目标拦截均通过。
 
 ---
 
@@ -86,3 +85,15 @@ ce-services 任务层 `:8101`，挂在 `cost_router`（`main.py:46`，无额外 
 - **自动过（高置信）的依据**：自动过不打断，但每个门控节点经 `state.gate_event(...)` 往 `events` 写一条决策事件——`auto_pass=true`，编码闸再带 `confidence`/`tau`，前端渲染「自动采纳」徽标 + 「置信 X ≥ 阈值 τ，故未打断」。
 - **覆盖的门控**：`list_gate`（带 τ）/ `quota_gate` / `quantity_gate` / `params_gate` / `rates_gate` 全部发 `gate_event`，所有闸的「停/过」决策在时间线可见、可审计（呼应 §8.2 可观测）。
 - 代码：后端 `cost/state.py::gate_event` + `cost/graph.py` 各门控节点；前端 `core/cost/types.ts::CostEvent`（加 `auto_pass/tau/confidence`）+ `cost-hitl-panel.tsx::EventTimeline`。
+
+---
+
+## 6. P2 健壮性（配套 · 已落地）
+
+| 项 | 内容 | 代码 |
+|---|---|---|
+| 前端 `context.why` 渲染 | 特征澄清闸的 `context.why`（数组）专门渲染成「为什么要补这些：· 砂浆等级 —— 缺砂浆等级无法定子目」；`CONTEXT_LABELS` 把 feature/code/unit… 显示成中文 | `frontend/.../cost/gates.tsx::InputGate` |
+| rewind 回退 | 见 §3.1 | `cost/session.py` + 端点 |
+| **多构件**（PRD §5.2 FR-P05） | **外层循环**：`current_item` 标当前在办件，per-item 闸（list_match→…→quantity_gate）只动 `items[current_item]`（`_put_item` 写回保留其余件），`advance` 推进到下一件；办完所有件才进**项目级**收尾——`rates_gate` 一套费率给每件算综合单价、`rollup` 汇总 Σ 各件。单个坏件（选不出码/缺 Q）`skip` 跳过、不拖死整单，`done_node` 仅当全无综合合价才整单 blocked。入口 `start(features=[...])` / `SessionStartRequest.features`。`clarify_rounds` 移至 item（各件独立计澄清预算） | `cost/graph.py`（`_put_item`/`advance_node`/`_after_advance`/`rates_gate` 项目级化）+ `cost/state.py`（`current_item`）+ `cost/session.py`/`router.py`（`features` 入口） |
+
+验证（本地 mock，全过）：双构件各自 Q（×3/×5）、各算综合合价、`subtotal=Σ`、项目级费率一套管全单、rollup approve→done；单构件回归（特征澄清回环 + rewind）不受影响。

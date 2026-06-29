@@ -1,7 +1,10 @@
 """可中断组价状态机（langgraph）—— HITL 全 13 步图（设计 §3.1）。
 
-链路：``setup → list_match → feature_gate →（缺特征?回环 list_match）→ list_gate →（有码?）compose →
-       quota_gate → price_gate → quantity_gate → rates_gate → params_gate → rollup → done``。
+链路（**多构件外层循环**）：``setup →〔每件：list_match → feature_gate →（缺特征?回环 list_match）→ list_gate
+       →（有码?compose → quota_gate → price_gate → quantity_gate / 无码 skip）→ advance →（还有件?回 list_match）〕
+       → rates_gate（项目级·给每件算综合单价）→ params_gate → rollup → done``。
+- **多构件**：``current_item`` 标当前在办件，per-item 闸只动 ``items[current_item]``（``_put_item`` 写回保留其余件）；
+  ``advance`` 推进到下一件、办完才进项目级收尾（费率/参数/汇总一套管全单）。单构件退化为列表只一项。
 - **compute / gate 双拆**：原语调用（list_match / compose，含 LLM 与知识层取数）放「compute 节点」，
   暂停闸放「gate 节点」。因 langgraph 的 ``interrupt()`` 在 resume 时**会从节点头部重跑**——把昂贵且
   非确定性的 LLM 调用单独放上游 compute 节点（节点间有 checkpoint，跑且仅跑一次），gate 节点只读 state +
@@ -42,9 +45,25 @@ MAX_CLARIFY_ROUNDS = 2
 
 
 def _item(state: CostTaskState) -> dict[str, Any]:
-    """取本期单构件 item（items[0]）；缺则按 feature 初始化一个空 item。"""
+    """取当前在办构件 item（items[current_item]）；缺则按 feature 初始化一个空 item（多构件外层循环用 current_item 选位）。"""
     items = state.get("items") or [{"feature": state.get("feature")}]
-    return dict(items[0])
+    idx = min(state.get("current_item", 0), len(items) - 1)
+    return dict(items[idx])
+
+
+def _put_item(state: CostTaskState, item: dict[str, Any]) -> list[dict[str, Any]]:
+    """把更新后的 item 写回 items[current_item]，**保留其余构件**（多构件写回原语，替代整表覆盖 ``[item]``）。
+
+    参数：state —— 当前状态；item —— 改后的当前构件。返回：整张 items 列表（仅当前位被替换）。
+    单构件时退化为「列表只一项、替换它」，与旧行为等价。
+    """
+    items = [dict(it) for it in (state.get("items") or [])]
+    idx = state.get("current_item", 0)
+    if 0 <= idx < len(items):
+        items[idx] = item
+    else:
+        items.append(item)
+    return items
 
 
 # ── 节点 ──
@@ -97,12 +116,13 @@ def list_match_node(state: CostTaskState) -> dict[str, Any]:
     item = _item(state)
     env = provenance.list_match(item.get("feature"), state["spec_version"], TOP_K, LLM_URL, LLM_MODEL_ID)
     item["code"] = {"envelope": env, "value": env["result"].get("code"), "locked": False}
-    if env["status"] == provenance.STATUS_NEED_REVIEW and (state.get("clarify_rounds") or 0) < MAX_CLARIFY_ROUNDS:
+    # clarify_rounds 存 item（多构件各自计澄清预算，互不挪用）。
+    if env["status"] == provenance.STATUS_NEED_REVIEW and (item.get("clarify_rounds") or 0) < MAX_CLARIFY_ROUNDS:
         hints = [env["result"].get("name")] + [a.get("name") for a in env["provenance"].get("alternatives", [])]
         item["missing_features"] = clarify.extract_missing_features(item.get("feature"), hints, LLM_URL, LLM_MODEL_ID)
     else:
         item["missing_features"] = []
-    return {"items": [item], "events": [provenance_event(env, paused=False)], "needs_rematch": False}
+    return {"items": _put_item(state, item), "events": [provenance_event(env, paused=False)], "needs_rematch": False}
 
 
 def feature_gate_node(state: CostTaskState) -> dict[str, Any]:
@@ -133,17 +153,18 @@ def feature_gate_node(state: CostTaskState) -> dict[str, Any]:
     added = "，".join(parts)
     item["feature"] = (item.get("feature") or "") + (("，" + added) if added else "")
     item["missing_features"] = []
-    rounds = (state.get("clarify_rounds") or 0) + 1
+    rounds = (item.get("clarify_rounds") or 0) + 1
+    item["clarify_rounds"] = rounds  # 澄清轮次记 item（多构件各自计）
+    idx = state.get("current_item", 0)
     out: dict[str, Any] = {
-        "items": [item],
-        "clarify_rounds": rounds,
+        "items": _put_item(state, item),
         # 有补充才回环重匹配；用户全空（拒答）则不回环、落 list_gate 确认闸兜底，不空转。
         "needs_rematch": bool(added),
-        "audit_log": [audit_entry("feature_clarify", "input", {"added": added, "round": rounds}, by="user")],
-        "events": [gate_event("feature_gate", paused=True, detail={"added": added, "round": rounds})],
+        "audit_log": [audit_entry("feature_clarify", "input", {"added": added, "round": rounds, "item": idx}, by="user")],
+        "events": [gate_event("feature_gate", paused=True, detail={"added": added, "round": rounds, "item": idx})],
     }
     if added:
-        out["overrides"] = [override_entry("feature", 0, added, by="user")]
+        out["overrides"] = [override_entry("feature", idx, added, by="user")]
     return out
 
 
@@ -164,18 +185,19 @@ def list_gate_node(state: CostTaskState) -> dict[str, Any]:
         by = "model"
 
     item["code"] = lock_value(value, prov, by=by)
+    idx = state.get("current_item", 0)
     out: dict[str, Any] = {
-        "items": [item],
-        "audit_log": [audit_entry("list_coding", action, {"code": value}, by=by)],
+        "items": _put_item(state, item),
+        "audit_log": [audit_entry("list_coding", action, {"code": value, "item": idx}, by=by)],
         # 门控决策入依据时间线：自动过时带 confidence/τ，让「为什么没问你」可见（≥τ 故自动采纳）。
         "events": [gate_event("list_gate", paused=pause,
                               confidence=env.get("provenance", {}).get("confidence"),
                               tau=HITL_CONFIDENCE_TAU, provenance=prov, detail={"code": value})],
     }
     if by == "user" and action in ("manual_override", "select_alternative"):
-        out["overrides"] = [override_entry("code", 0, value, by="user")]
-    if not value:
-        out["status"] = "blocked"  # 选不出码且用户也未给值 → 阻塞，不硬编（§10）
+        out["overrides"] = [override_entry("code", idx, value, by="user")]
+    # 选不出码：该构件跳过取数（_has_code 路由 skip→advance），不硬编、不阻断其余构件；
+    # 整单是否 blocked 由 done_node 据「是否有任一构件算出综合合价」统一判（多构件不被单个坏件拖死）。
     return out
 
 
@@ -195,7 +217,7 @@ def compose_node(state: CostTaskState) -> dict[str, Any]:
             item["quota"] = {"status": "未就绪"}
             item["materials"] = []
             return {
-                "items": [item],
+                "items": _put_item(state, item),
                 "status": "running",
                 "events": [{"step": "from_price_compose", "status": "未就绪",
                             "provenance": {"source_ref": f"spec={spec} 组价数据未就绪"}, "paused": False}],
@@ -205,7 +227,7 @@ def compose_node(state: CostTaskState) -> dict[str, Any]:
     item["quota"] = {"envelope": bundle["quota_envelope"], "locked": False}
     item["materials"] = bundle["materials"]
     return {
-        "items": [item],
+        "items": _put_item(state, item),
         "events": [provenance_event(bundle["quota_envelope"], paused=False)],
     }
 
@@ -235,7 +257,7 @@ def quota_gate_node(state: CostTaskState) -> dict[str, Any]:
     quotas = env.get("result", {}).get("quotas", [])
     item["quota_basis"] = next((q for q in quotas if str(q.get("子目号")) == str(value)), None)
     return {
-        "items": [item],
+        "items": _put_item(state, item),
         "audit_log": [audit_entry("quota", action, {"子目号": value}, by=by)],
         # 自动过=唯一子目，无 LLM 置信（tau=None）；停闸=多子目人工选。
         "events": [gate_event("quota_gate", paused=paused, provenance=prov, detail={"子目号": value})],
@@ -276,7 +298,7 @@ def price_gate_node(state: CostTaskState) -> dict[str, Any]:
             audits.append(audit_entry("price_query", "manual_override", {"material": m.get("std"), "value": val}, by="user"))
 
     item["materials"] = materials
-    out: dict[str, Any] = {"items": [item]}
+    out: dict[str, Any] = {"items": _put_item(state, item)}
     if overrides:
         out["overrides"] = overrides
         out["audit_log"] = audits
@@ -313,16 +335,16 @@ def quantity_gate_node(state: CostTaskState) -> dict[str, Any]:
         action, by = "auto_pass", "model"
 
     item["quantity"] = quantity
+    idx = state.get("current_item", 0)
     out: dict[str, Any] = {
-        "items": [item],
-        "audit_log": [audit_entry("quantity", action, {"quantity": quantity}, by=by)],
+        "items": _put_item(state, item),
+        "audit_log": [audit_entry("quantity", action, {"quantity": quantity, "item": idx}, by=by)],
         # 自动过=start 已预供 Q（缺口 1：让 quantity_gate 也进依据时间线）。
-        "events": [gate_event("quantity_gate", paused=(by == "user"), detail={"quantity": quantity})],
+        "events": [gate_event("quantity_gate", paused=(by == "user"), detail={"quantity": quantity, "item": idx})],
     }
     if by == "user":
-        out["overrides"] = [override_entry("quantity", 0, quantity, by="user")]
-    if quantity is None:
-        out["status"] = "blocked"  # 要 Q 而用户未给 → 阻塞，不静默按 1 算（§10）
+        out["overrides"] = [override_entry("quantity", idx, quantity, by="user")]
+    # 缺 Q：该构件综合合价标 missing_quantity（rates_gate），不静默按 1 算、也不阻断其余构件。
     return out
 
 
@@ -353,10 +375,11 @@ def _unit_price_for(basis: dict[str, Any] | None, rates: dict[str, Any], quantit
 
 
 def rates_gate_node(state: CostTaskState) -> dict[str, Any]:
-    """综合单价费率录入闸（§3⑧/§6）：有费率自动过、缺政策数（管理费/利润/取费基数）停闸录入；钉率后算综合单价。
+    """综合单价费率录入闸（§3⑧/§6）·**项目级**：费率一套管全单，钉率后给**每条构件**算综合单价/综合合价。
 
-    参数：state。返回：state.rates 钉值 + item.unit_price（compute_unit_price 结果）+ 审计/override。
-    费率是政策数（库内无），缺则停（gates.should_pause_rates）；齐则自动过。算钱确定性、不入 LLM（resume 重跑无漂移）。
+    参数：state。返回：state.rates 钉值 + 每个 item.unit_price（compute_unit_price 结果）+ 审计/override/逐件事件。
+    费率是政策数（库内无）、整单一套，缺则停闸录入（gates.should_pause_rates）、齐则自动过；算钱确定性、不入 LLM。
+    本节点在外层循环跑完所有构件后执行一次（current_item 已越界），故遍历全 items、不依赖 _item。
     """
     rates = state.get("rates")
     paused = gates.should_pause_rates(rates)
@@ -375,23 +398,25 @@ def rates_gate_node(state: CostTaskState) -> dict[str, Any]:
             )
         )
 
-    item = _item(state)
-    quantity = item.get("quantity")
-    basis = item.get("quota_basis")
-    # 有基价却缺 Q（quantity_gate 已置 blocked）→ 标 missing_quantity，不静默按 1 计；
-    # 无基价（未就绪/选错码）→ 交 _unit_price_for 返回 missing_base（Q 与否都算不出综合单价）。
-    unit_price = ({"status": "missing_quantity"} if basis is not None and quantity is None
-                  else _unit_price_for(basis, rates, quantity))
-    item["unit_price"] = unit_price
+    items = [dict(it) for it in (state.get("items") or [])]
+    events: list[dict[str, Any]] = []
+    for i, it in enumerate(items):
+        quantity = it.get("quantity")
+        basis = it.get("quota_basis")
+        # 有基价却缺 Q → missing_quantity（不静默按 1 计）；无基价（未就绪/选错码）→ missing_base。
+        up = ({"status": "missing_quantity"} if basis is not None and quantity is None
+              else _unit_price_for(basis, rates, quantity))
+        it["unit_price"] = up
+        events.append({"step": f"compute_unit_price[{i}]", "status": up.get("status", "ok"),
+                       "provenance": up.get("provenance"), "result": up,
+                       "paused": paused and i == 0, "auto_pass": not paused})
     by = "user" if paused else "model"
     out: dict[str, Any] = {
         "rates": rates,
-        "items": [item],
+        "items": items,
         "audit_log": [audit_entry("unit_price", "input" if paused else "auto_pass",
-                                  {"rates": rates, "unit_price_status": unit_price.get("status", "ok")}, by=by)],
-        "events": [{"step": "compute_unit_price", "status": unit_price.get("status", "ok"),
-                    "provenance": unit_price.get("provenance"), "result": unit_price,
-                    "paused": paused, "auto_pass": not paused}],
+                                  {"rates": rates, "items": len(items)}, by=by)],
+        "events": events,
     }
     if paused:
         out["overrides"] = [override_entry("rates", 0, rates, by="user")]
@@ -482,9 +507,19 @@ def rollup_node(state: CostTaskState) -> dict[str, Any]:
     }
 
 
+def advance_node(state: CostTaskState) -> dict[str, Any]:
+    """多构件外层循环推进：当前构件处理完，current_item+1（路由 ``_after_advance`` 据此回 list_match 或进 rates_gate）。"""
+    return {"current_item": (state.get("current_item", 0) + 1)}
+
+
 def done_node(state: CostTaskState) -> dict[str, Any]:
-    """收尾（§3⑬）：终态置 done；选不出码的 blocked 分支直达此节点（跳过算钱）时保留 blocked，不掩盖缺口。"""
-    return {"status": "blocked" if state.get("status") == "blocked" else "done"}
+    """收尾（§3⑬）：有任一构件算出综合合价 → done；全无（都选不出码/未就绪/缺 Q）→ blocked，不掩盖缺口。
+
+    多构件下单个坏件不拖死整单（坏件在 rollup 计入 missing），仅当**所有**构件都无综合合价才整单 blocked。
+    """
+    items = state.get("items") or []
+    any_ok = any((it.get("unit_price") or {}).get("total_price") is not None for it in items)
+    return {"status": "done" if any_ok else "blocked"}
 
 
 def _after_feature(state: CostTaskState) -> str:
@@ -493,9 +528,15 @@ def _after_feature(state: CostTaskState) -> str:
 
 
 def _has_code(state: CostTaskState) -> str:
-    """list_gate 后路由：已钉到码 → 继续 compose；否则（blocked）直接收尾。"""
+    """list_gate 后路由：已钉到码 → 取数 compose；否则该构件跳过（skip→advance，处理下一构件）。"""
     item = _item(state)
-    return "compose" if (item.get("code") or {}).get("value") else "done"
+    return "compose" if (item.get("code") or {}).get("value") else "skip"
+
+
+def _after_advance(state: CostTaskState) -> str:
+    """advance 后路由：还有未办构件 → 回 list_match 办下一件；全办完 → 进 rates_gate 做项目级收尾。"""
+    items = state.get("items") or []
+    return "list_match" if state.get("current_item", 0) < len(items) else "rates_gate"
 
 
 def build_graph(checkpointer: Any):
@@ -513,6 +554,7 @@ def build_graph(checkpointer: Any):
     g.add_node("quota_gate", quota_gate_node)
     g.add_node("price_gate", price_gate_node)
     g.add_node("quantity_gate", quantity_gate_node)
+    g.add_node("advance", advance_node)
     g.add_node("rates_gate", rates_gate_node)
     g.add_node("params_gate", params_gate_node)
     g.add_node("rollup", rollup_node)
@@ -523,11 +565,14 @@ def build_graph(checkpointer: Any):
     g.add_edge("list_match", "feature_gate")
     # 特征澄清回环：补了特征→回 list_match 重匹配；齐→list_gate（PRD §8.2 澄清回填后重走门控）。
     g.add_conditional_edges("feature_gate", _after_feature, {"list_match": "list_match", "list_gate": "list_gate"})
-    g.add_conditional_edges("list_gate", _has_code, {"compose": "compose", "done": "done"})
+    # 选不出码 → skip 到 advance（跳过该构件取数，办下一件）；有码 → compose 取数。
+    g.add_conditional_edges("list_gate", _has_code, {"compose": "compose", "skip": "advance"})
     g.add_edge("compose", "quota_gate")
     g.add_edge("quota_gate", "price_gate")
     g.add_edge("price_gate", "quantity_gate")
-    g.add_edge("quantity_gate", "rates_gate")
+    g.add_edge("quantity_gate", "advance")
+    # 多构件外层循环：还有未办构件→回 list_match；全办完→rates_gate 项目级收尾（费率/参数/汇总）。
+    g.add_conditional_edges("advance", _after_advance, {"list_match": "list_match", "rates_gate": "rates_gate"})
     g.add_edge("rates_gate", "params_gate")
     g.add_edge("params_gate", "rollup")
     g.add_edge("rollup", "done")

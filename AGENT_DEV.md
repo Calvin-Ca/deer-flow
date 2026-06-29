@@ -37,8 +37,8 @@
 
 ### 2.2 冲突（关键，需改）
 
-1. **PRD 的 HITL 本质是「ReAct 特征澄清循环」，不是固定全流程闸机。** §8.2 明确「澄清结果回填后**重走 §4.4 门控**」——这是 clarify→回填→重新门控的**回环**；当前图是无回边 DAG、单向不可回退，**恰好相反**。
-2. **PRD 头号澄清场景——特征澄清——当前图没实现。** `setup_node` 只补 `spec/region`，拿到 `feature` 字符串直接 `list_match`。而 FR-P02/EH-04（「只写'砌筑'，缺砌块/砂浆强度」）要求**先反问补构件关键特征槽再匹配**，当前缺这个闸，等于跳过 PRD 最核心 HITL 用例。
+1. **PRD 的 HITL 本质是「ReAct 特征澄清循环」，不是固定全流程闸机。** **（改 1 已落地解决）** §8.2 明确「澄清结果回填后**重走 §4.4 门控**」——clarify→回填→重新门控的**回环**；原图是无回边 DAG、单向不可回退。现加 `feature_gate→list_match` 条件回边实现该回环。
+2. **PRD 头号澄清场景——特征澄清——当前图没实现。** **（改 1 已落地解决）** FR-P02/EH-04（「只写'砌筑'，缺砌块/砂浆强度」）要求先反问补关键特征再匹配；现 `feature_gate` 以 LLM 抽取缺口（`clarify.py`）+ 回环重匹配落地。
 3. **缺「工程量 Q 录入闸」，当前静默按 Q=1 算出错误总价。** Q 由**用户录入**（非 BIM 自动算——PRD §1.2 范围外的是 Q 的几何/扣减**计算**，用户手填一个已知 Q 是正常 HITL 输入，不越界）。但当前图**没有任何闸收 Q**：`_unit_price_for` 构造 `UnitPriceInput` 时不传 `quantity`，而 `pricing.py:80` `quantity` 默认 1.0，故 `total_price = 综合单价 × 1`。`_compute_rollup` 把一堆「Q=1 的综合单价」当分部分项合价相加——**不报错、直接定稿一个名不副实的总造价**。这是「静默用错误默认值」，比报错更危险。
    - 注：综合单价/总造价段本身**不违 C-04**——`compute_unit_price`/`rollup_cost` 是确定性「计算工具能力」，HITL 只负责收 Q/rates/params 再喂给它。问题不在「该不该算总造价」，而在「缺一个把 Q 喂进去的闸」。
 4. **缺 Orchestrator/意图路由层。** PRD 骨架是 Orchestrator 按 §4.3 在「两 Agent + 两能力」间路由；当前 HITL 是单体组价管线，无意图分类、无规范问答介入、无复合拆解（EH-01）。它更像「组价 happy-path 脚手架」，不是 PRD 描述的 agent 系统。
@@ -51,7 +51,7 @@
 
 | 改动 | 优先级 | 内容 | 解决的冲突 |
 |---|---|---|---|
-| 改 1 · 特征澄清闸 | 必须 | 在 `list_match` 之前加「特征槽检查闸」：缺关键特征槽（构件类型/强度等级/断面…）就停、回填后**重跑门控** | §2.2 之 1+2（不可回退 & 头号用例缺失一并解决） |
+| 改 1 · 特征澄清闸 | 必须 · **已落地** | `list_match` 后加 `feature_gate`：缺关键特征→反问补全→回填进 `feature`→**回环重跑 `list_match`+门控**（条件边 `feature_gate→list_match`）。缺口判定走 LLM 抽取（`clarify.extract_missing_features`，降级安全：不可靠则不澄清、交 list_gate 兜底）；回环由 `MAX_CLARIFY_ROUNDS=2` 截断，无死循环。代码见 `cost/clarify.py` + `cost/graph.py`(`list_match_node`/`feature_gate_node`/`_after_feature`) | §2.2 之 1+2（不可回退 & 头号用例缺失一并解决） |
 | 改 2 · 补 Q 录入闸 | 高 · **已落地** | 在 `price_gate` 之后、`rates_gate` 之前新增 `quantity_gate` input 闸收工程量 Q，透传 `_unit_price_for(..., quantity=Q)` → `compute_unit_price`，修掉「静默 Q=1 出错误总价」。无基价时跳闸、有基价缺 Q 标 `missing_quantity`/blocked、不静默按 1 计。可经 `SessionStartRequest.quantity` 预供则自动过。总造价段保留（合规、不违 C-04）。代码见 `cost/{graph,gates,session,router,state}.py` | §2.2 之 3 |
 | 改 3 · 架构归位 | 中 | 这条线性图应是 Orchestrator 路由后**组价 Agent 内部**的一种 pipeline 形态，意图路由（§4.3）置于其上 | §2.2 之 4 |
 
@@ -74,7 +74,7 @@ ce-services 任务层 `:8101`，挂在 `cost_router`（`main.py:46`，无额外 
 
 - 与 `POST /cost/compose`（端到端「简单场景」旧路）并存，判据=是否需 HITL/可审计。
 - 前端调试页：`/workspace/cost`（`frontend/src/app/workspace/cost/page.tsx`，渲染 `CostHitlPanel`），经同源代理 `/ce-cost/*` 转发到 `:8101`。
-- 图链路：`setup → list_match → list_gate →(有码?)→ compose → quota_gate → price_gate → quantity_gate → rates_gate → params_gate → rollup → done`。
+- 图链路：`setup → list_match → feature_gate →(缺特征?回环 list_match)→ list_gate →(有码?)→ compose → quota_gate → price_gate → quantity_gate → rates_gate → params_gate → rollup → done`。
 
 ---
 

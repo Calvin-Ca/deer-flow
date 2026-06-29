@@ -26,9 +26,11 @@ class CostTaskState(TypedDict, total=False):
         rates —— 综合单价费率块（管理费/利润/风险/取费基数，§8 费率闸采集；给定则末步算综合单价）。
         params —— 项目级费用块（措施/其他/规费/税金率，§10⑪/§12 参数闸采集）。
         rollup —— 末尾汇总结果（§13：分部分项 + 措施 + 其他 + 规费 + 税金 → 总造价）。
-        feature —— 本期单构件/做法描述（入口输入）。
-        items —— §5.4 items：每项含 code/quota/quota_basis/materials/quantity/unit_price，确认后 locked
-          （quantity=工程量 Q，用户录入，综合合价 = 综合单价 × Q，§2 步骤 9）。
+        feature —— 本期单构件/做法描述（入口输入；特征澄清回填后被追加补充特征）。
+        clarify_rounds —— 特征澄清已回环轮次（PRD FR-P02/EH-04；达上限 MAX_CLARIFY_ROUNDS 则不再反问、落 list_gate）。
+        needs_rematch —— 特征澄清后是否需回 list_match 重匹配重门控的回环标记（list_match 起始清零）。
+        items —— §5.4 items：每项含 code/missing_features/quota/quota_basis/materials/quantity/unit_price，确认后 locked
+          （missing_features=待澄清的缺失关键特征；quantity=工程量 Q，用户录入，综合合价 = 综合单价 × Q，§2 步骤 9）。
         overrides —— 用户覆盖轨迹（§5.4）。
         audit_log —— 审计时间线（哪步谁改了什么）。
         events —— 逐节点 provenance 事件（前端依据卡数据源，无论是否暂停每节点都发）。
@@ -44,6 +46,8 @@ class CostTaskState(TypedDict, total=False):
     params: dict[str, Any] | None
     rollup: dict[str, Any] | None
     feature: str
+    clarify_rounds: int
+    needs_rematch: bool
     items: list[dict[str, Any]]
     overrides: Annotated[list[dict[str, Any]], operator.add]
     audit_log: Annotated[list[dict[str, Any]], operator.add]

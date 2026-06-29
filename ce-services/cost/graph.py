@@ -1,7 +1,7 @@
 """可中断组价状态机（langgraph）—— HITL 全 13 步图（设计 §3.1）。
 
-链路：``setup → list_match → list_gate →（有码?）compose → quota_gate → price_gate →
-       quantity_gate → rates_gate → params_gate → rollup → done``。
+链路：``setup → list_match → feature_gate →（缺特征?回环 list_match）→ list_gate →（有码?）compose →
+       quota_gate → price_gate → quantity_gate → rates_gate → params_gate → rollup → done``。
 - **compute / gate 双拆**：原语调用（list_match / compose，含 LLM 与知识层取数）放「compute 节点」，
   暂停闸放「gate 节点」。因 langgraph 的 ``interrupt()`` 在 resume 时**会从节点头部重跑**——把昂贵且
   非确定性的 LLM 调用单独放上游 compute 节点（节点间有 checkpoint，跑且仅跑一次），gate 节点只读 state +
@@ -23,7 +23,7 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.types import interrupt
 
 from common.config import HITL_CONFIDENCE_TAU, LLM_MODEL_ID, LLM_URL
-from cost import gates, provenance
+from cost import clarify, gates, provenance
 from cost.pricing import RollupInput, UnitPriceInput, compute_unit_price, rollup_cost
 from cost.state import (
     CostTaskState,
@@ -37,6 +37,8 @@ from cost.state import (
 logger = logging.getLogger("ce-services.cost.hitl")
 
 TOP_K = 10
+# 特征澄清最多回环轮次（PRD FR-P02/EH-04）：超过则不再反问、落 list_gate 确认闸兜底，避免无解死循环。
+MAX_CLARIFY_ROUNDS = 2
 
 
 def _item(state: CostTaskState) -> dict[str, Any]:
@@ -87,13 +89,62 @@ def setup_node(state: CostTaskState) -> dict[str, Any]:
 def list_match_node(state: CostTaskState) -> dict[str, Any]:
     """编码 compute（§3②）：bill_match 召回 + select_code 选码（含 LLM），结果入 item，**不暂停**。
 
-    参数：state。返回：item.code 挂上 list_match 信封 + 一条 provenance 事件。
-    LLM 在此唯一一次调用（与 gate 拆开，resume 不重跑）。
+    参数：state。返回：item.code 挂 list_match 信封 + item.missing_features（缺特征探测）+ provenance 事件，
+      并清 needs_rematch（回环已消费）。LLM 选码在此唯一一次调用（与 gate 拆开，resume 不重跑）。
+    缺特征探测（PRD FR-P02/EH-04）：仅 need_review（低置信/选不出码）且澄清未超轮次时抽缺口供下游特征澄清闸；
+      高置信直配 / 超轮次 → 空（不澄清）。LLM 不可靠时 extract 返回空，degrade 到现有行为。
     """
     item = _item(state)
     env = provenance.list_match(item.get("feature"), state["spec_version"], TOP_K, LLM_URL, LLM_MODEL_ID)
     item["code"] = {"envelope": env, "value": env["result"].get("code"), "locked": False}
-    return {"items": [item], "events": [provenance_event(env, paused=False)]}
+    if env["status"] == provenance.STATUS_NEED_REVIEW and (state.get("clarify_rounds") or 0) < MAX_CLARIFY_ROUNDS:
+        hints = [env["result"].get("name")] + [a.get("name") for a in env["provenance"].get("alternatives", [])]
+        item["missing_features"] = clarify.extract_missing_features(item.get("feature"), hints, LLM_URL, LLM_MODEL_ID)
+    else:
+        item["missing_features"] = []
+    return {"items": [item], "events": [provenance_event(env, paused=False)], "needs_rematch": False}
+
+
+def feature_gate_node(state: CostTaskState) -> dict[str, Any]:
+    """特征澄清闸（§3② 前置 / PRD FR-P02、EH-04）：描述缺关键特征→反问补全→回填后回环重匹配；齐→直接过。
+
+    参数：state。返回：有缺口 → interrupt 收特征值、把补充拼回 item.feature、clarify_rounds+1、置 needs_rematch
+      （路由回 list_match 重走门控，呼应 PRD §8.2「澄清回填后重走门控」）；无缺口 → 空增量（路由直走 list_gate）。
+    缺口由上游 list_match 探测存 item.missing_features；本闸只读 state + interrupt（幂等、resume 不重跑 LLM，原则 3）。
+    """
+    item = _item(state)
+    missing = item.get("missing_features") or []
+    if not missing:
+        return {}  # 描述充分 / 已澄清够 → 不停，路由走 list_gate
+
+    data = interrupt(
+        gates.input_payload(
+            "feature",
+            "请补全构件关键特征（缺这些信息无法唯一选码/套定额）",
+            [{"key": m["key"], "type": "text", "label": m.get("label") or m["key"], "required": True}
+             for m in missing],
+            context={"feature": item.get("feature"),
+                     "why": [{"label": m.get("label"), "why": m.get("why")} for m in missing]},
+        )
+    )
+    # resume：把用户补的特征拼回描述、清缺口、标回环重匹配。
+    parts = [f"{m.get('label') or m['key']}={(data or {}).get(m['key'])}"
+             for m in missing if (data or {}).get(m["key"]) not in (None, "")]
+    added = "，".join(parts)
+    item["feature"] = (item.get("feature") or "") + (("，" + added) if added else "")
+    item["missing_features"] = []
+    rounds = (state.get("clarify_rounds") or 0) + 1
+    out: dict[str, Any] = {
+        "items": [item],
+        "clarify_rounds": rounds,
+        # 有补充才回环重匹配；用户全空（拒答）则不回环、落 list_gate 确认闸兜底，不空转。
+        "needs_rematch": bool(added),
+        "audit_log": [audit_entry("feature_clarify", "input", {"added": added, "round": rounds}, by="user")],
+        "events": [gate_event("feature_gate", paused=True, detail={"added": added, "round": rounds})],
+    }
+    if added:
+        out["overrides"] = [override_entry("feature", 0, added, by="user")]
+    return out
 
 
 def list_gate_node(state: CostTaskState) -> dict[str, Any]:
@@ -436,6 +487,11 @@ def done_node(state: CostTaskState) -> dict[str, Any]:
     return {"status": "blocked" if state.get("status") == "blocked" else "done"}
 
 
+def _after_feature(state: CostTaskState) -> str:
+    """feature_gate 后路由：刚补了特征 → 回 list_match 重匹配重门控（回环，§8.2）；否则继续 list_gate。"""
+    return "list_match" if state.get("needs_rematch") else "list_gate"
+
+
 def _has_code(state: CostTaskState) -> str:
     """list_gate 后路由：已钉到码 → 继续 compose；否则（blocked）直接收尾。"""
     item = _item(state)
@@ -451,6 +507,7 @@ def build_graph(checkpointer: Any):
     g = StateGraph(CostTaskState)
     g.add_node("setup", setup_node)
     g.add_node("list_match", list_match_node)
+    g.add_node("feature_gate", feature_gate_node)
     g.add_node("list_gate", list_gate_node)
     g.add_node("compose", compose_node)
     g.add_node("quota_gate", quota_gate_node)
@@ -463,7 +520,9 @@ def build_graph(checkpointer: Any):
 
     g.add_edge(START, "setup")
     g.add_edge("setup", "list_match")
-    g.add_edge("list_match", "list_gate")
+    g.add_edge("list_match", "feature_gate")
+    # 特征澄清回环：补了特征→回 list_match 重匹配；齐→list_gate（PRD §8.2 澄清回填后重走门控）。
+    g.add_conditional_edges("feature_gate", _after_feature, {"list_match": "list_match", "list_gate": "list_gate"})
     g.add_conditional_edges("list_gate", _has_code, {"compose": "compose", "done": "done"})
     g.add_edge("compose", "quota_gate")
     g.add_edge("quota_gate", "price_gate")

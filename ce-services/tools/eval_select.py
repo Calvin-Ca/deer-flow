@@ -4,7 +4,7 @@
 候选后（Recall@10≈60%），LLM 能不能在候选里把正解挑出来（PRD §6 业务红线 Top-1 ≥ 85%）。
 端到端可用率 ≈ Recall@k × 候选内 Top-1，两段各管各的指标。
 
-读金标 `match_gold.jsonl`（每行 ``{query, gold:[code...], note?}``，复用 ce-code 同一份）→ 每条：
+读金标 `match_gold.jsonl`（每行 ``{query, gold:[code...], note?}``，复用 benchmark/retrieval_eval/ 同一份）→ 每条：
   ① ``cost_client.bill_match`` 拿候选（量是否 recall 到正解）
   ② ``selection.select_code`` LLM 候选内选码（量是否选中正解、红线行为是否正确）
 按**编码精确相等**判命中（清单 9 位码唯一）。三类核心指标：
@@ -27,9 +27,9 @@ from pathlib import Path
 # select_code 的置信阈值（< 此值强制 need_review）；危险判定要用，故从源头取避免漂移。
 from cost.selection import CONFIDENCE_THRESHOLD
 
-# 金标默认在 ce-code（与 ce-services 平级）；以本文件定位 ce-services 根再回溯到 ce-code。
+# 金标默认在 benchmark/retrieval_eval/（仓库根下，与 ce-services 平级）；以本文件定位 ce-services 根再回溯到仓库根。
 SERVICES_ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_GOLD = SERVICES_ROOT.parent / "ce-code" / "data" / "eval_set" / "match_gold.jsonl"
+DEFAULT_GOLD = SERVICES_ROOT.parent / "benchmark" / "retrieval_eval" / "match_gold.jsonl"
 
 
 def classify_case(gold: set[str], candidate_codes: list[str], selection: dict,
@@ -214,7 +214,7 @@ def _cli() -> None:
     from common.config import KNOWLEDGE_URL, LLM_MODEL_ID, LLM_URL
 
     p = argparse.ArgumentParser(description="CostAgent 选码评测（任务层 Top-1）")
-    p.add_argument("--gold", default=str(DEFAULT_GOLD), help="金标 jsonl 路径（默认 ce-code/data/eval_set/match_gold.jsonl）")
+    p.add_argument("--gold", default=str(DEFAULT_GOLD), help="金标 jsonl 路径（默认 benchmark/retrieval_eval/match_gold.jsonl）")
     p.add_argument("--spec", default="2024", help="国标版本 2013/2024（默认 2024）")
     p.add_argument("--top-k", type=int, default=10, help="候选召回深度（默认 10）")
     p.add_argument("--knowledge-url", default=KNOWLEDGE_URL, help="知识服务 :8100 地址")

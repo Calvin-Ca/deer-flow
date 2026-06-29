@@ -12,7 +12,7 @@
 |---|---|---|
 | 测什么 | 检索召回 / 选码 / 取数（K1–K3） | 路由 / 澄清 / 调用 / 转达（S1–S4） |
 | 跑法 | 直接打 :8100/:8101 HTTP，绕开 agent，确定性、秒级 | 经 **lead-agent**（`DeerFlowClient` in-process），看模型行为 |
-| 评测集 | `ce-code/data/eval_set/match_gold*.jsonl` | `ce-services/eval/agent_routing_eval.jsonl` |
+| 评测集 | `benchmark/retrieval_eval/match_gold*.jsonl` | `benchmark/routing_eval/agent_routing_eval.jsonl` |
 | 指标 | recall@k / Top-1 / MRR | 路由率 / 红线遵守率 / web兜底率 / 越界拒答率 |
 | 判读 | 自动（金标比对） | 自动 harness（解析 stream tool call）或前端人工 |
 | 变量 | 索引/重排/数据 | **system prompt / 工具面 / 模型档** |

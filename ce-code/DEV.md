@@ -117,7 +117,7 @@ unit_factor；按 region + 时效取，on_date 命中期优先、缺省取最新
 
 ## 5. 质量度量
 
-- **评测对象**：`/bill/match` 召回质量。`tools/eval_bill.py` 读 `match_gold.jsonl`（构件描述→编码）→ 召回 →
+- **评测对象**：`/bill/match` 召回质量。`tools/eval_bill.py` 读 `benchmark/retrieval_eval/match_gold.jsonl`（构件描述→编码）→ 召回 →
   按**编码精确相等**判命中 → Top-1 / Top-3 / Recall@k / MRR / 平均金标秩（排序敏感）。
 - **gold**：`tools/build_match_gold.py` 从真实结算 xlsx 转（query=COMP_NAME+FEATURE 不含清单名避循环；gold=前 9 位码；
   覆盖过滤 + 脱敏）。

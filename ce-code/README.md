@@ -19,14 +19,14 @@ ce-code/
 ├── PRD.md / DEV.md / TODO.md        # 需求设计 / 开发环境 / 进度
 ├── pyproject.toml                  # uv 管理依赖
 ├── config.py                       # 共享运行配置：服务地址 / 国标版本注册表 SPEC_REGISTRY / collection 命名
-├── data/                           # 数据资产（parsed/structured/eval_set 入 git；raw/vector_store 不入）
+├── data/                           # 数据资产（parsed/structured 入 git；raw/vector_store 不入；评测金标见 ../benchmark/）
 │   ├── raw/                        #   原始 PDF（手动放入；⛔不入 git，版权敏感）
 │   ├── parsed/                     #   MinerU 解析输出（python -m ingest.parser 产物，缓存；✅入 git）
 │   ├── structured/                 #   ✅入 git，两桶分离：
 │   │   ├── chunks/<规范>/default/   #     摄取产物 chunks.json（ingest 写）
 │   │   └── cost/<doc_id>/<表>.jsonl #     抽取产物（cost 写）+ 扁平 bill_quota_map/resource_price_map.jsonl
 │   ├── vector_store/               #   Milvus 索引（⛔不入 git，可重生）
-│   └── eval_set/                   #   评测集（✅入 git；xlsx 原件不入 git）
+│   └── eval_set/                   #   评测 xlsx 原件（⛔不入 git）；评测金标已迁 ../benchmark/
 │
 │  ── ① 摄取层 ingest/：PDF → chunks（组价抽取的上游）──
 ├── ingest/

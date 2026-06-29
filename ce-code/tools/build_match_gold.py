@@ -14,7 +14,7 @@
   uv run python -m tools.build_match_gold \
     --xlsx data/raw/清单量关联实物量数据.xlsx \
     --bill-spec data/structured/cost/GB-50854-2013/bill_spec.jsonl \
-    --out data/eval_set/match_gold_2013.jsonl
+    --out ../benchmark/retrieval_eval/match_gold_2013.jsonl
 """
 from __future__ import annotations
 
@@ -129,8 +129,8 @@ def _cli():
                   help="真实工程 xlsx（构件↔清单关联）")
     @click.option("--bill-spec", "bill_spec_path", required=True, type=click.Path(exists=True, path_type=Path),
                   help="2013 bill_spec.jsonl（覆盖过滤用）")
-    @click.option("--out", "out_path", default="data/eval_set/match_gold_2013.jsonl", type=Path,
-                  help="输出 gold jsonl（相对 ce-code 根）")
+    @click.option("--out", "out_path", default="../benchmark/retrieval_eval/match_gold_2013.jsonl", type=Path,
+                  help="输出 gold jsonl（相对 ce-code 根；默认落 benchmark/retrieval_eval/）")
     def main(xlsx_path: Path, bill_spec_path: Path, out_path: Path) -> None:
         """xlsx → match_gold_2013.jsonl（脱敏 + 覆盖过滤 + 覆盖率报告）。"""
         valid = load_valid_codes(bill_spec_path)

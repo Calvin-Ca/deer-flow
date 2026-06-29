@@ -62,7 +62,7 @@ def load_eval(path: Path) -> list[dict]:
     """读取 agent_routing_eval.jsonl 评测集。
 
     参数：
-        path: jsonl 评测集路径（每行一个用例，字段见 ce-services/eval/README.md）。
+        path: jsonl 评测集路径（每行一个用例，字段见 benchmark/routing_eval/README.md）。
     返回：
         用例 dict 列表。
     """
@@ -188,7 +188,7 @@ def eval_case(client, case: dict) -> dict:
 
 
 def compute_metrics(results: list[dict]) -> dict:
-    """按 ce-services/eval/README.md 口径汇总四项编排层指标。
+    """按 benchmark/routing_eval/README.md 口径汇总四项编排层指标。
 
     参数：
         results: eval_case 产出的逐条结果列表。
@@ -246,7 +246,7 @@ def main() -> int:
     """
     ap = argparse.ArgumentParser(description="lead-agent 提示词消融 harness")
     here = Path(__file__).resolve().parent
-    ap.add_argument("--eval", type=Path, default=here.parents[1] / "eval" / "agent_routing_eval.jsonl")
+    ap.add_argument("--eval", type=Path, default=here.parents[2] / "benchmark" / "routing_eval" / "agent_routing_eval.jsonl")
     ap.add_argument("--prompts-dir", type=Path, default=here / "prompts")
     ap.add_argument("--out", type=Path, default=here / "results")
     ap.add_argument("--model", type=str, default=None, help="config.yaml 里的模型名；缺省用默认模型")

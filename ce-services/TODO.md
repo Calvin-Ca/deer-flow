@@ -45,7 +45,7 @@
   （**放开 `ask_clarification`**——用户没说规范版本时反问澄清，实现多轮"缺 spec 追问"，这是比单轮端点更进一步的智能体闭环）。
   本地：qa.py py_compile + 必填/版本红线行为冒烟过；JSON 合法；YAML 结构对齐 compliance-checker 模板（本地无 PyYAML，
   最终解析待服务器）。**待服务器加载 agent + 走一轮多轮问答验证。**
-- [ ] **B3 评测**：`ce-code/data/eval_set` 建造价规范问答评测集（条文召回 + 引用准确率）。
+- [ ] **B3 评测**：`benchmark/` 建造价规范问答评测集（条文召回 + 引用准确率）。
   ⚠️ **前置瓶颈=检索质量（2026-06-23 已字段级确证）**：实测"矩形柱按什么计量"召回 15 条无现浇柱规则、误引
   装饰柱/钢柱；隔离确证=纯召回缺失（skip_rerank on/off 都捞不到），根因=计量规则困在 chunk `tables` 字段、
   content 只存表标题、检索文本不含表体（见 `../ce-code/TODO.md` 四 🔴 条）。**先修知识层表体注入再做 B3，
@@ -86,7 +86,7 @@
   → `orchestration.compose`；异常映射（依赖 HTTPError 透传状态码 / 不可达 503 / LLM 非法 JSON 502）；
   need_review、price_status 原样冒泡供 HITL。main.py 挂 cost+norm 双路由、`/health.routes=["/norm/qa","/cost/compose"]`。
   （不单建 `server.py`——沿用 norm 模式，main.py 唯一入口。）
-- [~] **Step 4 选码评测**（脚本就位待服务器跑，2026-06-22）：`tools/eval_select.py` 复用 ce-code `match_gold.jsonl`，
+- [~] **Step 4 选码评测**（脚本就位待服务器跑，2026-06-22）：`tools/eval_select.py` 复用 `benchmark/retrieval_eval/match_gold.jsonl`，
   对每条 `bill_match` 召回 → `select_code` 选码，量三指标：**Top-1（端到端）**= 选中码==金标（PRD §6 红线 ≥85%）、
   **候选内 Top-1**= 仅在召回到正解子集上算（隔离召回拖累、纯量选码）、**自动定稿准确率**= need_review=false 时的命中率
   + **高置信错码**计数（绕过 HITL 的危险案例，须为 0）。纯指标函数本地打桩 5 路径全过；待服务器 :8100+vLLM 跑实测。

@@ -11,7 +11,7 @@
 ablation 结论失真。
 
 使用方式（从 ce-code 根，单行命令）：
-  python -m tools.eval --store-dir data/vector_store/<std>/<profile> --eval-set data/eval_set/gb50016_eval.json --skip-rerank
+  python -m tools.eval --store-dir data/vector_store/<std>/<profile> --eval-set ../benchmark/retrieval_eval/gb50016_eval.json --skip-rerank
 """
 
 from __future__ import annotations
@@ -253,7 +253,7 @@ def main(
     """批量评测检索质量，输出期望/关联条款召回率报告。"""
 
     if eval_path is None:
-        eval_path = ROOT / "data" / "eval_set" / "gb50016_eval.json"
+        eval_path = ROOT.parent / "benchmark" / "retrieval_eval" / "gb50016_eval.json"
 
     collection_name = build_collection_name(store_dir.name)
 

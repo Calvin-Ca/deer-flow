@@ -214,3 +214,111 @@ norm-qa / cost-agent 现在是 skill，我认为这个选择对，但理由要�
 HITL 按时机分前置审批/过程编辑/事后审核，按粒度分逐步停走/批量表单/多轮澄清，按角色分 always-on/置信度门控。我做的造价组价 Agent 选的是置信度门控的逐闸停走——因为造价是高风险要担责的数字，必须定稿前逐项确认（前置审批）；又因为强制全量溯源和审计，逐闸比批量表单更能逐项留痕；再加上底座是小模型，流程走向交给确定性门控、不让弱模型自己决定。局限是现在单向不可回退，正在往"澄清回环"演进。
 
 （实现细节、与 PRD 的契合度评估、改造方案见 AGENT_DEV.md §1–3。）
+
+# Agent 和大模型的 benchmark 有什么区别？
+一句话先立住：大模型 benchmark 测的是"一次问答的输出质量"，Agent benchmark 测的是"一个能用工具、多步行动的系统能不能在环境里把任务做完"。前者问"它说得对不对"，后者问"它做没做成"。下面分六个角度拆，最后落到你的 EPC eval。
+
+一、评测对象不同——这是根
+- 大模型 benchmark：被测主体是模型本身（权重 + 一次/几次 forward），边界是「输入文本 → 输出文本」。
+- Agent benchmark：被测主体是「模型 + 工具 + 记忆 + 编排逻辑」组成的整个系统，边界是「输入任务 → 在环境里执行 → 改变环境状态」。
+关键判据：同一个底座模型，换 prompt、换工具、换 ReAct/Plan-Execute 框架，Agent 分数能差很多，而模型 benchmark 分数不变。所以 Agent benchmark 测的从来不只是模型。
+
+二、任务形态不同
+- 大模型：单轮/少轮、封闭式，一题一答（MMLU 选择题、GSM8K 算术、MT-Bench 对话）。
+- Agent：长程、多步、需与外部交互（SWE-bench 改代码、WebArena/GAIA 网页任务、τ-bench 工具对话），一个任务内部可能几十步工具调用。
+
+三、评判标准不同
+- 大模型：看输出文本对不对——比对参考答案、人评/模型评打分、困惑度，本质是「答案质量」。
+- Agent：看最终状态/结果对不对（outcome-based、可执行验证）——测试是否真跑绿、订单是否真建好。过程不重要，任务是否达成才算分，通常程序化客观可验，而非比文本相似度。
+
+四、多出来的考察维度（大模型 benchmark 根本测不到）
+工具使用/函数调用正确性、多步规划与中途纠错、长程一致性（几十步后不跑偏）、环境反馈的利用（看到报错会不会调整）、效率与成本（步数/token/时延/死循环）、安全与越界。
+
+五、工程属性不同
+- 大模型 benchmark：静态数据集，确定性强、易复现，跑一遍就有分。
+- Agent benchmark：需要可交互的环境/沙箱（容器、模拟网站、模拟 API），带随机性和状态，复现难、成本高、易受环境版本漂移影响——评测基建本身就是工程难题。
+
+六、一个必须点破的误区
+Agent benchmark 分数低，未必是模型笨，可能是工具设计差、prompt/编排弱、环境太难。所以解读时要分清：你测的是模型能力，还是整套 agent 系统的工程水平。这正是它和纯模型 benchmark 最本质的差别。
+
+七、落到你的 EPC 系统
+这恰好解释了为什么前面选型那题说"通用分数（MMLU/GSM8K）对 Agent 几乎没参考价值"——通用分数是大模型 benchmark，量的是模型输出质量；而你真正要的是把组价 agent、规范问答 agent 放进带 :8100/:8101 工具的环境里，用「这条清单项有没有套对定额、规范问答有没有引对条款」这种 outcome 来打分。你已生成的两份 agent 测试数据（routing_eval / retrieval_eval 金标），本质就是在搭一个属于自己的 Agent benchmark：有任务、有工具环境、有可程序化判定的最终结果。面试时把这句话亮出来——"通用榜单只圈候选，真正定胜负的是我自建的、按任务达成率打分的 agent eval"——比只背概念有说服力。
+
+30 秒电梯版：大模型 benchmark 是静态数据集，问"它说得对不对"，测一次问答的输出质量；Agent benchmark 要可交互沙箱，问"它做没做成"，按最终状态/任务达成率打分，还额外暴露工具调用、多步纠错、长程一致性、成本安全这些纯模型测不到的维度。所以 Agent 分低未必是模型笨，可能是编排和环境的问题——这也是我项目里坚持用自建 eval、而不是看通用榜单的原因。
+
+# Agent 有哪些 benchmark？
+别平铺一长串名字，按能力维度归类才有体系感。共同点先立住：下面这些和 MMLU/GSM8K 那类纯模型榜单的根本区别是——都要可交互环境 + 按任务达成率打分（呼应上一题）。
+
+一、综合 / 通用 Agent
+- GAIA：真实世界助理任务（要联网、用工具、多步推理），人类容易、模型难。
+- AgentBench：跨 8 类环境（OS / DB / 知识图谱 / 卡牌 / 网购…）综合评 LLM-as-Agent。
+- AgentBoard：多回合、带过程分（不只看最终成败，看中间进度）。
+
+二、软件工程 / 代码 Agent（当前最热）
+- SWE-bench / SWE-bench Verified：真实 GitHub issue → 改代码让测试通过，改代码 agent 的事实标准。
+- SWE-bench Multimodal / Multilingual：带截图的前端 issue / 多语言扩展。
+- SWE-Lancer：真实自由职业任务，按"能不能赚到钱"折算。
+- Terminal-Bench：终端里多步命令完成任务。
+- LiveCodeBench：防污染的竞赛编程（持续更新题，避免泄题）。
+
+三、工具调用 / Function Calling
+- BFCL（Berkeley Function-Calling Leaderboard）：工具选择 + 参数填充正确性，function-calling 的事实标准。
+- τ-bench / τ²-bench：真实对话场景（航空/零售客服）里调工具 + 守策略规则，多轮。
+- ToolBench / API-Bank / ToolEmu：大规模 API 调用 / 工具安全。
+- NexusBench：复杂嵌套工具调用。
+
+四、Web / GUI Agent
+- WebArena / VisualWebArena：自建可复现网站里完成真实网页任务。
+- WebVoyager：真实线上网站、视觉导航。
+- Mind2Web：跨 137 个真实网站的通用网页操作。
+- OSWorld：真实操作系统桌面（GUI）多应用任务。
+- AndroidWorld / AppWorld：手机 App 操作。
+
+五、推理 / 规划专项
+- WebShop：模拟网购，长程决策。
+- PlanBench / TravelPlanner：硬约束下的规划能力。
+- ALFWorld / ScienceWorld：具身/文字世界的多步执行。
+（GSM8K/MATH 叠工具偏模型侧，不算纯 agent，注意区分。）
+
+六、多 Agent / 安全
+- AgentVerse / MetaGPT 评测：多 agent 协作。
+- AgentDojo / InjecAgent：prompt 注入、工具滥用等 agent 安全评测。
+- ToolEmu：沙箱里测危险操作的风险。
+
+七、面试怎么讲（给框架别背名字）
+"我按能力维度记：综合看 GAIA / AgentBench；改代码看 SWE-bench；工具调用看 BFCL 和 τ-bench；网页/GUI 看 WebArena / OSWorld；安全看 AgentDojo。它们共同点是都要可交互环境 + 按任务达成率打分，这正是和纯模型榜单的根本区别。"
+
+八、落到你的项目（最该对标的两个）
+- τ-bench：它就是"对话里调工具 + 守领域策略规则"，和你组价 / 规范问答 agent 调 :8100/:8101 + 守造价红线的形态几乎同构，是你自建 routing_eval / retrieval_eval 的最佳参照范式。
+- BFCL：你 memory 里记着 Qwen3-8B function-calling 不稳，BFCL 正是量化"换模型/量化后工具调用掉不掉"的标尺，对应选型那题"量化后测 tool calling"那条。
+一句话收尾：通用榜单只圈候选，真正定胜负的是按 τ-bench/BFCL 范式自建、用任务达成率打分的 agent eval。
+
+# 我的项目应该对标哪个 benchmark，为什么？
+结论先行：不该"去跑"任何公开 benchmark，而该按 τ-bench 的范式自建领域 eval，BFCL 和 RAGAS 作为两个零部件嵌进去。理由分三层——为什么是这个范式、为什么不直接用现成的、各组件分别对标谁。
+
+一、为什么主范式是 τ-bench
+你的系统形态（多轮对话里调工具 :8100/:8101 + 必须守领域硬规则 + 按最终结果判对错）和 τ-bench 几乎一对一同构：
+- 对话式客服 agent ↔ 组价 / 规范问答 agent
+- 调航空/零售 API ↔ 调 :8100 检索 / :8101 合规
+- 守 domain policy（退改签规则）↔ 守造价红线 + 全量溯源
+- 按数据库最终状态判成败 ↔ 按"这条清单项有没有套对定额"判
+- 多轮、会要用户补信息 ↔ ask_clarification / HITL 回环
+
+更关键的是 τ-bench 两个方法论你正好缺、又正好需要：
+1. pass^k（不是 pass@k）：同一任务连跑 k 次都对才算过，专测一致性/稳定性。你底座 Qwen3-8B、function-calling 不稳，最该担心"同输入会飘"，pass^k 直接量这个，比单次准确率诚实。
+2. policy 遵守度单独计分：把"任务做对"和"有没有违规"分开评。造价错一个数字要赔钱担责，违规率必须是独立硬指标，不能糅进总分。
+→ 所以 τ-bench 给你的不是一个分数，是一套"该怎么搭自己 eval"的方法论。你已有的 routing_eval / retrieval_eval 就是雏形，缺的是升级成"多轮 + 工具 + 终态判定 + pass^k + 违规率"。
+
+二、为什么不直接用公开 benchmark
+- 领域不匹配：SWE-bench 改代码、WebArena 点网页、GAIA 开放助理，没一个碰造价，分数对"组价对不对"零信息量。
+- 语言/知识不匹配：公开 benchmark 几乎全英文、通用知识，测不到深圳·2013 口径、9 位编码、SJG 规范这些真正难点。
+- 本质：公开 benchmark 用来横向比模型选候选；你要的是纵向验证自己这套 agent 在自己业务上做没做成。前者圈候选，后者定胜负——正是上一题"通用榜单只圈候选"的落点。
+
+三、各组件分别对标谁（系统异构，eval 也该异构）
+- Orchestrator 路由（norm vs cost）→ 分类 eval，不是 agent benchmark。你的 routing_eval 已经对了，断言路由结果即可，正则可测。
+- cost agent 工具调用层（:8100 召回、套定额）→ BFCL。量"工具选对没、参数填对没、schema 合法率"，重点测量化后掉不掉，对应选型题那条。
+- cost agent 整体（多步组价到收敛）→ τ-bench。终态判定 + pass^k + 红线违规率。
+- norm-qa agent（规范问答）→ RAGAS / 忠实度 eval，不是 agent benchmark。规范问答核心风险是幻觉/引错条款，要测 faithfulness、引用准确率、context precision，而不是多步能力。
+关键提醒：规范问答别硬塞进 agent benchmark——它本质是 RAG，最致命的是"答得流畅但引错条款号"，该用 RAGAS 那套 grounding 指标量。想清楚这点比套个 agent 框架更重要。
+
+一句话面试版：我不直接跑公开 benchmark——它们用来横向选模型，不验证我的业务。我按 τ-bench 范式自建领域 eval：多轮调 :8100/:8101、按组价终态判对错、用 pass^k 量小模型一致性、把红线违规率单列；工具调用层借 BFCL 量化后测掉不掉；规范问答因为本质是 RAG、最怕引错条款，单独用 RAGAS 忠实度指标。我已有的 routing_eval / retrieval_eval 就是这套 eval 的起点。

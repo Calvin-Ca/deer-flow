@@ -76,17 +76,31 @@ def _drive_agent(query: str, model_name: str | None) -> dict:
 
 
 def _drive_agent_isolated(query: str, model_name: str | None) -> dict:
-    """在全新线程里跑 _drive_agent，隔离事件循环。
+    """在全新线程（自带专属事件循环）里跑 _drive_agent，隔离事件循环。
 
     功能：``dataset.run_experiment`` 在自己的事件循环线程里同步调 task，而
         ``DeerFlowClient.stream`` 内部自驱 async + 反复建/拆 MCP（streamable_http）
         会话——两者同线程会撞「cancel scope in a different task」而崩。丢进每条
-        独享的新线程（自带干净 loop、跑完即销）即复刻冒烟测试那种无外层 loop 的条件。
+        独享的新线程即隔离开。但 Python 3.12 非主线程默认无事件循环，而 harness
+        的 ``mcp/cache.py`` 用老式 ``asyncio.get_event_loop()`` 取循环（主线程会
+        自动建、子线程则抛 RuntimeError），故须在该线程内先手动建好并设上，复刻
+        主线程（冒烟测试）的条件。
     参数：query 用户问法；model_name 覆盖模型名。
     返回：``_drive_agent`` 的结果 dict。
     """
+    import asyncio
+
+    def _runner() -> dict:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            return _drive_agent(query, model_name)
+        finally:
+            loop.close()
+            asyncio.set_event_loop(None)
+
     with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-        return pool.submit(_drive_agent, query, model_name).result()
+        return pool.submit(_runner).result()
 
 
 def _eval_clarify(*, input, output, expected_output=None, **kwargs):

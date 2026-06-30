@@ -8,6 +8,7 @@
 端点：
   GET  /health        健康检查（含知识服务 / LLM 地址）
   POST /route         前置路由（T-A1）：确定性能力分流 + 形态判定（无 LLM，供编排器/agent 分流前置）
+  POST /orchestrate   复合编排（T-A4）：单一直派 / 复合 32b 拆解→子任务回①路由→派发→综合
   POST /norm/qa       造价规范条文检索 + Qwen3 带引用作答（norm-qa）
   POST /cost/compose  构件描述 → 候选召回 → LLM 选码 → 组价取数（cost-agent，P1 选码闭环；传 rates 则算综合单价）
   POST /cost/unit-price 综合单价计算原语（P2，确定性算钱、pydantic 闸门、不入 LLM）

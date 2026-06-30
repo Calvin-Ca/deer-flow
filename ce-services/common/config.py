@@ -9,9 +9,15 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-# Qwen3-8B vLLM（判定 / 生成 / 反思直接调）
+# Qwen3-8B vLLM（桶 A：判定 / 生成 / 反思 / 选码直接调；延迟敏感路径）
 LLM_URL = os.environ.get("BCRAG_LLM_URL", "http://localhost:8099")
 LLM_MODEL_ID = os.environ.get("BCRAG_LLM_MODEL_ID", "qwen3-8b")
+
+# Qwen3-32B vLLM（桶 B：复合拆解/综合等真·推理；AGENT_DEV §9.3 模型分层）。
+# T-A4 复合编排器用；**完整双模型 config.yaml 接线属 T-A5**，这里仅给编排器最小可用句柄。
+# 未部署 32b 时缺省回落到 8B 端点（编排器 decompose/synthesize 失败时另有降级，不致命）。
+ORCH_LLM_URL = os.environ.get("BCRAG_ORCH_LLM_URL", LLM_URL)
+ORCH_LLM_MODEL_ID = os.environ.get("BCRAG_ORCH_LLM_MODEL_ID", "qwen3-32b")
 
 # ce-code 知识服务（裸检索原语 /search /expand /clause）
 KNOWLEDGE_URL = os.environ.get("BCRAG_KNOWLEDGE_URL", "http://localhost:8100")

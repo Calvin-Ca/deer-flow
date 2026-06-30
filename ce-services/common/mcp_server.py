@@ -37,7 +37,6 @@ bash 命令、不再把结论埋在 bash stdout 里看不见。
 """
 from __future__ import annotations
 
-import logging
 from typing import Annotated
 
 import requests
@@ -50,13 +49,9 @@ try:  # ToolError 在不同 mcp 版本路径略有差异，缺则退化为 Value
 except ImportError:  # pragma: no cover
     ToolError = ValueError  # type: ignore[assignment,misc]
 
-from common import knowledge_client
 from common.config import LLM_MODEL_ID, LLM_URL
 from cost import orchestration
-from norm import generation, guards
-from norm.standard_router import resolve_standard
-
-logger = logging.getLogger("ce-services.mcp")
+from norm import pipeline
 
 # 内网可信服务，关掉 DNS rebinding 保护——允许经 localhost / 服务器 IP 任意 Host 访问 :8101/mcp。
 mcp = FastMCP(
@@ -99,54 +94,20 @@ def norm_qa(
         answer 为「未检索到」、cited_clauses 空（这是正确行为，非错误）。
     异常：未知规范 / 索引未就绪 / 知识服务不可达 / LLM 不可达或输出非法 JSON → ToolError。
     """
-    # 规范选择确定化：standard 仅作 hint，family 由问题类型确定性裁定（见 T-A2）。
-    resolution = resolve_standard(query, hint=standard)
-    resolved = resolution.standard
-    if resolution.overrode_hint:
-        logger.warning("standard 漂移拦截：hint=%s → 确定性夺回 %s（intent=%s, matched=%s）",
-                       standard, resolved, resolution.intent, resolution.matched)
+    # 编排内核与 /norm/qa 端点、复合编排器共用 norm.pipeline.answer_query（含 T-A2 规范选择 +
+    # 校验闸 C-01/02/03）。本工具仅把异常映射为 ToolError。
     try:
-        search_resp = knowledge_client.search(
-            query, standard=resolved, top_k=top_k, skip_rerank=skip_rerank,
+        return pipeline.answer_query(
+            query, standard_hint=standard, llm_url=LLM_URL, model_id=LLM_MODEL_ID,
+            top_k=top_k, skip_rerank=skip_rerank,
         )
     except requests.HTTPError as exc:
         detail = exc.response.text if exc.response is not None else str(exc)
         raise ToolError(f"知识服务检索失败: {detail}") from exc
     except requests.RequestException as exc:
-        raise ToolError(f"知识服务不可达: {exc}") from exc
-
-    clauses = search_resp.get("clauses", [])
-    search_meta = search_resp.get("meta", {})
-    if not clauses:
-        # C-03 校验闸（零召回）：不喂空上下文给 LLM，集中化结构化拒答（给出路；与 /norm/qa 一致）。
-        result, report = guards.reject_no_recall(resolved, search_meta=search_meta)
-        result["meta"] = {"standard": resolved, "retrieved": 0,
-                          "standard_resolution": resolution.as_meta(),
-                          "guard": report.as_meta(),
-                          "search_meta": search_meta}
-        return result
-
-    try:
-        result = generation.answer(query, clauses, LLM_URL, LLM_MODEL_ID)
-    except requests.RequestException as exc:
-        raise ToolError(f"LLM 生成服务不可达: {exc}") from exc
+        raise ToolError(f"依赖服务不可达（知识服务 :8100 / LLM）: {exc}") from exc
     except ValueError as exc:  # json.JSONDecodeError 是 ValueError 子类
         raise ToolError(f"LLM 输出非合法 JSON: {exc}") from exc
-
-    # C-01/C-02 校验闸（生成后）：剔除他部/跨版条文、规范化溯源；全污染则降级拒答。
-    result, report = guards.audit_answer(result, resolved_standard=resolved, search_meta=search_meta)
-    if report.violations:
-        logger.warning("norm_qa 校验闸 standard=%s verdict=%s 剔除=%d 违规=%s",
-                       resolved, report.verdict, report.cited_dropped, report.violations)
-
-    result["meta"] = {
-        "standard": resolved,
-        "retrieved": len(clauses),
-        "standard_resolution": resolution.as_meta(),
-        "guard": report.as_meta(),
-        "search_meta": search_meta,
-    }
-    return result
 
 
 @mcp.tool()

@@ -21,6 +21,10 @@ DEFAULTS: dict = {
 }
 
 RERANK_MODEL = "BAAI/bge-reranker-large"
+# cross-encoder 精排所用 GPU——**单卡**。新版 FlagEmbedding 的 FlagReranker 默认吃光所有可见 GPU、
+# 每次 compute_score 跨多卡 spawn 多进程池（起池就 ~21s），给几十个候选重排纯属灾难性 overhead。
+# 钉死单卡 → 走单进程、不起池，P95 从分钟级降回亚秒级。需换卡只改这一行（如 "cuda:1"）。
+RERANK_DEVICE = "cuda:0"
 EMBED_MODEL = "BAAI/bge-large-zh-v1.5"
 EMBED_DIM = 1024  # bge-large-zh-v1.5 输出维度
 COLLECTION_PREFIX = "building_code"

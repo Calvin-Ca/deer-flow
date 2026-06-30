@@ -32,10 +32,12 @@ def _get_reranker():
     global _RERANKER, _RERANKER_FAILED
     if _RERANKER is not None or _RERANKER_FAILED:
         return _RERANKER
-    from config import RERANK_MODEL
+    from config import RERANK_DEVICE, RERANK_MODEL
     try:
         from FlagEmbedding import FlagReranker
-        _RERANKER = FlagReranker(RERANK_MODEL, use_fp16=True)
+        # devices 钉死单卡：否则新版 FlagReranker 默认吃光全部可见 GPU，每次 compute_score 跨多卡
+        # spawn 多进程池（起池 ~21s），重排几十个候选反被池开销拖成分钟级（见 config.RERANK_DEVICE）。
+        _RERANKER = FlagReranker(RERANK_MODEL, use_fp16=True, devices=RERANK_DEVICE)
     except Exception as e:
         print(f"[retrieval] Rerank 模型加载失败（{e}），后续统一 fallback 到 RRF 排序")
         _RERANKER_FAILED = True

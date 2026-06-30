@@ -93,9 +93,11 @@ trace_id = Langfuse.create_trace_id(seed=run_id)
 
 > **边界**：Prompt Experiments 只做「单 prompt → 一次 LLM 调用」，**跑不了完整 agent**（无工具/MCP/路由）。所以它**测不了路由两率**（那条只能走 `run_routing_experiment.py`）；它的位置是「自包含单跳 prompt 的横向比」。
 
+> 🚧 **当前状态（2026-06-30）：本节两功能暂搁置。** 它们都要 Langfuse **主动去调模型**，而 Langfuse 的 SSRF 防护**硬拦内网私网 IP**，本项目模型全在内网 → 配 model connection 即报 `Blocked IP address detected`，且 v4 无可用放行开关（详见 §6.6）。脚本/喂料（`upload_prompts.py`、`judges/*.md`、`intent_classify.txt`）已就位，等满足以下任一条件再启用：① 接一个**公网模型**（如 qwen-plus，过 SSRF + judge 更强，但数据出内网）；② 或改成**脚本驱动纯内网**（脚本调内网模型当判官、`create_score` 推分回 trace，复用 `run_routing_experiment.py` 同套管道，数据不出内网）。下面 5.0–5.2 是「墙打通后」的 UI 用法，先留作 runbook。
+
 ### 5.0 前置：在 UI 配一个 model connection（两功能共用）
 
-Settings → LLM Connections → Add：填被测/judge 用的模型(走项目内网 LLM 的 OpenAI 兼容端点即可)。Prompt Experiments 的「跑」和 LLM-as-judge 的「评」都要它，没有它两个都点不动。
+Settings → LLM Connections → Add：填被测/judge 用的模型。⚠️ **填内网 IP 会被 SSRF 拦**（见上方状态横幅 + §6.6）——只有目标是**公网端点**时这步才走得通。Prompt Experiments 的「跑」和 LLM-as-judge 的「评」都要它，没有它两个都点不动。
 
 ### 5.1 Prompt Experiments —— 纳管 intent 分类 prompt，UI 里横向比
 
@@ -165,6 +167,19 @@ config.yaml 里没有叫 `qwen-plus` 的模型。先用 `DeerFlowClient().list_m
 
 服务器侧 `structured/chunks/*`、`notebooks/results/*`、`uv.lock` 是工作树里的未提交改动，会挡住 pull。按约定它们**该入 git 同步**（`uv.lock` 以服务器为准）——在**服务器**上 `git add ce-code ce-services && git commit` 正式提交，之后 Mac 也能同步，不必每次 `stash/pop`。
 
+### 6.6 Langfuse UI 连内网模型：SSRF 死路 + rootful/rootless 双 daemon 坑
+
+接 Prompt Experiments / LLM-as-judge 时撞了两层坑，都很费时，记下来。
+
+**坑一·SSRF 拦内网私网 IP（无解，已定论）**：在 UI 配 LLM connection 填内网端点（如 `http://172.19.3.136:8099/v1`）报 `Blocked IP address detected`。根因是 Langfuse 对**用户填的 URL**做 SSRF 防护、**硬拦 RFC1918 私网段**（`10/8`、`172.16/12`、`192.168/16`），本项目模型全在 `172.19.x` → 必拦。
+- 官方变量 `LANGFUSE_UNSAFE_TRUSTED_PRIVATE_IPS=true`（web+worker 都加）**文档有、实际没实装**，4.5.1 实测无效，官方 issue #13097 标 **not planned**。我们加上去重建容器、确认 env 已注入，UI 仍拦——**坐实无效**，遂从 compose 移除（只留注释）。
+- **代理/DNS 偏方也绕不过**：docker 网络内的服务名也解析成 `172.18.x` 私网段，一样被拦。
+- **关键认知**：SSRF 墙**只拦「Langfuse 主动调模型」**（UI 的 Experiments/Playground/judge），**不拦「脚本调模型后把分推回来」**——所以 `run_routing_experiment.py`、线上 feedback `create_score` 一直好好的。**出路二选一**：① UI 侧改指**公网模型**（qwen-plus，过 SSRF，数据出内网）；② **脚本驱动纯内网**（脚本当判官、`create_score` 推分，数据不出内网）。当前**选搁置**，等需要再启用（§5 状态横幅）。
+
+**坑二·rootful/rootless 双 docker daemon（排查耗时主因）**：`docker compose up` 报 `0.0.0.0:3030 address already in use`，但 `docker ps` 啥也看不到、`docker inspect` 说容器不存在。真相是**真栈跑在 `sudo docker`（rootful）里**（Up 2 周、带全部数据），而不带 sudo 的 `docker` 是**另一套 rootless daemon**，两者完全隔离。不带 sudo 的 `up` 又在 rootless 里另起了一套**空库**撞了端口。
+- 定位手法：`sudo ss -ltnp | grep :3030` 看到 `docker-proxy` 占用 → `sudo docker ps` 才看到真栈 → `sudo cat /proc/<proxy-pid>/cmdline` 看 `-container-ip` 反查归属。
+- **教训**：这台机器的 langfuse 一律用 **`sudo docker compose ...`** 操作；不带 sudo 的是另一套空环境。误起的空栈用**不带 sudo** 的 `docker compose ... down -v` 清掉（只动 rootless，数据在 rootful 不受影响）。
+
 ---
 
 ## 7. 首轮基线结果（默认 Qwen3-8B，run `v2_runbook`）
@@ -183,6 +198,7 @@ config.yaml 里没有叫 `qwen-plus` 的模型。先用 `DeerFlowClient().list_m
 - [ ] 换强模型（真实 config 模型名）重跑，多 `--run-name` 在 Langfuse Runs 横向比，定方案 0/A。
 - [ ] `retrieval_eval` / `agent_eval` 接入 `upload_datasets.py`（同套路扩展）。
 - [ ] 想清噪音后再消 MCP 会话 GC 报错（§6.1 残留）。根因是同进程跨多个事件循环复用全局 MCP 缓存——**串行救不了，靠进程/循环隔离**。两条路线择一：① 把整轮跑进**单个 asyncio 事件循环**（用 agent 异步接口逐条 await，会话全程同 loop）；② **子进程隔离**，每条用例 fork 独立进程跑（复刻已验证干净的冒烟测试路径，更稳、不改异步驱动，但 17× 冷启动明显变慢）。纯美观收益，不损结果，优先级低。
-- [x] norm-qa 忠实度 / cost 选码合理性走 LLM-as-judge：评分细则已落 `benchmark/judges/*.md`，UI 配法见 §5.2。
-- [ ] 两份 judge 先在小批人标样本上**校准**（核对 judge 判 0/1 与人判一致率），再正式上量；忠实度可进一步对接 RAGAS。
-- [ ] intent 分类 Prompt Experiment 接一个自动 evaluator（输出标签 vs 金标期望意图），免去人工比对（§5.1）。
+- [x] norm-qa 忠实度 / cost 选码合理性走 LLM-as-judge：评分细则已落 `benchmark/judges/*.md`（喂料就绪）。
+- [x] intent 分类 Prompt Experiment 喂料就绪：`prompts/intent_classify.txt` + `runner/upload_prompts.py`。
+- [ ] 🚧 **UI 侧两功能（Prompt Experiments / LLM-as-judge）被 SSRF 阻断、暂搁置**（§6.6）：内网模型配 connection 必报 `Blocked IP`，v4 无放行开关。**重启时二选一**：① UI 侧接公网 qwen-plus（数据出内网）；② 改脚本驱动纯内网（脚本当判官 + `create_score` 推分，复用 `run_routing_experiment.py` 管道）。**倾向 ②**（合 §1「数据不出内网」），届时两份 judge 细则与 intent prompt 直接复用。
+- [ ] 启用后：两份 judge 先在小批人标样本上**校准**（judge 判 0/1 与人判一致率），再上量；忠实度可进一步对接 RAGAS。

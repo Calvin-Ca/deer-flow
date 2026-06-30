@@ -18,13 +18,17 @@
 | **Scores** | 自动评测分 + 线上用户反馈分，挂到对应 trace |
 | **Dashboard** | 按 tag/model/时间聚合成本、延迟、调用量、错误率 |
 
-## 2. 已打通的三件事
+## 2. 已打通的能力
+
+前 3 件是「脚本/后端驱动」、跑通即得；后 2 件是「Langfuse UI 侧」，代码只喂料、真正的「跑/评」在 UI 点（详见 §5）。
 
 | # | 事 | 形态 | 入口 |
 |---|---|---|---|
 | 1 | **链路冒烟**：发一次对话→读回 trace，验标签正确 | 脚本 | `runner/smoke_test.py` |
 | 2 | **benchmark→Dataset+自动评测**：金标灌进 Dataset，逐条跑 agent、程序化挂分 | 脚本 | `runner/upload_datasets.py` + `runner/run_routing_experiment.py` |
 | 3 | **线上反馈→score 闭环**：前端点赞踩→回写成 trace 的 score | **后端内建** | `app/gateway/routers/feedback.py` |
+| 4 | **Prompt Experiments**：自包含 intent 分类 prompt 纳管，UI 里换版本/模型横向比 | 脚本喂料 + UI | `runner/upload_prompts.py` + `prompts/intent_classify.txt`（§5.1） |
+| 5 | **LLM-as-judge**：对已有 trace 自动打语义分（忠实度/选码合理性） | 细则留底 + UI | `judges/*.md`（§5.2） |
 
 ---
 
@@ -83,11 +87,50 @@ trace_id = Langfuse.create_trace_id(seed=run_id)
 
 ---
 
-## 5. 踩坑记录（这一路怎么趟过来的）
+## 5. UI 侧评测：Prompt Experiments 与 LLM-as-judge
+
+§4 的 runner 是「脚本驱动 agent 真跑」——测路由这类**带工具调用**的能力必须走它。本节是另两条**主体在 Langfuse UI 上点**的路子，代码侧只「喂料」（推 prompt、留 judge 细则），适合**单跳 prompt 消融**和**对已有 trace 自动打分**。
+
+> **边界**：Prompt Experiments 只做「单 prompt → 一次 LLM 调用」，**跑不了完整 agent**（无工具/MCP/路由）。所以它**测不了路由两率**（那条只能走 `run_routing_experiment.py`）；它的位置是「自包含单跳 prompt 的横向比」。
+
+### 5.0 前置：在 UI 配一个 model connection（两功能共用）
+
+Settings → LLM Connections → Add：填被测/judge 用的模型(走项目内网 LLM 的 OpenAI 兼容端点即可)。Prompt Experiments 的「跑」和 LLM-as-judge 的「评」都要它，没有它两个都点不动。
+
+### 5.1 Prompt Experiments —— 纳管 intent 分类 prompt，UI 里横向比
+
+意图分类被抽成**自包含单跳** prompt（`benchmark/prompts/intent_classify.txt`，`{{query}}` → `norm|cost|both|clarify|chat`），不需要 agent，正好喂 Prompt Experiments。
+
+1. 推进 Prompt Management（服务器上）：
+   ```
+   uv run --project backend python benchmark/runner/upload_prompts.py
+   ```
+   → UI Prompts 里出现 `intent-classify`（带 `production` 标签的版本）。改口径只改那个 txt 重跑本脚本，**新版本累积、旧版本保留可回溯**。
+2. 跑实验：Datasets → `agent-routing-eval` → **New experiment** → 选 `intent-classify` prompt + 5.0 的 model connection → Run。它对每条 item 用 `{{query}}` 跑一次出意图标签。
+3. 比/评：多发几个 prompt 版本各跑一次，UI 里并排比；要自动判对错，给该 experiment 挂一个 evaluator（最简：LLM-judge 比对输出标签与金标里能推出的期望意图——金标 `agent` 字段 norm-qa→norm / cost-agent→cost，`expect_clarify=true & 无版本`→clarify）。
+
+**单一事实源**：prompt 文本在 git 的 `intent_classify.txt`，UI 里的版本是它的快照。别在 UI 直接改 prompt 而不回写文件，否则 Mac↔服务器 git 流里会丢。
+
+### 5.2 LLM-as-judge —— 对已有 trace 自动打分
+
+judge 评的是**已落库的 trace**，配好后新 trace 自动出分。两份评分细则已在 git 留底，**改口径改文件、再到 UI 更新 Prompt 版本**：
+
+| Judge | 细则文件 | score 名 | 评谁 |
+|---|---|---|---|
+| norm-qa 忠实度（防幻觉） | `benchmark/judges/norm_faithfulness.md` | `norm_faithfulness` | norm 类 trace：答案是否只用了 `cited_clauses`、没编造条文号 |
+| cost 选码合理性 | `benchmark/judges/cost_code_selection.md` | `cost_code_reasonable` | cost 类 trace：9 位编码与描述/版本是否匹配、有无串库 |
+
+配法（UI）：Evaluators → New evaluator → Custom(LLM-as-judge) → 选 model connection → 把细则文件里「判官 Prompt」整段粘进去 → 按文件里的 **Variable mapping** 把 `{{...}}` 映射到 trace 字段 → 限定 Target 到对应能力的 trace（别让忠实度 judge 去评 cost）。细节、打分口径、建议门全在各自 md 文件里。
+
+> 与确定性判分互补：judge 管「说的有没有出处 / 码选得合不合理」这类**语义**判断；`run_routing_experiment.py` 那种**确定性**两率（调没调对工具）继续留在脚本里，更准更省。
+
+---
+
+## 6. 踩坑记录（这一路怎么趟过来的）
 
 留这一节是因为这些坑会复现，且根因不直觉。
 
-### 5.1 `dataset.run_experiment` 与 MCP 持久会话生命周期相撞 → 弃用
+### 6.1 `dataset.run_experiment` 与 MCP 持久会话生命周期相撞 → 弃用
 
 **现象**：用 langfuse 的 `dataset.run_experiment(task=...)` 跑，崩在
 `RuntimeError: Attempted to exit cancel scope in a different task` / `Task was destroyed but it is pending` / `athrow(): asynchronous generator is already running`。
@@ -102,7 +145,7 @@ trace_id = Langfuse.create_trace_id(seed=run_id)
 
 > 残留：仍有少量 MCP 会话 GC 噪音（`GeneratorExit` 等），**非致命、不影响结果**（run 完整跑完、分数正确）。要彻底消需把整轮跑进单个 asyncio 事件循环，改动较大，暂缓。
 
-### 5.2 `my_package.mcp.auth` 拦截器报错 → 无害，清掉即可
+### 6.2 `my_package.mcp.auth` 拦截器报错 → 无害，清掉即可
 
 **现象**：每次起 agent 都打一段 `ModuleNotFoundError: No module named 'my_package'` 的 traceback。
 
@@ -110,21 +153,21 @@ trace_id = Langfuse.create_trace_id(seed=run_id)
 
 > 拦截器 = MCP 工具调用的中间件（鉴权注入/审计/限流/护栏短路等横切关注点）。`mcpInterceptors` 要的是 `模块:函数` 形式的**构造函数**，不是 server，不能把 `ce-cost` 填进去。`ce-cost` 是 localhost 开放服务、无需拦截，把 `mcpInterceptors` 置空即可消噪音。
 
-### 5.3 `--model qwen-plus` 报 not found
+### 6.3 `--model qwen-plus` 报 not found
 
 config.yaml 里没有叫 `qwen-plus` 的模型。先用 `DeerFlowClient().list_models()` 查真实模型名，或不带 `--model` 用默认。
 
-### 5.4 路由判定别靠流式 args 子串
+### 6.4 路由判定别靠流式 args 子串
 
 最初 `did_route` 在「工具名 + 流式 args 文本」里搜 `qa.py`/`:8100` 等子串。但**流式 tool_call 的 args 是分片的**，bash 命令常捕获不全。改为**纯按工具名**判（名字在首片即到齐），稳健且合 README 口径（commit `69c2e22b`）。
 
-### 5.5 Mac↔服务器 git：派生数据挡 pull
+### 6.5 Mac↔服务器 git：派生数据挡 pull
 
 服务器侧 `structured/chunks/*`、`notebooks/results/*`、`uv.lock` 是工作树里的未提交改动，会挡住 pull。按约定它们**该入 git 同步**（`uv.lock` 以服务器为准）——在**服务器**上 `git add ce-code ce-services && git commit` 正式提交，之后 Mac 也能同步，不必每次 `stash/pop`。
 
 ---
 
-## 6. 首轮基线结果（默认 Qwen3-8B，run `v2_runbook`）
+## 7. 首轮基线结果（默认 Qwen3-8B，run `v2_runbook`）
 
 | 指标 | 值 | 建议门 |
 |---|---|---|
@@ -135,9 +178,11 @@ config.yaml 里没有叫 `qwen-plus` 的模型。先用 `DeerFlowClient().list_m
 
 ---
 
-## 7. 后续 TODO
+## 8. 后续 TODO
 
 - [ ] 换强模型（真实 config 模型名）重跑，多 `--run-name` 在 Langfuse Runs 横向比，定方案 0/A。
 - [ ] `retrieval_eval` / `agent_eval` 接入 `upload_datasets.py`（同套路扩展）。
-- [ ] 想清噪音后再消 MCP 会话 GC 报错（§5.1 残留）。根因是同进程跨多个事件循环复用全局 MCP 缓存——**串行救不了，靠进程/循环隔离**。两条路线择一：① 把整轮跑进**单个 asyncio 事件循环**（用 agent 异步接口逐条 await，会话全程同 loop）；② **子进程隔离**，每条用例 fork 独立进程跑（复刻已验证干净的冒烟测试路径，更稳、不改异步驱动，但 17× 冷启动明显变慢）。纯美观收益，不损结果，优先级低。
-- [ ] norm-qa 忠实度（L6-C）走 RAGAS LLM-judge，judge 先在小批人标样本上校准。
+- [ ] 想清噪音后再消 MCP 会话 GC 报错（§6.1 残留）。根因是同进程跨多个事件循环复用全局 MCP 缓存——**串行救不了，靠进程/循环隔离**。两条路线择一：① 把整轮跑进**单个 asyncio 事件循环**（用 agent 异步接口逐条 await，会话全程同 loop）；② **子进程隔离**，每条用例 fork 独立进程跑（复刻已验证干净的冒烟测试路径，更稳、不改异步驱动，但 17× 冷启动明显变慢）。纯美观收益，不损结果，优先级低。
+- [x] norm-qa 忠实度 / cost 选码合理性走 LLM-as-judge：评分细则已落 `benchmark/judges/*.md`，UI 配法见 §5.2。
+- [ ] 两份 judge 先在小批人标样本上**校准**（核对 judge 判 0/1 与人判一致率），再正式上量；忠实度可进一步对接 RAGAS。
+- [ ] intent 分类 Prompt Experiment 接一个自动 evaluator（输出标签 vs 金标期望意图），免去人工比对（§5.1）。

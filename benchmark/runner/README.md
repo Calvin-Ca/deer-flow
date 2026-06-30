@@ -40,6 +40,20 @@ uv run --project backend python benchmark/runner/run_routing_experiment.py --run
 
 数据集口径见 `benchmark/routing_eval/README.md` 与 `benchmark/AGENT_BENCHMARK.md`。`retrieval_eval` / `agent_eval` 暂未接入 uploader，按相同套路扩 `upload_datasets.py` 即可。
 
+## 任务4 · UI 侧评测喂料（Prompt Experiments / LLM-as-judge）
+
+这两条主体在 Langfuse UI 上点，脚本只负责把「料」推上去。完整 UI 操作步骤见 `../LANGFUSE.md §5`。
+
+把自包含 intent 分类 prompt 纳管进 Prompt Management（供 UI 里 New experiment 选用）：
+
+```
+uv run --project backend python benchmark/runner/upload_prompts.py
+```
+
+→ UI Prompts 里出现 `intent-classify`。prompt 文本在 `../prompts/intent_classify.txt`（单一事实源，改它重跑即发新版本）。
+
+LLM-as-judge **无脚本**：评分细则在 `../judges/norm_faithfulness.md`、`../judges/cost_code_selection.md`，把里面「判官 Prompt」粘进 UI 的 Evaluator 即可（变量映射、打分口径都写在各 md 里）。
+
 ## 任务3 · 线上反馈 → Langfuse score（无需脚本，已内建）
 
 前端/渠道对某条回复点赞踩，Gateway 的 feedback 接口会**自动**把 ±1 作为 `user_feedback` score 回写到对应 run 的 trace —— 形成「线上真实反馈 → 评测样本」闭环。

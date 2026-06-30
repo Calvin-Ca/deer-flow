@@ -354,15 +354,14 @@ def _available_skill_names(agent_config, is_bootstrap: bool) -> set[str] | None:
 def _load_enabled_skills_for_tool_policy(available_skills: set[str] | None, *, app_config: AppConfig) -> list[Skill]:
     try:
         from deerflow.agents.lead_agent.prompt import get_enabled_skills_for_config
-        # 先取"全部已启用"的 skill
+
         skills = get_enabled_skills_for_config(app_config)
     except Exception:
         logger.exception("Failed to load skills for allowed-tools policy")
         raise
 
-    if available_skills is None: # None 就不过滤skills,全要
+    if available_skills is None: # None就不过滤skills,原样返回
         return skills
-    # 否则只保留"全部已启用"和"available_skills"交集
     return [skill for skill in skills if skill.name in available_skills]
 
 
@@ -381,17 +380,17 @@ def _make_lead_agent(config: RunnableConfig, *, app_config: AppConfig):
     # config：运行时配置（本次请求参数），app_config：系统能力蓝图（静态配置）
     cfg = _get_runtime_config(config)
     resolved_app_config = app_config # 完整的 Agent 运行系统蓝图
-    # ┌───────────┬──────────────────┬──────────────┬──────────────────┬──────────────────┐
-    # │ 前端 mode │ thinking_enabled │ is_plan_mode │ subagent_enabled │ reasoning_effort │
-    # ├───────────┼──────────────────┼──────────────┼──────────────────┼──────────────────┤
-    # │ flash     │ false            │ false        │ false            │ undefined        │
-    # ├───────────┼──────────────────┼──────────────┼──────────────────┼──────────────────┤
-    # │ thinking  │ true             │ false        │ false            │ low              │
-    # ├───────────┼──────────────────┼──────────────┼──────────────────┼──────────────────┤
-    # │ pro       │ true             │ true         │ false            │ medium           │
-    # ├───────────┼──────────────────┼──────────────┼──────────────────┼──────────────────┤
-    # │ ultra     │ true             │ true         │ true             │ high             │
-    # └───────────┴──────────────────┴──────────────┴──────────────────┴──────────────────┘
+# ┌───────────┬──────────────────┬──────────────┬──────────────────┬──────────────────┐
+# │ 前端 mode │ thinking_enabled │ is_plan_mode │ subagent_enabled │ reasoning_effort │
+# ├───────────┼──────────────────┼──────────────┼──────────────────┼──────────────────┤
+# │ flash     │ false            │ false        │ false            │ undefined        │
+# ├───────────┼──────────────────┼──────────────┼──────────────────┼──────────────────┤
+# │ thinking  │ true             │ false        │ false            │ low              │
+# ├───────────┼──────────────────┼──────────────┼──────────────────┼──────────────────┤
+# │ pro       │ true             │ true         │ false            │ medium           │
+# ├───────────┼──────────────────┼──────────────┼──────────────────┼──────────────────┤
+# │ ultra     │ true             │ true         │ true             │ high             │
+# └───────────┴──────────────────┴──────────────┴──────────────────┴──────────────────┘
     thinking_enabled = cfg.get("thinking_enabled", True) # 是否给模型开思考模式，默认true，但后面还会通过supports_thinking二次校验，不支持则降级关闭
     reasoning_effort = cfg.get("reasoning_effort", None) # 思考力度档位（如 low/medium/high）。None = 不指定,交给模型/provider 默认
     requested_model_name: str | None = cfg.get("model_name") or cfg.get("model") # 前端要求的模型
@@ -407,11 +406,10 @@ def _make_lead_agent(config: RunnableConfig, *, app_config: AppConfig):
     agent_config = load_agent_config(agent_name) if not is_bootstrap else None  # 否则按 agent_name 读 .deer-flow/users/{user_id}/agents/{agent_name}/config.yaml
     available_skills = _available_skill_names(agent_config, is_bootstrap) 
     # Custom agent model from agent config (if any), or None to let _resolve_model_name pick the default
-    # 只有用户自定义的agent,agent_model_name才会非 None
     agent_model_name = agent_config.model if agent_config and agent_config.model else None
 
     # Final model name resolution: request → agent config → global default, with fallback for unknown names
-    model_name = _resolve_model_name(requested_model_name or agent_model_name, app_config=resolved_app_config) # app_config兜底,即配置文件中的模型兜底
+    model_name = _resolve_model_name(requested_model_name or agent_model_name, app_config=resolved_app_config)
 
     model_config = resolved_app_config.get_model_config(model_name)
 
@@ -461,17 +459,7 @@ def _make_lead_agent(config: RunnableConfig, *, app_config: AppConfig):
         if not isinstance(existing, list):
             existing = list(existing)
         config["callbacks"] = [*existing, *tracing_callbacks]
-    # 如果 available_skills 是 None 则不过滤，否则 skills_for_tool_policy = available_skills
-    # ┌──────────────────────────────────────────────┬──────────────────┐
-    # │                     场景                     │ available_skills │
-    # ├──────────────────────────────────────────────┼──────────────────┤
-    # │ bootstrap（前端新建 agent）                   │ {"bootstrap"}    │
-    # ├──────────────────────────────────────────────┼──────────────────┤
-    # │ 用户自定义 agent 且 config.yaml 声明了 skills  │ 该集合           │
-    # ├──────────────────────────────────────────────┼──────────────────┤
-    # │ 默认lead agent/用户自定义 agent 未声明 skills  │ None             │
-    # └──────────────────────────────────────────────┴──────────────────┘
-    # 总结：通过 available_skills 裁剪 app_configs 的 skill
+    # 如果 available_skills 是 None 则不过滤，否则skills_for_tool_policy = available_skills
     skills_for_tool_policy = _load_enabled_skills_for_tool_policy(available_skills, app_config=resolved_app_config)
 
     if is_bootstrap:    # 用户在前端自己新增skill才为true
@@ -493,22 +481,19 @@ def _make_lead_agent(config: RunnableConfig, *, app_config: AppConfig):
     # Custom agents can update their own SOUL.md / config via update_agent.
     # The default agent (no agent_name) does not see this tool.
     extra_tools = [update_agent] if agent_name else []
-
-    # 默认 lead agent（agent_config 为 None）→ groups=None → 不过滤，全部工具
-    # 自定义 agent（agent_config 非 None）→ groups=agent_config.tool_groups → 按声明的工具组裁剪
+    # Default lead agent (unchanged behavior),按 gent_config.tool_groups中 agent 声明的工具组装配工具集
     # model_name：决定是否加 view_image_tool(取决于模型是否支持 vision)
-    # 按 tool.group 过滤 config 工具,None 表示全要;正如上面备注所说,只要不是自定义agent窗口发送的请求,agent_config为None
-    # subagent_enabled 决定 lead_agent是否启用 task 工具，即决定是否能委派 subagent
+    # 按 tool.group 过滤 config 工具;None 表示全要;正如上面备注所说,只要不是自定义agent窗口发送的请求,agent_config为None
     tools = get_available_tools(model_name=model_name, groups=agent_config.tool_groups if agent_config else None, subagent_enabled=subagent_enabled, app_config=resolved_app_config)
     return create_agent(
         model=create_chat_model(name=model_name, thinking_enabled=thinking_enabled, reasoning_effort=reasoning_effort, app_config=resolved_app_config, attach_tracing=False),
-        tools=filter_tools_by_skill_allowed_tools(tools + extra_tools, skills_for_tool_policy), # 按 skill 声明的 allowed-tools 字段裁剪工具集
+        tools=filter_tools_by_skill_allowed_tools(tools + extra_tools, skills_for_tool_policy),
         middleware=_build_middlewares(config, model_name=model_name, agent_name=agent_name, app_config=resolved_app_config),
         system_prompt=apply_prompt_template(
             subagent_enabled=subagent_enabled,
             max_concurrent_subagents=max_concurrent_subagents,
             agent_name=agent_name,
-# available_skills
+# 
 # ┌─────────────────────────────────────────┬────────────────────────────────────────────────┐
 # │                  取值                   │                      含义                      │
 # ├─────────────────────────────────────────┼────────────────────────────────────────────────┤

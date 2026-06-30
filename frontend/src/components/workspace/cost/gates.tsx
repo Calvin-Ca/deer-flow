@@ -256,9 +256,7 @@ export function InputGate({
                   <span className="font-mono">{displayValue(v)}</span>
                 </div>
               ))}
-            {Array.isArray(
-              (interrupt.context as Record<string, unknown>).why,
-            ) && (
+            {Array.isArray(interrupt.context.why) && (
               <div className="space-y-0.5">
                 <div className="text-muted-foreground">为什么要补这些：</div>
                 {(

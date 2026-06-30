@@ -34,9 +34,9 @@ uv run --project backend python benchmark/runner/run_routing_experiment.py --run
 - `clarify_correct`：该反问就反问（命中 `ask_clarification`）——红线主判据；
 - `route_correct`：该调脚本就调（工具名/ bash 命中 `qa.py`/`cost.py` 等 `ROUTE_SIGNALS`）。
 
-> **判定是外部观测启发式**：路由是否发生靠匹配工具调用文本里的 `ROUTE_SIGNALS`（见 `run_routing_experiment.py` 顶部常量）。跑首轮后照真实 trace 里 agent 的实际调用方式（具体 MCP 工具名 / 知识服务端点）回调该常量，再上量。
+> **判定是外部观测启发式**：路由是否发生靠匹配工具调用文本里的 `ROUTE_SIGNALS`（见 `run_routing_experiment.py` 顶部常量）。跑首轮后照真实 trace 里 agent 的实际调用方式（多半是带 `ce-cost` 前缀的 MCP 工具名）回调该常量，再上量。
 >
-> **已知限制**：当前 agent 自身的详细 trace 与 experiment 的 dataset-run trace 是两条（agent 那条按 `thread_id` 可查，前缀 `exp-routing-`），尚未嵌套到同一棵树。够用于出分对比；要嵌套需把 experiment 的 trace 上下文透进 `DeerFlowClient`，后续再做。
+> **实现说明**：脚本**主线程逐条**跑（与 `smoke_test.py` 同一调用路径，已验证干净退出），**未用** `dataset.run_experiment`——后者在自己的事件循环里调 task，会和 `DeerFlowClient.stream` 的持久 MCP 会话生命周期相撞而崩（cancel scope / Task destroyed）。每条跑完读回其 trace，用 `dataset_run_items.create` 把这条 agent trace 直接关联进同名 dataset run，再 `create_score` 挂 `route_correct` / `clarify_correct`——所以 UI 里 Datasets→Runs 下每条就是 agent 自己的完整 trace，分数也挂在同一条上，不再是两棵分离的树。
 
 数据集口径见 `benchmark/routing_eval/README.md` 与 `benchmark/AGENT_BENCHMARK.md`。`retrieval_eval` / `agent_eval` 暂未接入 uploader，按相同套路扩 `upload_datasets.py` 即可。
 

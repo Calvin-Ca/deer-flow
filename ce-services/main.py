@@ -7,6 +7,7 @@
 
 端点：
   GET  /health        健康检查（含知识服务 / LLM 地址）
+  POST /route         前置路由（T-A1）：确定性能力分流 + 形态判定（无 LLM，供编排器/agent 分流前置）
   POST /norm/qa       造价规范条文检索 + Qwen3 带引用作答（norm-qa）
   POST /cost/compose  构件描述 → 候选召回 → LLM 选码 → 组价取数（cost-agent，P1 选码闭环；传 rates 则算综合单价）
   POST /cost/unit-price 综合单价计算原语（P2，确定性算钱、pydantic 闸门、不入 LLM）
@@ -44,6 +45,7 @@ from common.config import KNOWLEDGE_URL, LLM_URL  # noqa: E402
 from common.mcp_server import mcp as task_mcp  # noqa: E402
 from cost.router import router as cost_router  # noqa: E402
 from norm.router import router as norm_router  # noqa: E402
+from routing.router import router as routing_router  # noqa: E402
 
 
 @asynccontextmanager
@@ -59,6 +61,7 @@ async def _lifespan(_: FastAPI):
 
 app = FastAPI(title="CE Task Services · Norm-QA + CostAgent", version="4.0.0",
               lifespan=_lifespan)
+app.include_router(routing_router)
 app.include_router(norm_router)
 app.include_router(cost_router)
 

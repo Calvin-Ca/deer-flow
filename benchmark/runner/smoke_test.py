@@ -64,9 +64,12 @@ def main() -> int:
     print(f"      tags       = {tags}")
     has_model = any(s.startswith("model:") for s in tags)
     has_variant = any(s.startswith("variant:") for s in tags)
-    print(f"      model:/variant: 标签 = {has_model} / {has_variant}")
-    if not (has_model and has_variant):
-        print("      ⚠ 缺 model:/variant: 标签——检查 metadata.py 注入与 prompt variant 解析。")
+    print(f"      model: 标签 = {has_model}   variant: 标签 = {has_variant}")
+    if not has_variant:
+        print("      ⚠ 缺 variant: 标签——检查 metadata.py 注入与 prompt variant 解析。")
+    if not has_model:
+        print("      ℹ 无 model: 标签属正常——本脚本未带 --model 时 embedded client 走默认模型")
+        print("        （model_name=None，metadata 仅在已知模型名时打 model:）。带 --model qwen-plus 重跑即有。")
     return 0
 
 

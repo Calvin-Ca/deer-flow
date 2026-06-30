@@ -19,6 +19,7 @@
 from __future__ import annotations
 
 import argparse
+import concurrent.futures
 import json
 import sys
 import uuid
@@ -72,6 +73,20 @@ def _drive_agent(query: str, model_name: str | None) -> dict:
         "did_route": any(sig in haystack for sig in ROUTE_SIGNALS),
         "thread_id": thread_id,
     }
+
+
+def _drive_agent_isolated(query: str, model_name: str | None) -> dict:
+    """在全新线程里跑 _drive_agent，隔离事件循环。
+
+    功能：``dataset.run_experiment`` 在自己的事件循环线程里同步调 task，而
+        ``DeerFlowClient.stream`` 内部自驱 async + 反复建/拆 MCP（streamable_http）
+        会话——两者同线程会撞「cancel scope in a different task」而崩。丢进每条
+        独享的新线程（自带干净 loop、跑完即销）即复刻冒烟测试那种无外层 loop 的条件。
+    参数：query 用户问法；model_name 覆盖模型名。
+    返回：``_drive_agent`` 的结果 dict。
+    """
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+        return pool.submit(_drive_agent, query, model_name).result()
 
 
 def _eval_clarify(*, input, output, expected_output=None, **kwargs):
@@ -133,9 +148,9 @@ def main() -> int:
     dataset = get_client().get_dataset(DATASET_NAME)
 
     def task(*, item, **kwargs):
-        """run_experiment 的 task：驱动 agent 跑一条用例。"""
+        """run_experiment 的 task：驱动 agent 跑一条用例（隔离线程，避免 loop/MCP 串台）。"""
         query = (item.input or {}).get("query", "")
-        return _drive_agent(query, args.model)
+        return _drive_agent_isolated(query, args.model)
 
     result = dataset.run_experiment(
         name=args.run_name or f"routing-{uuid.uuid4().hex[:8]}",

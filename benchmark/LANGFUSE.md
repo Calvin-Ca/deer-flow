@@ -1,7 +1,8 @@
 # Langfuse 接入与评测闭环说明
 
 > 本文记录把 **Langfuse**（LLM 可观测性 + 评测平台）接入 deer-flow、并打通三件事的**架构、用法与踩坑过程**。
-> 操作命令见 [`runner/README.md`](runner/README.md)；评测体系/分层口径见 [`AGENT_BENCHMARK.md`](AGENT_BENCHMARK.md)；自托管部署见 [`../docker/langfuse/README.md`](../docker/langfuse/README.md)。
+> **文档对**：本文是 **「怎么用 Langfuse 测」（操作步骤 → [§9 runbook](#9-端到端测试步骤runbook)）**；**「测什么 / 分层指标口径」见 [`AGENT_BENCHMARK.md`](AGENT_BENCHMARK.md)**。看那份定指标、看本文跑评测。
+> 另：操作命令细节见 [`runner/README.md`](runner/README.md)；自托管部署见 [`../docker/langfuse/README.md`](../docker/langfuse/README.md)。
 > 版本：langfuse **4.5.1**（自托管）；首次打通日期 2026-06-30。
 
 ---
@@ -210,3 +211,81 @@ config.yaml 里没有叫 `qwen-plus` 的模型。先用 `DeerFlowClient().list_m
 - [x] intent 分类 Prompt Experiment 喂料就绪：`prompts/intent_classify.txt` + `runner/upload_prompts.py`。
 - [ ] 🚧 **UI 侧两功能（Prompt Experiments / LLM-as-judge）被 SSRF 阻断、暂搁置**（§6.6）：内网模型配 connection 必报 `Blocked IP`，v4 无放行开关。**重启时二选一**：① UI 侧接公网 qwen-plus（数据出内网）；② 改脚本驱动纯内网（脚本当判官 + `create_score` 推分，复用 `run_routing_experiment.py` 管道）。**倾向 ②**（合 §1「数据不出内网」），届时两份 judge 细则与 intent prompt 直接复用。
 - [ ] 启用后：两份 judge 先在小批人标样本上**校准**（judge 判 0/1 与人判一致率），再上量；忠实度可进一步对接 RAGAS。
+
+---
+
+## 9. 端到端测试步骤（runbook）
+
+把散在各节的命令串成一条可照抄的流程。**全部在服务器上跑**，命令单行。命令细节见 `runner/README.md`，口径见各 `*_eval/README` 与 `AGENT_BENCHMARK.md`。
+
+**先看「测什么 ↔ 怎么测」对照**（`AGENT_BENCHMARK.md` 定指标，本表给对应 runner 与 Langfuse score）：
+
+| AGENT_BENCHMARK 层（测什么） | runner（怎么测） | Langfuse score | 现状 |
+|---|---|---|---|
+| L1 路由 / L2 门控（落点 + 该反问就反问） | `run_routing_experiment.py` | `route_correct` / `clarify_correct` | ✅ 可跑 |
+| L3 检索 · 清单匹配（Recall@k / Top-1） | `run_retrieval_experiment.py` | `match_top1` / `recalled` | ✅ 可跑 |
+| L6-B 工具调用（arg_match） | `run_toolcall_experiment.py` | `tool_correct` / `call_correct` | ✅ 可跑 |
+| L3 检索 · 条文召回（expected_clauses） | 待建 | — | ⬜ 待 qa.py 支持 gb50016 |
+| 端到端组价（terminal_check） | 待建 | — | ⬜ 待终态校验 runner |
+| L6-C 规范问答忠实度（RAGAS/judge） | judge 细则备 `judges/*.md` | `norm_faithfulness` 等 | ⬜ 撞 SSRF，搁置（§5/§6.6） |
+
+### 步骤 0 · 前提（一次）
+
+1. 起 Langfuse 自托管栈（rootful docker，见 §6.6 双 daemon 坑）：`sudo docker compose -f docker/langfuse/docker-compose.yaml up -d`，UI 在 :3030。
+2. 根 `.env` 开上报四行并**重启 Gateway**：`LANGFUSE_TRACING=true` / `LANGFUSE_PUBLIC_KEY=...` / `LANGFUSE_SECRET_KEY=...` / `LANGFUSE_BASE_URL=http://localhost:3030`。
+3. 评测要 agent 真调脚本/取数，**四服务起齐**：:8100 知识检索、:8101 任务（cost/norm）、:8099 vLLM、Gateway。
+
+### 步骤 1 · 冒烟（先确认 trace 落库）
+
+```
+uv run --project backend python benchmark/runner/smoke_test.py
+```
+
+退出码 0 = trace 能落、标签对。不通先查 §0 的 env / 重启，再往下。
+
+### 步骤 2 · 灌全部金标到 Dataset（幂等）
+
+```
+uv run --project backend python benchmark/runner/upload_datasets.py
+```
+
+一次灌 6 个集（routing/clist/toolcall/cost_task/norm_faithful/clause）。补了真金标（agent_eval 的 `{name}.jsonl`）重跑本条即覆盖。单灌某集加 `--only <名>`。
+
+### 步骤 3 · 跑评测（现在可跑的三条）
+
+```
+uv run --project backend python benchmark/runner/run_routing_experiment.py --run-name routing_v1 --model qwen-plus
+```
+```
+uv run --project backend python benchmark/runner/run_retrieval_experiment.py --spec 2024 --run-name clist_2024_v1
+```
+```
+uv run --project backend python benchmark/runner/run_toolcall_experiment.py --run-name toolcall_v1 --model qwen-plus
+```
+
+各自终端打印聚合指标，并把逐条分挂到对应 dataset run：
+- 路由：`route_correct` / `clarify_correct`（两率）；
+- 清单匹配：`match_top1` / `recalled`（Top-1 + Recall@k，终端另有 eval_select 完整表）；
+- 工具调用：`tool_correct` / `call_correct`（arg_match）。
+
+> 横向比：换模型 / prompt variant 时改 `--run-name` 再跑，UI 里多个 run 并排比。
+
+### 步骤 4 · 在 UI 看结果（:3030）
+
+- 单条调用树：**Tracing** → 点 trace（prompt/工具/token/延迟）。
+- 一轮指标 + 逐条对错：**Datasets** → 对应集 → **Runs** → 你的 `--run-name`。
+- 多 run 横向比：Runs 列表并排。
+- 线上被点踩的真实 case：Tracing 按 `user_feedback` score 过滤。
+- 成本/延迟/错误率：**Dashboard** 按 tag/model/时间。
+
+### 步骤 5 · 暂不可跑的（前置未满足，别空跑）
+
+| 集 | 卡点 |
+|---|---|
+| `cost_task` | runner 待建（端到端跑 agent + `terminal_check` 终态校验）。数据集已可灌、可在 UI 见金标 |
+| 条文召回（gb50016）/ `norm_faithful` | standard `gb50016` 不在 qa.py 支持列表（知识层前置）；忠实度类指标走 LLM-judge 又撞 SSRF（§6.6） |
+| LLM-as-judge / Prompt Experiments（UI 侧） | 内网模型被 SSRF 拦，**暂搁置**；改脚本驱动纯内网或指公网模型（§5 状态横幅、§6.6） |
+
+### 一句话流程
+
+`(0 起栈+四服务) → (1 冒烟) → (2 upload_datasets) → (3 跑 routing/clist/toolcall 三 runner) → (4 UI Datasets→Runs 看分/横向比)`。语义类（judge）与 gb50016 相关项见步骤 5 的前置。

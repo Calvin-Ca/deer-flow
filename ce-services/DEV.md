@@ -147,3 +147,34 @@
 > 与现状的关系：`/cost/compose` 编排（`cost/orchestration.py`）= 复合入口，已就位；`cost-agent` skill = 其 agent
 > 门面，已就位。本方案的**新增工作量** = ① 知识层三原语加 MCP façade（红线复述进 schema）；② 任务层 P2 把
 > `compute_unit_price` 做成带 schema 校验的确定性 tool。两者落地后即满足"原语 first-class + 复合并列 + 红线在边界"。
+
+## 任务层能力 MCP façade + 前端依据渲染（决策，2026-06-30）
+
+> 背景：deer-flow 前端「中间过程」折叠流（`message-group.tsx`）只渲染 **思考 + 工具调用** 两类 step；
+> 且泛型工具分支只画一行 label、**不渲染工具结果**。`norm-qa` / `cost-agent` 两个 skill 是经 **bash** 跑 Python
+> 客户端进来的，bash 分支只显示命令文本、不显示 stdout——于是选码/置信度/cited_clauses 等**依据全埋在 bash
+> 输出里看不见**，造价用户在对话里拿不到「凭什么这么答」。这违背「过程信任：让依据可见」的产品目标。
+
+**方案（选 A：MCP 工具化，弃 B：在 bash 分支 sniff 命令）**：tool 与 MCP 对模型是同一个 function-calling 表面，
+但 MCP 让**工具名/入参/结果天然结构化**——前端可按**稳定工具名**派发渲染，而非脆弱地解析 bash 命令文本。
+
+- **服务端**：`common/mcp_server.py` 起 FastMCP `ce-task`（streamable-HTTP），把两个**无状态、一把出结果**的任务层
+  能力包成 MCP 工具，**复用编排内核、不反代自家 REST**：
+  - `norm_qa` → `knowledge_client.search` + `norm/generation.answer`（零召回拒答、不编造，与 `/norm/qa` 一致）；
+  - `cost_compose` → `cost/orchestration.compose`（选不出码转 HITL、缺价 no_source、2013 未就绪，红线如实透传）。
+  - **HITL 可中断组价会话不在此暴露**：那是有状态 + 交互式，已由前端内嵌 `cost-hitl` marker 卡片驱动（见
+    `cost/router.py` 的 session 端点 + `frontend/.../cost/`）。MCP 这层只收**无状态**能力。
+  - 挂载：`main.py` lifespan 跑 `task_mcp.session_manager.run()` + `app.mount("/", …streamable_http_app())`，对外
+    `:8101/mcp`（与知识层 `:8100/mcp` 同款）。依赖 `mcp>=1.2`（服务器 `uv add mcp`，本地不提交 uv.lock）。
+  - 注册：`extensions_config.json` mcpServers 加 `ce-task`（工具名带 server 前缀 → agent 见 `ce-task_norm_qa` /
+    `ce-task_cost_compose`）。与知识层 `ce-cost`（bill_match / quota_lookup / price_compose）分工：`ce-cost`=纯数据
+    原语，`ce-task`=带 LLM 编排的任务层能力。
+- **前端**：`frontend/src/components/workspace/messages/ce-tool-result.tsx` 集中所有造价 MCP 工具的依据渲染
+  （`ce-task_*` + `ce-cost_*`），`message-group.tsx` 只加一个 `isCeTool(name)` 委派分支——**不把造价业务字段塞进
+  上游通用组件**。按工具名渲染：规范问答→cited_clauses（标准号+条文号）；组价选码→选中码+置信度+转人工+取数状态；
+  清单召回→Top 候选；组价取数→定额子目；定额直取→子目+工料机条数。结果形状做防御性读取（MCP 序列化/加载中/异常
+  透传都不崩）。
+- **bash skill 保留**：`norm-qa` / `cost-agent` 两个 skill 不删，作命令行兜底 / curl 调试；但**对话主路径走 MCP**。
+
+> 验证：前端真跑在服务器，`pnpm check`（eslint+tsc）+ 浏览器对话调 `ce-task_*` 看依据渲染须在服务器过一轮（本地无
+> node_modules）。服务端 `mcp` 装好后 `:8101/mcp` 可由 `curl` 列工具校验。

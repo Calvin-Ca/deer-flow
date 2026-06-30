@@ -38,6 +38,7 @@ import { cn } from "@/lib/utils";
 import { useArtifacts } from "../artifacts";
 import { Tooltip } from "../tooltip";
 
+import { CeToolResult, isCeTool } from "./ce-tool-result";
 import { MarkdownContent } from "./markdown-content";
 
 export function MessageGroup({
@@ -310,7 +311,11 @@ function ToolCall({
       fallback
     );
 
-  if (name === "web_search") {
+  if (isCeTool(name)) {
+    // 造价领域 MCP 工具（ce-task_* / ce-cost_*）：领域结果渲染收在 ce-tool-result，
+    // 不把造价业务字段塞进本通用组件（见该文件）。
+    return <CeToolResult name={name} args={args} result={result} />;
+  } else if (name === "web_search") {
     let label: React.ReactNode = t.toolCalls.searchForRelatedInfo;
     if (typeof args.query === "string") {
       label = t.toolCalls.searchOnWebFor(args.query);

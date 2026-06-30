@@ -14,6 +14,10 @@ dependencies = [
     # 服务器侧以 `uv add langgraph langgraph-checkpoint-sqlite` 落锁（本地不提交 uv.lock）。
     "langgraph>=0.2.50",
     "langgraph-checkpoint-sqlite>=2.0",
+    # 任务层能力 MCP façade（FastMCP streamable-HTTP，:8101/mcp）：把 norm_qa / cost_compose
+    # 包成 MCP 工具供 deer-flow agent 直接调，工具名/入参/结果结构化进前端 toolCall 流。
+    # 服务器侧以 `uv add mcp` 落锁（本地不提交 uv.lock）。
+    "mcp>=1.2",
 ]
 
 [tool.uv]

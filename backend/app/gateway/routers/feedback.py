@@ -19,6 +19,32 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/threads", tags=["feedback"])
 
 
+def _push_langfuse_feedback_score(run_id: str, rating: int, comment: str | None) -> None:
+    """把用户 thumbs-up/down 作为 score 回写到对应 run 的 Langfuse trace。
+
+    功能：打通「线上真实反馈 → 评测样本」闭环 —— trace_id 由 run_id 确定性重算
+        （与 worker 建 trace 时同源），故无需在反馈库里另存 trace_id。
+    参数：run_id 评分目标 run；rating +1/-1；comment 可选文字说明。
+    返回：无。best-effort —— langfuse 未启用或任何异常只记 warning，绝不阻断接口。
+    """
+    try:
+        from deerflow.tracing import build_langfuse_trace_id, get_langfuse_client
+
+        trace_id = build_langfuse_trace_id(run_id)
+        client = get_langfuse_client()
+        if not trace_id or client is None:
+            return
+        client.create_score(
+            name="user_feedback",
+            value=float(rating),
+            trace_id=trace_id,
+            data_type="NUMERIC",
+            comment=comment,
+        )
+    except Exception:  # pragma: no cover - 防御性：反馈回写失败不应影响主流程
+        logger.warning("Langfuse feedback score 回写失败 run_id=%s", run_id, exc_info=True)
+
+
 # ---------------------------------------------------------------------------
 # Request / response models
 # ---------------------------------------------------------------------------
@@ -80,13 +106,15 @@ async def upsert_feedback(
         raise HTTPException(status_code=404, detail=f"Run {run_id} not found in thread {thread_id}")
 
     feedback_repo = get_feedback_repo(request)
-    return await feedback_repo.upsert(
+    result = await feedback_repo.upsert(
         run_id=run_id,
         thread_id=thread_id,
         rating=body.rating,
         user_id=user_id,
         comment=body.comment,
     )
+    _push_langfuse_feedback_score(run_id, body.rating, body.comment)
+    return result
 
 
 @router.delete("/{thread_id}/runs/{run_id}/feedback")
@@ -132,7 +160,7 @@ async def create_feedback(
         raise HTTPException(status_code=404, detail=f"Run {run_id} not found in thread {thread_id}")
 
     feedback_repo = get_feedback_repo(request)
-    return await feedback_repo.create(
+    result = await feedback_repo.create(
         run_id=run_id,
         thread_id=thread_id,
         rating=body.rating,
@@ -140,6 +168,8 @@ async def create_feedback(
         message_id=body.message_id,
         comment=body.comment,
     )
+    _push_langfuse_feedback_score(run_id, body.rating, body.comment)
+    return result
 
 
 @router.get("/{thread_id}/runs/{run_id}/feedback", response_model=list[FeedbackResponse])

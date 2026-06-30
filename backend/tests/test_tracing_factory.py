@@ -79,7 +79,7 @@ def test_build_tracing_callbacks_creates_langsmith_and_langfuse(monkeypatch):
     monkeypatch.setattr(
         tracing_factory,
         "_create_langfuse_handler",
-        lambda cfg: FakeLangfuseHandler(public_key=cfg.public_key),
+        lambda cfg, trace_id=None: FakeLangfuseHandler(public_key=cfg.public_key),
     )
 
     callbacks = tracing_factory.build_tracing_callbacks()
@@ -107,7 +107,7 @@ def test_build_tracing_callbacks_raises_when_enabled_provider_fails(monkeypatch)
             },
         )(),
     )
-    monkeypatch.setattr(tracing_factory, "_create_langfuse_handler", lambda cfg: (_ for _ in ()).throw(RuntimeError("boom")))
+    monkeypatch.setattr(tracing_factory, "_create_langfuse_handler", lambda cfg, trace_id=None: (_ for _ in ()).throw(RuntimeError("boom")))
 
     with pytest.raises(RuntimeError, match="Langfuse tracing initialization failed"):
         tracing_factory.build_tracing_callbacks()
@@ -171,3 +171,53 @@ def test_create_langfuse_handler_initializes_client_before_handler(monkeypatch):
             },
         ),
     ]
+
+
+def test_create_langfuse_handler_passes_trace_context_when_trace_id_given(monkeypatch):
+    """传入 trace_id 时，应作为 trace_context 注入 CallbackHandler（v4 自定义 root trace）。"""
+    handler_kwargs: dict = {}
+
+    class FakeLangfuse:
+        def __init__(self, **kwargs):
+            pass
+
+    class FakeCallbackHandler:
+        def __init__(self, **kwargs):
+            handler_kwargs.update(kwargs)
+
+    fake_langfuse_module = types.ModuleType("langfuse")
+    fake_langfuse_module.Langfuse = FakeLangfuse
+    fake_langfuse_langchain_module = types.ModuleType("langfuse.langchain")
+    fake_langfuse_langchain_module.CallbackHandler = FakeCallbackHandler
+    monkeypatch.setitem(sys.modules, "langfuse", fake_langfuse_module)
+    monkeypatch.setitem(sys.modules, "langfuse.langchain", fake_langfuse_langchain_module)
+
+    cfg = type("LangfuseCfg", (), {"secret_key": "sk", "public_key": "pk-lf-test", "host": "h"})()
+
+    tracing_factory._create_langfuse_handler(cfg, trace_id="abc123")
+
+    assert handler_kwargs == {"public_key": "pk-lf-test", "trace_context": {"trace_id": "abc123"}}
+
+
+def test_build_langfuse_trace_id_deterministic_and_guarded(monkeypatch):
+    """启用 langfuse 时按 run_id 确定性派生 trace_id；未启用 / run_id 为空时返回 None。"""
+
+    class FakeLangfuse:
+        @staticmethod
+        def create_trace_id(*, seed=None):
+            return f"trace-of-{seed}"
+
+    fake_langfuse_module = types.ModuleType("langfuse")
+    fake_langfuse_module.Langfuse = FakeLangfuse
+    monkeypatch.setitem(sys.modules, "langfuse", fake_langfuse_module)
+
+    monkeypatch.setattr(tracing_factory, "get_enabled_tracing_providers", lambda: ["langfuse"])
+    assert tracing_factory.build_langfuse_trace_id("run-1") == "trace-of-run-1"
+    # 同一 run_id 必得同一 trace_id（feedback 回写依赖此确定性）
+    assert tracing_factory.build_langfuse_trace_id("run-1") == tracing_factory.build_langfuse_trace_id("run-1")
+    # run_id 为空 → None
+    assert tracing_factory.build_langfuse_trace_id("") is None
+
+    # langfuse 未启用 → None（即便 run_id 有值）
+    monkeypatch.setattr(tracing_factory, "get_enabled_tracing_providers", lambda: ["langsmith"])
+    assert tracing_factory.build_langfuse_trace_id("run-1") is None

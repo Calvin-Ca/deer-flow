@@ -6,6 +6,7 @@ Milvus collection 命名规则收口一处（重构前被复制三四份，极�
 """
 from __future__ import annotations
 
+import os
 import re
 from pathlib import Path
 
@@ -23,8 +24,10 @@ DEFAULTS: dict = {
 RERANK_MODEL = "BAAI/bge-reranker-large"
 # cross-encoder 精排所用 GPU——**单卡**。新版 FlagEmbedding 的 FlagReranker 默认吃光所有可见 GPU、
 # 每次 compute_score 跨多卡 spawn 多进程池（起池就 ~21s），给几十个候选重排纯属灾难性 overhead。
-# 钉死单卡 → 走单进程、不起池，P95 从分钟级降回亚秒级。需换卡只改这一行（如 "cuda:1"）。
-RERANK_DEVICE = "cuda:0"
+# 钉死单卡 → 走单进程、不起池，P95 从分钟级降回亚秒级。
+# 默认 cuda:2（本机 0/1/3 被 vLLM 占满、仅 2 有空闲）；GPU 分配变动时用 env CE_RERANK_DEVICE 覆盖，
+# 不必改代码。所选卡需 ≥~2G 空闲（bge-reranker-large fp16），否则 OOM→静默 fallback RRF（精排失效）。
+RERANK_DEVICE = os.environ.get("CE_RERANK_DEVICE", "cuda:2")
 EMBED_MODEL = "BAAI/bge-large-zh-v1.5"
 EMBED_DIM = 1024  # bge-large-zh-v1.5 输出维度
 COLLECTION_PREFIX = "building_code"

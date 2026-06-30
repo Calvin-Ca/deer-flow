@@ -317,7 +317,7 @@
 
 ---
 
-## 主线四：任务层能力 MCP 化 + 前端依据渲染（🟡 代码就位，待服务器验，2026-06-30）
+## 主线四：任务层能力 MCP 化 + 前端依据渲染（🟢 norm_qa 全链服务器验通，2026-06-30）
 
 > 动机：deer-flow「中间过程」折叠流只渲染 思考 + 工具调用，且泛型工具分支不渲染结果；norm-qa / cost-agent 走 bash
 > skill 进来，依据全埋在 bash stdout 看不见 → 造价用户拿不到「凭什么这么答」。方案 A：把无状态任务层能力 MCP 工具化
@@ -333,9 +333,17 @@
 - [x] **agent 提示词改走 MCP**：`skills/public/norm-qa/SKILL.md` 主路径改优先调 `ce-task_norm_qa`、`cost-agent/SKILL.md`
   模式一 compose 改优先调 `ce-task_cost_compose`（理由=结果结构化渲染进对话中间过程）；bash skill 保留作 curl/无 MCP
   兜底。cost-agent 模式二 HITL（start+内嵌卡）不变——有状态、不 MCP 化。
-- [ ] **🔴 服务器验**：① 服务器 `uv add mcp` 落锁 + 重启 :8101，`curl :8101/mcp` 列出 ce-task 两工具；
-  ② gateway 重启加载 `ce-task_*` 工具；③ 前端 `pnpm check` + 浏览器对话调 norm_qa/cost_compose 看依据卡渲染
-  （本地无 node_modules/python+mcp，未本地验）；④ 确认 MCP 工具 result 的实际序列化形状与 `ce-tool-result` 防御性读取吻合。
+- [x] **服务器验（norm_qa 全链 ✅ 2026-06-30）**：① `:8101/mcp` initialize 回 `serverInfo.name=ce-task`；
+  ② gateway 首次对话懒加载 `Successfully loaded 5 tool(s)`（ce-cost 3 + ce-task 2）、`Total tools loaded: 7`；
+  ③ 前端发「现浇矩形柱按什么计量/gb50854-2024」→ **agent 选用 `ce-task_norm_qa`（未退回 bash）→ 依据卡渲染**
+  「规范问答：… / 命中 15 条引用 1 条 / GB_T50854-2024 E.7.3」→ 答案带 E.7.3 溯源；④ result 序列化形状与
+  `ce-tool-result` 防御性读取吻合（字段全对上）。**意外收获**：qwen3-8b 走 MCP function-calling 比走 bash+贴 marker
+  可靠得多（TODO 阻塞1 那类翻车没复现）。
+- [x] **依据卡显原文片段**（2026-06-30）：`ce-tool-result.tsx` NormQa 从「只显标准号+条款号」改为附 `cited_clauses[].text`
+  原文片段（截断 140 字、contextual 标「背景参考」）。依据：PRD C-01 溯源（标准号+版本+条款号）现卡片已满足，页码/章节非
+  必须且页码 edition-dependent 不如条款号权威；显原文是零成本（字段已在）、最高核验价值的增强（讨论见对话）。
+- [ ] **cost_compose 卡片肉眼验**（渲染走同一组件、MCP 已加载，信心高但未单独视觉确认）：发一句组价看「组价选码」卡。
+- [ ] **前端 `pnpm check`（服务器）**：本地无 node_modules，ce-tool-result + message-group 改动的 eslint+tsc 待服务器过一轮。
 
 ---
 

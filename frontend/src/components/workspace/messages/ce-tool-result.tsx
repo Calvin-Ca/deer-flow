@@ -43,6 +43,11 @@ function str(v: unknown): string | undefined {
 function num(v: unknown): number | undefined {
   return typeof v === "number" && !Number.isNaN(v) ? v : undefined;
 }
+/** 折叠卡里只显原文片段，截断到 n 字（完整原文在最终答案/可点开溯源里）。 */
+function clip(s: string, n = 140): string {
+  const t = s.replace(/\s+/g, " ").trim();
+  return t.length > n ? t.slice(0, n) + "…" : t;
+}
 
 /** 把任意工具 result（string / object / 加载中 undefined）规整成 object。 */
 function resultObj(result?: string | Rec): Rec | undefined {
@@ -107,14 +112,26 @@ function NormQa({ args, r }: { args: Rec; r?: Rec }) {
       description={desc}
     >
       {cited.length > 0 && (
-        <ChainOfThoughtSearchResults>
-          {cited.slice(0, 8).map((c, i) => (
-            <ChainOfThoughtSearchResult key={i}>
-              {[str(c.standard), str(c.clause)].filter(Boolean).join(" ") ||
-                "条文"}
-            </ChainOfThoughtSearchResult>
-          ))}
-        </ChainOfThoughtSearchResults>
+        <div className="space-y-1.5">
+          {cited.slice(0, 6).map((c, i) => {
+            const head =
+              [str(c.standard), str(c.clause)].filter(Boolean).join(" ") ||
+              "条文";
+            const text = str(c.text);
+            const contextual = str(c.relevance) === "contextual";
+            return (
+              <div key={i} className="text-xs leading-snug">
+                <span className="font-medium">{head}</span>
+                {contextual && (
+                  <span className="text-muted-foreground"> · 背景参考</span>
+                )}
+                {text && (
+                  <span className="text-muted-foreground"> — {clip(text)}</span>
+                )}
+              </div>
+            );
+          })}
+        </div>
       )}
     </ChainOfThoughtStep>
   );

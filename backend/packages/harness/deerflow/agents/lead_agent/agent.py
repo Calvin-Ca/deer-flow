@@ -453,7 +453,10 @@ def _make_lead_agent(config: RunnableConfig, *, app_config: AppConfig):
     # actually propagates ``langfuse_session_id`` / ``langfuse_user_id`` from
     # ``config["metadata"]`` onto the trace. Without root-level attachment the
     # model is a nested observation and the handler strips ``langfuse_*`` keys.
-    tracing_callbacks = build_tracing_callbacks()
+    # worker 在 configurable 里预置了由 run_id 派生的确定性 langfuse_trace_id，
+    # 透传给 Langfuse handler，使这条 run 落到该 trace 上、供 feedback 事后回写 score。
+    _configurable_for_trace = config.get("configurable") or {}
+    tracing_callbacks = build_tracing_callbacks(langfuse_trace_id=_configurable_for_trace.get("langfuse_trace_id"))
     if tracing_callbacks:
         existing = config.get("callbacks") or []
         if not isinstance(existing, list):

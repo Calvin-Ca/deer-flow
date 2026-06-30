@@ -33,7 +33,7 @@ from deerflow.config.app_config import AppConfig
 from deerflow.runtime.serialization import serialize
 from deerflow.runtime.stream_bridge import StreamBridge
 from deerflow.runtime.user_context import get_effective_user_id
-from deerflow.tracing import inject_langfuse_metadata, resolve_active_prompt_variant
+from deerflow.tracing import build_langfuse_trace_id, inject_langfuse_metadata, resolve_active_prompt_variant
 
 from .manager import RunManager, RunRecord
 from .naming import resolve_root_run_name
@@ -246,6 +246,13 @@ async def run_agent(
             environment=os.environ.get("DEER_FLOW_ENV") or os.environ.get("ENVIRONMENT"),
             variant=resolve_active_prompt_variant(ctx.app_config),
         )
+
+        # 由 run_id 确定性派生 langfuse trace_id 并预置进 configurable：make_lead_agent
+        # 据此把这条 run 绑定到该 trace，feedback 路由事后用同一 run_id 重算出同一
+        # trace_id 即可回写 score（线上反馈→评测样本闭环）。未启用 langfuse 时返回 None。
+        _langfuse_trace_id = build_langfuse_trace_id(run_id)
+        if _langfuse_trace_id:
+            config.setdefault("configurable", {})["langfuse_trace_id"] = _langfuse_trace_id
 
         # Resolve after runtime context installation so context/configurable reflect
         # the agent name that this run will actually execute.

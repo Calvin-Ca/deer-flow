@@ -47,6 +47,9 @@ services:
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:-417184d53bb04353fbb18183e3914cae0b60a8dec01e8f19f0c8465c5c41cce8}
       TELEMETRY_ENABLED: ${TELEMETRY_ENABLED:-false}
       LANGFUSE_ENABLE_EXPERIMENTAL_FEATURES: ${LANGFUSE_ENABLE_EXPERIMENTAL_FEATURES:-false}
+      # 放行内网私网 IP 的 LLM connection（SSRF 防护默认拦 172.16/12 等私网段，
+      # 内网自托管 vLLM 必须开；web/worker 都要加。详见 benchmark/LANGFUSE.md §5.0）
+      LANGFUSE_UNSAFE_TRUSTED_PRIVATE_IPS: "true"
       # ── ClickHouse（trace 明细存储）────────────────────────────
       CLICKHOUSE_MIGRATION_URL: clickhouse://clickhouse:9000
       CLICKHOUSE_URL: http://clickhouse:8123
@@ -104,6 +107,8 @@ services:
       SALT: ${SALT:-FkkV/FYoVaVcNW4YqzcL+0gwrvFKzGMpYc4qh5tj9GA=}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:-417184d53bb04353fbb18183e3914cae0b60a8dec01e8f19f0c8465c5c41cce8}
       TELEMETRY_ENABLED: ${TELEMETRY_ENABLED:-false}
+      # 同 web：放行内网私网 IP 的 LLM connection（SSRF 防护默认拦私网段）
+      LANGFUSE_UNSAFE_TRUSTED_PRIVATE_IPS: "true"
       CLICKHOUSE_MIGRATION_URL: clickhouse://clickhouse:9000
       CLICKHOUSE_URL: http://clickhouse:8123
       CLICKHOUSE_USER: clickhouse

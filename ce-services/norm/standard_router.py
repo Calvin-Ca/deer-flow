@@ -132,7 +132,24 @@ class StandardResolution:
 
 
 _VERSION_RE = re.compile(r"(20\s*13|20\s*24)")
-_HINT_RE = re.compile(r"(gb\s*50500|gb\s*50854|gb\s*50856)[^\d]*(20\s*13|20\s*24)?", re.IGNORECASE)
+# 五位规范码（50500/50854/50856）可出现在任意串里：代号 gb50854-2024、store 名 GB_T50854-2024_…、
+# 散写 GB/T 50854 均能认。版本（2013/2024）单独抠。
+_CODE_RE = re.compile(r"(50500|50854|50856)")
+
+
+def family_version_of(text: str | None) -> tuple[str | None, str | None]:
+    """从任意规范串里**宽松**抽 (family, version)。
+
+    认得：``gb50854-2024`` / ``GB_T50854-2024_房屋…``（store 名）/ ``GB/T 50854`` / ``50500`` 等；
+    抽不到对应位返回 None。供 hint 解析与 guard 口径纯净校验复用（cited_clause.standard 即 store 名）。
+    """
+    if not text:
+        return None, None
+    code_m = _CODE_RE.search(text)
+    family = ("gb" + code_m.group(1)) if code_m else None
+    ver_m = _VERSION_RE.search(text)
+    version = ver_m.group(1).replace(" ", "") if ver_m else None
+    return family, version
 
 
 def _count_hits(text: str, vocab: tuple[str, ...]) -> list[str]:
@@ -153,18 +170,11 @@ def _parse_version(text: str) -> str | None:
 
 
 def parse_hint(hint: str | None) -> tuple[str | None, str | None]:
-    """解析调用方 hint（可能是完整代号 ``gb50854-2024``，也可能脏写）→ (family, version)。
+    """解析调用方 hint（完整代号 ``gb50854-2024`` 或脏写）→ (family, version)。
 
-    宽松匹配：``gb50854-2024`` / ``GB 50854 2024`` / ``gb50500`` 都能认；认不出返回 (None, None)。
+    薄封装 ``family_version_of``；认不出返回 (None, None)。
     """
-    if not hint:
-        return None, None
-    m = _HINT_RE.search(hint)
-    if not m:
-        return None, None
-    family = "gb" + re.sub(r"\D", "", m.group(1))  # gb50854
-    version = m.group(2).replace(" ", "") if m.group(2) else None
-    return family, version
+    return family_version_of(hint)
 
 
 def _clamp_version(family: str, version: str) -> tuple[str, list[str]]:

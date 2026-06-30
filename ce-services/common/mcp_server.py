@@ -53,7 +53,7 @@ except ImportError:  # pragma: no cover
 from common import knowledge_client
 from common.config import LLM_MODEL_ID, LLM_URL
 from cost import orchestration
-from norm import generation
+from norm import generation, guards
 from norm.standard_router import resolve_standard
 
 logger = logging.getLogger("ce-services.mcp")
@@ -116,17 +116,15 @@ def norm_qa(
         raise ToolError(f"知识服务不可达: {exc}") from exc
 
     clauses = search_resp.get("clauses", [])
+    search_meta = search_resp.get("meta", {})
     if not clauses:
-        # 零召回：不喂空上下文给 LLM 编答案，直接返回「无依据」（与 /norm/qa 一致）。
-        return {
-            "answer": "未在所选造价规范中检索到与问题相关的条文，无法作答。本回答仅供参考，不替代专业造价审核。",
-            "cited_clauses": [],
-            "uncertain_aspects": ["检索零召回，可能问题超出该规范范围或需换用其它规范"],
-            "out_of_scope_warnings": [],
-            "meta": {"standard": resolved, "retrieved": 0,
-                     "standard_resolution": resolution.as_meta(),
-                     "search_meta": search_resp.get("meta", {})},
-        }
+        # C-03 校验闸（零召回）：不喂空上下文给 LLM，集中化结构化拒答（给出路；与 /norm/qa 一致）。
+        result, report = guards.reject_no_recall(resolved, search_meta=search_meta)
+        result["meta"] = {"standard": resolved, "retrieved": 0,
+                          "standard_resolution": resolution.as_meta(),
+                          "guard": report.as_meta(),
+                          "search_meta": search_meta}
+        return result
 
     try:
         result = generation.answer(query, clauses, LLM_URL, LLM_MODEL_ID)
@@ -135,11 +133,18 @@ def norm_qa(
     except ValueError as exc:  # json.JSONDecodeError 是 ValueError 子类
         raise ToolError(f"LLM 输出非合法 JSON: {exc}") from exc
 
+    # C-01/C-02 校验闸（生成后）：剔除他部/跨版条文、规范化溯源；全污染则降级拒答。
+    result, report = guards.audit_answer(result, resolved_standard=resolved, search_meta=search_meta)
+    if report.violations:
+        logger.warning("norm_qa 校验闸 standard=%s verdict=%s 剔除=%d 违规=%s",
+                       resolved, report.verdict, report.cited_dropped, report.violations)
+
     result["meta"] = {
         "standard": resolved,
         "retrieved": len(clauses),
         "standard_resolution": resolution.as_meta(),
-        "search_meta": search_resp.get("meta", {}),
+        "guard": report.as_meta(),
+        "search_meta": search_meta,
     }
     return result
 

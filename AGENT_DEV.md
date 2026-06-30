@@ -224,7 +224,7 @@ ce-services 任务层 `:8101`，挂在 `cost_router`（`main.py:46`，无额外 
 |---|---|:--:|:--:|---|
 | ① 前置路由 | 能力分流 + 形态判定 + 规范映射，确定性 | 无 LLM | 🔴 缺 | 现由 deer-flow lead-agent(8b)自由判断（标准漂移即此弱点）；§8 块1/块3 只做了地域+版本默认，未做能力路由与规范映射 |
 | ② 能力层 | RAG 接地生成 / 置信门控选码 / 取数 / 算钱 | **8b** | 🟢 基本就位 | 组价 HITL 图（§1–7 `cost/graph.py`）+ MCP `ce-task`(`common/mcp_server.py`) + 门控(`gates.py`) + 计算工具(`pricing.py`) + norm RAG(`norm/router.py`) |
-| ③ 校验闸 | 溯源 / 拒答 / 口径纯净，结构化拦截 | 无 LLM | 🟡 部分 | 溯源(provenance/cited_clauses ✅)、拒答(norm 零召回 ✅)已有；口径纯净度(C-02)随 §8 web 兜底待开工；**未统一成显式一层** |
+| ③ 校验闸 | 溯源 / 拒答 / 口径纯净，结构化拦截 | 无 LLM | 🟢 已成层(norm) | **T-A3 已落地**：`norm/guards.py` 把 C-01 溯源完整 / C-02 口径纯净(他部+跨版剔除) / C-03 零召回拒答统一为显式 guard（`GuardReport`→`meta.guard`），接进 `/norm/qa`+MCP。cost 侧仍走 provenance 信封(need_review/no_source)，待对齐同契约；C-02 联网 Tier-2 降级标注随 §8 web 兜底并入 |
 | ④ 复合编排 | 拆解(EH-01) + 综合 + 高阶推理(FR-X/FR-C) | **32b** | 🔴 缺 | §2.2 冲突4「缺 Orchestrator」/§3 改3「架构归位·中」即此；无意图分类、无复合拆解、无 32b 接线 |
 
 ### 9.3 模型分层结论（8b / 32b）
@@ -256,7 +256,7 @@ ce-services 任务层 `:8101`，挂在 `cost_router`（`main.py:46`，无额外 
 
 - [ ] **T-A1 · 前置路由层（①）**：能力分流（cost/norm/price）+ 形态判定（单/复合 EH-01、特征缺 EH-04、口径缺 EH-05），确定性/轻分类器实现，置于 agent 之前；输出路由落点 + 形态标记供下游。对应 PRD §4.1/§4.3
 - [x] **T-A2 · 规范选择确定化（①，高优先）· 已落地**：「问题类型→规范代号」确定性映射（计量→GB50854 / 计价→GB50500 / 安装→GB50856），从 LLM 自由判断手里夺回——**直接根治标准漂移 bug**（50854→50500）。实现 = `norm/standard_router.py`（关键词规则两轴：intent 计价/计量 + discipline 房建/安装，纯函数零 LLM；降级安全：零命中回退 hint、无 hint 默认 50854；版本轴 query>hint>default 仅轻解析，版本默认策略留 §8 块1/T9-1）。接线：`/norm/qa` 端点 + `ce-task_norm_qa` MCP 工具——`standard` 改可选 hint，进检索前跑 `resolve_standard`，family 与 hint 冲突即**夺回**（`overrode_hint`，warning 日志），meta 加 `standard_resolution` 全证据。验证：内置自测 19/19（含 2 例漂移夺回 + 版本钳制 50856-2013→2024）；金标 `benchmark/routing_eval` norm-qa family 选择 6/6=100%（A6 越界跳过，归校验闸 T-A3）。代码 `ce-services/norm/standard_router.py` + `norm/router.py` + `common/mcp_server.py` + `tools/standard_router_eval.py`。**待服务器端到端验证**（真 :8100/:8101，并入 T-A6）
-- [ ] **T-A3 · 校验闸成层（③）**：把溯源(C-01)/拒答(C-03)/口径纯净(C-02)统一为显式 guard（前置或后置），结构化拦截、不靠 LLM 自觉；与 §8.3 web 三道闸、依据卡 source 字段对齐
+- [x] **T-A3 · 校验闸成层（③）· 已落地（norm-qa 侧）**：把溯源(C-01)/拒答(C-03)/口径纯净(C-02)统一为显式 guard（生成后/检索后确定性执行，不靠 LLM 自觉）。实现 = `norm/guards.py`：**C-03** 零召回拒答集中化（`reject_no_recall`，给出路 + tier=none）；**C-02** 口径纯净（`audit_answer` 逐条 cited_clause 抽 family/version，与 resolved 冲突即剔除——他部=串库、跨版=同码不同义；全剔光则降级拒答 verdict=reject）；**C-01** 溯源完整（保留条 `standard` 确定性规范化为 resolved 全码，标准号+版本恒带齐、不靠 LLM 抄对；缺条款号标 `provenance_complete=False`）。产出结构化 `GuardReport`（verdict/violations/caliber_pure/provenance_complete/tier，进 `meta.guard`）。接线 `/norm/qa` + `ce-task_norm_qa`：零召回走 reject_no_recall、生成后跑 audit_answer + warning 日志。family 抽取复用 `standard_router.family_version_of`（兼容 store 名 `GB_T50854-2024_…`）。验证：内置自测 9/9（他部剔除 / 跨版剔除→reject / 缺条款号标记不剔 / 全合规 pass）。**范围**：当前覆盖 norm-qa（C-01/02/03 在此最缺显式层）；cost 侧已有 provenance 信封做结构化拦截（need_review/no_source），后续对齐同一 GuardReport 契约。**C-02 联网降级标注**（Tier-2）随 §8 web 兜底落地时并入此层。代码 `ce-services/norm/guards.py` + `norm/router.py` + `common/mcp_server.py` + `norm/standard_router.py`(`family_version_of`)
 - [ ] **T-A4 · 复合编排器（④）**：EH-01 拆解 → 子任务回 ① 路由 → 综合；承接 FR-X02/X03、FR-C。对应 §2.2 冲突4 / §3 改3「架构归位」
 - [ ] **T-A5 · 模型分层接线**：`config.yaml` 配双模型；桶 A(② norm_qa生成/直配/取价/澄清) 走 8b、桶 B(④复合推理 + FR-C 深核对 + **选码消歧 τ 区间**) 走 32b（落位表见 §9.3）。GPU 充足、8b+32b 并存无顾虑（2026-06-30 确认）；仍注意 GPU 分配（reranker 已占 cuda:2，见 ce-code 经验）
 - [ ] **T-A6 · 端到端验证**：路由正确率 ≥95%（脏请求 EH-01~05，复用 `benchmark/routing_eval/` 金标）+ 延迟分桶 P95（FR-K≤3s/FR-P01≤2s/复合≤5s）+ 复合桶质量抽检；红线回归（检索层算数=0、组价/价格联网=0）

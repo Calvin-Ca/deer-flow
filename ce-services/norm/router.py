@@ -15,7 +15,7 @@ from pydantic import BaseModel, Field
 
 from common import knowledge_client
 from common.config import LLM_MODEL_ID, LLM_URL
-from norm import generation
+from norm import generation, guards
 from norm.standard_router import resolve_standard
 
 logger = logging.getLogger("ce-services.norm")
@@ -73,19 +73,17 @@ def norm_qa_endpoint(req: NormQARequest) -> dict:
         raise HTTPException(status_code=503, detail=f"知识服务不可达: {exc}") from exc
 
     clauses = search_resp.get("clauses", [])
+    search_meta = search_resp.get("meta", {})
     retrieve_ms = (time.perf_counter() - t0) * 1000
     if not clauses:
-        # 无召回：不喂空上下文给 LLM 编答案，直接返回"无依据"
-        return {
-            "answer": "未在所选造价规范中检索到与问题相关的条文，无法作答。本回答仅供参考，不替代专业造价审核。",
-            "cited_clauses": [],
-            "uncertain_aspects": ["检索零召回，可能问题超出该规范范围或需换用其它规范"],
-            "out_of_scope_warnings": [],
-            "meta": {"standard": standard, "retrieved": 0,
-                     "retrieve_ms": round(retrieve_ms),
-                     "standard_resolution": resolution.as_meta(),
-                     "search_meta": search_resp.get("meta", {})},
-        }
+        # ③ C-03 校验闸（零召回）：不喂空上下文给 LLM，集中化结构化拒答（给出路）。
+        result, report = guards.reject_no_recall(standard, search_meta=search_meta)
+        result["meta"] = {"standard": standard, "retrieved": 0,
+                          "retrieve_ms": round(retrieve_ms),
+                          "standard_resolution": resolution.as_meta(),
+                          "guard": report.as_meta(),
+                          "search_meta": search_meta}
+        return result
 
     # ② 生成：检索条文 → 结构化带引用回答
     t1 = time.perf_counter()
@@ -97,14 +95,22 @@ def norm_qa_endpoint(req: NormQARequest) -> dict:
         raise HTTPException(status_code=502, detail=f"LLM 输出非合法 JSON: {exc}") from exc
     generate_ms = (time.perf_counter() - t1) * 1000
 
-    logger.info("/norm/qa standard=%s (hint=%s src=%s) retrieved=%d retrieve=%.0fms generate=%.0fms",
-                standard, req.standard, resolution.source, len(clauses), retrieve_ms, generate_ms)
+    # ③ C-01/C-02 校验闸（生成后）：剔除他部/跨版条文、规范化溯源；全污染则降级拒答。
+    result, report = guards.audit_answer(result, resolved_standard=standard, search_meta=search_meta)
+    if report.violations:
+        logger.warning("/norm/qa 校验闸 standard=%s verdict=%s 剔除=%d 违规=%s",
+                       standard, report.verdict, report.cited_dropped, report.violations)
+
+    logger.info("/norm/qa standard=%s (hint=%s src=%s) retrieved=%d verdict=%s retrieve=%.0fms generate=%.0fms",
+                standard, req.standard, resolution.source, len(clauses), report.verdict,
+                retrieve_ms, generate_ms)
     result["meta"] = {
         "standard": standard,
         "retrieved": len(clauses),
         "retrieve_ms": round(retrieve_ms),
         "generate_ms": round(generate_ms),
         "standard_resolution": resolution.as_meta(),
+        "guard": report.as_meta(),
         "search_meta": search_resp.get("meta", {}),
     }
     return result

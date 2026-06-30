@@ -38,7 +38,55 @@ uv run --project backend python benchmark/runner/run_routing_experiment.py --run
 >
 > **实现说明**：脚本**主线程逐条**跑（与 `smoke_test.py` 同一调用路径，已验证干净退出），**未用** `dataset.run_experiment`——后者在自己的事件循环里调 task，会和 `DeerFlowClient.stream` 的持久 MCP 会话生命周期相撞而崩（cancel scope / Task destroyed）。每条跑完读回其 trace，用 `dataset_run_items.create` 把这条 agent trace 直接关联进同名 dataset run，再 `create_score` 挂 `route_correct` / `clarify_correct`——所以 UI 里 Datasets→Runs 下每条就是 agent 自己的完整 trace，分数也挂在同一条上，不再是两棵分离的树。
 
-数据集口径见 `benchmark/routing_eval/README.md` 与 `benchmark/AGENT_BENCHMARK.md`。`retrieval_eval` / `agent_eval` 暂未接入 uploader，按相同套路扩 `upload_datasets.py` 即可。
+### 任务2 扩展 · 清单匹配评测（retrieval_eval 之 match）
+
+「清单匹配」= 构件描述 → 9 位清单码。**复用 `ce-services/tools/eval_select.py` 的成熟评测**（bill_match 召回 + select_code 选码 + Recall@k / 端到端 Top-1 / 候选内 Top-1 / 高置信错码=0 红线），只加 Langfuse 层。需 :8100 知识服务 + :8099 vLLM 在跑。
+
+先灌金标（2013+2024 合进一个 dataset）：
+
+```
+uv run --project backend python benchmark/runner/upload_datasets.py --only clist
+```
+
+再按版本跑（每次一个 spec；`--run-name` 建议带版本便于横向比）：
+
+```
+uv run --project backend python benchmark/runner/run_retrieval_experiment.py --spec 2024 --run-name clist_2024_v1
+```
+
+逐条挂 `match_top1`（端到端选码命中）/ `recalled`（金标是否进候选）两分到 `clist-match-eval` 的 dataset run；终端同时打印 eval_select 的完整指标表（含 PRD Top-1≥85% 红线对照）。
+
+> 范围：只接了**清单匹配**（`match_gold*.jsonl`）。**条文召回**（`gb50016_eval.json`）的 standard `gb50016` 不在 qa.py 支持列表（仅 gb50500/50854/50856），待知识服务加载该规范后再按同套路加 qa.py 驱动。`match_gold_2013_uncovered.jsonl` 是「库未覆盖码」清单（无 query），量覆盖缺口、不进召回评测。
+
+### 任务2 扩展 · agent_eval 三子集（先接管道，数据后补）
+
+`agent_eval/{toolcall,cost_task,norm_faithful}` 当前多为 **2 行 sample 模板**。按「先接进来、数据以后补」：upload 优先读真金标 `{name}.jsonl`、没有才回退 `{name}.sample.jsonl`——**补好同名 `.jsonl` 重传即覆盖，无需改代码**。
+
+全部金标一次灌（routing/clist/toolcall/cost_task/norm_faithful/clause）：
+
+```
+uv run --project backend python benchmark/runner/upload_datasets.py
+```
+
+或单传：`--only toolcall` / `--only cost_task` / `--only norm_faithful` / `--only clause`。
+
+**已能跑的 runner —— 工具调用评测**（需四服务起齐）：
+
+```
+uv run --project backend python benchmark/runner/run_toolcall_experiment.py --run-name toolcall_v1 --model qwen-plus
+```
+
+逐条挂 `tool_correct`（调没调对工具）/ `call_correct`（工具名对 + args 按 `arg_match` 命中）。
+⚠️ 金标 `expected_call.tool` 须用**真实 agent 工具名**（qa.py/cost.py/ce-cost_*）；sample 里的 `query_bill_8100` 是理想名，照搬恒不命中。
+
+**待补前置、runner 暂未建的**：
+
+| 集 | runner 卡在哪 |
+|---|---|
+| `cost_task` | 端到端终态校验（`terminal_check`）要跑完整 agent + 解析组价终态 schema，待真金标 + 终态校验器 |
+| `norm_faithful` / `clause`（gb50016） | standard `gb50016` 不在 qa.py 支持列表；忠实度类指标走 LLM-judge 又撞 SSRF（§6.6）。待知识服务加载 GB50016 + SSRF 出路 |
+
+数据集口径见 `benchmark/routing_eval/README.md` 与 `benchmark/AGENT_BENCHMARK.md`（§L3 Recall@k、§L6-B arg_match）。
 
 ## 任务4 · UI 侧评测喂料（Prompt Experiments / LLM-as-judge）
 

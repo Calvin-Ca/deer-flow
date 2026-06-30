@@ -1,7 +1,8 @@
 # Langfuse 接入与评测闭环说明
 
 > 本文记录把 **Langfuse**（LLM 可观测性 + 评测平台）接入 deer-flow、并打通三件事的**架构、用法与踩坑过程**。
-> 操作命令见 [`runner/README.md`](runner/README.md)；评测体系/分层口径见 [`AGENT_BENCHMARK.md`](AGENT_BENCHMARK.md)；自托管部署见 [`../docker/langfuse/README.md`](../docker/langfuse/README.md)。
+> **文档对**：本文是 **「怎么用 Langfuse 测」（操作步骤 → [§9 runbook](#9-端到端测试步骤runbook)）**；**「测什么 / 分层指标口径」见 [`AGENT_BENCHMARK.md`](AGENT_BENCHMARK.md)**。看那份定指标、看本文跑评测。
+> 另：操作命令细节见 [`runner/README.md`](runner/README.md)；自托管部署见 [`../docker/langfuse/README.md`](../docker/langfuse/README.md)。
 > 版本：langfuse **4.5.1**（自托管）；首次打通日期 2026-06-30。
 
 ---
@@ -75,11 +76,14 @@ trace_id = Langfuse.create_trace_id(seed=run_id)
 
 ## 4. 评测 runner（任务2 细节）
 
-`benchmark/runner/` 三脚本，服务器上 `uv run --project backend python ...` 跑。命令见 `runner/README.md`。
+`benchmark/runner/`，服务器上 `uv run --project backend python ...` 跑。命令见 `runner/README.md`。
 
 - `smoke_test.py`：驱动一次对话→`api.trace.list(session_id=...)` 读回→断言 `session_id`/`model:`/`variant:` 标签。
-- `upload_datasets.py`：`routing_eval/agent_routing_eval.jsonl` → Langfuse Dataset `agent-routing-eval`，以用例号作 item id（幂等 upsert）。
-- `run_routing_experiment.py`：逐条把 query 喂默认 lead agent，从工具调用判两项，读回 trace → `dataset_run_items.create` 关联进 dataset run + `create_score` 挂分。
+- `upload_datasets.py`：金标 → Langfuse Dataset（`--only routing` 路由集 / `--only clist` 清单匹配集，幂等 upsert）。
+- `run_routing_experiment.py`：逐条把 query 喂默认 lead agent，从工具调用判两率，读回 trace → `dataset_run_items.create` 关联进 dataset run + `create_score` 挂分。
+- `run_retrieval_experiment.py`：**清单匹配**评测——复用 `ce-services/tools/eval_select.py` 的 bill_match 召回 + select_code 选码（Recall@k / Top-1 / 高置信错码红线），手建 trace 挂 `match_top1` / `recalled`。需 :8100 + :8099。
+- `run_toolcall_experiment.py`：**工具调用**评测——逐条跑 agent，按 `arg_match`（exact/subset）比完整 tool_calls 与 `expected_call`，挂 `tool_correct` / `call_correct`。需四服务起齐。
+- `upload_prompts.py`：把自包含 prompt（intent 分类）推进 Prompt Management（供 UI 侧 Prompt Experiments，当前受 §6.6 SSRF 阻断搁置）。
 
 **判定口径**（对标 `routing_eval/README` 两率）：
 - `route_correct`：该调脚本就调——按**工具名**判（`qa.py` / `cost.py` / `ce-cost_*`），bash/read_file 瞎折腾不算。
@@ -196,9 +200,92 @@ config.yaml 里没有叫 `qwen-plus` 的模型。先用 `DeerFlowClient().list_m
 ## 8. 后续 TODO
 
 - [ ] 换强模型（真实 config 模型名）重跑，多 `--run-name` 在 Langfuse Runs 横向比，定方案 0/A。
-- [ ] `retrieval_eval` / `agent_eval` 接入 `upload_datasets.py`（同套路扩展）。
+- [x] `retrieval_eval` 之**清单匹配**接入：`upload_datasets.py --only clist` + `run_retrieval_experiment.py`（复用 ce-services `eval_select`，挂 `match_top1`/`recalled`）。
+- [ ] `retrieval_eval` 之**条文召回**（`gb50016_eval.json`）：standard `gb50016` 不在 qa.py 支持列表，待知识服务加载该规范 + 加 qa.py 驱动后接入（指标=expected_clauses 召回率 + must_be_mandatory 命中）。
+- [x] `agent_eval` 三子集 + 条文召回**数据集已接管道**（`upload_datasets.py` 全集 upload，优先真金标 `.jsonl`、回退 `.sample.jsonl`，补数据重传即覆盖）。
+- [x] `agent_eval/toolcall` runner 已建：`run_toolcall_experiment.py`（arg_match 判 `tool_correct`/`call_correct`）。前置：金标用真实工具名。
+- [ ] `agent_eval/cost_task` runner 待建：端到端跑 agent + `terminal_check` 终态校验（定额/费率带/must_cite），依赖组价终态 schema + 真金标。
+- [ ] `agent_eval/norm_faithful` + 条文召回 runner 待建：均打在 GB50016，**待 qa.py 支持 gb50016**（知识层）；忠实度类指标走 LLM-judge 又卡 SSRF（§6.6）。
 - [ ] 想清噪音后再消 MCP 会话 GC 报错（§6.1 残留）。根因是同进程跨多个事件循环复用全局 MCP 缓存——**串行救不了，靠进程/循环隔离**。两条路线择一：① 把整轮跑进**单个 asyncio 事件循环**（用 agent 异步接口逐条 await，会话全程同 loop）；② **子进程隔离**，每条用例 fork 独立进程跑（复刻已验证干净的冒烟测试路径，更稳、不改异步驱动，但 17× 冷启动明显变慢）。纯美观收益，不损结果，优先级低。
 - [x] norm-qa 忠实度 / cost 选码合理性走 LLM-as-judge：评分细则已落 `benchmark/judges/*.md`（喂料就绪）。
 - [x] intent 分类 Prompt Experiment 喂料就绪：`prompts/intent_classify.txt` + `runner/upload_prompts.py`。
 - [ ] 🚧 **UI 侧两功能（Prompt Experiments / LLM-as-judge）被 SSRF 阻断、暂搁置**（§6.6）：内网模型配 connection 必报 `Blocked IP`，v4 无放行开关。**重启时二选一**：① UI 侧接公网 qwen-plus（数据出内网）；② 改脚本驱动纯内网（脚本当判官 + `create_score` 推分，复用 `run_routing_experiment.py` 管道）。**倾向 ②**（合 §1「数据不出内网」），届时两份 judge 细则与 intent prompt 直接复用。
 - [ ] 启用后：两份 judge 先在小批人标样本上**校准**（judge 判 0/1 与人判一致率），再上量；忠实度可进一步对接 RAGAS。
+
+---
+
+## 9. 端到端测试步骤（runbook）
+
+把散在各节的命令串成一条可照抄的流程。**全部在服务器上跑**，命令单行。命令细节见 `runner/README.md`，口径见各 `*_eval/README` 与 `AGENT_BENCHMARK.md`。
+
+**先看「测什么 ↔ 怎么测」对照**（`AGENT_BENCHMARK.md` 定指标，本表给对应 runner 与 Langfuse score）：
+
+| AGENT_BENCHMARK 层（测什么） | runner（怎么测） | Langfuse score | 现状 |
+|---|---|---|---|
+| L1 路由 / L2 门控（落点 + 该反问就反问） | `run_routing_experiment.py` | `route_correct` / `clarify_correct` | ✅ 可跑 |
+| L3 检索 · 清单匹配（Recall@k / Top-1） | `run_retrieval_experiment.py` | `match_top1` / `recalled` | ✅ 可跑 |
+| L6-B 工具调用（arg_match） | `run_toolcall_experiment.py` | `tool_correct` / `call_correct` | ✅ 可跑 |
+| L3 检索 · 条文召回（expected_clauses） | 待建 | — | ⬜ 待 qa.py 支持 gb50016 |
+| 端到端组价（terminal_check） | 待建 | — | ⬜ 待终态校验 runner |
+| L6-C 规范问答忠实度（RAGAS/judge） | judge 细则备 `judges/*.md` | `norm_faithfulness` 等 | ⬜ 撞 SSRF，搁置（§5/§6.6） |
+
+### 步骤 0 · 前提（一次）
+
+1. 起 Langfuse 自托管栈（rootful docker，见 §6.6 双 daemon 坑）：`sudo docker compose -f docker/langfuse/docker-compose.yaml up -d`，UI 在 :3030。
+2. 根 `.env` 开上报四行并**重启 Gateway**：`LANGFUSE_TRACING=true` / `LANGFUSE_PUBLIC_KEY=...` / `LANGFUSE_SECRET_KEY=...` / `LANGFUSE_BASE_URL=http://localhost:3030`。
+3. 评测要 agent 真调脚本/取数，**四服务起齐**：:8100 知识检索、:8101 任务（cost/norm）、:8099 vLLM、Gateway。
+
+### 步骤 1 · 冒烟（先确认 trace 落库）
+
+```
+uv run --project backend python benchmark/runner/smoke_test.py
+```
+
+退出码 0 = trace 能落、标签对。不通先查 §0 的 env / 重启，再往下。
+
+### 步骤 2 · 灌全部金标到 Dataset（幂等）
+
+```
+uv run --project backend python benchmark/runner/upload_datasets.py
+```
+
+一次灌 6 个集（routing/clist/toolcall/cost_task/norm_faithful/clause）。补了真金标（agent_eval 的 `{name}.jsonl`）重跑本条即覆盖。单灌某集加 `--only <名>`。
+
+### 步骤 3 · 跑评测（现在可跑的三条）
+
+```
+uv run --project backend python benchmark/runner/run_routing_experiment.py --run-name routing_v1 --model qwen-plus
+```
+```
+uv run --project backend python benchmark/runner/run_retrieval_experiment.py --spec 2024 --run-name clist_2024_v1
+```
+```
+uv run --project backend python benchmark/runner/run_toolcall_experiment.py --run-name toolcall_v1 --model qwen-plus
+```
+
+各自终端打印聚合指标，并把逐条分挂到对应 dataset run：
+- 路由：`route_correct` / `clarify_correct`（两率）；
+- 清单匹配：`match_top1` / `recalled`（Top-1 + Recall@k，终端另有 eval_select 完整表）；
+- 工具调用：`tool_correct` / `call_correct`（arg_match）。
+
+> 横向比：换模型 / prompt variant 时改 `--run-name` 再跑，UI 里多个 run 并排比。
+
+### 步骤 4 · 在 UI 看结果（:3030）
+
+- 单条调用树：**Tracing** → 点 trace（prompt/工具/token/延迟）。
+- 一轮指标 + 逐条对错：**Datasets** → 对应集 → **Runs** → 你的 `--run-name`。
+- 多 run 横向比：Runs 列表并排。
+- 线上被点踩的真实 case：Tracing 按 `user_feedback` score 过滤。
+- 成本/延迟/错误率：**Dashboard** 按 tag/model/时间。
+
+### 步骤 5 · 暂不可跑的（前置未满足，别空跑）
+
+| 集 | 卡点 |
+|---|---|
+| `cost_task` | runner 待建（端到端跑 agent + `terminal_check` 终态校验）。数据集已可灌、可在 UI 见金标 |
+| 条文召回（gb50016）/ `norm_faithful` | standard `gb50016` 不在 qa.py 支持列表（知识层前置）；忠实度类指标走 LLM-judge 又撞 SSRF（§6.6） |
+| LLM-as-judge / Prompt Experiments（UI 侧） | 内网模型被 SSRF 拦，**暂搁置**；改脚本驱动纯内网或指公网模型（§5 状态横幅、§6.6） |
+
+### 一句话流程
+
+`(0 起栈+四服务) → (1 冒烟) → (2 upload_datasets) → (3 跑 routing/clist/toolcall 三 runner) → (4 UI Datasets→Runs 看分/横向比)`。语义类（judge）与 gb50016 相关项见步骤 5 的前置。

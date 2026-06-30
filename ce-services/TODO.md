@@ -317,6 +317,28 @@
 
 ---
 
+## 主线四：任务层能力 MCP 化 + 前端依据渲染（🟡 代码就位，待服务器验，2026-06-30）
+
+> 动机：deer-flow「中间过程」折叠流只渲染 思考 + 工具调用，且泛型工具分支不渲染结果；norm-qa / cost-agent 走 bash
+> skill 进来，依据全埋在 bash stdout 看不见 → 造价用户拿不到「凭什么这么答」。方案 A：把无状态任务层能力 MCP 工具化
+> （工具名/入参/结果结构化），前端按稳定工具名渲染依据。决策详见 `DEV.md §任务层能力 MCP façade`。
+
+- [x] **服务端 MCP façade** `common/mcp_server.py`：FastMCP `ce-task`（streamable-HTTP），`norm_qa` 复用
+  `knowledge_client.search`+`generation.answer`、`cost_compose` 复用 `orchestration.compose`，复用内核不反代 REST；
+  红线（spec/standard 必填、零召回拒答、need_review/no_source/501 透传）落工具边界。HITL 会话不暴露（有状态走内嵌卡）。
+- [x] **挂载 + 依赖 + 注册**：`main.py` 加 lifespan（`session_manager.run()`）+ `app.mount("/", …)` → `:8101/mcp`；
+  `pyproject.toml` 加 `mcp>=1.2`；`extensions_config.json` mcpServers 加 `ce-task`。
+- [x] **前端依据渲染** `frontend/.../messages/ce-tool-result.tsx`：集中 `ce-task_*`+`ce-cost_*` 渲染（cited_clauses /
+  选码+置信度 / 候选 / 取数 / 定额），`message-group.tsx` 加 `isCeTool` 委派分支，不污染上游通用组件。
+- [x] **agent 提示词改走 MCP**：`skills/public/norm-qa/SKILL.md` 主路径改优先调 `ce-task_norm_qa`、`cost-agent/SKILL.md`
+  模式一 compose 改优先调 `ce-task_cost_compose`（理由=结果结构化渲染进对话中间过程）；bash skill 保留作 curl/无 MCP
+  兜底。cost-agent 模式二 HITL（start+内嵌卡）不变——有状态、不 MCP 化。
+- [ ] **🔴 服务器验**：① 服务器 `uv add mcp` 落锁 + 重启 :8101，`curl :8101/mcp` 列出 ce-task 两工具；
+  ② gateway 重启加载 `ce-task_*` 工具；③ 前端 `pnpm check` + 浏览器对话调 norm_qa/cost_compose 看依据卡渲染
+  （本地无 node_modules/python+mcp，未本地验）；④ 确认 MCP 工具 result 的实际序列化形状与 `ce-tool-result` 防御性读取吻合。
+
+---
+
 ## 退役 · 规范 RAG 消费方（⛔ 2026-06-18，后端已随 ce-code 移除）
 
 - [⛔] **阶段1 code-qa skill**（原 `/qa`，Qwen3 结构化生成 + 强制引用）——后端 :8100 `/search` 已删。

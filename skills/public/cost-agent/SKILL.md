@@ -19,14 +19,18 @@ description: 算量计价 CostAgent 技能。接收构件/做法的自然语言�
 
 | 模式 | 用 | 何时 |
 |---|---|---|
-| **一次性 compose** | `cost.py compose` | 用户只想「知道某构件的清单码 / 工料机取数」，不需要走完整算价、不需要人逐步确认 |
-| **HITL 流程 start/resume** | `cost.py start` → 逐闸 `resume` | 用户要「走完整组价、算到总造价、要人确认编码/录入费率」——可中断、可审计 |
+| **一次性 compose** | MCP 工具 `ce-task_cost_compose`（bash `cost.py compose` 兜底） | 用户只想「知道某构件的清单码 / 工料机取数」，不需要走完整算价、不需要人逐步确认 |
+| **HITL 流程 start/resume** | `cost.py start` → 前端内嵌卡片 | 用户要「走完整组价、算到总造价、要人确认编码/录入费率」——可中断、可审计 |
 
 服务地址默认 `http://localhost:8101`（环境变量 `COST_AGENT_URL` 覆盖）。脚本是纯 stdlib 薄客户端，沙箱内零依赖。
 
 ---
 
 ## 模式一：一次性组价（compose）
+
+**首选 MCP 工具 `ce-task_cost_compose`**（对话主路径）：直接作为 function-calling 工具调用，参数 `description`（必填）/ `spec`（必填 2013/2024，红线 1 先确认）/ `region`（默认深圳）/ `top_k`（默认 10）。工具的**选中码、置信度、候选、取数状态会结构化渲染进对话中间过程**（用户看得见选码依据），优于 bash 把结论埋进 stdout。注册见 `extensions_config.json` 的 `ce-task`（`http://localhost:8101/mcp`），任务服务 :8101 起着即可用。
+
+兜底（curl/无 MCP 环境）：bash 调 `cost.py compose`：
 
 ```bash
 python3 /mnt/skills/public/cost-agent/cost.py compose \

@@ -1,0 +1,72 @@
+warning: `VIRTUAL_ENV=ce-code/.venv` does not match the project environment path `backend/.venv` and will be ignored; use `--active` to target the active environment instead
+/mnt/nvme/calvin/code/deer-flow/backend/.venv/lib/python3.12/site-packages/langgraph/checkpoint/serde/encrypted.py:5: LangChainPendingDeprecationWarning: The default value of `allowed_objects` will change in a future version. Pass an explicit value (e.g., allowed_objects='messages' or allowed_objects='core') to suppress this warning.
+  from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
+Your config.yaml (version 9) is outdated — the latest version is 10. Run `make config-upgrade` to merge new fields into your config.
+
+===== 变体 deerflow_prompt =====
+  [A1/no_version] noroute - web=False
+  [A2/no_version] noroute - web=False
+  [A3/with_version] noroute - web=False
+  [A4/with_version] noroute - web=False
+  [A5/with_version] noroute - web=False
+  [A6/boundary] noroute clarify web=False
+  [A7/no_version] noroute - web=False
+  [B1/no_version] noroute - web=False
+  [B2/no_version] noroute - web=False
+  [B3/with_version] noroute clarify web=False
+  [B4/with_version] noroute clarify web=False
+  [B5/with_version] noroute clarify web=False
+  [B6/with_version] noroute clarify web=False
+  [B7/with_version] noroute - web=False
+  [B8/with_version] noroute clarify web=False
+  [B9/with_version] noroute clarify web=False
+  [B10/no_version] noroute clarify web=False
+  → {'route_rate': 0.0, 'subagent_route_rate': 0.4375, 'reach_skill_rate': 0.4375, 'redline_rate': 0.1667, 'web_fallback_rate': 0.0, 'boundary_reject_rate': 1.0, 'n_total': 17, 'n_route': 16, 'n_no_version': 6, 'n_boundary': 1}
+
+===== 变体 v1_current_costized =====
+  [A1/no_version] route clarify web=False
+  [A2/no_version] noroute clarify web=False
+  [A3/with_version] route - web=False
+  [A4/with_version] noroute clarify web=False
+  [A5/with_version] noroute clarify web=False
+  [A6/boundary] noroute clarify web=False
+  [A7/no_version] noroute clarify web=False
+  [B1/no_version] route clarify web=False
+  [B2/no_version] noroute clarify web=False
+  [B3/with_version] noroute clarify web=False
+  [B4/with_version] noroute clarify web=False
+  [B5/with_version] noroute clarify web=False
+  [B6/with_version] noroute - web=False
+  [B7/with_version] noroute clarify web=False
+  [B8/with_version] noroute clarify web=False
+  [B9/with_version] route - web=False
+  [B10/no_version] noroute clarify web=False
+  → {'route_rate': 0.25, 'subagent_route_rate': 0.5, 'reach_skill_rate': 0.75, 'redline_rate': 1.0, 'web_fallback_rate': 0.0, 'boundary_reject_rate': 1.0, 'n_total': 17, 'n_route': 16, 'n_no_version': 6, 'n_boundary': 1}
+
+===== 变体 v2_runbook_saturated =====
+  [A1/no_version] route clarify web=False
+  [A2/no_version] route clarify web=False
+  [A3/with_version] route - web=False
+  [A4/with_version] route - web=False
+  [A5/with_version] noroute clarify web=False
+  [A6/boundary] noroute clarify web=False
+  [A7/no_version] route clarify web=False
+  [B1/no_version] route clarify web=False
+  [B2/no_version] route clarify web=False
+  [B3/with_version] route - web=False
+  [B4/with_version] route - web=False
+  [B5/with_version] route - web=False
+  [B6/with_version] route - web=False
+  [B7/with_version] route - web=False
+  [B8/with_version] noroute clarify web=False
+  [B9/with_version] route - web=False
+  [B10/no_version] route clarify web=False
+  → {'route_rate': 0.875, 'subagent_route_rate': 0.0, 'reach_skill_rate': 0.875, 'redline_rate': 1.0, 'web_fallback_rate': 0.0, 'boundary_reject_rate': 1.0, 'n_total': 17, 'n_route': 16, 'n_no_version': 6, 'n_boundary': 1}
+
+| 变体 | 路由率(直跑) | 子agent路由率 | 触达skill率 | 红线遵守率(主) | web兜底率(应0) | 越界拒答率 |
+|---|---|---|---|---|---|---|
+| deerflow_prompt | 0.0 | 0.4375 | 0.4375 | 0.1667 | 0.0 | 1.0 |
+| v1_current_costized | 0.25 | 0.5 | 0.75 | 1.0 | 0.0 | 1.0 |
+| v2_runbook_saturated | 0.875 | 0.0 | 0.875 | 1.0 | 0.0 | 1.0 |
+
+逐条 trace → /mnt/nvme/calvin/code/deer-flow/ce-services/notebooks/2026-06-26-1710-lead-prompt-ablation/results/raw_traces.jsonl

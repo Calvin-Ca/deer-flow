@@ -37,6 +37,7 @@ bash 命令、不再把结论埋在 bash stdout 里看不见。
 """
 from __future__ import annotations
 
+import logging
 from typing import Annotated
 
 import requests
@@ -53,6 +54,9 @@ from common import knowledge_client
 from common.config import LLM_MODEL_ID, LLM_URL
 from cost import orchestration
 from norm import generation
+from norm.standard_router import resolve_standard
+
+logger = logging.getLogger("ce-services.mcp")
 
 # 内网可信服务，关掉 DNS rebinding 保护——允许经 localhost / 服务器 IP 任意 Host 访问 :8101/mcp。
 mcp = FastMCP(
@@ -72,29 +76,38 @@ mcp = FastMCP(
 def norm_qa(
     query: Annotated[str, Field(description="造价/计量/计价类自然语言问题，如「现浇混凝土柱按什么计量」")],
     standard: Annotated[
-        str,
-        Field(description="规范代号（必填，无默认）：如 gb50854-2024 / gb50500-2013。按国标版本隔离，避免错版串库"),
-    ],
+        str | None,
+        Field(description="规范代号 hint（可选）：如 gb50854-2024。服务端按问题类型确定性定族"
+                          "（计量→50854/计价→50500/安装→50856），仅零命中时回退此 hint，错族由确定性夺回"),
+    ] = None,
     top_k: Annotated[int, Field(ge=1, le=50, description="检索召回条数")] = 15,
     skip_rerank: Annotated[bool, Field(description="跳过 cross-encoder 精排（调试用）")] = False,
 ) -> dict:
     """造价规范条文检索 + Qwen3 带引用作答（任务层 /norm/qa 的 MCP 表面）。
 
     **红线**：只引检索到的条文、零召回不喂空上下文给 LLM（直返「未检索到」），不编造条文号/原文。
+    **规范选择确定化（T-A2）**：选哪部规范由服务端 ``standard_router`` 按问题类型确定性裁定，
+    不再由（弱模型）调用方说了算——治「计量问题被路由到计价规范」的标准漂移。
 
     参数：
         query —— 造价/计量/计价自然语言问题。
-        standard —— 规范代号（必填，无默认）：gb50854-2024 / gb50500-2013 等，按版本隔离。
+        standard —— 规范代号 hint（可选）：gb50854-2024 等；仅在确定性零命中时作回退。
         top_k —— 检索召回条数（1–50）。
         skip_rerank —— 跳过精排（调试）。
     返回：``{answer, cited_clauses:[{clause,standard,text,relevance}...], uncertain_aspects,
-        out_of_scope_warnings, meta:{standard,retrieved,...}}``；零召回时 answer 为「未检索到」、
-        cited_clauses 空（这是正确行为，非错误）。
+        out_of_scope_warnings, meta:{standard,standard_resolution,retrieved,...}}``；零召回时
+        answer 为「未检索到」、cited_clauses 空（这是正确行为，非错误）。
     异常：未知规范 / 索引未就绪 / 知识服务不可达 / LLM 不可达或输出非法 JSON → ToolError。
     """
+    # 规范选择确定化：standard 仅作 hint，family 由问题类型确定性裁定（见 T-A2）。
+    resolution = resolve_standard(query, hint=standard)
+    resolved = resolution.standard
+    if resolution.overrode_hint:
+        logger.warning("standard 漂移拦截：hint=%s → 确定性夺回 %s（intent=%s, matched=%s）",
+                       standard, resolved, resolution.intent, resolution.matched)
     try:
         search_resp = knowledge_client.search(
-            query, standard=standard, top_k=top_k, skip_rerank=skip_rerank,
+            query, standard=resolved, top_k=top_k, skip_rerank=skip_rerank,
         )
     except requests.HTTPError as exc:
         detail = exc.response.text if exc.response is not None else str(exc)
@@ -110,7 +123,9 @@ def norm_qa(
             "cited_clauses": [],
             "uncertain_aspects": ["检索零召回，可能问题超出该规范范围或需换用其它规范"],
             "out_of_scope_warnings": [],
-            "meta": {"standard": standard, "retrieved": 0, "search_meta": search_resp.get("meta", {})},
+            "meta": {"standard": resolved, "retrieved": 0,
+                     "standard_resolution": resolution.as_meta(),
+                     "search_meta": search_resp.get("meta", {})},
         }
 
     try:
@@ -121,8 +136,9 @@ def norm_qa(
         raise ToolError(f"LLM 输出非合法 JSON: {exc}") from exc
 
     result["meta"] = {
-        "standard": standard,
+        "standard": resolved,
         "retrieved": len(clauses),
+        "standard_resolution": resolution.as_meta(),
         "search_meta": search_resp.get("meta", {}),
     }
     return result

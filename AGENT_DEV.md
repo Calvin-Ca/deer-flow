@@ -255,7 +255,7 @@ ce-services 任务层 `:8101`，挂在 `cost_router`（`main.py:46`，无额外 
 ### 9.5 TODO（落代码）
 
 - [ ] **T-A1 · 前置路由层（①）**：能力分流（cost/norm/price）+ 形态判定（单/复合 EH-01、特征缺 EH-04、口径缺 EH-05），确定性/轻分类器实现，置于 agent 之前；输出路由落点 + 形态标记供下游。对应 PRD §4.1/§4.3
-- [ ] **T-A2 · 规范选择确定化（①，高优先）**：「问题类型→规范代号」确定性映射（计量→GB50854 / 计价→GB50500 / 安装→GB50856），从 LLM 自由判断手里夺回——**直接根治标准漂移 bug**（50854→50500）。先落此条收益最快
+- [x] **T-A2 · 规范选择确定化（①，高优先）· 已落地**：「问题类型→规范代号」确定性映射（计量→GB50854 / 计价→GB50500 / 安装→GB50856），从 LLM 自由判断手里夺回——**直接根治标准漂移 bug**（50854→50500）。实现 = `norm/standard_router.py`（关键词规则两轴：intent 计价/计量 + discipline 房建/安装，纯函数零 LLM；降级安全：零命中回退 hint、无 hint 默认 50854；版本轴 query>hint>default 仅轻解析，版本默认策略留 §8 块1/T9-1）。接线：`/norm/qa` 端点 + `ce-task_norm_qa` MCP 工具——`standard` 改可选 hint，进检索前跑 `resolve_standard`，family 与 hint 冲突即**夺回**（`overrode_hint`，warning 日志），meta 加 `standard_resolution` 全证据。验证：内置自测 19/19（含 2 例漂移夺回 + 版本钳制 50856-2013→2024）；金标 `benchmark/routing_eval` norm-qa family 选择 6/6=100%（A6 越界跳过，归校验闸 T-A3）。代码 `ce-services/norm/standard_router.py` + `norm/router.py` + `common/mcp_server.py` + `tools/standard_router_eval.py`。**待服务器端到端验证**（真 :8100/:8101，并入 T-A6）
 - [ ] **T-A3 · 校验闸成层（③）**：把溯源(C-01)/拒答(C-03)/口径纯净(C-02)统一为显式 guard（前置或后置），结构化拦截、不靠 LLM 自觉；与 §8.3 web 三道闸、依据卡 source 字段对齐
 - [ ] **T-A4 · 复合编排器（④）**：EH-01 拆解 → 子任务回 ① 路由 → 综合；承接 FR-X02/X03、FR-C。对应 §2.2 冲突4 / §3 改3「架构归位」
 - [ ] **T-A5 · 模型分层接线**：`config.yaml` 配双模型；桶 A(② norm_qa生成/直配/取价/澄清) 走 8b、桶 B(④复合推理 + FR-C 深核对 + **选码消歧 τ 区间**) 走 32b（落位表见 §9.3）。GPU 充足、8b+32b 并存无顾虑（2026-06-30 确认）；仍注意 GPU 分配（reranker 已占 cuda:2，见 ce-code 经验）

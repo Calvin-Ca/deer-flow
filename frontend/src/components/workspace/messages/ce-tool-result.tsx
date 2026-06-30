@@ -112,7 +112,7 @@ function NormQa({ args, r }: { args: Rec; r?: Rec }) {
       description={desc}
     >
       {cited.length > 0 && (
-        <div className="space-y-1.5">
+        <div className="space-y-2">
           {cited.slice(0, 6).map((c, i) => {
             const head =
               [str(c.standard), str(c.clause)].filter(Boolean).join(" ") ||
@@ -120,13 +120,22 @@ function NormQa({ args, r }: { args: Rec; r?: Rec }) {
             const text = str(c.text);
             const contextual = str(c.relevance) === "contextual";
             return (
-              <div key={i} className="text-xs leading-snug">
-                <span className="font-medium">{head}</span>
-                {contextual && (
-                  <span className="text-muted-foreground"> · 背景参考</span>
-                )}
+              <div
+                key={i}
+                className="border-primary/50 bg-muted/40 rounded-r-md border-l-2 py-1.5 pr-2 pl-2.5"
+              >
+                <div className="text-muted-foreground mb-0.5 flex items-center gap-1.5 text-[11px]">
+                  <span className="font-mono">{head}</span>
+                  {contextual && (
+                    <span className="bg-background/70 rounded px-1 text-[10px]">
+                      背景参考
+                    </span>
+                  )}
+                </div>
                 {text && (
-                  <span className="text-muted-foreground"> — {clip(text)}</span>
+                  <p className="text-foreground text-xs leading-relaxed">
+                    {clip(text)}
+                  </p>
                 )}
               </div>
             );

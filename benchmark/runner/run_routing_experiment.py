@@ -25,7 +25,6 @@ run（UI 里 Datasets→Runs 可横向比 prompt variant），并 ``create_score
 from __future__ import annotations
 
 import argparse
-import json
 import sys
 import uuid
 from pathlib import Path
@@ -36,10 +35,18 @@ from _lf import require_langfuse, wait_for_traces  # noqa: E402
 
 DATASET_NAME = "agent-routing-eval"
 
-# 「发生了路由（调了 ce-cost 知识/算量工具）」的观测信号：命中工具名或参数文本任一即算。
-# 跑首轮后照真实 trace 调整（例如换成具体 MCP 工具名前缀）。
-ROUTE_SIGNALS = ("ce-cost", "qa.py", "cost.py", "knowledge", ":8100", ":8101")
+# 「发生了路由」= agent 调了正经的知识/算量工具（按工具名判定，可靠：名字在流式
+# tool_call 首片里就到齐，不像 args 会分片）。口径见 routing_eval/README：路由 = 调
+# 脚本/工具，bash/read_file 自己瞎折腾不算。首轮实跑确认真实工具名为 qa.py / cost.py
+# （脚本式工具）与 ce-cost_* （:8100 MCP 工具）；新增工具时往这两处加。
+ROUTE_TOOL_NAMES = {"qa.py", "cost.py"}
+ROUTE_TOOL_PREFIXES = ("ce-cost",)
 CLARIFY_TOOL = "ask_clarification"
+
+
+def _is_route_tool(name: str) -> bool:
+    """工具名是否属于「正经路由工具」（精确名或前缀命中）。"""
+    return name in ROUTE_TOOL_NAMES or any(name.startswith(p) for p in ROUTE_TOOL_PREFIXES)
 
 
 def _drive_agent(query: str, model_name: str | None, thread_id: str) -> dict:
@@ -52,8 +59,7 @@ def _drive_agent(query: str, model_name: str | None, thread_id: str) -> dict:
     """
     from deerflow.client import DeerFlowClient
 
-    tool_names: list[str] = []
-    blobs: list[str] = []  # 工具名 + 参数文本，供 ROUTE_SIGNALS 匹配
+    tool_names: list[str] = []  # 只收非空工具名（流式后续分片 name 为空，跳过）
     answer_parts: list[str] = []
 
     for ev in DeerFlowClient(model_name=model_name).stream(query, thread_id=thread_id):
@@ -63,18 +69,16 @@ def _drive_agent(query: str, model_name: str | None, thread_id: str) -> dict:
         if d.get("type") == "ai":
             for tc in d.get("tool_calls", []) or []:
                 name = tc.get("name") or ""
-                tool_names.append(name)
-                blobs.append(name)
-                blobs.append(json.dumps(tc.get("args", {}), ensure_ascii=False))
+                if name:
+                    tool_names.append(name)
             if isinstance(d.get("content"), str):
                 answer_parts.append(d["content"])
 
-    haystack = "\n".join(blobs)
     return {
         "answer": "".join(answer_parts)[:500],
         "tool_names": tool_names,
         "did_clarify": CLARIFY_TOOL in tool_names,
-        "did_route": any(sig in haystack for sig in ROUTE_SIGNALS),
+        "did_route": any(_is_route_tool(n) for n in tool_names),
     }
 
 

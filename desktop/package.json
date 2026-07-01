@@ -4,6 +4,7 @@
   "private": true,
   "description": "deer-flow 桌面壳 (Electron)——路 A 独立项目，用相对路径消费 frontend 的 standalone 产物",
   "main": "src/main.js",
+  "packageManager": "pnpm@10.26.2",
   "scripts": {
     "dev": "cross-env DEERFLOW_DESKTOP_DEV_URL=http://localhost:3000 electron .",
     "start": "electron .",

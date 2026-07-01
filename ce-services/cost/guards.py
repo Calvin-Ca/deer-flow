@@ -75,13 +75,15 @@ def audit_cost_result(
     price = result.get("price")
     price_status = result.get("price_status")
 
-    # ── C-03：选不出码（含低置信 need_review）→ 转人工，不当权威结论呈现 ──
-    if not code:
+    # ── C-03：选不出码 / 选到码但低置信 need_review → 转人工，不当权威结论呈现 ──
+    # need_review=true 即使带了个 tentative code 也不算「定稿」（红线：低置信只建议不定稿）——
+    # 故与「选不出码」一并降级 reject/tier=none；tentative code 仍留在 result.selection 供人核。
+    if not code or selection.get("need_review"):
         report = GuardReport(verdict=VERDICT_REJECT, tier="none",
                              provenance_complete=False, caliber_pure=True)
         reason = selection.get("reason") or "候选内选不出可信编码"
-        report.add(GUARD_C03, "error",
-                   f"选不出码（need_review）：{reason}。{_REVIEW_OUTLET}")
+        label = "选不出码" if not code else f"选到码 {code} 但低置信需复核"
+        report.add(GUARD_C03, "error", f"{label}（need_review）：{reason}。{_REVIEW_OUTLET}")
         return report
 
     report = GuardReport(verdict=VERDICT_PASS, tier="local")
@@ -152,6 +154,13 @@ def _selftest() -> int:
           rep.verdict == VERDICT_REJECT and rep.tier == "none")
     check("C-03 选不出码：violations 带 C-03",
           any(v["code"] == GUARD_C03 for v in rep.violations))
+
+    # ①b 选到码但 need_review（低置信）→ 仍 reject（tentative code 不算定稿）
+    rep_nr = audit_cost_result(
+        {"code": "010502025", "selection": {"need_review": True, "reason": "低置信"},
+         "price": {"quotas": []}, "price_status": "ok"}, spec="2024", region="深圳")
+    check("C-03 低置信 need_review（带 code）：verdict=reject",
+          rep_nr.verdict == VERDICT_REJECT and rep_nr.tier == "none")
 
     # ② 选到码 + 全合规取数 → pass / 纯净 / 完整
     good_price = {"quotas": [{

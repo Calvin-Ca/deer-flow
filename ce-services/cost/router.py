@@ -82,7 +82,8 @@ def cost_compose_endpoint(req: CostComposeRequest) -> dict:
     logger.info("/cost/compose spec=%s region=%s candidates=%d code=%s need_review=%s price_status=%s (%.0fms)",
                 req.spec, req.region, result.get("candidates_count", 0), result.get("code"),
                 result.get("selection", {}).get("need_review"), result.get("price_status"), elapsed_ms)
-    result["meta"] = {"elapsed_ms": round(elapsed_ms), "top_k": req.top_k}
+    # compose 已在 meta 里挂 guard（③ 校验闸）；这里 merge 计时/参数，勿 clobber。
+    result.setdefault("meta", {}).update({"elapsed_ms": round(elapsed_ms), "top_k": req.top_k})
     return result
 
 

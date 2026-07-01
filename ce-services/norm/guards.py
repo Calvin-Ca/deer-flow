@@ -23,59 +23,21 @@
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 from typing import Any
 
+from common.guards import (  # ③ 共享契约（norm/cost 同形 GuardReport，见 common/guards.py）
+    GUARD_C01,
+    GUARD_C02,
+    GUARD_C03,
+    VERDICT_PASS,
+    VERDICT_REJECT,
+    GuardReport,
+)
 from norm.standard_router import family_version_of
-
-# 红线编号（与 AGENT_PRD C-01/02/03 对齐）
-GUARD_C01 = "C-01"  # 全量溯源
-GUARD_C02 = "C-02"  # 地域/版本口径纯净
-GUARD_C03 = "C-03"  # 空结果不幻觉
-
-VERDICT_PASS = "pass"
-VERDICT_REJECT = "reject"
 
 # 拒答给出路（C-03 / EH-02）：统一的「建议渠道」话术，避免做「死工具」。
 _REJECT_OUTLET = "建议核对规范代号/版本，或换用更贴合的规范、补充更具体的问法；必要时查阅住建部及深圳住建局造价站原文。"
 _DISCLAIMER = "本回答仅供参考，不替代专业造价审核。"
-
-
-@dataclass
-class GuardReport:
-    """校验闸结论（结构化、可审计；进响应 meta.guard）。
-
-    字段：
-        verdict —— ``pass`` / ``reject``（reject = 降级为无依据拒答）。
-        violations —— 命中的红线条目 ``[{code, severity, detail}]``（severity: error 剔除 / warn 标记）。
-        provenance_complete —— C-01：保留引用是否全带条款号且非空（溯源完整）。
-        caliber_pure —— C-02：是否无他部/他版条文混入（无剔除即纯净）。
-        cited_total —— 进闸前 cited_clauses 条数。
-        cited_dropped —— 被 C-02 剔除条数。
-        tier —— 来源层级（§8.3）：``local`` 本地权威命中 / ``none`` 无可信命中（拒答）。
-    """
-
-    verdict: str
-    violations: list[dict] = field(default_factory=list)
-    provenance_complete: bool = True
-    caliber_pure: bool = True
-    cited_total: int = 0
-    cited_dropped: int = 0
-    tier: str = "local"
-
-    def add(self, code: str, severity: str, detail: str) -> None:
-        self.violations.append({"code": code, "severity": severity, "detail": detail})
-
-    def as_meta(self) -> dict:
-        return {
-            "verdict": self.verdict,
-            "tier": self.tier,
-            "provenance_complete": self.provenance_complete,
-            "caliber_pure": self.caliber_pure,
-            "cited_total": self.cited_total,
-            "cited_dropped": self.cited_dropped,
-            "violations": self.violations,
-        }
 
 
 def reject_no_recall(standard: str, *, search_meta: dict | None = None,

@@ -344,6 +344,16 @@
   必须且页码 edition-dependent 不如条款号权威；显原文是零成本（字段已在）、最高核验价值的增强（讨论见对话）。
 - [ ] **cost_compose 卡片肉眼验**（渲染走同一组件、MCP 已加载，信心高但未单独视觉确认）：发一句组价看「组价选码」卡。
 - [ ] **前端 `pnpm check`（服务器）**：本地无 node_modules，ce-tool-result + message-group 改动的 eslint+tsc 待服务器过一轮。
+- [x] **§9 四层骨架前门 + cost ③ 校验闸对齐**（✅ 2026-07-01，本地全验；AGENT_DEV §9 权威）：
+  ① **前门 MCP 工具 `ce-task_orchestrate`**（`common/mcp_server.py`）——lead-agent 发原始请求 → ① 确定性路由
+  → 单一直派②/③ 或 复合④拆解-综合；把 T-A1/T-A4「待接入实际调度」补齐。原语 norm_qa/cost_compose 并列保留。
+  ② **cost 侧 ③ 校验闸对齐 `GuardReport`**：契约下沉 `common/guards.py`；新增 `cost/guards.py::audit_cost_result`
+  （C-03 选不出码→reject/tier=none、C-02 定额跨版串库→caliber_pure=False、C-01 缺来源→provenance_complete=False），
+  `orchestration.compose` 末步挂 `meta.guard`、`router.py` merge meta。验证：norm guards 9/9 + cost guards 7/7 +
+  compose meta.guard 三路径 + orchestrator 8/8。`extensions_config.json` ce-task 描述加 orchestrate。
+- [ ] **前端 `ce-task_orchestrate` 结果卡渲染**（follow-up）：`ce-tool-result.tsx` 加 `mode=single/compound` 分支
+  （单一直显子结果卡 + guard 徽标；复合显各子任务卡 + 综合答）。当前 orchestrate 结果走通用渲染、不够结构化。
+- [ ] **lead-agent 工具 allow-list 确认**（服务器验）：确认默认/lead agent 能看见 `ce-task_orchestrate`（cost-agent 是精确 allow-list，见 [[project_mcp_tool_exposure]]）。
 
 ---
 

@@ -7,7 +7,8 @@ bash 命令、不再把结论埋在 bash stdout 里看不见。
 
 与知识层 façade（``ce-code/service/mcp_server.py`` 的 ``ce-cost``，:8100/mcp，三个取数原语）分工：
   - ``ce-cost``（:8100）—— **纯数据原语**：bill_match / quota_lookup / price_compose；
-  - ``ce-task``（本文件，:8101）—— **带 LLM 编排的任务层能力**：norm_qa（检索+带引用作答）、
+  - ``ce-task``（本文件，:8101）—— **带 LLM 编排的任务层能力**：orchestrate（四层骨架前门：
+    确定性路由 → 单一直派 / 复合拆解-综合，§9 T-A4）、norm_qa（检索+带引用作答）、
     cost_compose（候选召回 → LLM 选码 → 组价取数）。
 
 设计要点（与知识层 façade 一致）：
@@ -52,12 +53,15 @@ except ImportError:  # pragma: no cover
 from common.config import LLM_MODEL_ID, LLM_URL
 from cost import orchestration
 from norm import pipeline
+from routing.orchestrator import orchestrate as _orchestrate
 
 # 内网可信服务，关掉 DNS rebinding 保护——允许经 localhost / 服务器 IP 任意 Host 访问 :8101/mcp。
 mcp = FastMCP(
     "ce-task",
     instructions=(
         "深圳房建任务层能力（按国标版本严格隔离 2013/2024）：\n"
+        "  · orchestrate —— 【前门】原始请求 → 确定性路由 → 单一直派 / 复合拆解-综合；不确定问谁、"
+        "或一句话含多诉求时用它，自动分流（内部调下面两能力）\n"
         "  · norm_qa —— 造价/计量/计价规范问题 → 检索条文 + 带引用结构化作答（零召回拒答，不编造条文）\n"
         "  · cost_compose —— 构件描述 → 清单候选召回 → LLM 选码 → 组价取数（缺价标 no_source、"
         "选不出码转 HITL，绝不杜撰）"
@@ -142,6 +146,44 @@ def cost_compose(
         raise ToolError(f"依赖服务不可达（知识服务 :8100 / LLM :8099）: {exc}") from exc
     except ValueError as exc:  # call_qwen3 的 json.JSONDecodeError
         raise ToolError(f"LLM 选码输出非合法 JSON: {exc}") from exc
+
+
+@mcp.tool()
+def orchestrate(
+    query: Annotated[str, Field(description="用户请求（可复合，如「这做法套什么清单码，再解释它按什么计量、可否更省」）")],
+    has_project_context: Annotated[
+        bool | None,
+        Field(description="是否已挂 BOQ/算量上下文（覆盖文本推断）；None 则由文本推断"),
+    ] = None,
+) -> dict:
+    """四层骨架**前门**（AGENT_DEV §9）：确定性前置路由 → 单一直派能力层 / 复合 32b 拆解-综合。
+
+    lead-agent 把**原始请求**整条交给本工具即可，无需自己判能力/拆子任务：
+      - ① 前置路由（无 LLM）定 capability（组价/规范/价格/复合）+ 形态；
+      - 单一意图 → 直派能力层 ②（norm_qa 检索带引用 / cost 选码+组价取数），过 ③ 校验闸（meta.guard）；
+      - 复合意图（EH-01）→ 32b 拆解 → 每子任务回 ① 路由 → 派发 → 32b 综合（降级安全：LLM 挂则确定性拼接）。
+
+    **何时用哪个**：模糊/复合/不确定该问谁 → 本工具（前门，自动分流）；已确定要「检索规范条文」或
+    「构件→清单码→价」的单一能力，可直接调 ``ce-task_norm_qa`` / ``ce-task_cost_compose`` 原语（非 chokepoint）。
+    HITL 完整组价（逐闸确认/算总造价）不走本工具——那是有状态交互，走 cost-agent 的 start + 内嵌卡。
+
+    **红线（下沉能力层，不靠本层）**：规范零召回拒答不编条文、组价选不出码转人工、缺价 no_source 不杜撰；
+    每子结果带 ``meta.guard``（C-01 溯源 / C-02 口径纯净 / C-03 拒答，norm+cost 同契约）。
+
+    参数：
+        query —— 用户自然语言请求（可复合）。
+        has_project_context —— 是否已挂 BOQ/算量；None 由文本推断。
+    返回：
+        单一 ``{mode:"single", route, result:<能力层信封，含 meta.guard>}``；
+        复合 ``{mode:"compound", route, subtasks:[{subtask, route, result}...], answer:<综合，含 cited_clauses>}``。
+    异常：能力层依赖（知识服务 :8100 / LLM）整体不可达且未被内部降级吸收 → ToolError。
+    """
+    try:
+        return _orchestrate(query, has_project_context=has_project_context)
+    except requests.RequestException as exc:
+        raise ToolError(f"依赖服务不可达（知识服务 :8100 / LLM）: {exc}") from exc
+    except ValueError as exc:  # 拆解/综合 LLM 输出非法 JSON（多已内部降级，兜底映射）
+        raise ToolError(f"编排 LLM 输出非合法 JSON: {exc}") from exc
 
 
 if __name__ == "__main__":

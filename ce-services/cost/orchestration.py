@@ -17,6 +17,7 @@ from typing import Any
 import requests
 
 from common import cost_client
+from cost.guards import audit_cost_result
 from cost.pricing import UnitPriceInput, compute_unit_price
 from cost.selection import select_code
 
@@ -67,8 +68,9 @@ def compose(
         rates —— 可选费率块（management_fee_rate/profit_rate/risk_rate/fee_base/tax_rate）；给定且组价取数 ok
         时为每条定额算综合单价（P2，确定性不入 LLM），缺则维持 P1 行为（仅选码 + 取数，不算钱）。
     返回：
-        ``{description, spec, region, candidates_count, selection, code, price, price_status}``：
+        ``{description, spec, region, candidates_count, selection, code, price, price_status, meta}``：
         - selection —— select_code 全量结果（code/confidence/reason/need_review/alternatives）；
+        - meta.guard —— ③ 校验闸 GuardReport（C-01/02/03，verdict/tier/caliber_pure/provenance_complete）；
         - 选不出码（code=None）→ price=None、price_status="skipped(need_review)"，不调组价；
         - spec=2013 组价未就绪（compose 501）→ price=None、price_status="未就绪(2013 组价数据未就绪)"；
         - 正常 → price=price_compose 结果（含工料机含量 + 信息价单价 + 小计，未命中价的资源 no_source）。
@@ -96,6 +98,7 @@ def compose(
     # ③ 选不出码 → 不调组价，转 HITL
     if not code:
         result["price_status"] = "skipped(need_review)"
+        result["meta"] = {"guard": audit_cost_result(result, spec=spec, region=region).as_meta()}
         return result
 
     # ④ 组价取数；spec=2013 未就绪（501）降级透传，不丢选码结果
@@ -112,4 +115,6 @@ def compose(
             result["price_status"] = "未就绪(该国标版本组价数据未就绪，仅返回选码)"
         else:
             raise  # 404/503 等交 router 映射
+    # ③ 校验闸（C-01/02/03 → GuardReport，进 meta.guard，对齐 norm 侧同契约）
+    result["meta"] = {"guard": audit_cost_result(result, spec=spec, region=region).as_meta()}
     return result

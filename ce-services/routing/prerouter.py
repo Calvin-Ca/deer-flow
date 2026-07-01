@@ -44,6 +44,9 @@ COMPOUND_KW: tuple[str, ...] = (
     "比选", "方案对比", "方案比选", "哪种更省", "哪个更划算", "造价指标",
     "结算", "变更", "签证", "索赔", "结算审核",
 )
+# 比选意图的**柔性变体**（治漏判机制一）：中缀「做法/方案」会隔断关键词精确子串匹配
+# （「哪种做法更省」不含子串「哪种更省」），关键词表穷举不尽，补一条正则兜「哪[种个样]…更省/划算」。
+_COMPARE_RE = re.compile(r"哪[种个样].{0,6}(更省|更划算|更便宜|更经济|省钱|划算)")
 # 项目上下文（FR-C）：引用「这份清单/本项目/上传的算量」。
 CONTEXT_KW: tuple[str, ...] = (
     "这份清单", "本项目", "这个项目", "我的清单", "我上传", "上传的", "这份报价",
@@ -154,6 +157,7 @@ def route(query: str, *, has_project_context: bool | None = None) -> RouteDecisi
     cost_sig = _hits(text, COST_INTENT_KW)
     price_sig = _hits(text, PRICE_INTENT_KW)
     compound_sig = _hits(text, COMPOUND_KW)
+    compare_hit = bool(_COMPARE_RE.search(text))
     norm_sig = _hits(text, NORM_KW)
     ctx_sig = _hits(text, CONTEXT_KW)
     ctx_check_sig = _hits(text, CONTEXT_CHECK_KW)
@@ -169,11 +173,31 @@ def route(query: str, *, has_project_context: bool | None = None) -> RouteDecisi
     # ── 数值计算（C-04）──
     needs_calc = bool(calc_sig)
 
+    # ── 复合检测（两路，EH-01）──
+    #   ① 显式复合词：比选/结算/变更/签证…（COMPOUND_KW）+ 比选柔性变体（_COMPARE_RE）——治机制一。
+    #   ② 多能力并列启发式（治机制二）：真实复合大量是「套码 + 按什么计量」「套码 + 当期价」这种
+    #      **无显式复合词的多能力并列**，旧「先命中先出」阶梯会把它吞成单一、丢掉另一半诉求。故：
+    #      组价**动作词**(COST_INTENT_KW) ∧ 规范，或 价格 ∧ 另一能力 → 判复合先拆解。
+    #      **刻意只认组价「动作词」、不认构件名(COMPONENT_KW)**——「现浇柱怎么计量」只是构件名+规范信号，
+    #      属单一规范问答，不该误升复合（金标 routing_eval 回归防误触，见 tools/prerouter_eval.py）。
+    price_like = bool(price_sig or (material_sig and time_sig))
+    explicit_compound = bool(compound_sig) or compare_hit
+    multi_capability = (
+        (bool(cost_sig) and bool(norm_sig))     # 组价动作 + 规范口径（如「套定额 + 按什么计量」）
+        or (price_like and bool(cost_sig))       # 价格 + 组价
+        or (price_like and bool(norm_sig))       # 价格 + 规范
+    )
+
     # ── 能力分流（优先级：复合 > 价格 > 组价 > 上下文核对 > 规范兜底）──
-    if compound_sig:
+    if explicit_compound or multi_capability:
         capability, source_type = "compound", "static"
-        reasons.append(f"复合/高阶信号 {compound_sig} → 先拆解（EH-01/FR-X）")
-    elif price_sig or (material_sig and time_sig):
+        if explicit_compound:
+            reasons.append(
+                f"复合/高阶信号 {compound_sig or '哪…更省(柔性匹配)'} → 先拆解（EH-01/FR-X）")
+        else:
+            reasons.append(
+                f"多能力并列（组价={cost_sig} 价格={price_like} 规范={norm_sig}）→ 判复合先拆解（EH-01）")
+    elif price_like:
         capability, source_type = "price", "dynamic"
         reasons.append(f"价格取数信号 {price_sig or (material_sig + time_sig)} → 动态价格")
     elif cost_sig:
@@ -216,6 +240,7 @@ def route(query: str, *, has_project_context: bool | None = None) -> RouteDecisi
         clarify=clarify,
         matched={
             "cost": cost_sig, "price": price_sig, "compound": compound_sig,
+            "compare": compare_hit, "multi_capability": multi_capability,
             "norm": norm_sig, "context": ctx_sig, "context_check": ctx_check_sig,
             "calc": calc_sig, "material": material_sig, "time": time_sig,
         },
@@ -246,6 +271,14 @@ _SELFTEST_CASES: tuple[tuple[str, str, str | None], ...] = (
     # ── compound（复合）──
     ("这两种方案哪种更省，并给出造价指标对比", "compound", None),
     ("这个变更怎么计价、签证如何办理", "compound", None),
+    # 机制一·比选柔性变体（中缀「做法」隔断精确串）→ 正则兜住
+    ("现浇柱和预制柱哪种做法更省", "compound", None),
+    ("这几个方案哪个更划算", "compound", None),
+    # 机制二·多能力并列（无显式复合词）→ 启发式判复合
+    ("C30现浇矩形柱套什么定额，并说明它按什么计量", "compound", None),   # 组价动作 + 规范
+    ("这个柱子套定额，再查下HRB400钢筋当期信息价", "compound", None),     # 组价动作 + 价格
+    # 反例·只有构件名 + 规范信号（无组价动作词）→ 仍是单一 norm，不误升复合
+    ("现浇混凝土柱按什么规则计量", "norm", "caliber"),
 )
 
 

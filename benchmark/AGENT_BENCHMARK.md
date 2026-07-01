@@ -447,7 +447,7 @@ L1 路由 + L6-B 工具调用——标签由 §4.3 决策表 / 工具 schema 机
 |---|---|---|---|---|---|:--:|
 | B1 | **选码置信校准 + 8b/32b 决策** | 服务器实测 96% 转人工、置信被校准压到 ~0（benchmark 8b/32b 见对话） | `CE_SELECT_{FLOOR,CEIL,MARGIN}` 盲拍，cosine 量纲随 embedder 变；且需定选码用 8b 还是 32b | 用 `tools/benchmark.py` 暴露的真实 chosen_score 分布（选对 vs 选错）精调 `CE_SELECT_*`（`ce-services/common/config.py`）；8b vs 32b 对比（`tools/models.json` 已备）定选码模型 | **L2 门控**：高置信错码=0 且转人工率不过高（误直配率）+ **L6-A** Top-1 | **高** |
 | B2 | **FR-I 价格/比选后端** | 「哪种更省」落 norm、答计量规则而非真成本对比 | orchestrator `dispatch_subtask` price=`unsupported`；FR-X02 比选无价差后端 | 建价格取数/比选后端并接 `routing/orchestrator.py` dispatch（承 §9.2 ④「FR-I 价格后端接入」） | **L5 复合拆解**（比选子任务出真价差）+ **L6-A** 组价终态 | 中 |
-| B3 | **复合路由精度** | 「哪种做法更省」中缀"做法"漏配 `COMPOUND_KW`；cost∧norm 同现被判 single | `prerouter` compound 检测**仅关键词**、不看「多能力命中」 | `COMPOUND_KW` 柔性变体（轻）/「多能力命中→compound」启发式（稳，需防误触）；`ce-services/routing/prerouter.py` | **L1 路由**（compound 召回/逐行准确率）+ **L5**；`benchmark/routing_eval/` 加回归用例 | 中 |
+| B3 | ~~**复合路由精度**~~ ✅ **已修（2026-07-01）** | ~~「哪种做法更省」漏配；cost∧norm 判 single~~ → 两档都落地：`_COMPARE_RE` 兜比选柔性变体 + 多能力并列启发式（组价**动作词**∧规范 / 价格∧另一能力，**刻意不认构件名**防误触）；`ce-services/routing/prerouter.py` | 本地自测 20/20 + 金标 `routing_eval` 17/17=100%**零误升复合**（反例「现浇柱按什么计量」仍判 norm） | **剩 L1/L5 真跑抽检**：`benchmark/routing_eval` 尚无 compound 金标用例，compound 召回率待补金标后量化（现仅单一用例回归防误触已通） | 中→低 |
 | B4 | **lead 呈现层稳定性** | qwen3-8b 偶发 prose 加料（编码/条文），一次干净≠永远稳 | 弱模型呈现层不可靠（[[project_skill_invocation_model]]） | 已做：前端 guard 卡兜底（`ce-tool-result.tsx`）+ lead prompt 硬化；要更硬则 lead 基座换 qwen-plus（`config.yaml` gateway-llm） | **L6-B** 工具调用忠实 + 人工抽检 prose 杜撰率（对照 orchestrate 原始返回） | 低（卡已兜底，观察） |
 
 **前置依赖**：B1 需先扩选码 gold 到 30–50 条（现 2024 仅 n=10；2013 已有 n=91 可先用）。B2/B3 修法都要 `benchmark/routing_eval/` 与选码 gold 支撑回归，与 §7/§8 数据集路线合流。

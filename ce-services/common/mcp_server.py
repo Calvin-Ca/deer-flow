@@ -133,7 +133,7 @@ def cost_compose(
     """
     try:
         return orchestration.compose(
-            description, spec, region, LLM_URL, LLM_MODEL_ID, top_k=top_k,
+            description, spec, region, top_k=top_k,
         )
     except requests.HTTPError as exc:
         detail = exc.response.text if exc.response is not None else str(exc)

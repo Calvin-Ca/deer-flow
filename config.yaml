@@ -26,26 +26,30 @@ models:
     extra_body:
       chat_template_kwargs:
         enable_thinking: false
-# ── 服务器 vLLM Qwen3-32B-AWQ（新增接入，暂不启用）────────────────────────
+# ── 服务器 vLLM Qwen3-32B-AWQ（桶 B：真·推理 + 选码消歧，AGENT_DEV §9.3 / T-A5 双模型）────
 #    另一台服务器 172.19.2.2 上的 vLLM，OpenAI 兼容端点 :8001/v1，模型 id 即权重路径
 #    /models/Qwen3-32B-AWQ；同为 Qwen3 系（带 <think>），沿用 VllmChatModel 走 thinking 开关。
-#    ⚠️ 暂不启用：仅写入配置备测。要启用就取消本段注释，并把它放到 models 列表第一项
-#       （或注释掉上面 qwen3-8b 段），列表第一项才是 agent 默认模型。
-# - name: qwen3-32b-awq
-#   display_name: Qwen3-32B-AWQ (172.19.2.2)
-#   use: deerflow.models.vllm_provider:VllmChatModel
-#   model: /models/Qwen3-32B-AWQ
-#   api_key: none
-#   base_url: http://172.19.2.2:8001/v1
-#   supports_thinking: true
-#   when_thinking_enabled:
-#     extra_body:
-#       chat_template_kwargs:
-#         enable_thinking: true
-#   when_thinking_disabled:
-#     extra_body:
-#       chat_template_kwargs:
-#         enable_thinking: false
+#    ✅ T-A5 已注册为**可用模型**，但**非默认**（8b 仍列表第一项 = agent 默认，桶 A 延迟敏感路径）。
+#       deer-flow agent（norm-qa/cost-agent）保持 8b；桶 B 的实际消费方是 ce-services 内部——
+#       复合编排（routing/orchestrator）+ 选码消歧（cost/selection），它们**不读本 config.yaml**，
+#       而经 env 成对指到同一端点：`BCRAG_ORCH_LLM_URL=http://172.19.2.2:8001`
+#       + `BCRAG_ORCH_LLM_MODEL_ID=/models/Qwen3-32B-AWQ`（见 ce-services/common/config.py）。
+#       未部署 32b（env 未设）时 ce-services 侧成对回落 8b，选码不受影响、零风险。
+- name: qwen3-32b-awq
+  display_name: Qwen3-32B-AWQ (172.19.2.2)
+  use: deerflow.models.vllm_provider:VllmChatModel
+  model: /models/Qwen3-32B-AWQ
+  api_key: none
+  base_url: http://172.19.2.2:8001/v1
+  supports_thinking: true
+  when_thinking_enabled:
+    extra_body:
+      chat_template_kwargs:
+        enable_thinking: true
+  when_thinking_disabled:
+    extra_body:
+      chat_template_kwargs:
+        enable_thinking: false
 # ── 阿里云百炼 / 通义千问（云端，临时注释；要切回云端：取消下面注释 + 注释掉上面本地 vLLM 段）──────────
 #    api_key 是占位符；服务器上换成真实 sk- 后那份 config.yaml 别再 commit（否则 push 会把 key 带回 GitHub）。
 # - name: gateway-llm

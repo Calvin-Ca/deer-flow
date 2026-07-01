@@ -5,7 +5,8 @@
 
 **层位**：坐在前置路由 ①（``routing/prerouter``）之上。单一意图直接派发到能力层 ②；复合意图
 （EH-01）才进拆解—综合回环。**模型分层（§9.3）**：拆解 + 综合是真·推理（桶 B）→ 用 **32b**
-（``ORCH_LLM``）；各子任务的能力执行（norm 生成/选码/取数）仍走 **8b**（桶 A，延迟敏感）。
+（``ORCH_LLM``）；子任务能力执行里 norm 生成/取数走 **8b**（桶 A，延迟敏感），而 cost 选码消歧
+自走 **32b**（桶 B，``select_code`` 内定，§9.3「选错最贵」）——故 ``cap_*`` 仅喂 norm 生成。
 
 **降级安全**（同 clarify/标准漂移原则，弱模型不可靠不致命）：
   - 拆解 LLM 失败 / 输出非 list → 退化为「单任务=整条 query」。
@@ -121,8 +122,8 @@ def dispatch_subtask(query: str, decision: RouteDecision, *,
                        cited_clauses=res.get("cited_clauses", []), meta=res.get("meta", {}))
         elif cap == "cost":
             from cost import orchestration  # 局部 import：避免 routing 包在无 langgraph 环境下连带失败
-            res = orchestration.compose(query, _spec_of(query), "深圳",
-                                        cap_llm_url, cap_model_id)
+            # 选码走桶 B 32b（compose 内 select_code 自定，§9.3）；cap_* 仅供 norm 生成（桶 A 8b）。
+            res = orchestration.compose(query, _spec_of(query), "深圳")
             env.update(status="ok", result=res)
         elif cap == "price":
             env.update(status="unsupported",

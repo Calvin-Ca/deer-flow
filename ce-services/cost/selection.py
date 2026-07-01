@@ -1,8 +1,10 @@
 """选码层 —— LLM 在 bill_match 候选内选清单编码（CostAgent 主线第一环）。
 
 知识层只**召回候选**（Recall@10≈60%，正解多已进 top-k）；选 Top-1 归任务层（PRD §6）。本模块把
-「构件描述 + 候选清单项」交 Qwen3-8B 选出最匹配的一项，产 ``{code, confidence, reason, need_review,
-alternatives}``。
+「构件描述 + 候选清单项」交 LLM 选出最匹配的一项，产 ``{code, confidence, reason, need_review,
+alternatives}``。**默认走桶 B 32b**（AGENT_DEV §9.3：选码消歧 8b 最不可靠、选错最贵，非 2s 直配
+路径可承受 32b 延迟；未部署 32b 时 config 成对回落 8b）；``llm_url``/``model_id`` 仍可显式覆盖
+（benchmark 对比 8b/32b 即用此）。
 
 三条红线（钉在系统提示 + 代码兜底双保险）：
 1. **只能从候选 code 里选**——LLM 仍可能造码，故**代码侧再校验 code ∈ candidates**，越界即作废并 need_review；
@@ -19,6 +21,8 @@ from common.config import (
     CE_SELECT_MARGIN_FULL,
     CE_SELECT_SCORE_CEIL,
     CE_SELECT_SCORE_FLOOR,
+    SELECT_LLM_MODEL_ID,
+    SELECT_LLM_URL,
 )
 from common.llm import call_qwen3
 from cost.calibration import calibrate
@@ -104,14 +108,14 @@ def _coerce_confidence(raw: Any) -> float:
 def select_code(
     description: str,
     candidates: list[dict],
-    llm_url: str,
-    model_id: str,
+    llm_url: str = SELECT_LLM_URL,
+    model_id: str = SELECT_LLM_MODEL_ID,
 ) -> dict[str, Any]:
     """LLM 在候选内选清单编码 + 确定性红线兜底。
 
     参数：
         description —— 构件/做法描述；candidates —— /bill/match 候选列表；
-        llm_url / model_id —— Qwen3 vLLM 配置。
+        llm_url / model_id —— vLLM 配置，缺省桶 B 32b（§9.3）；benchmark 可显式覆盖比 8b/32b。
     返回：
         ``{code, confidence, llm_confidence, external_confidence, reason, need_review, alternatives}``：
         - confidence —— **校准后**有效置信 = min(LLM 自报, 外部信号)（路 2，下游闸门/阈值用这个）；

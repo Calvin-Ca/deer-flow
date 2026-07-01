@@ -54,8 +54,6 @@ def compose(
     description: str,
     spec: str,
     region: str,
-    llm_url: str,
-    model_id: str,
     top_k: int = 10,
     rates: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
@@ -63,7 +61,9 @@ def compose(
 
     参数：
         description —— 构件/做法描述；spec —— 国标版本（2013/2024，必填）；region —— 地区（如「深圳」）；
-        llm_url / model_id —— Qwen3 vLLM 配置；top_k —— 候选召回数；
+        top_k —— 候选召回数；
+        选码模型不在本层选：唯一的 LLM 步 ``select_code`` 自定桶 B 32b（§9.3），本层不透传；取数
+        （bill_match/price_compose）与算价（compute_unit_price）均无 LLM。
         rates —— 可选费率块（management_fee_rate/profit_rate/risk_rate/fee_base/tax_rate）；给定且组价取数 ok
         时为每条定额算综合单价（P2，确定性不入 LLM），缺则维持 P1 行为（仅选码 + 取数，不算钱）。
     返回：
@@ -78,8 +78,8 @@ def compose(
     match_resp = cost_client.bill_match(description, spec, top_k=top_k)
     candidates = match_resp.get("candidates", [])
 
-    # ② LLM 候选内选码 + 红线兜底
-    selection = select_code(description, candidates, llm_url, model_id)
+    # ② LLM 候选内选码 + 红线兜底（select_code 自定桶 B 32b，§9.3）
+    selection = select_code(description, candidates)
     code = selection.get("code")
 
     result: dict[str, Any] = {

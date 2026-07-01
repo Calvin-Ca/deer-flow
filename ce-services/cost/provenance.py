@@ -85,13 +85,11 @@ def list_match(
     description: str,
     spec: str,
     top_k: int,
-    llm_url: str,
-    model_id: str,
 ) -> dict[str, Any]:
     """编码原语 —— ``bill_match`` 召回 + ``select_code`` 候选内选码，包成信封。
 
-    参数：description —— 构件/做法描述；spec —— 国标版本（2013/2024）；top_k —— 候选召回数；
-      llm_url / model_id —— Qwen3 vLLM 配置。
+    参数：description —— 构件/做法描述；spec —— 国标版本（2013/2024）；top_k —— 候选召回数。
+      选码模型不在本层选：``select_code`` 自定桶 B 32b（§9.3 模型分层），本层不透传 8b。
     返回：信封，``result={code, name, 项目特征归类, unit}``；status = select_code need_review/选不出码→
       need_review，否则 ok；provenance.source_type=spec_clause，confidence 取 select_code，
       alternatives 取候选内次优（带 name/confidence，均来自候选、非杜撰）。
@@ -101,7 +99,7 @@ def list_match(
     candidates = match_resp.get("candidates", [])
     by_code = {str(c.get("code", "")).strip(): c for c in candidates if c.get("code")}
 
-    sel = select_code(description, candidates, llm_url, model_id)
+    sel = select_code(description, candidates)
     code = sel.get("code")
     chosen = by_code.get(str(code).strip()) if code else None
 

@@ -13,11 +13,24 @@ from pathlib import Path
 LLM_URL = os.environ.get("BCRAG_LLM_URL", "http://localhost:8099")
 LLM_MODEL_ID = os.environ.get("BCRAG_LLM_MODEL_ID", "qwen3-8b")
 
-# Qwen3-32B vLLM（桶 B：复合拆解/综合等真·推理；AGENT_DEV §9.3 模型分层）。
-# T-A4 复合编排器用；**完整双模型 config.yaml 接线属 T-A5**，这里仅给编排器最小可用句柄。
-# 未部署 32b 时缺省回落到 8B 端点（编排器 decompose/synthesize 失败时另有降级，不致命）。
-ORCH_LLM_URL = os.environ.get("BCRAG_ORCH_LLM_URL", LLM_URL)
-ORCH_LLM_MODEL_ID = os.environ.get("BCRAG_ORCH_LLM_MODEL_ID", "qwen3-32b")
+# ── 桶 B（Qwen3-32B vLLM）：真·推理 + 选码消歧（AGENT_DEV §9.3 模型分层，T-A5 接线）──
+# 用于：① 复合拆解/综合（routing/orchestrator）；② 选码候选消歧（cost/selection.select_code）——
+#   「8b 最不可靠、选错最贵、非 2s 直配路径，可承受 32b 延迟」（§9.3）。取价/生成/直配/澄清仍走 8b。
+# 部署：32b 在另一台服务器（config.yaml 记 172.19.2.2:8001/v1，model=/models/Qwen3-32B-AWQ），
+#   服务器成对设 BCRAG_ORCH_LLM_URL + BCRAG_ORCH_LLM_MODEL_ID 指过去即升桶 B。
+# **未部署 32b 时 URL 与 model 成对回落 8b**（避免「8b 端点 + 32b model id」不匹配打不通）：
+#   仅当显式设了 32b URL 才把 model 缺省成 qwen3-32b，否则回落 8b model —— 故本地/未部署默认
+#   一切照旧走 8b（选码不受影响），GPU 一松、env 一设即升 32b，零风险接线。
+_ORCH_LLM_URL_ENV = os.environ.get("BCRAG_ORCH_LLM_URL")
+ORCH_LLM_URL = _ORCH_LLM_URL_ENV or LLM_URL
+ORCH_LLM_MODEL_ID = os.environ.get(
+    "BCRAG_ORCH_LLM_MODEL_ID",
+    "qwen3-32b" if _ORCH_LLM_URL_ENV else LLM_MODEL_ID,
+)
+
+# 选码消歧走同一桶 B；单列句柄便于独立指向另一 32b 实例，默认同编排器 32b（成对回落 8b）。
+SELECT_LLM_URL = os.environ.get("BCRAG_SELECT_LLM_URL", ORCH_LLM_URL)
+SELECT_LLM_MODEL_ID = os.environ.get("BCRAG_SELECT_LLM_MODEL_ID", ORCH_LLM_MODEL_ID)
 
 # ce-code 知识服务（裸检索原语 /search /expand /clause）
 KNOWLEDGE_URL = os.environ.get("BCRAG_KNOWLEDGE_URL", "http://localhost:8100")

@@ -1,0 +1,23 @@
+{
+  "name": "deer-flow-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "deer-flow 桌面壳 (Electron)——路 A 独立项目，用相对路径消费 frontend 的 standalone 产物",
+  "main": "src/main.js",
+  "scripts": {
+    "dev": "cross-env DEERFLOW_DESKTOP_DEV_URL=http://localhost:3000 electron .",
+    "start": "electron .",
+    "build:win": "electron-builder --win",
+    "build:mac": "electron-builder --mac",
+    "build:linux": "electron-builder --linux"
+  },
+  "dependencies": {
+    "electron-updater": "^6.3.0",
+    "exceljs": "^4.4.0"
+  },
+  "devDependencies": {
+    "cross-env": "^7.0.3",
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  }
+}

@@ -13,6 +13,9 @@ function getInternalServiceURL(envKey, fallbackURL) {
 /** @type {import("next").NextConfig} */
 const config = {
   devIndicators: false,
+  // 桌面壳（desktop/）需独立 node 产物：standalone 会把 server.js + 最小 runtime 输出到
+  // .next/standalone，由 Electron fork 起子进程。对现有 web 部署无影响（next start 仍照常）。
+  output: "standalone",
   // 允许从内网 IP 访问 dev server(Next 16.2 起会拦截非 localhost 源对 /_next 资源的访问，
   // 导致页面能渲染但 JS 不 hydrate、登录等交互失效）。服务器内网调试用 172.19.3.136 直连时需放行。
   allowedDevOrigins: ["172.19.3.136"],

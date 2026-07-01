@@ -1,0 +1,31 @@
+appId: com.caic.deerflow.desktop
+productName: DeerFlow
+directories:
+  output: dist
+  buildResources: resources
+
+# 只打壳自身代码；frontend 的 standalone 产物走 extraResources 单独映射。
+files:
+  - src/**/*
+  - package.json
+
+# 关键：Next standalone 输出不含 .next/static 和 public，必须手动拷到 server.js 旁边，
+# 否则运行时静态资源 404。三段映射把它们拼成完整可跑目录 → resources/standalone。
+extraResources:
+  - from: ../frontend/.next/standalone
+    to: standalone
+  - from: ../frontend/.next/static
+    to: standalone/.next/static
+  - from: ../frontend/public
+    to: standalone/public
+
+win:
+  target: nsis
+mac:
+  target: dmg
+  category: public.app-category.productivity
+linux:
+  target: AppImage
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true

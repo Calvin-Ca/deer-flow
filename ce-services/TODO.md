@@ -183,7 +183,7 @@
 
 ---
 
-## 主线三：HITL 可中断组价编排（🟢 全 13 步图 + 前端页面 + 对话内嵌卡片均服务器验通；🔴 余两阻塞：cost-agent 基座 qwen3-8b 不可靠 / 知识层定额覆盖缺口）
+## 主线三：HITL 可中断组价编排（🟢 全 13 步图 + 前端页面 + 对话内嵌卡片均服务器验通；🔴 余一阻塞：知识层定额覆盖缺口。~~cost-agent 基座 qwen3-8b 不可靠~~ 已由 §9 架构解决、降 backlog B4）
 
 > 设计见 `HITL_DESIGN.md`、开发见 `DEV.md`「HITL 可中断组价图」。判断：13 步组价装不进 `cost.py` 黑盒
 > （不能暂停 / 不能发中间态），编排上提成 ce-services 独立 langgraph 图——每数字带 provenance 信封、
@@ -302,10 +302,17 @@
       ② `CostHitlInline` done 态从「只显总价」改为**可复核明细**（总造价构成 + 编码/定额 + 录入项 + 审计数，靠 get_state 重建、重开对话可复看）。
     - [x] **Tier 2 链路服务器验通**：对话发「走完整组价」→ agent `start` → 贴 marker → **内嵌卡片渲染** → 卡片拉 `/ce-cost` state（200）
       → 编码闸（手动覆盖）→ … → done 显明细。source_ref 精确、置信校准生效（confidence 0）、缺口诚实透传（missing_base）全在真链路验到。
-    - [ ] **🔴 阻塞1 · cost-agent 基座 = qwen3-8b 不可靠**：对话框「起会话+原样贴 marker」这步实测**三次三种翻车**
-      （compose+幻觉置信95% / 问无关尺寸 / 复述闸不贴 marker），逐字下命令也不听。**根治=cost-agent 基座换 qwen-plus**
-      （config.yaml 取消注释 gateway-llm + `api_key:$DASHSCOPE_API_KEY` + cost-agent `model:gateway-llm`；服务器 export key + 重启网关）。
-      `/workspace/cost` 页面入口不依赖 agent、已稳，可先用页面。
+    - [x] **~~🔴 阻塞1 · cost-agent 基座 = qwen3-8b 不可靠~~ → 已由 §9 架构解决（2026-07-01），非换模型**：
+      原症状=对话框「起会话+原样贴 marker」三次三种翻车（compose+幻觉置信95% / 问无关尺寸 / 复述闸不贴 marker）。
+      **结论修正**：治本方案「换 qwen-plus」**未执行、也不再是首选**——config.yaml 仍 qwen3-8b 默认、gateway-llm 仍注释。
+      问题被**换调用方式**绕过：主路径从「bash skill + 贴 marker」改为 **MCP function-calling**（§9 前门 `ce-task_orchestrate`
+      / `ce-task_*` 工具，系统填参不靠弱模型拼 marker）——**实测 8b 走 MCP function-calling 未复现该类翻车**（主线四意外收获）。
+      病根「弱模型不可靠」仍在，但改由**不靠弱模型自觉的确定性兜底**封住：① 确定性前门路由（弱模型只点火）；
+      ② 新暴露的「呈现层 prose 杜撰编码」（8b 转述时自补前门没返回的 010503001/010504001/E.4.1）已修——前端
+      **orchestrate 结果卡 + guard 徽标**摆 ground truth（不信弱模型 prose，commit 96eee227）+ lead prompt 硬化
+      「前门没返回的一个字不写」（commit 4db3bab7）。**已降级为调优 backlog B4（低优先，卡已兜底）**，详见 AGENT_DEV §9 T-A6。
+      - **残留角落（不阻塞）**：纯**有状态 HITL 逐闸组价**（cost-agent `start` + 内嵌卡）前门 orchestrate **不接管**（有状态、
+        走内嵌 marker 卡），那条仍是 8b + marker；稳定兜底=`/workspace/cost` 页面入口（不依赖 agent、已稳）。
     - [ ] **🔴 阻塞2 · 知识层定额覆盖缺口（归 ce-code）**：正解码 `010502006`（现浇矩形柱）在 `bill_quota_map` **无定额映射**
       → quota 空 → 综合单价 missing_base → 算不出真总价（系统如实标「无映射定额子目」「missing_base」，未杜撰=红线对）。
       `bill_quota_map` 仅覆盖 ~53 清单码；有定额的 010503001 反是预制+模板措施码。**需 ce-code 补 010502006→现浇柱本体定额 映射**才能端到端出真总价。

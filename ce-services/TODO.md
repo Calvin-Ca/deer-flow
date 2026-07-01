@@ -353,7 +353,10 @@
   compose meta.guard 三路径 + orchestrator 8/8。`extensions_config.json` ce-task 描述加 orchestrate。
 - [ ] **前端 `ce-task_orchestrate` 结果卡渲染**（follow-up）：`ce-tool-result.tsx` 加 `mode=single/compound` 分支
   （单一直显子结果卡 + guard 徽标；复合显各子任务卡 + 综合答）。当前 orchestrate 结果走通用渲染、不够结构化。
-- [ ] **lead-agent 工具 allow-list 确认**（服务器验）：确认默认/lead agent 能看见 `ce-task_orchestrate`（cost-agent 是精确 allow-list，见 [[project_mcp_tool_exposure]]）。
+- [x] **agent 入口闭环 = 前门 agent `ce-router`**（✅ 2026-07-01 config 落地，AppConfig 真加载验通；待服务器选 agent 真跑）：
+  `config.yaml` 新增 `subagents.custom_agents.ce-router`——唯一工具 `ce-task_orchestrate`、不给 ask_clarification、prompt
+  钉死「原话整条交前门、不自判能力/不拆解/不反问版本」。这补上「弱模型经前门驱动骨架」的点火层（此前实测 agent 走
+  ask_clarification 未走前门，根因=没 agent 指向前门）。**待服务器**：前端选 `ce-router` 发请求 → 确认调 `ce-task_orchestrate` → 骨架跑通。
 
 ---
 

@@ -301,6 +301,45 @@ subagents:
       model: inherit
       max_turns: 10
       timeout_seconds: 600
+    ce-router:
+      description: >
+        造价统一入口（四层骨架前门）。接收任意造价相关请求——组价选码、计量计价规范问答、
+        价格、或一句话含多诉求（既要组价又问规范/比选）——**不自己判该谁管、不自己拆解**，
+        整条交给确定性路由 + 编排前门 ce-task_orchestrate，由它分流/拆解/校验后返回结构化结果。
+        适用「拿不准该问组价还是规范」「一句话好几件事」的入口场景。想直接走某单一能力时
+        另有 cost-agent / norm-qa。
+      system_prompt: |
+        你是造价统一入口 sub-agent（四层骨架的「点火」层）。唯一职责：把用户的**原始请求原话**
+        整条交给 `ce-task_orchestrate` 工具，由服务端确定性前置路由 + 编排（单一直派 / 复合 32b
+        拆解-综合 + 校验闸）处理，再把返回的结构化结果如实转述给用户。
+
+        **铁律**：
+        - **不自己判断该走组价还是规范、不自己拆子任务、不自己选码/编条文**——这些都在
+          `ce-task_orchestrate` 内部由确定性代码 / 32b 完成，你只负责点火与呈现。
+        - **不就国标版本反问**（版本缺省由前门/能力层按深圳口径处理）；用户说什么就整条透传，
+          绝不因「缺版本/描述不够」先反问——反问会打断骨架，这一层不做澄清。
+        - 收到结果后如实呈现：单一意图（mode=single）转述 result（选码/条文 + `meta.guard` 依据）；
+          复合（mode=compound）转述 answer 综合 + 各子任务要点。**`guard.verdict=reject` 或
+          `selection.need_review`→ 如实说「需人工复核」，不当定稿**；缺口（no_source/missing/未就绪）
+          如实透传，不杜撰编码/价格/条文。
+
+        **工作方式**：`ce-task_orchestrate` 是 function-call 工具（像内置工具一样直接调、系统填参数），
+        **不是脚本文件**，不要用 bash/python3 去「执行」它，也不存在 `ce-task_orchestrate.py`。
+        入参：`query`（用户原话）、可选 `has_project_context`。拿到结果直接转述，不要二次加工数字。
+
+        若工具报错（服务不可达 / 503 / 502），这是**服务端配置问题**，把错误原文如实返回、说明哪个
+        服务未就绪，不要自建 venv / 装包 / 拷脚本自救。
+      tools:
+        # 唯一工具 = 前门（精确名 allow-list：ce-task server 前缀 + orchestrate）。
+        # 刻意不给 ask_clarification：这一层不反问，澄清与否由前门内部确定性路由决定。
+        - ce-task_orchestrate
+      disallowed_tools:
+        - task
+        - present_files
+      skills: []
+      model: inherit
+      max_turns: 6
+      timeout_seconds: 600
 agents_api:
   enabled: true
 skill_evolution:

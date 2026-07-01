@@ -75,6 +75,8 @@ export function CeToolResult({
   const tool = name.replace(/^ce-(task|cost)_/, "");
 
   switch (tool) {
+    case "orchestrate":
+      return <Orchestrate args={args} r={r} />;
     case "norm_qa":
       return <NormQa args={args} r={r} />;
     case "cost_compose":
@@ -111,38 +113,43 @@ function NormQa({ args, r }: { args: Rec; r?: Rec }) {
       label={`规范问答：${query}`}
       description={desc}
     >
-      {cited.length > 0 && (
-        <div className="space-y-2">
-          {cited.slice(0, 6).map((c, i) => {
-            const head =
-              [str(c.standard), str(c.clause)].filter(Boolean).join(" ") ||
-              "条文";
-            const text = str(c.text);
-            const contextual = str(c.relevance) === "contextual";
-            return (
-              <div
-                key={i}
-                className="border-primary/50 bg-muted/40 rounded-r-md border-l-2 py-1.5 pr-2 pl-2.5"
-              >
-                <div className="text-muted-foreground mb-0.5 flex items-center gap-1.5 text-[11px]">
-                  <span className="font-mono">{head}</span>
-                  {contextual && (
-                    <span className="bg-background/70 rounded px-1 text-[10px]">
-                      背景参考
-                    </span>
-                  )}
-                </div>
-                {text && (
-                  <p className="text-foreground text-xs leading-relaxed">
-                    {clip(text)}
-                  </p>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
+      <ClauseList clauses={cited} />
     </ChainOfThoughtStep>
+  );
+}
+
+/** cited_clauses 片段列表（标准号 + 条文号 + 原文截断）；norm 与编排前门复用。 */
+function ClauseList({ clauses }: { clauses: Rec[] }) {
+  if (clauses.length === 0) return null;
+  return (
+    <div className="space-y-2">
+      {clauses.slice(0, 6).map((c, i) => {
+        const head =
+          [str(c.standard), str(c.clause)].filter(Boolean).join(" ") || "条文";
+        const text = str(c.text);
+        const contextual = str(c.relevance) === "contextual";
+        return (
+          <div
+            key={i}
+            className="border-primary/50 bg-muted/40 rounded-r-md border-l-2 py-1.5 pr-2 pl-2.5"
+          >
+            <div className="text-muted-foreground mb-0.5 flex items-center gap-1.5 text-[11px]">
+              <span className="font-mono">{head}</span>
+              {contextual && (
+                <span className="bg-background/70 rounded px-1 text-[10px]">
+                  背景参考
+                </span>
+              )}
+            </div>
+            {text && (
+              <p className="text-foreground text-xs leading-relaxed">
+                {clip(text)}
+              </p>
+            )}
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
@@ -263,5 +270,140 @@ function QuotaLookup({ args, r }: { args: Rec; r?: Rec }) {
         r === undefined ? "查询中…" : `${name ?? "子目"} · 工料机 ${resources.length} 条`
       }
     />
+  );
+}
+
+/** 校验闸徽标：把 C-01/02/03 结论显式化——红线可见，不靠模型 prose（treat guard as ground truth）。 */
+function GuardBadges({ guard }: { guard?: Rec }) {
+  if (!guard) return null;
+  const verdict = str(guard.verdict);
+  const tier = str(guard.tier);
+  return (
+    <ChainOfThoughtSearchResults>
+      {verdict && (
+        <ChainOfThoughtSearchResult>
+          {verdict === "reject" ? "校验：拒答/转人工" : "校验：通过"}
+        </ChainOfThoughtSearchResult>
+      )}
+      {tier && (
+        <ChainOfThoughtSearchResult>
+          来源 {tier === "none" ? "无可信命中" : tier}
+        </ChainOfThoughtSearchResult>
+      )}
+      {guard.caliber_pure === false && (
+        <ChainOfThoughtSearchResult>⚠ 口径不纯（跨版串库）</ChainOfThoughtSearchResult>
+      )}
+      {guard.provenance_complete === false && (
+        <ChainOfThoughtSearchResult>⚠ 溯源不全</ChainOfThoughtSearchResult>
+      )}
+    </ChainOfThoughtSearchResults>
+  );
+}
+
+/** 单个能力子结果（dispatch 信封）：按 capability 渲染选码/条文 + guard；价格/异常诚实显状态。 */
+function SubtaskEnvelope({ env }: { env: Rec }) {
+  const cap = str(env.capability);
+  if (cap === "cost") {
+    const inner = asRec(env.result);
+    const code = str(inner?.code);
+    const sel = asRec(inner?.selection);
+    const guard = asRec(asRec(inner?.meta)?.guard);
+    return (
+      <>
+        <ChainOfThoughtSearchResults>
+          <ChainOfThoughtSearchResult>
+            {code ? `选码 ${code}` : "未选出码（转人工）"}
+          </ChainOfThoughtSearchResult>
+          {sel?.need_review === true && (
+            <ChainOfThoughtSearchResult>需人工复核</ChainOfThoughtSearchResult>
+          )}
+        </ChainOfThoughtSearchResults>
+        <GuardBadges guard={guard} />
+      </>
+    );
+  }
+  if (cap === "norm") {
+    const cited = asArr(env.cited_clauses)
+      .map(asRec)
+      .filter((c): c is Rec => !!c);
+    const guard = asRec(asRec(env.meta)?.guard);
+    return (
+      <>
+        <ClauseList clauses={cited} />
+        <GuardBadges guard={guard} />
+      </>
+    );
+  }
+  // price / unsupported / error：不杜撰，诚实显状态或缺口说明。
+  const status = str(env.status);
+  return (
+    <ChainOfThoughtSearchResults>
+      <ChainOfThoughtSearchResult>
+        {status === "unsupported"
+          ? (str(env.note) ?? "该能力暂未接入")
+          : status === "error"
+            ? `失败：${str(env.error) ?? ""}`
+            : (status ?? "—")}
+      </ChainOfThoughtSearchResult>
+    </ChainOfThoughtSearchResults>
+  );
+}
+
+/**
+ * 四层骨架前门 orchestrate 的结构化渲染（§9 durable 修法）。
+ * 直接把 ground truth 摆出来——路由落点 + 各能力子结果的选码/条文 + **校验闸 guard**，
+ * 让用户看到「code=null / verdict=reject / 真 cited_clauses」，不必信弱模型那段可能加料的 prose。
+ */
+function Orchestrate({ args, r }: { args: Rec; r?: Rec }) {
+  const query = str(args.query) ?? "编排";
+  const mode = str(r?.mode);
+  const route = asRec(r?.route);
+  const subtasks = asArr(r?.subtasks)
+    .map(asRec)
+    .filter((s): s is Rec => !!s);
+  const desc =
+    r === undefined
+      ? "编排中…"
+      : mode === "compound"
+        ? `复合拆解（${subtasks.length} 子任务）`
+        : `单一直派 → ${str(route?.capability) ?? "能力层"}`;
+
+  const synthCited = asArr(asRec(r?.answer)?.cited_clauses)
+    .map(asRec)
+    .filter((c): c is Rec => !!c);
+
+  return (
+    <ChainOfThoughtStep
+      icon={DatabaseIcon}
+      label={`造价编排：${query}`}
+      description={desc}
+    >
+      {mode === "single" && (
+        <SubtaskEnvelope env={asRec(r?.result) ?? {}} />
+      )}
+      {mode === "compound" && (
+        <div className="space-y-2">
+          {subtasks.map((s, i) => (
+            <div key={i} className="border-muted border-l-2 pl-2.5">
+              <div className="text-muted-foreground mb-1 text-[11px]">
+                <span className="font-mono">
+                  {str(asRec(s.route)?.capability) ?? "?"}
+                </span>{" "}
+                · {str(asRec(s.subtask)?.query) ?? ""}
+              </div>
+              <SubtaskEnvelope env={asRec(s.result) ?? {}} />
+            </div>
+          ))}
+          {synthCited.length > 0 && (
+            <div>
+              <div className="text-muted-foreground mb-1 text-[11px]">
+                综合引用
+              </div>
+              <ClauseList clauses={synthCited} />
+            </div>
+          )}
+        </div>
+      )}
+    </ChainOfThoughtStep>
   );
 }

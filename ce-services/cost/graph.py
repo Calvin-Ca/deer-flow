@@ -114,7 +114,7 @@ def list_match_node(state: CostTaskState) -> dict[str, Any]:
       高置信直配 / 超轮次 → 空（不澄清）。LLM 不可靠时 extract 返回空，degrade 到现有行为。
     """
     item = _item(state)
-    env = provenance.list_match(item.get("feature"), state["spec_version"], TOP_K, LLM_URL, LLM_MODEL_ID)
+    env = provenance.list_match(item.get("feature"), state["spec_version"], TOP_K)
     item["code"] = {"envelope": env, "value": env["result"].get("code"), "locked": False}
     # clarify_rounds 存 item（多构件各自计澄清预算，互不挪用）。
     if env["status"] == provenance.STATUS_NEED_REVIEW and (item.get("clarify_rounds") or 0) < MAX_CLARIFY_ROUNDS:

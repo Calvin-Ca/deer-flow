@@ -1,0 +1,344 @@
+"""复合编排器（T-A4，AGENT_DEV §9.1 ④）—— 复合请求：拆解 → 子任务回 ① 路由 → 派发 → 综合。
+
+> 对应 §9.5 T-A4 / §2.2 冲突4「缺 Orchestrator」/ §3 改3「架构归位」；承 PRD EH-01 拆解、
+> FR-X02 比选 / FR-X03 结算变更。
+
+**层位**：坐在前置路由 ①（``routing/prerouter``）之上。单一意图直接派发到能力层 ②；复合意图
+（EH-01）才进拆解—综合回环。**模型分层（§9.3）**：拆解 + 综合是真·推理（桶 B）→ 用 **32b**
+（``ORCH_LLM``）；子任务能力执行里 norm 生成/取数走 **8b**（桶 A，延迟敏感），而 cost 选码消歧
+自走 **32b**（桶 B，``select_code`` 内定，§9.3「选错最贵」）——故 ``cap_*`` 仅喂 norm 生成。
+
+**降级安全**（同 clarify/标准漂移原则，弱模型不可靠不致命）：
+  - 拆解 LLM 失败 / 输出非 list → 退化为「单任务=整条 query」。
+  - 综合 LLM 失败 → 确定性拼接各子答案 + 汇集引用（不丢溯源 C-01）。
+  - 单个子任务派发失败 → 记 ``status=error``、不拖垮整单（其余子任务照跑）。
+
+**可测**：``orchestrate`` 的 ``dispatch_fn`` / ``decompose_fn`` / ``synthesize_fn`` 均可注入，
+默认用真实现（调服务 + LLM），单测注入 stub 即可不依赖服务/LLM 验编排 loop 与降级路径。
+"""
+from __future__ import annotations
+
+import json
+import logging
+from typing import Any, Callable
+
+import requests
+
+from common.config import (
+    LLM_MODEL_ID, LLM_URL, ORCH_LLM_MODEL_ID, ORCH_LLM_URL,
+)
+from common.llm import call_qwen3
+from norm import pipeline
+from norm.standard_router import family_version_of
+from routing.prerouter import RouteDecision, route
+
+logger = logging.getLogger("ce-services.orchestrator")
+
+# 拆解上限：避免一句话被拆成过多子任务压垮下游 / 失控调用。
+MAX_SUBTASKS = 5
+# cost 子任务默认国标版本（query 未显式给版本时）。**版本默认策略属 §8 块1/T9-1**，此处取与当前
+# 组价数据就绪一致的 2024 作过渡缺省；T9-1 落地后由那条统管。
+_COST_DEFAULT_SPEC = "2024"
+
+
+# ─────────────────────────── ① 拆解（32b，EH-01）───────────────────────────
+_DECOMPOSE_SYSTEM = """\
+你是建设工程造价的复合任务拆解器。用户的一句话可能含多个独立子任务（如「先套定额、再算合价、\
+并判断是否合规」）。把它拆成**彼此独立、各自可单独路由到一个能力**的子问题。
+
+铁律：
+1. 每个子问题必须**自包含**（补全指代，如「这个柱子」→带上构件描述），能脱离原句单独理解。
+2. 只拆**真正独立**的子任务；本就是单一问题就只返回 1 条（不硬拆）。
+3. 不臆造原句没有的诉求；不合并不同诉求到一条。
+4. 最多 5 条，按执行先后排序。
+
+只返回合法 JSON，不输出任何 JSON 以外的文字。\
+"""
+
+
+def _decompose_user(query: str) -> str:
+    return (
+        f"复合请求：{query}\n\n"
+        "请拆成独立可路由的子问题，只返回合法 JSON：\n"
+        '{\n'
+        '  "subtasks": [\n'
+        '    {"id": "s1", "query": "自包含的子问题原文", "note": "这条想解决什么（可空）"}\n'
+        '  ]\n'
+        '}\n\n/no_think'
+    )
+
+
+def decompose(query: str, llm_url: str = ORCH_LLM_URL, model_id: str = ORCH_LLM_MODEL_ID) -> list[dict]:
+    """32b 把复合请求拆成独立子任务。降级安全：失败/非法 → 单任务=整条 query。
+
+    返回：``[{id, query, note}]``（至少 1 条；最多 MAX_SUBTASKS）。
+    """
+    fallback = [{"id": "s1", "query": query, "note": "拆解降级：按单任务处理"}]
+    try:
+        raw = call_qwen3(_DECOMPOSE_SYSTEM, _decompose_user(query), llm_url, model_id)
+    except (requests.RequestException, json.JSONDecodeError, ValueError):
+        logger.warning("decompose LLM 不可靠 → 降级单任务：%s", query[:40])
+        return fallback
+
+    subs = raw.get("subtasks") if isinstance(raw, dict) else None
+    if not isinstance(subs, list) or not subs:
+        return fallback
+    out: list[dict] = []
+    for i, s in enumerate(subs[:MAX_SUBTASKS]):
+        if not isinstance(s, dict):
+            continue
+        q = str(s.get("query") or "").strip()
+        if not q:
+            continue
+        out.append({"id": str(s.get("id") or f"s{i + 1}"), "query": q,
+                    "note": str(s.get("note") or "").strip()})
+    return out or fallback
+
+
+# ─────────────────────────── ② 派发（子任务 → 能力层，桶 A 8b）───────────────────────────
+def _spec_of(query: str) -> str:
+    """cost 子任务取国标版本：query 显式 2013/2024 优先，否则默认。"""
+    _, version = family_version_of(query)
+    return version or _COST_DEFAULT_SPEC
+
+
+def dispatch_subtask(query: str, decision: RouteDecision, *,
+                     cap_llm_url: str = LLM_URL, cap_model_id: str = LLM_MODEL_ID) -> dict:
+    """把单个子任务派发到其能力层并归一为统一信封。
+
+    返回信封：``{capability, query, status, ...}``：
+      - norm：``status=ok`` + ``answer`` + ``cited_clauses`` + ``meta``（走 norm.pipeline，含校验闸）。
+      - cost：``status=ok`` + ``result``（orchestration.compose 全量）。
+      - price：``status=unsupported``（FR-I 价格取数后端尚未接入编排器，诚实标注不杜撰）。
+      - 异常：``status=error`` + ``error``（不拖垮整单）。
+    """
+    cap = decision.capability
+    env: dict[str, Any] = {"capability": cap, "query": query}
+    try:
+        if cap == "norm":
+            res = pipeline.answer_query(query, standard_hint=None,
+                                        llm_url=cap_llm_url, model_id=cap_model_id)
+            env.update(status="ok", answer=res.get("answer"),
+                       cited_clauses=res.get("cited_clauses", []), meta=res.get("meta", {}))
+        elif cap == "cost":
+            from cost import orchestration  # 局部 import：避免 routing 包在无 langgraph 环境下连带失败
+            # 选码走桶 B 32b（compose 内 select_code 自定，§9.3）；cap_* 仅供 norm 生成（桶 A 8b）。
+            res = orchestration.compose(query, _spec_of(query), "深圳")
+            env.update(status="ok", result=res)
+        elif cap == "price":
+            env.update(status="unsupported",
+                       note="价格取数（FR-I）后端尚未接入编排器，建议人工查当期信息价")
+        else:  # compound 嵌套：不递归，标记交人核（拆解应已展平）
+            env.update(status="unsupported", note=f"未支持的子任务能力：{cap}")
+    except (requests.RequestException, ValueError) as exc:
+        env.update(status="error", error=str(exc))
+        logger.warning("子任务派发失败 cap=%s err=%s", cap, exc)
+    return env
+
+
+# ─────────────────────────── ③ 综合（32b）───────────────────────────
+_SYNTH_SYSTEM = """\
+你是建设工程造价的复合结论综合器。给定用户原始复合问题，以及各子任务的检索/计算结果，\
+把它们整合成一份连贯、面向造价从业者的回答。
+
+铁律：
+1. **只基于子任务结果**作答，不补充子结果中没有的事实/条文/数字；不杜撰。
+2. 完整保留各子结果的来源引用（条文号/定额子目/价格期段），汇入 cited_clauses。
+3. 子结果间若有冲突或缺口，在 conflicts/uncertain_aspects 中如实点出。
+4. 末尾附：本回答仅供参考，不替代专业造价审核。
+
+只返回合法 JSON，不输出任何 JSON 以外的文字。\
+"""
+
+
+def _synth_user(query: str, results: list[dict]) -> str:
+    blocks = [f"用户原始复合问题：{query}", "", "各子任务结果："]
+    for r in results:
+        blocks.append(f"--- 子任务（{r.get('capability')}）：{r.get('query', '')} ---")
+        blocks.append(f"状态：{r.get('status')}")
+        if r.get("answer"):
+            blocks.append(f"回答：{r['answer']}")
+        if r.get("cited_clauses"):
+            blocks.append(f"引用：{json.dumps(r['cited_clauses'], ensure_ascii=False)}")
+        if r.get("result"):
+            blocks.append(f"结果：{json.dumps(r['result'], ensure_ascii=False)[:1500]}")
+        if r.get("note"):
+            blocks.append(f"说明：{r['note']}")
+        if r.get("error"):
+            blocks.append(f"错误：{r['error']}")
+        blocks.append("")
+    blocks += [
+        "请综合成一份回答，只返回合法 JSON：",
+        '{\n  "answer": "整合后的回答正文（含引用、免责声明）",\n'
+        '  "cited_clauses": [{"clause": "...", "standard": "...", "text": "..."}],\n'
+        '  "conflicts": ["子结果间的冲突，若无则空数组"],\n'
+        '  "uncertain_aspects": ["需人工核实的方面，若无则空数组"]\n}',
+        "",
+        "/no_think",
+    ]
+    return "\n".join(blocks)
+
+
+def _synth_fallback(query: str, results: list[dict]) -> dict:
+    """综合降级：确定性拼接子答案 + 汇集引用（不丢溯源 C-01）。"""
+    parts: list[str] = []
+    cited: list[dict] = []
+    for r in results:
+        head = f"【{r.get('capability')}｜{r.get('query', '')}】"
+        if r.get("status") == "ok" and r.get("answer"):
+            parts.append(f"{head}\n{r['answer']}")
+        elif r.get("status") == "ok" and r.get("result"):
+            parts.append(f"{head}\n（组价结果见结构化数据）")
+        else:
+            parts.append(f"{head}\n[{r.get('status')}] {r.get('note') or r.get('error') or ''}")
+        cited.extend(r.get("cited_clauses") or [])
+    parts.append("（综合降级：以下为各子任务结果的确定性拼接。本回答仅供参考，不替代专业造价审核。）")
+    return {"answer": "\n\n".join(parts), "cited_clauses": cited,
+            "conflicts": [], "uncertain_aspects": ["综合 LLM 不可用，已降级为确定性拼接"]}
+
+
+def synthesize(query: str, results: list[dict],
+               llm_url: str = ORCH_LLM_URL, model_id: str = ORCH_LLM_MODEL_ID) -> dict:
+    """32b 把各子任务结果综合成一份回答。降级安全：失败 → 确定性拼接（``_synth_fallback``）。"""
+    try:
+        out = call_qwen3(_SYNTH_SYSTEM, _synth_user(query, results), llm_url, model_id,
+                         max_tokens=4096)
+    except (requests.RequestException, json.JSONDecodeError, ValueError):
+        logger.warning("synthesize LLM 不可靠 → 降级确定性拼接")
+        return _synth_fallback(query, results)
+    if not isinstance(out, dict) or not out.get("answer"):
+        return _synth_fallback(query, results)
+    out.setdefault("cited_clauses", [])
+    out.setdefault("conflicts", [])
+    out.setdefault("uncertain_aspects", [])
+    return out
+
+
+# ─────────────────────────── 编排主流程 ───────────────────────────
+def orchestrate(
+    query: str,
+    *,
+    has_project_context: bool | None = None,
+    cap_llm_url: str = LLM_URL,
+    cap_model_id: str = LLM_MODEL_ID,
+    dispatch_fn: Callable[[str, RouteDecision], dict] | None = None,
+    decompose_fn: Callable[[str], list[dict]] | None = None,
+    synthesize_fn: Callable[[str, list[dict]], dict] | None = None,
+) -> dict:
+    """复合编排：① 路由 → 单一直派 / 复合则拆解→逐子任务回①→派发→综合。
+
+    参数：
+        query —— 用户请求；has_project_context —— 是否挂 BOQ（透传 prerouter）。
+        cap_llm_url / cap_model_id —— 能力层（桶 A 8b）模型；拆解/综合用 32b（在默认 fn 内）。
+        dispatch_fn / decompose_fn / synthesize_fn —— 可注入（单测用 stub）；缺省用真实现。
+    返回：
+        单一：``{mode:"single", route, result:<信封>}``；
+        复合：``{mode:"compound", route, subtasks:[{route, result}...], answer:<综合>}``。
+    """
+    _dispatch = dispatch_fn or (lambda q, d: dispatch_subtask(
+        q, d, cap_llm_url=cap_llm_url, cap_model_id=cap_model_id))
+    _decompose = decompose_fn or decompose
+    _synthesize = synthesize_fn or synthesize
+
+    decision = route(query, has_project_context=has_project_context)
+
+    # 单一意图：无需拆解/综合，直接派发到能力层（编排器也作统一入口）。
+    if decision.capability != "compound":
+        result = _dispatch(query, decision)
+        logger.info("orchestrate single cap=%s status=%s", decision.capability, result.get("status"))
+        return {"mode": "single", "route": decision.as_meta(), "result": result}
+
+    # 复合意图（EH-01）：拆解 → 逐子任务回 ① 路由 + 派发 → 综合。
+    subtasks = _decompose(query)
+    sub_records: list[dict] = []
+    dispatch_inputs: list[dict] = []
+    for st in subtasks:
+        sub_decision = route(st["query"], has_project_context=has_project_context)
+        env = _dispatch(st["query"], sub_decision)
+        sub_records.append({"subtask": st, "route": sub_decision.as_meta(), "result": env})
+        dispatch_inputs.append(env)
+
+    final = _synthesize(query, dispatch_inputs)
+    logger.info("orchestrate compound subtasks=%d caps=%s",
+                len(subtasks), [r["result"].get("capability") for r in sub_records])
+    return {
+        "mode": "compound",
+        "route": decision.as_meta(),
+        "subtasks": sub_records,
+        "answer": final,
+    }
+
+
+# ─────────────────────────── 内置自测（注入 stub，无需服务/LLM）───────────────────────────
+def _selftest() -> int:
+    import sys
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+    except (AttributeError, ValueError):
+        pass
+
+    passed = failed = 0
+
+    def check(name: str, cond: bool, extra: str = "") -> None:
+        nonlocal passed, failed
+        print(f"{'✓' if cond else '✗'} {name}{('  ' + extra) if extra else ''}")
+        if cond:
+            passed += 1
+        else:
+            failed += 1
+
+    # stub 派发：按 capability 造假结果，记录被派发的子 query
+    dispatched: list[tuple[str, str]] = []
+
+    def stub_dispatch(q: str, d: RouteDecision) -> dict:
+        dispatched.append((d.capability, q))
+        if d.capability == "norm":
+            return {"capability": "norm", "query": q, "status": "ok", "answer": f"规范答[{q}]",
+                    "cited_clauses": [{"clause": "5.1.1", "standard": "gb50854-2024", "text": "x"}]}
+        if d.capability == "cost":
+            return {"capability": "cost", "query": q, "status": "ok", "result": {"code": "010502006"}}
+        return {"capability": d.capability, "query": q, "status": "unsupported", "note": "stub"}
+
+    def stub_decompose(q: str) -> list[dict]:
+        return [{"id": "s1", "query": "C30现浇矩形柱怎么组价", "note": "套价"},
+                {"id": "s2", "query": "矩形柱按什么计量", "note": "计量规则"}]
+
+    def stub_synth(q: str, results: list[dict]) -> dict:
+        return {"answer": "综合：" + "；".join(r.get("answer", r.get("status")) for r in results),
+                "cited_clauses": [c for r in results for c in r.get("cited_clauses", [])],
+                "conflicts": [], "uncertain_aspects": []}
+
+    # ① 单一意图（norm）：mode=single、直派、不拆解
+    out = orchestrate("矩形柱按什么计量", dispatch_fn=stub_dispatch,
+                      decompose_fn=stub_decompose, synthesize_fn=stub_synth)
+    check("单一 norm：mode=single", out["mode"] == "single")
+    check("单一 norm：route.capability=norm", out["route"]["capability"] == "norm")
+    check("单一 norm：未触发拆解（dispatched 1 次）", len(dispatched) == 1)
+
+    # ② 复合意图：mode=compound、拆解 2 子任务、各自回路由派发、综合
+    dispatched.clear()
+    out = orchestrate("这个变更怎么计价、并核对是否合规", dispatch_fn=stub_dispatch,
+                      decompose_fn=stub_decompose, synthesize_fn=stub_synth)
+    check("复合：mode=compound", out["mode"] == "compound")
+    check("复合：拆出 2 子任务", len(out["subtasks"]) == 2)
+    check("复合：子任务回 ① 路由（cost + norm）",
+          [s["route"]["capability"] for s in out["subtasks"]] == ["cost", "norm"],
+          str([s["route"]["capability"] for s in out["subtasks"]]))
+    check("复合：综合答非空 + 汇集引用",
+          bool(out["answer"]["answer"]) and len(out["answer"]["cited_clauses"]) == 1)
+
+    # ③ 综合降级：确定性拼接不丢引用（综合 LLM 不可用时的兜底形态）
+    fb_out = _synth_fallback("原问", [
+        {"capability": "norm", "query": "q1", "status": "ok", "answer": "A1",
+         "cited_clauses": [{"clause": "1.1", "standard": "gb50854-2024", "text": "t"}]},
+        {"capability": "price", "query": "q2", "status": "unsupported", "note": "未接入"},
+    ])
+    check("综合降级：拼接含两段 + 保留引用",
+          "A1" in fb_out["answer"] and len(fb_out["cited_clauses"]) == 1 and fb_out["uncertain_aspects"])
+
+    print(f"\n自测：{passed} 过 / {failed} 败 / 共 {passed + failed}")
+    return 1 if failed else 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(_selftest())

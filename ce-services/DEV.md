@@ -10,7 +10,8 @@
 
 | 角色 | 模型 / 服务 | 地址 | 任务层用途 | 备注 |
 |---|---|---|---|---|
-| 文本生成 / 推理 | Qwen3-8B | `http://localhost:8099`，model_id `qwen3-8b` | 问答生成、合规判定、反思校验、参数提取 | `/think` 启用 thinking、`/no_think` 禁用；JSON 输出建议 `/no_think` |
+| 桶 A · 生成 / 推理 | Qwen3-8B | `http://localhost:8099`，model_id `qwen3-8b` | 问答生成、直配、取价、澄清、参数提取（延迟敏感路径） | `/think` 启用 thinking、`/no_think` 禁用；JSON 输出建议 `/no_think` |
+| 桶 B · 真·推理 / 选码消歧 | Qwen3-32B-AWQ | `http://172.19.2.2:8001`，model_id `/models/Qwen3-32B-AWQ` | 复合拆解/综合（编排器）+ **选码候选消歧**（选错最贵、非 2s 路径） | AGENT_DEV §9.3 模型分层 / T-A5；**成对 env 指端点**（见下），未设则回落 8b、选码不受影响 |
 | 检索（内部依赖） | 知识服务 | `http://localhost:8100` | 打 `/search` 拿裸条款 | 由 `common/knowledge_client.py` 封装；必须先起 |
 
 > 任务层**不直连** Embedding / Milvus / VLM —— 那些是知识层（`../ce-code/`）的资产，任务层一概不碰。
@@ -22,8 +23,11 @@
 | 变量 | 默认 | 说明 |
 |---|---|---|
 | `BCRAG_KNOWLEDGE_URL` | `http://localhost:8100` | 知识服务地址 |
-| `BCRAG_LLM_URL` | `http://localhost:8099` | Qwen3-8B vLLM 地址 |
-| `BCRAG_LLM_MODEL_ID` | `qwen3-8b` | LLM model_id |
+| `BCRAG_LLM_URL` | `http://localhost:8099` | 桶 A Qwen3-8B vLLM 地址 |
+| `BCRAG_LLM_MODEL_ID` | `qwen3-8b` | 桶 A LLM model_id |
+| `BCRAG_ORCH_LLM_URL` | 未设→回落 `BCRAG_LLM_URL`（8b） | 桶 B 32b 端点（复合编排 + 选码消歧共用）；**与下一项成对设**才升 32b |
+| `BCRAG_ORCH_LLM_MODEL_ID` | 未设 32b URL 时回落 `qwen3-8b`，设了则 `qwen3-32b` | 桶 B model_id（成对回落，避免「8b 端点 + 32b id」不匹配）|
+| `BCRAG_SELECT_LLM_URL` / `_MODEL_ID` | 回落 `BCRAG_ORCH_LLM_*` | 仅当选码要指到**另一** 32b 实例时单设，否则同编排器桶 B |
 | `CE_HITL_CHECKPOINT_DB` | `ce-services/.hitl_checkpoints.db` | HITL 图 SqliteSaver 持久化文件（gitignore，可重生成）|
 | `CE_HITL_CONFIDENCE_TAU` | `0.75` | 编码闸置信阈值 τ：≥τ 且无多候选才自动过（保守起步偏高）|
 

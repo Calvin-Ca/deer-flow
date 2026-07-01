@@ -49,10 +49,9 @@ try:  # ToolError 在不同 mcp 版本路径略有差异，缺则退化为 Value
 except ImportError:  # pragma: no cover
     ToolError = ValueError  # type: ignore[assignment,misc]
 
-from common import knowledge_client
 from common.config import LLM_MODEL_ID, LLM_URL
 from cost import orchestration
-from norm import generation
+from norm import pipeline
 
 # 内网可信服务，关掉 DNS rebinding 保护——允许经 localhost / 服务器 IP 任意 Host 访问 :8101/mcp。
 mcp = FastMCP(
@@ -72,60 +71,43 @@ mcp = FastMCP(
 def norm_qa(
     query: Annotated[str, Field(description="造价/计量/计价类自然语言问题，如「现浇混凝土柱按什么计量」")],
     standard: Annotated[
-        str,
-        Field(description="规范代号（必填，无默认）：如 gb50854-2024 / gb50500-2013。按国标版本隔离，避免错版串库"),
-    ],
+        str | None,
+        Field(description="规范代号 hint（可选）：如 gb50854-2024。服务端按问题类型确定性定族"
+                          "（计量→50854/计价→50500/安装→50856），仅零命中时回退此 hint，错族由确定性夺回"),
+    ] = None,
     top_k: Annotated[int, Field(ge=1, le=50, description="检索召回条数")] = 15,
     skip_rerank: Annotated[bool, Field(description="跳过 cross-encoder 精排（调试用）")] = False,
 ) -> dict:
     """造价规范条文检索 + Qwen3 带引用作答（任务层 /norm/qa 的 MCP 表面）。
 
     **红线**：只引检索到的条文、零召回不喂空上下文给 LLM（直返「未检索到」），不编造条文号/原文。
+    **规范选择确定化（T-A2）**：选哪部规范由服务端 ``standard_router`` 按问题类型确定性裁定，
+    不再由（弱模型）调用方说了算——治「计量问题被路由到计价规范」的标准漂移。
 
     参数：
         query —— 造价/计量/计价自然语言问题。
-        standard —— 规范代号（必填，无默认）：gb50854-2024 / gb50500-2013 等，按版本隔离。
+        standard —— 规范代号 hint（可选）：gb50854-2024 等；仅在确定性零命中时作回退。
         top_k —— 检索召回条数（1–50）。
         skip_rerank —— 跳过精排（调试）。
     返回：``{answer, cited_clauses:[{clause,standard,text,relevance}...], uncertain_aspects,
-        out_of_scope_warnings, meta:{standard,retrieved,...}}``；零召回时 answer 为「未检索到」、
-        cited_clauses 空（这是正确行为，非错误）。
+        out_of_scope_warnings, meta:{standard,standard_resolution,retrieved,...}}``；零召回时
+        answer 为「未检索到」、cited_clauses 空（这是正确行为，非错误）。
     异常：未知规范 / 索引未就绪 / 知识服务不可达 / LLM 不可达或输出非法 JSON → ToolError。
     """
+    # 编排内核与 /norm/qa 端点、复合编排器共用 norm.pipeline.answer_query（含 T-A2 规范选择 +
+    # 校验闸 C-01/02/03）。本工具仅把异常映射为 ToolError。
     try:
-        search_resp = knowledge_client.search(
-            query, standard=standard, top_k=top_k, skip_rerank=skip_rerank,
+        return pipeline.answer_query(
+            query, standard_hint=standard, llm_url=LLM_URL, model_id=LLM_MODEL_ID,
+            top_k=top_k, skip_rerank=skip_rerank,
         )
     except requests.HTTPError as exc:
         detail = exc.response.text if exc.response is not None else str(exc)
         raise ToolError(f"知识服务检索失败: {detail}") from exc
     except requests.RequestException as exc:
-        raise ToolError(f"知识服务不可达: {exc}") from exc
-
-    clauses = search_resp.get("clauses", [])
-    if not clauses:
-        # 零召回：不喂空上下文给 LLM 编答案，直接返回「无依据」（与 /norm/qa 一致）。
-        return {
-            "answer": "未在所选造价规范中检索到与问题相关的条文，无法作答。本回答仅供参考，不替代专业造价审核。",
-            "cited_clauses": [],
-            "uncertain_aspects": ["检索零召回，可能问题超出该规范范围或需换用其它规范"],
-            "out_of_scope_warnings": [],
-            "meta": {"standard": standard, "retrieved": 0, "search_meta": search_resp.get("meta", {})},
-        }
-
-    try:
-        result = generation.answer(query, clauses, LLM_URL, LLM_MODEL_ID)
-    except requests.RequestException as exc:
-        raise ToolError(f"LLM 生成服务不可达: {exc}") from exc
+        raise ToolError(f"依赖服务不可达（知识服务 :8100 / LLM）: {exc}") from exc
     except ValueError as exc:  # json.JSONDecodeError 是 ValueError 子类
         raise ToolError(f"LLM 输出非合法 JSON: {exc}") from exc
-
-    result["meta"] = {
-        "standard": standard,
-        "retrieved": len(clauses),
-        "search_meta": search_resp.get("meta", {}),
-    }
-    return result
 
 
 @mcp.tool()
@@ -151,7 +133,7 @@ def cost_compose(
     """
     try:
         return orchestration.compose(
-            description, spec, region, LLM_URL, LLM_MODEL_ID, top_k=top_k,
+            description, spec, region, top_k=top_k,
         )
     except requests.HTTPError as exc:
         detail = exc.response.text if exc.response is not None else str(exc)

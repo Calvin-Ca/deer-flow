@@ -13,7 +13,6 @@ import requests
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
-from common.config import LLM_MODEL_ID, LLM_URL
 from cost import orchestration
 from cost.pricing import RollupInput, UnitPriceInput, compute_unit_price, rollup_cost
 
@@ -67,7 +66,7 @@ def cost_compose_endpoint(req: CostComposeRequest) -> dict:
     t0 = time.perf_counter()
     try:
         result = orchestration.compose(
-            req.description, req.spec, req.region, LLM_URL, LLM_MODEL_ID, top_k=req.top_k,
+            req.description, req.spec, req.region, top_k=req.top_k,
             rates=req.rates.model_dump() if req.rates else None,
         )
     except requests.HTTPError as exc:

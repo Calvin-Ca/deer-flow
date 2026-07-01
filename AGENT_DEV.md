@@ -186,3 +186,79 @@ ce-services 任务层 `:8101`，挂在 `cost_router`（`main.py:46`，无额外 
 - **联网结果一律 Tier-2 降级标注**:绝不冒充深圳2013 权威口径(块2 强制,不靠 LLM 自觉)。
 - **联网兜底 ≠ 替代拒答**:联网无可信源仍走 C-03,不把「不知道」包装成「有链接的答案」。
 - **三道闸在服务端确定性执行**,弱模型不碰查询口径/可信度筛查(同 HITL)。
+
+---
+
+## 9. 整体 Agent 骨架编排（架构基线，待落代码）
+
+> 定位：§1–8 各自聚焦「组价 HITL 管线」与「规范问答兜底」两条具体线；本节给**统摄两者的整体 agent 骨架**——从 AGENT_PRD 的纯需求（C-01~05 红线 + 路由≥95% + §8.2 延迟 NFR + 功能需求的双峰难度）反推得到，并对模型选型（仅 Qwen3-8B / Qwen3-32B 之间）给出结论。
+>
+> **与 PRD 三层 Orchestrator–Pipeline–ReAct 同源**——因为那套骨架本就被红线**强制蕴含**（C-01 100%溯源 + C-03 零幻觉 + C-04 精确算钱 ⟹ 检索接地 + 确定性计算 + 校验闸 + 前置确定性路由，纯对话 agent 数学上满足不了），不是设计偏好。本节真正的**增量**只有四点：① 模型分层 8b/32b（PRD 未提模型）；② 复合推理桶上 32b（PRD 默认弱模型贯穿，此处分歧）；③ 「问题类型→规范代号」选择确定化（PRD §4.0 口径归一只管地域+版本，未管选哪部 GB——标准漂移 bug 即此缺口）；④ 校验闸显式提成独立一层（PRD 散在红线里）。
+
+### 9.1 四层骨架
+
+```
+用户请求
+  │
+  ▼
+① 前置路由（确定性 / 轻分类器，无 LLM）          ← 保 ≥95% 分流 + 低延迟
+   · 能力分流：组价(FR-P) / 规范(FR-K) / 价格(FR-I)
+   · 形态判定：单一 vs 复合(EH-01)、特征缺?(EH-04)、口径缺?(EH-05)
+   · 规范映射：计量→GB50854 / 计价→GB50500 / 安装→GB50856   ← 治标准漂移
+  │ 单一意图                              │ 复合意图
+  ▼                                      ▼
+② 能力层（工具，结构化）                    ④ 复合编排器 (32b)
+   · norm_qa：RAG→受限引用生成 (8b) +FR-K07     拆解→逐子任务回①→综合
+   · cost：召回→置信门控→直配/消歧(8b)/澄清       FR-X02 比选 / X03 结算 / EH-01
+   · price：确定性取数      · calc：确定性算钱(C-04)
+  │
+  ▼
+③ 校验闸（非 LLM，强制）：溯源必带(C-01) · 无命中即拒(C-03) · 口径纯净(C-02)
+  │
+  ▼  结构化卡（依据可见）+ 答案
+```
+
+### 9.2 各层职责 · 模型落位 · 现状
+
+| 层 | 职责 | 模型 | 现状 | 代码 / 缺口 |
+|---|---|:--:|:--:|---|
+| ① 前置路由 | 能力分流 + 形态判定 + 规范映射，确定性 | 无 LLM | 🟢 模块就位 | **T-A1**（`routing/prerouter.py`：能力分流 norm/cost/price/compound + 形态 EH-01/04/05，`/route` 端点）+ **T-A2**（`norm/standard_router.py`：规范映射，已接进 norm_qa）均落地，确定性无 LLM。**待接入实际调度**（lead-agent/编排器消费，随 T-A4） |
+| ② 能力层 | RAG 接地生成 / 置信门控选码 / 取数 / 算钱 | **8b** | 🟢 基本就位 | 组价 HITL 图（§1–7 `cost/graph.py`）+ MCP `ce-task`(`common/mcp_server.py`) + 门控(`gates.py`) + 计算工具(`pricing.py`) + norm RAG(`norm/router.py`) |
+| ③ 校验闸 | 溯源 / 拒答 / 口径纯净，结构化拦截 | 无 LLM | 🟢 已成层(norm) | **T-A3 已落地**：`norm/guards.py` 把 C-01 溯源完整 / C-02 口径纯净(他部+跨版剔除) / C-03 零召回拒答统一为显式 guard（`GuardReport`→`meta.guard`），接进 `/norm/qa`+MCP。cost 侧仍走 provenance 信封(need_review/no_source)，待对齐同契约；C-02 联网 Tier-2 降级标注随 §8 web 兜底并入 |
+| ④ 复合编排 | 拆解(EH-01) + 综合 + 高阶推理(FR-X/FR-C) | **32b** | 🟢 模块就位 | **T-A4**（`routing/orchestrator.py`：32b 拆解→子任务回①路由→派发→32b 综合，降级安全，`/orchestrate` 端点）落地；接住 §2.2 冲突4「缺 Orchestrator」。**待**真 LLM 质量抽检 + FR-I 价格后端 + 嵌套/依赖子任务 |
+
+### 9.3 模型分层结论（8b / 32b）
+
+需求在「推理难度 × 延迟预算」上**双峰**，单一模型无法同时满足：
+
+- **桶 A（接地检索/选码/取价/生成）**：正确性靠 RAG+工具+闸兜住，与模型大小无关，真正诉求是**快**（FR-K P95≤3s、FR-P01≤2s）。32b 跑带引用生成几乎必超 3s → **桶 A 用 8b**。
+- **桶 B（复合推理/判断/结算）**：FR-X02 比选「哪种更省」、FR-X03 结算/索赔、FR-C 漏项/错套、EH-01 拆解是**真·推理**，8b 给不出可信结论；低频、5s 预算宽 → **桶 B 用 32b**。
+
+**分层落位（GPU 充足版，2026-06-30——GPU 足以并存 8b+32b，分层无成本顾虑）：**
+
+| 槽 | 模型 | 理由 |
+|---|:--:|---|
+| norm_qa 受限引用生成（FR-K） | **8b** | P95≤3s 延迟敏感；引用生成 8b 已验够用（E.7.3 实测） |
+| 高置信直配（FR-P01）/ 取价（FR-I）/ 澄清 | **8b** | ≤2s、高频、低推理 |
+| **选码候选消歧（τ 区间，FR-P02）** | **32b** | 8b 最不可靠（现浇/预制、矩形柱召回、幻觉置信95%）且选错最贵；非 2s 直配路径、可承受 32b 延迟。**T-A5 已接线**：`select_code` 缺省桶 B（`SELECT_LLM`），成对 env 一设即升 32b |
+| 复合推理/判断/结算（FR-X02/03、FR-C、EH-01 拆解） | **32b** | 真·推理，5s 预算宽 |
+| ① 路由 + 规范映射 | 无 LLM | 确定性，模型选择在此无关 |
+
+> **关键**：延迟由**单请求 per-token 速度**决定，**多 GPU 解决不了**——故 FR-K/FR-P01 生成仍钉 8b，与 GPU 数量无关；GPU 充足只是让「8b+32b 并存」零成本，并让选码消歧从 8b 升到 32b（之前因 GPU 紧张才留 8b）。
+> **唯一翻盘前提**：若放弃 FR-K P95≤3s，GPU 充足下可「32b 全量」求质量齐整——不建议，FR-K 最高频，慢了天天硌用户。
+> **退路**：若运维只能起一个模型 → 选 8b（守住全部红线 C-01/03/04 + 所有延迟 NFR，只让步可降级的 FR-X 高阶推理；32b-only 反而结构性违反高频路径 P95）。
+
+### 9.4 落地顺序
+
+①（含规范映射，直接消标准漂移、把路由从弱模型夺回）→ ④（复合桶接 32b）→ ③ 统一成层。② 已基本就位（这两天的 MCP 工具 + 依据卡 + 门控 + 拒答）。
+
+> **进度（2026-07-01）**：①（T-A1+T-A2）、③（T-A3 norm 侧）、④（T-A4）、**⑤ T-A5 模型分层接线** 模块+端点均落地——确定性层无 LLM，桶 B 32b 用于复合拆解/综合 **+ 选码消歧**（`SELECT_LLM`/`ORCH_LLM` 成对回落 8b，未部署零风险）。**剩 T-A6 端到端验证**（服务器真跑全链 + 32b 选码质量/延迟分桶 + 路由≥95% + 红线回归；升 32b 靠成对 `BCRAG_ORCH_LLM_*` env）。本地全链单测/eval 已通（standard_router 19、guards 9、prerouter 15、orchestrator 8；金标 family 6/6、能力分流 17/17；T-A5 config 双向回落 + select_code 桶 B 绑定 + 签名去参）。
+
+### 9.5 TODO（落代码）
+
+- [x] **T-A1 · 前置路由层（①）· 已落地（模块+端点）**：能力分流（norm/cost/price/compound）+ 形态判定，确定性关键词规则无 LLM。实现 = `routing/prerouter.py`：能力分流优先级（复合>价格>组价>项目核对>规范兜底）+ 四维信号（source_type / needs_calc C-04 / needs_context FR-C / intent_count）+ 形态（特征完整度 EH-04 仅 cost、口径完整度 §4.0）+ `clarify` 裁定（**按 §8 块1 收窄**：cost 仅特征缺反问、版本缺默认不问；norm 缺口径走 EH-05 反问）。产出 `RouteDecision`（供下游编排器消费，本层不执行）。接线：`POST /route` 端点（`routing/router.py` 挂进 `main.py`）。与 T-A2 串联——本层先定 capability=norm，再由 `standard_router` 定哪部 GB，不重复做规范映射。验证：内置自测 15/15；金标 `benchmark/routing_eval` **能力分流 17/17=100%**（clarify 与旧 expect 分歧 3 例=B1/B10 版本缺不再问 + A6 边界，§8块1 设计演进非错）。**待**：接入实际 agent 调度/编排器（随 T-A4），及 MCP 工具表面（让 lead-agent 可咨询路由）。代码 `ce-services/routing/{prerouter,router}.py` + `main.py` + `tools/prerouter_eval.py`
+- [x] **T-A2 · 规范选择确定化（①，高优先）· 已落地**：「问题类型→规范代号」确定性映射（计量→GB50854 / 计价→GB50500 / 安装→GB50856），从 LLM 自由判断手里夺回——**直接根治标准漂移 bug**（50854→50500）。实现 = `norm/standard_router.py`（关键词规则两轴：intent 计价/计量 + discipline 房建/安装，纯函数零 LLM；降级安全：零命中回退 hint、无 hint 默认 50854；版本轴 query>hint>default 仅轻解析，版本默认策略留 §8 块1/T9-1）。接线：`/norm/qa` 端点 + `ce-task_norm_qa` MCP 工具——`standard` 改可选 hint，进检索前跑 `resolve_standard`，family 与 hint 冲突即**夺回**（`overrode_hint`，warning 日志），meta 加 `standard_resolution` 全证据。验证：内置自测 19/19（含 2 例漂移夺回 + 版本钳制 50856-2013→2024）；金标 `benchmark/routing_eval` norm-qa family 选择 6/6=100%（A6 越界跳过，归校验闸 T-A3）。代码 `ce-services/norm/standard_router.py` + `norm/router.py` + `common/mcp_server.py` + `tools/standard_router_eval.py`。**待服务器端到端验证**（真 :8100/:8101，并入 T-A6）
+- [x] **T-A3 · 校验闸成层（③）· 已落地（norm-qa 侧）**：把溯源(C-01)/拒答(C-03)/口径纯净(C-02)统一为显式 guard（生成后/检索后确定性执行，不靠 LLM 自觉）。实现 = `norm/guards.py`：**C-03** 零召回拒答集中化（`reject_no_recall`，给出路 + tier=none）；**C-02** 口径纯净（`audit_answer` 逐条 cited_clause 抽 family/version，与 resolved 冲突即剔除——他部=串库、跨版=同码不同义；全剔光则降级拒答 verdict=reject）；**C-01** 溯源完整（保留条 `standard` 确定性规范化为 resolved 全码，标准号+版本恒带齐、不靠 LLM 抄对；缺条款号标 `provenance_complete=False`）。产出结构化 `GuardReport`（verdict/violations/caliber_pure/provenance_complete/tier，进 `meta.guard`）。接线 `/norm/qa` + `ce-task_norm_qa`：零召回走 reject_no_recall、生成后跑 audit_answer + warning 日志。family 抽取复用 `standard_router.family_version_of`（兼容 store 名 `GB_T50854-2024_…`）。验证：内置自测 9/9（他部剔除 / 跨版剔除→reject / 缺条款号标记不剔 / 全合规 pass）。**范围**：当前覆盖 norm-qa（C-01/02/03 在此最缺显式层）；cost 侧已有 provenance 信封做结构化拦截（need_review/no_source），后续对齐同一 GuardReport 契约。**C-02 联网降级标注**（Tier-2）随 §8 web 兜底落地时并入此层。代码 `ce-services/norm/guards.py` + `norm/router.py` + `common/mcp_server.py` + `norm/standard_router.py`(`family_version_of`)
+- [x] **T-A4 · 复合编排器（④）· 已落地（模块+端点）**：EH-01 拆解 → 子任务回 ① 路由 → 派发 → 综合。实现 = `routing/orchestrator.py`：`decompose`（32b 拆解，降级安全：失败/非法→单任务）+ 逐子任务 `prerouter.route` + `dispatch_subtask`（norm→`norm.pipeline`、cost→`orchestration.compose`、price→诚实标 unsupported、子任务失败标 error 不拖垮整单）+ `synthesize`（32b 综合，降级：确定性拼接 + 汇集引用不丢溯源 C-01）。`orchestrate` 单一意图直派 / 复合走拆解—综合回环。模型分层（§9.3）：拆解+综合走 **32b**（`ORCH_LLM`，config 已加最小句柄），能力执行走 **8b**（桶 A）。`dispatch_fn/decompose_fn/synthesize_fn` 可注入 → 无服务/LLM 单测。接线 `POST /orchestrate`（挂 main.py）。验证：内置自测 8/8（单一直派不拆解 / 复合拆 2 子任务各自回①路由 cost+norm / 综合汇引用 / 降级拼接保留溯源）。承 §2.2 冲突4 / §3 改3「架构归位」——**T-A1/T-A3 标注的「待接入实际调度」由本编排器承接**。**待**：真 LLM 拆解/综合质量抽检（并入 T-A6）、FR-I 价格取数后端接入、嵌套复合/子任务依赖（当前独立子任务）。代码 `ce-services/routing/orchestrator.py` + `routing/router.py` + `main.py` + `common/config.py`(ORCH_LLM)
+- [x] **T-A5 · 模型分层接线 · 已落地（2026-07-01，本地验证）**：桶 A(② norm_qa生成/直配/取价/澄清) 走 8b、桶 B(④复合拆解/综合 + **选码消歧**) 走 32b（落位表见 §9.3）。落地 = **单点接线在 `common/config.py`**：桶 B 定义一次（`ORCH_LLM_*` 复合编排 + 新增 `SELECT_LLM_*` 选码消歧，默认同端点），**URL 与 model 成对回落 8b**（修掉旧 `ORCH_LLM` 的「8b 端点 + 32b model id」不匹配隐患）——仅当显式设 `BCRAG_ORCH_LLM_URL` 才升 32b，故本地/未部署一切照旧走 8b、**零风险**。选码路由到桶 B 走**唯一 chokepoint**：`selection.select_code` 缺省 = `SELECT_LLM`（overridable 供 benchmark 比 8b/32b），并从 `provenance.list_match` / `orchestration.compose` **剥掉透传 8b 的死参**（二者唯一 LLM 步就是选码）；`compose` 四调用点（router/mcp/orchestrator/graph）同步去参。取价/澄清（`clarify.extract_missing_features`）/norm 生成仍显式走 8b。`config.yaml` 注册 qwen3-32b-awq 为**可用非默认**模型（8b 仍列表首=agent 默认；deer-flow agent 保持 8b，桶 B 消费方是 ce-services 内部、经 env 指端点不读 config.yaml）。**服务器升 32b**：成对 `export BCRAG_ORCH_LLM_URL=http://172.19.2.2:8001 BCRAG_ORCH_LLM_MODEL_ID=/models/Qwen3-32B-AWQ`（可再单设 `BCRAG_SELECT_LLM_*` 指另一实例）。验证：config 成对回落/升级两向、`select_code` 默认绑桶 B、`list_match`/`compose` 签名去参、orchestrator 8/8 + prerouter 15/15 自测全过。代码 `ce-services/common/config.py` + `cost/{selection,provenance,orchestration,graph,router}.py` + `common/mcp_server.py` + `routing/orchestrator.py` + `config.yaml`。**GPU 分配**：32b 独占 172.19.2.2，reranker 占 cuda:2（ce-code 经验），互不挤。**待 T-A6 服务器真跑**验 32b 选码质量/延迟
+- [ ] **T-A6 · 端到端验证**：路由正确率 ≥95%（脏请求 EH-01~05，复用 `benchmark/routing_eval/` 金标）+ 延迟分桶 P95（FR-K≤3s/FR-P01≤2s/复合≤5s）+ 复合桶质量抽检；红线回归（检索层算数=0、组价/价格联网=0）

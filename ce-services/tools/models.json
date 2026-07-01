@@ -1,0 +1,4 @@
+[
+  {"name": "qwen3-8b", "llm_url": "http://localhost:8099", "model_id": "qwen3-8b"},
+  {"name": "qwen3-32b-awq", "llm_url": "http://172.19.2.2:8001", "model_id": "/models/Qwen3-32B-AWQ"}
+]

@@ -159,17 +159,26 @@ def input_payload(node: str, title: str, fields: list[dict[str, Any]], context: 
     return payload
 
 
-def quota_missing_payload(env: dict[str, Any], code: str | None, feature: str | None) -> dict[str, Any]:
+def quota_missing_payload(env: dict[str, Any], code: str | None, feature: str | None,
+                          partial: bool = False) -> dict[str, Any]:
     """缺定额映射闸 payload（§6 数据缺失应停）——① 告知无映射 ② 可选手工补录人材机基价。
 
-    参数：env —— pick_quota 空信封；code —— 已确认清单码；feature —— 构件描述。
+    参数：env —— pick_quota 空信封；code —— 已确认清单码；feature —— 构件描述；
+      partial —— 上一轮补录人材机三项**没填齐**（半填），本轮改用"必须填齐或全空放弃"的提示语重问一次。
     返回：input 型 payload（node=``quota_missing``）。字段全 ``required=False``：补齐人材机三项 → 续算综合
       单价；三项留空提交 → 视为放弃、跳过该构件（不虚构价，下游 ``no_pricing`` 终止）。``context.message``
       说明处境，前端醒目呈现（结构化字段，弱模型不参与，红线：数值/流程不经 LLM）。
     """
+    message = (
+        "人材机三项需一起填齐才能续算综合单价；如暂时无法提供，请三项全部留空直接提交＝放弃该构件、不虚构价格。"
+        if partial else
+        "知识库暂无该清单码对应的定额子目。可手工补录该子目的人材机基价以继续组价；"
+        "若暂时无法提供，三项留空直接提交将跳过该构件、不虚构价格。"
+    )
+    title = f"未找到清单编码 {code} 的定额映射" + ("（请补齐人材机三项，或三项全空放弃）" if partial else "")
     return input_payload(
         "quota_missing",
-        f"未找到清单编码 {code} 的定额映射",
+        title,
         [
             {"key": "quota_code", "type": "text", "label": "定额子目号（如已知，可选）", "required": False},
             {"key": "labor_cost", "type": "number", "label": "定额人工费基价（元/单位）", "required": False},
@@ -179,11 +188,22 @@ def quota_missing_payload(env: dict[str, Any], code: str | None, feature: str | 
         context={
             "code": code,
             "feature": feature,
-            "message": "知识库暂无该清单码对应的定额子目。可手工补录该子目的人材机基价以继续组价；"
-                       "若暂时无法提供，三项留空直接提交将跳过该构件、不虚构价格。",
+            "message": message,
             "source_ref": env.get("provenance", {}).get("source_ref"),
         },
     )
+
+
+def has_partial_costs(data: dict[str, Any] | None) -> bool:
+    """补录数据是否"半填"人材机基价（填了一两项、没填齐三项）——区别于"全空=放弃"。
+
+    参数：data —— 缺定额闸提交的字段 dict。
+    返回：True=人材机三项里填了 1~2 项（半填，视为想补但没填全，应重问一次而非静默丢弃）；
+      全填(3 项) / 全空(0 项) → False。
+    """
+    data = data or {}
+    present = sum(1 for k in QUOTA_BASIS_COSTS if data.get(k) is not None)
+    return 0 < present < len(QUOTA_BASIS_COSTS)
 
 
 def build_manual_basis(data: dict[str, Any] | None) -> dict[str, Any] | None:

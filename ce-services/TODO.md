@@ -44,6 +44,11 @@
     manual_override→`010502006`（真 :8100 确认无映射）→ **`quota_missing` 闸**（title/message 正确）→ 放弃 `{}`
     →`status=blocked` + `blocked_reason`、**未弹费率/税率闸、无虚构总价**（空 `{}` 哨兵兜底真链路生效）。
     补录→续算路径本地已验（379.76），服务器补一条 fresh session 到 `gate=quantity` 即可（同段代码，低风险）。
+  - **code-review + 修复（✅ 2026-07-02，high 强度自审 5 项）**：修 #1 `no_pricing` 分因归因（`_unpriceable_reason`：
+    未选出清单编码 / 版本未就绪(501) / 无定额映射，不再一律标"缺定额映射"）+ #2 半填不静默丢（`has_partial_costs`
+    → `quota_missing` 重问一次"三项一起填或全空放弃"）。本地新增 5 用例全过（#1 三分因 + #2 补齐续算/仍空放弃）。
+    余 3 项低优先（下方待办）：#3 空 decision 哨兵全局化对 setup 闸的影响 / #4 `should_pause_quota` 死代码 /
+    #5 补录 basis 无「单位」致工程量卡单位栏空白。
 - [ ] **补常见现浇构件本体定额映射**（归 ce-code，**数据填充、你来补**）：`010502006 钢筋混凝土柱 / 010502011 梁 /
   010401 砌体墙` 等 → SJG 子目写进 `bill_quota_map`。**根因非重跑匹配器**：清单名「钢筋混凝土柱」与定额名
   「非泵送现浇混凝土 矩形柱」(`010002-34`)/「矩形柱 木模板」(`010006-15`) 字面不重叠，名称匹配桥不过去，需**领域
@@ -373,6 +378,14 @@
   哨兵兜底 langgraph 死循环坑。详见上「🚀 内网试用上线 Checklist · P0」条。compose 501 未就绪(2013) 同享该终态保护
   （env 无 envelope→跳 quota_gate→无 basis→no_pricing）。**服务器 `pnpm check` + :8101 真链路已验通**（2026-07-02）。
 - [ ] **门控阈值调参**：τ 从保守（多停）逐步放松（§6）。
+- [ ] **缺定额机制 code-review 遗留 3 项（低优先，2026-07-02）**：
+  - #3 `session.resume` 空 decision 哨兵 `decision or {"__resume__":True}` 是**全局**的——setup 闸（spec_version
+    required）空提交会带 `spec=None` 继续、下游 `list_match` 报错，而非干净重问（前端 required 拦住，仅 curl/MCP 可达）。
+    治法：哨兵只在"该闸允许全空放弃"时生效，或 setup 缺 spec 仍回环重问。
+  - #4 `gates.should_pause_quota` 已成**死代码**（唯一调用点 `quota_gate_node` 改内联 `len(quotas)>1`）→ 删除或让
+    `quota_gate_node` 复用它，避免双份真值漂移。
+  - #5 `build_manual_basis` 造的 basis 无「单位」键 → 补录构件走 `quantity_gate` 时卡片单位栏空白（用户不知按
+    m³/m²/t 填 Q）→ 缺定额闸加"单位"选填字段并写入 basis。
 
 **红线**：弱模型不驱动流程（跳闸判断在图代码）/ provenance 是字段不口述 / override 钉值不重跑 LLM / 缺口（no_source/need_review/501）如实透传不杜撰。
 

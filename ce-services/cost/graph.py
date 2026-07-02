@@ -253,6 +253,10 @@ def quota_gate_node(state: CostTaskState) -> dict[str, Any]:
         code = (item.get("code") or {}).get("value")
         data = interrupt(gates.quota_missing_payload(env, code, item.get("feature")))
         basis = gates.build_manual_basis(data)
+        # 半填（人材机只填了一两项）不静默丢：重问一次，提示三项需一起填齐或全空放弃（#2）。
+        if basis is None and gates.has_partial_costs(data):
+            data = interrupt(gates.quota_missing_payload(env, code, item.get("feature"), partial=True))
+            basis = gates.build_manual_basis(data)
         if basis is None:
             # 放弃补录：诚实标缺口，不钉子目、不造基价（下游 no_pricing 据 quota_basis 空终止）。
             item["quota"] = lock_value(None, {"source_type": "quota_lib",
@@ -545,20 +549,38 @@ def advance_node(state: CostTaskState) -> dict[str, Any]:
     return {"current_item": (state.get("current_item", 0) + 1)}
 
 
+def _unpriceable_reason(item: dict[str, Any]) -> str:
+    """判定单个构件"算不出综合单价"的**真实**原因（诚实归因，#1）。
+
+    参数：item —— 未拿到定额基价的构件。返回：分因文案——
+      未选出清单编码（list_gate 没定到码，skip 过来）/ 该版本组价数据未就绪（如 2013，compose 501）/
+      无定额映射且未补录（有码有取数但库里无子目、用户也没补录基价）。三种缘由不同、不可混为一谈。
+    """
+    if not (item.get("code") or {}).get("value"):
+        return "未选出清单编码"
+    if (item.get("quota") or {}).get("status") == "未就绪":
+        return "该版本组价数据未就绪（如 2013）"
+    return "无定额映射且未补录人材机基价"
+
+
 def no_pricing_node(state: CostTaskState) -> dict[str, Any]:
-    """无可算价终态（§6 数据缺失应停 / P0）：全部构件都无定额基价（缺映射且未补录）→ blocked。
+    """无可算价终态（§6 数据缺失应停 / P0）：全部构件都无定额基价 → blocked。
 
     参数：state。返回：status=blocked + rollup.blocked_reason（原因 + 涉及构件清单）+ 审计/事件。
     与 rates→params→rollup 正常收尾链路的本质区别：本节点**直达 END**，绝不弹费率/税率闸、绝不产出
       虚构总造价——数据缺失时诚实告知无法组价到总价，而非算一个只由项目费/税金堆出来的误导数字。
+    归因诚实（#1）：逐件按真实缘由标注（未选码 / 版本未就绪 / 缺定额映射），不一律归为"缺定额映射"。
     """
     unresolved = [
         {"item": i, "code": (it.get("code") or {}).get("value"), "feature": it.get("feature"),
-         "reason": "无定额映射且未补录人材机基价"}
+         "reason": _unpriceable_reason(it)}
         for i, it in enumerate(state.get("items") or [])
         if not gates.basis_complete((it or {}).get("quota_basis"))
     ]
-    reason = "无可用定额数据，无法组价到总价（缺定额映射、用户未补录基价）"
+    causes = {u["reason"] for u in unresolved}
+    detail = next(iter(causes)) if len(causes) == 1 else (
+        "存在未选码 / 版本未就绪 / 缺定额映射等构件" if causes else "无可算价构件")
+    reason = f"无法组价到总价（{detail}）"
     return {
         "status": "blocked",
         "rollup": {"blocked_reason": reason, "unpriceable_items": unresolved},

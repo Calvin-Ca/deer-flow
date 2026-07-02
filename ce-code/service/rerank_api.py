@@ -13,6 +13,7 @@ HTTP 服务后，:8100 即纯 CPU，GPU 隔离到本服务——可独立起停�
 from __future__ import annotations
 
 import logging
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from pydantic import BaseModel, Field
@@ -60,7 +61,17 @@ class RerankResponse(BaseModel):
     scores: list[float] = Field(..., description="与 passages 一一对应的精排分（降序在调用方排）")
 
 
-app = FastAPI(title="CE Rerank Service", version="1.0.0")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """启动即预加载模型：避免第一个 /rerank 冷启动慢（首推理编译 CUDA kernel）导致调用方超时降级。
+
+    加载在 healthcheck ``start_period``（40s）窗口内完成；加载失败不阻断启动（/rerank 走全 0 降级）。
+    """
+    _get_reranker()
+    yield
+
+
+app = FastAPI(title="CE Rerank Service", version="1.0.0", lifespan=lifespan)
 
 
 @app.get("/health")

@@ -10,6 +10,7 @@
 """
 from __future__ import annotations
 
+import time
 from pathlib import Path
 
 import requests
@@ -23,11 +24,13 @@ from retrieval.dense_retriever import DenseRetriever
 from retrieval.rrf import expand_references, merge_results
 
 
-# cross-encoder 精排已拆为独立 GPU 服务（service.rerank_api，config.RERANK_URL，默认 :8098）——
-# 把唯一的本地 GPU 消费者移出知识层，:8100 检索栈即纯 CPU（embedding 早已在 :8097，同款做法）。
-# 服务不可达（连不上）→ 缓存「不可用」，后续本进程一律 fallback RRF，不再逐查询空等超时（呼应旧
-# _RERANKER_FAILED 语义：一次判定、不反复重试）。单次打分错（如 5xx）不缓存，仅该查询退回 RRF。
-_RERANK_UNREACHABLE = False
+# cross-encoder 精排已拆为独立 GPU 服务（service.rerank_api，config.RERANK_URL）——把唯一的本地 GPU
+# 消费者移出知识层，:8100 检索栈即纯 CPU（embedding 早已在 :8097，同款做法）。
+# 服务不可达（连不上/超时）→ **进入冷却窗口**（_RERANK_COOLDOWN_SECS 秒内跳过、之后自动重试），
+# 使 rerank 抖动 / 冷启动一次超时能**自愈**，不必重启知识层（旧版永久 latch 太脆，见 TODO）。
+# 单次打分错（如 5xx）不进冷却，仅该查询退回 RRF。
+_RERANK_COOLDOWN_UNTIL = 0.0
+_RERANK_COOLDOWN_SECS = 60.0
 
 
 def rerank(query: str, results: list[dict], top_k: int) -> list[dict]:
@@ -35,9 +38,10 @@ def rerank(query: str, results: list[dict], top_k: int) -> list[dict]:
 
     参数：query 查询文本；results RRF 合并+扩展后的行 dict 列表；top_k 截断数。
     返回：按精排分降序（服务可用）或原 RRF 顺序（服务不可达/打分失败）截断后的前 top_k 行。
+    降级：连不上/超时 → 进入 ``_RERANK_COOLDOWN_SECS`` 秒冷却（期内直接 RRF，不空等），过后自动重试恢复。
     """
-    global _RERANK_UNREACHABLE
-    if _RERANK_UNREACHABLE or not results:
+    global _RERANK_COOLDOWN_UNTIL
+    if not results or time.monotonic() < _RERANK_COOLDOWN_UNTIL:
         return results[:top_k]
     from config import RERANK_TIMEOUT, RERANK_URL
     try:
@@ -51,8 +55,8 @@ def rerank(query: str, results: list[dict], top_k: int) -> list[dict]:
             item["_rerank_score"] = float(score)
         results_sorted = sorted(results, key=lambda x: x.get("_rerank_score", 0), reverse=True)
     except (requests.ConnectionError, requests.Timeout) as e:
-        print(f"[retrieval] Rerank 服务不可达（{e}），本进程后续统一 fallback RRF 排序")
-        _RERANK_UNREACHABLE = True  # 连不上就别每查询空等超时，一次判定
+        _RERANK_COOLDOWN_UNTIL = time.monotonic() + _RERANK_COOLDOWN_SECS
+        print(f"[retrieval] Rerank 服务不可达（{e}），进入 {int(_RERANK_COOLDOWN_SECS)}s 冷却后自动重试，暂 fallback RRF")
         return results[:top_k]
     except Exception as e:
         print(f"[retrieval] Rerank 打分失败（{e}），本次 fallback RRF 排序")

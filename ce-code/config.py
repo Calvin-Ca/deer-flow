@@ -32,7 +32,7 @@ RERANK_DEVICE = os.environ.get("CE_RERANK_DEVICE", "cuda:2")
 # 的做法）——把唯一的本地 GPU 消费者移出 :8100，知识服务本身即纯 CPU。RERANK_MODEL/RERANK_DEVICE 现由
 # 该 rerank 服务进程读取；检索侧只认 RERANK_URL。服务不可达 → 检索栈静默 fallback RRF（精排失效、召回不变）。
 RERANK_URL = os.environ.get("CE_RERANK_URL", "http://localhost:8095")
-RERANK_TIMEOUT = float(os.environ.get("CE_RERANK_TIMEOUT", "15"))
+RERANK_TIMEOUT = float(os.environ.get("CE_RERANK_TIMEOUT", "30"))  # 留足冷启动首推理余量（默认 15 太紧）
 EMBED_MODEL = "BAAI/bge-large-zh-v1.5"
 EMBED_DIM = 1024  # bge-large-zh-v1.5 输出维度
 COLLECTION_PREFIX = "building_code"

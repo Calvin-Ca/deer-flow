@@ -11,15 +11,15 @@
 #   docker compose -f docker/ce-services/docker-compose.yaml logs -f
 #
 # 架构：
-#   knowledge(:8100) ← tasks(:8101)  [/qa + /compliance 共进程]
-#   network_mode: host —— 两服务均直接访问宿主机的 Milvus:19530 / vLLM:8097,8099
+#   knowledge(:8100) ← tasks(:8101)  [CostAgent 选码/组价 + HITL 图 + Norm-QA + 前门路由 + ce-task MCP]
+#   network_mode: host —— 两服务均直接访问宿主机的 Milvus:19530 / embed:8097 / vLLM:8099
 
 include:
   - path: ../ce-code/docker-compose.yaml  # 知识服务（含 GPU、数据卷）
 
 services:
 
-  # ── 任务服务（qa + compliance 共进程，:8101）──────────────────────────────
+  # ── 任务服务（:8101）──────────────────────────────────────────────────────
   tasks:
     build:
       context: ../..
@@ -29,9 +29,19 @@ services:
     network_mode: host
     restart: unless-stopped
     environment:
+      # 知识服务 + LLM 地址（config.py 读 BCRAG_* 前缀；host 网络下走 localhost）
       - BCRAG_KNOWLEDGE_URL=${KNOWLEDGE_URL:-http://localhost:8100}
       - BCRAG_LLM_URL=${LLM_URL:-http://localhost:8099}
       - BCRAG_LLM_MODEL_ID=${LLM_MODEL_ID:-qwen3-8b}
+      # HITL 可中断组价图：SqliteSaver 落盘到持久卷（否则容器重建丢会话，跨会话恢复失效）
+      - CE_HITL_CHECKPOINT_DB=/data/hitl_checkpoints.db
+      # 可选：桶B(32B) 升级 / 编码闸阈值 —— 不设则走 config.py 默认（8b、τ=0.75），按需放开
+      # - BCRAG_ORCH_LLM_URL=${ORCH_LLM_URL:-}
+      # - BCRAG_ORCH_LLM_MODEL_ID=${ORCH_LLM_MODEL_ID:-}
+      # - CE_HITL_CONFIDENCE_TAU=${HITL_CONFIDENCE_TAU:-0.75}
+    volumes:
+      # HITL 会话持久化：绑大盘（与 deps 数据卷同盘，避免 / 满 + 容器重建丢状态）
+      - ${CE_DATA_ROOT:-/mnt/nvme/calvin/data/ce-code}/ce-services:/data
     command: ["python", "-m", "uvicorn", "main:app",
               "--host", "0.0.0.0", "--port", "8101"]
     depends_on:

@@ -1,5 +1,5 @@
-appId: com.caic.deerflow.desktop
-productName: DeerFlow
+appId: com.caic.magent.desktop
+productName: Magent
 directories:
   output: dist
   buildResources: resources

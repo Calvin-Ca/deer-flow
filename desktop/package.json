@@ -8,10 +8,15 @@
   "scripts": {
     "dev": "cross-env DEERFLOW_DESKTOP_DEV_URL=http://localhost:3000 electron .",
     "start": "electron .",
+    "build:frontend": "cross-env SKIP_ENV_VALIDATION=1 DEER_FLOW_INTERNAL_GATEWAY_BASE_URL=http://172.19.3.136:8001 pnpm -C ../frontend build",
     "build:win": "electron-builder --win",
     "build:mac": "electron-builder --mac",
-    "build:linux": "electron-builder --linux"
+    "build:linux": "electron-builder --linux",
+    "dist:mac": "pnpm run build:frontend && pnpm run build:mac",
+    "dist:win": "pnpm run build:frontend && pnpm run build:win",
+    "dist:linux": "pnpm run build:frontend && pnpm run build:linux"
   },
+  "//gateway": "打包默认网关 http://172.19.3.136:8001 在 build:frontend 里烘进 Next rewrites，须与 src/config.js DEFAULT_GATEWAY_URL 保持一致（Next rewrites build 时冻结，运行时改不了，详见 TODO 网关缺陷）。dist:* = 打包默认入口。",
   "dependencies": {
     "electron-updater": "^6.3.0",
     "exceljs": "^4.4.0"

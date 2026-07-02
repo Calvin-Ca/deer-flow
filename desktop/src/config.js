@@ -5,6 +5,9 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 // 内置默认：远程 GPU 服务器网关（CLAUDE.md 内网地址）。分发前按目标环境改这里即可。
+// ⚠️ 改这里的同时必须同步改 package.json build:frontend 里的 DEER_FLOW_INTERNAL_GATEWAY_BASE_URL：
+// 打包态 /api 客户端代理走 Next rewrites，地址在 build 时冻结、运行时读不到本值（本值目前只对 SSR 服务端 fetch 生效）。
+// 待「网关运行时可配重构」完成后，本值才会真正成为运行时可覆盖的默认。详见 desktop/TODO.md。
 const DEFAULT_GATEWAY_URL = "http://172.19.3.136:8001";
 
 function getUserConfigPath() {

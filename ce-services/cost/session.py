@@ -124,8 +124,11 @@ def resume(task_id: str, decision: dict[str, Any]) -> dict[str, Any]:
 
     参数：task_id —— 会话标识；decision —— 闸的用户输入（confirm: ``{action, value?}``；input: 字段值 dict）。
     返回：会话响应（下个 interrupt 或终态）。
+    注：**空 decision（``{}``）替换为非空哨兵**——langgraph 把空 dict resume 当「未提供恢复值」会在同一闸
+      重停死循环；全选填留空的合法「放弃」提交（如缺定额补录闸）会命中此坑，故在此归一化（哨兵不含业务
+      字段，被下游 ``build_manual_basis`` 等按缺省/放弃处理）。
     """
-    result = _graph.invoke(Command(resume=decision), config=_config(task_id))
+    result = _graph.invoke(Command(resume=decision or {"__resume__": True}), config=_config(task_id))
     return _format(task_id, result)
 
 

@@ -178,7 +178,9 @@ export function CostHitlInline({ taskId }: { taskId: string }) {
         {!gate && status === "done" && snap && <DoneSummary snap={snap} />}
         {!gate && status === "blocked" && (
           <div className="text-destructive text-sm">
-            会话阻塞：未能定编码，需人工处理（红线：不硬编）。
+            {typeof snap?.rollup?.blocked_reason === "string"
+              ? snap.rollup.blocked_reason
+              : "会话阻塞：未能定编码，需人工处理（红线：不硬编）。"}
           </div>
         )}
         {status === "loading" && (

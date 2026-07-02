@@ -251,7 +251,9 @@ export function CostHitlPanel() {
                 <CardHeader>
                   <CardTitle className="text-base text-destructive">会话阻塞</CardTitle>
                   <CardDescription>
-                    选不出码且无人工覆盖 —— 交人工处理（红线：不硬编）。
+                    {typeof session.rollup?.blocked_reason === "string"
+                      ? session.rollup.blocked_reason
+                      : "选不出码且无人工覆盖 —— 交人工处理（红线：不硬编）。"}
                   </CardDescription>
                 </CardHeader>
               </Card>

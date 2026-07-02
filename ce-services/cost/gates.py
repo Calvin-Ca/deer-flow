@@ -53,6 +53,29 @@ def should_pause_quota(env: dict[str, Any]) -> bool:
     return False
 
 
+# 定额基价三要素（人材机净价）：齐则可算综合单价，缺任一 → 无基价（不杜撰）。
+QUOTA_BASIS_COSTS = ("labor_cost", "material_cost", "machine_cost")
+
+
+def basis_complete(basis: dict[str, Any] | None) -> bool:
+    """定额基价是否人材机三项齐（可喂 ``compute_unit_price``）。
+
+    参数：basis —— quota_basis 块（知识层定额子目 或 用户补录）或 None。
+    返回：True=人材机三项均非空、可算综合单价；缺任一 / 空 → False（不杜撰基价）。
+    """
+    return bool(basis) and all(basis.get(k) is not None for k in QUOTA_BASIS_COSTS)
+
+
+def has_priceable_item(items: list[dict[str, Any]]) -> bool:
+    """整单是否至少有一条构件拿到可算价的定额基价（§6 数据缺失应停的判据）。
+
+    参数：items —— 全部构件 items。
+    返回：True=至少一条 quota_basis 三要素齐。全 False（都无定额映射且未补录基价）时整单应终止而非
+      算假总价（P0：不虚构总价）；只看基价齐否、不看工程量 Q（缺 Q 是另一停闸、不算「无法组价」）。
+    """
+    return any(basis_complete((it or {}).get("quota_basis")) for it in items)
+
+
 def should_pause_price(price: dict[str, Any]) -> bool:
     """信息价逐项例外闸门控（§6/§7）：单条材料价是否需人工录入。
 
@@ -134,6 +157,53 @@ def input_payload(node: str, title: str, fields: list[dict[str, Any]], context: 
     if context:
         payload["context"] = context
     return payload
+
+
+def quota_missing_payload(env: dict[str, Any], code: str | None, feature: str | None) -> dict[str, Any]:
+    """缺定额映射闸 payload（§6 数据缺失应停）——① 告知无映射 ② 可选手工补录人材机基价。
+
+    参数：env —— pick_quota 空信封；code —— 已确认清单码；feature —— 构件描述。
+    返回：input 型 payload（node=``quota_missing``）。字段全 ``required=False``：补齐人材机三项 → 续算综合
+      单价；三项留空提交 → 视为放弃、跳过该构件（不虚构价，下游 ``no_pricing`` 终止）。``context.message``
+      说明处境，前端醒目呈现（结构化字段，弱模型不参与，红线：数值/流程不经 LLM）。
+    """
+    return input_payload(
+        "quota_missing",
+        f"未找到清单编码 {code} 的定额映射",
+        [
+            {"key": "quota_code", "type": "text", "label": "定额子目号（如已知，可选）", "required": False},
+            {"key": "labor_cost", "type": "number", "label": "定额人工费基价（元/单位）", "required": False},
+            {"key": "material_cost", "type": "number", "label": "定额材料费基价（元/单位）", "required": False},
+            {"key": "machine_cost", "type": "number", "label": "定额机械费基价（元/单位）", "required": False},
+        ],
+        context={
+            "code": code,
+            "feature": feature,
+            "message": "知识库暂无该清单码对应的定额子目。可手工补录该子目的人材机基价以继续组价；"
+                       "若暂时无法提供，三项留空直接提交将跳过该构件、不虚构价格。",
+            "source_ref": env.get("provenance", {}).get("source_ref"),
+        },
+    )
+
+
+def build_manual_basis(data: dict[str, Any] | None) -> dict[str, Any] | None:
+    """把缺定额补录闸 resume 值构造成定额基价 quota_basis；人材机三项未齐 → None（放弃补录，不造基价）。
+
+    参数：data —— 缺定额闸提交的字段 dict（``quota_code?/labor_cost/material_cost/machine_cost``）。
+    返回：``{子目号, name, labor_cost, material_cost, machine_cost, source_ref}``（source=用户补录，与知识层
+      定额块同形，可直接喂 rates_gate 的 ``compute_unit_price``）；三要素缺任一 → None（视为放弃、不杜撰基价）。
+    """
+    data = data or {}
+    if any(data.get(k) is None for k in QUOTA_BASIS_COSTS):
+        return None
+    return {
+        "子目号": data.get("quota_code") or "用户录入",
+        "name": "用户补录定额基价",
+        "labor_cost": data.get("labor_cost"),
+        "material_cost": data.get("material_cost"),
+        "machine_cost": data.get("machine_cost"),
+        "source_ref": "用户补录定额基价（人工/材料/机械净价）",
+    }
 
 
 def apply_confirm_decision(env: dict[str, Any], decision: dict[str, Any]) -> tuple[Any, dict[str, Any], str]:

@@ -233,9 +233,11 @@ def compose_node(state: CostTaskState) -> dict[str, Any]:
 
 
 def quota_gate_node(state: CostTaskState) -> dict[str, Any]:
-    """定额确认闸（§3④/§6）：唯一子目自动过，多子目/无子目暂停；resume 钉子目。
+    """定额确认闸（§3④/§6）：唯一子目自动过，多子目暂停确认；**无定额映射→告知+可补录基价+可放弃**（P0）。
 
-    参数：state。返回：item.quota 钉值 + 审计。无定额块（如未就绪）→ 透传跳过。
+    参数：state。返回：item.quota 钉值 + quota_basis + 审计。无定额块（未就绪/无 envelope）→ 透传跳过。
+    缺定额映射（quotas 空）不再弹空白确认卡：改弹「缺定额」录入闸——补齐人材机基价→钉用户基价续算综合单价；
+      三项留空放弃→诚实标缺口（quota_basis=None，下游 ``no_pricing`` 据此终止、不算假总价，§6 数据缺失应停）。
     """
     item = _item(state)
     quota = item.get("quota") or {}
@@ -243,18 +245,49 @@ def quota_gate_node(state: CostTaskState) -> dict[str, Any]:
     if env is None:  # compose 未就绪/无定额块，跳过本闸
         return {"status": state.get("status", "running")}
 
-    paused = gates.should_pause_quota(env)
+    quotas = env.get("result", {}).get("quotas", [])
+    idx = state.get("current_item", 0)
+
+    # ── 缺定额映射（P0）：告知 + 可补录人材机基价 + 可放弃；不弹空白确认卡、不往下算假总价 ──
+    if not quotas:
+        code = (item.get("code") or {}).get("value")
+        data = interrupt(gates.quota_missing_payload(env, code, item.get("feature")))
+        basis = gates.build_manual_basis(data)
+        if basis is None:
+            # 放弃补录：诚实标缺口，不钉子目、不造基价（下游 no_pricing 据 quota_basis 空终止）。
+            item["quota"] = lock_value(None, {"source_type": "quota_lib",
+                                              "source_ref": "无映射定额子目（用户未补录）"}, by="user")
+            item["quota_basis"] = None
+            return {
+                "items": _put_item(state, item),
+                "audit_log": [audit_entry("quota", "skip_no_quota", {"code": code, "item": idx}, by="user")],
+                "events": [gate_event("quota_gate", paused=True, detail={"code": code, "no_quota": True})],
+            }
+        # 补录：钉用户给的子目 + 人材机基价，续算综合单价（quota_basis 同知识层定额块，rates_gate 直接可算）。
+        item["quota"] = lock_value(basis["子目号"], {"source_type": "user_input",
+                                   "source_ref": basis["source_ref"], "confidence": None}, by="user")
+        item["quota_basis"] = basis
+        return {
+            "items": _put_item(state, item),
+            "audit_log": [audit_entry("quota", "manual_input", {"子目号": basis["子目号"], "item": idx}, by="user")],
+            "overrides": [override_entry("quota", idx, basis["子目号"], by="user")],
+            "events": [gate_event("quota_gate", paused=True,
+                                  provenance={"source_type": "user_input", "source_ref": basis["source_ref"]},
+                                  detail={"子目号": basis["子目号"]})],
+        }
+
+    # ── 有子目：唯一自动过 / 多子目人工确认 ──
+    paused = len(quotas) > 1
     if paused:
         decision = interrupt(gates.confirm_payload("quota", env, "请确认套用定额子目"))
         value, prov, action = gates.apply_confirm_decision(env, decision)
         by = "user"
     else:
-        value = env["result"]["quotas"][0].get("子目号")
+        value = quotas[0].get("子目号")
         prov, action, by = env["provenance"], "auto_pass", "model"
 
     item["quota"] = lock_value(value, prov, by=by)
-    # 保留所选子目的定额基价（人材机净价）供 §8 综合单价计算；手填/越界子目无对应基价 → None（下游 missing_base 透传）。
-    quotas = env.get("result", {}).get("quotas", [])
+    # 保留所选子目的定额基价（人材机净价）供 §8 综合单价计算；越界子目无对应基价 → None（下游 missing_base 透传）。
     item["quota_basis"] = next((q for q in quotas if str(q.get("子目号")) == str(value)), None)
     return {
         "items": _put_item(state, item),
@@ -512,6 +545,30 @@ def advance_node(state: CostTaskState) -> dict[str, Any]:
     return {"current_item": (state.get("current_item", 0) + 1)}
 
 
+def no_pricing_node(state: CostTaskState) -> dict[str, Any]:
+    """无可算价终态（§6 数据缺失应停 / P0）：全部构件都无定额基价（缺映射且未补录）→ blocked。
+
+    参数：state。返回：status=blocked + rollup.blocked_reason（原因 + 涉及构件清单）+ 审计/事件。
+    与 rates→params→rollup 正常收尾链路的本质区别：本节点**直达 END**，绝不弹费率/税率闸、绝不产出
+      虚构总造价——数据缺失时诚实告知无法组价到总价，而非算一个只由项目费/税金堆出来的误导数字。
+    """
+    unresolved = [
+        {"item": i, "code": (it.get("code") or {}).get("value"), "feature": it.get("feature"),
+         "reason": "无定额映射且未补录人材机基价"}
+        for i, it in enumerate(state.get("items") or [])
+        if not gates.basis_complete((it or {}).get("quota_basis"))
+    ]
+    reason = "无可用定额数据，无法组价到总价（缺定额映射、用户未补录基价）"
+    return {
+        "status": "blocked",
+        "rollup": {"blocked_reason": reason, "unpriceable_items": unresolved},
+        "audit_log": [audit_entry("no_pricing", "blocked", {"unpriceable": unresolved}, by="model")],
+        "events": [{"step": "no_pricing", "status": "blocked",
+                    "provenance": {"source_type": "quota_lib", "source_ref": "缺定额映射，未算总价（不虚构）"},
+                    "result": {"blocked_reason": reason, "unpriceable_items": unresolved}, "paused": False}],
+    }
+
+
 def done_node(state: CostTaskState) -> dict[str, Any]:
     """收尾（§3⑬）：有任一构件算出综合合价 → done；全无（都选不出码/未就绪/缺 Q）→ blocked，不掩盖缺口。
 
@@ -534,9 +591,15 @@ def _has_code(state: CostTaskState) -> str:
 
 
 def _after_advance(state: CostTaskState) -> str:
-    """advance 后路由：还有未办构件 → 回 list_match 办下一件；全办完 → 进 rates_gate 做项目级收尾。"""
+    """advance 后路由：还有未办构件 → 回 list_match 办下一件；全办完 → 项目级收尾 or 无价终止。
+
+    全办完时：至少一件拿到定额基价（可算价）→ rates_gate 走费率/参数/汇总；无一件可算（都缺定额映射且
+      未补录基价）→ no_pricing 终止（不问费率、不算假总价，P0 数据缺失应停）。
+    """
     items = state.get("items") or []
-    return "list_match" if state.get("current_item", 0) < len(items) else "rates_gate"
+    if state.get("current_item", 0) < len(items):
+        return "list_match"
+    return "rates_gate" if gates.has_priceable_item(items) else "no_pricing"
 
 
 def build_graph(checkpointer: Any):
@@ -558,6 +621,7 @@ def build_graph(checkpointer: Any):
     g.add_node("rates_gate", rates_gate_node)
     g.add_node("params_gate", params_gate_node)
     g.add_node("rollup", rollup_node)
+    g.add_node("no_pricing", no_pricing_node)
     g.add_node("done", done_node)
 
     g.add_edge(START, "setup")
@@ -571,11 +635,13 @@ def build_graph(checkpointer: Any):
     g.add_edge("quota_gate", "price_gate")
     g.add_edge("price_gate", "quantity_gate")
     g.add_edge("quantity_gate", "advance")
-    # 多构件外层循环：还有未办构件→回 list_match；全办完→rates_gate 项目级收尾（费率/参数/汇总）。
-    g.add_conditional_edges("advance", _after_advance, {"list_match": "list_match", "rates_gate": "rates_gate"})
+    # 多构件外层循环：还有未办构件→回 list_match；全办完→rates_gate 项目级收尾 or no_pricing 无价终止。
+    g.add_conditional_edges("advance", _after_advance,
+                            {"list_match": "list_match", "rates_gate": "rates_gate", "no_pricing": "no_pricing"})
     g.add_edge("rates_gate", "params_gate")
     g.add_edge("params_gate", "rollup")
     g.add_edge("rollup", "done")
+    g.add_edge("no_pricing", END)  # 无可算价：直达 END，不走费率/参数/汇总、不产虚构总价（P0）
     g.add_edge("done", END)
 
     return g.compile(checkpointer=checkpointer)

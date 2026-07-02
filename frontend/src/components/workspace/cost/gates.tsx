@@ -203,6 +203,7 @@ const CONTEXT_LABELS: Record<string, string> = {
   spec: "规格",
   consumption: "消耗量",
   price_status: "信息价状态",
+  source_ref: "来源",
 };
 
 export function InputGate({
@@ -244,10 +245,15 @@ export function InputGate({
         <CardDescription>录入型闸 · {interrupt.node}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
+        {typeof interrupt.context?.message === "string" && (
+          <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs">
+            {interrupt.context.message}
+          </div>
+        )}
         {interrupt.context && (
           <div className="bg-muted/40 space-y-1 rounded-md border p-2 text-xs">
             {Object.entries(interrupt.context)
-              .filter(([k, v]) => k !== "why" && v != null && v !== "")
+              .filter(([k, v]) => k !== "why" && k !== "message" && v != null && v !== "")
               .map(([k, v]) => (
                 <div key={k}>
                   <span className="text-muted-foreground">

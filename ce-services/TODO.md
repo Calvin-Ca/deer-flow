@@ -23,6 +23,55 @@
 
 ---
 
+## 🚀 内网试用上线 Checklist（2026-07-02 定）
+
+> 场景=**内网试用**（少数造价同事稳定用网页版，不追公网/HTTPS 级别）。按「做不做会不会翻车」排序。
+> **最小可上线线** = P0 全部 + P1 全部 + P2 前三条。P0 缺定额「诚实兜底机制」已落地（✅），定额映射数据可增量补——
+> 系统在缺数据时「诚实拒答（blocked+原因）」而非「给错数」，符合红线，试用体验也更能接受。
+
+### P0 · 功能阻塞（不做，试用频繁踩空/误导）
+- [x] **缺定额映射三段式机制**（✅ 2026-07-02，本地 e2e 全过；前端待服务器 `pnpm check`）：`quota` 空不再弹空白
+  确认卡 / 不再往下算假总价，改为①**告知**（`quota_missing` 录入闸 + 醒目 message）②**可补录**人材机基价续算综合
+  单价（`build_manual_basis`，补齐三项→钉用户基价走 quantity→rates→params→rollup 正常收尾）③**放弃则诚实终止**
+  （`no_pricing` 节点直达 END，`status=blocked` + `rollup.blocked_reason`，**绝不弹费率/税率闸、绝不产虚构总价**）。
+  改动：`cost/gates.py`（`basis_complete`/`has_priceable_item`/`quota_missing_payload`/`build_manual_basis`）+
+  `cost/graph.py`（`quota_gate_node` 空定额分支 + `no_pricing_node` + `_after_advance` 路由）+ `cost/session.py`
+  （**空 decision `{}` 哨兵兜底**——langgraph 空 dict resume 会在同闸死循环，放弃提交命中此坑，已归一化）+
+  前端 `gates.tsx`/`cost-hitl-inline.tsx`/`cost-hitl-panel.tsx`（message 高亮 + blocked_reason 透传）。
+  本地 e2e（4 用例）：放弃→blocked（闸序列仅 `[quota_missing]`、无收尾闸）；补录→done 总价 379.76；正常单子目
+  回归不破；compose 501 未就绪(2013)→start 直达 blocked（不弹任何闸、不算假总价）。
+  - **待服务器**：① 前端 `pnpm check`；② :8101 真链路走一遍缺定额构件（放弃→blocked 卡显原因 / 补录→出价）。
+- [ ] **补常见现浇构件本体定额映射**（归 ce-code，**数据填充、你来补**）：`010502006 钢筋混凝土柱 / 010502011 梁 /
+  010401 砌体墙` 等 → SJG 子目写进 `bill_quota_map`。**根因非重跑匹配器**：清单名「钢筋混凝土柱」与定额名
+  「非泵送现浇混凝土 矩形柱」(`010002-34`)/「矩形柱 木模板」(`010006-15`) 字面不重叠，名称匹配桥不过去，需**领域
+  策划的种子映射**（真实子目已在 `ce-code/data/structured/cost/SZ-SJG171/quota_item.jsonl`：矩形柱浇筑=010002-34、
+  矩形梁浇筑=010002-38、异型/圆形柱=010002-35/36…）。缺映射时上面的机制已能诚实兜住（不算假总价），故此条从
+  **阻塞**降为**数据完善**：补一条即端到端出真总价一条。
+
+### P1 · 服务常驻 + 依赖（不做，「能用但动不动挂」）
+- [ ] **四进程常驻化**：`:8001` gateway / `:8100` 知识 / `:8101` 任务 / frontend。用 tmux 或 systemd，**别用 nohup**
+  （Exit 125 静默失败坑）。最好一个启动脚本按序拉起 + `curl /health` 自检。
+- [ ] **前端跑生产模式**（非 `pnpm dev`）：`pnpm build && pnpm start`（或 standalone）。
+- [ ] **依赖服务确认在跑**：PG `ce_cost` :5433、Milvus :19530、embed :8097、vLLM Qwen3-8B :8099、agent 基座
+  qwen-plus（DashScope key 有效）。任一挂 → 对应能力 500。
+- [ ] **向量索引已建**（不进 git，需服务器上在）：清单库 `cost_bill_*` + 规范库 `building_code_gb_*`，重启后仍在。
+- [ ] **登录体系开着 + 建好试用账号**：管理员经 :2026 /setup 建好，给试用同事各建账号（内网 http 下 auth 为内存态
+  session cookie，**关浏览器需重登**，提前告知，不阻塞）。
+
+### P2 · 收尾验证（清掉「待服务器验」的未知风险）
+- [ ] **前端 `pnpm check`**（eslint+tsc）服务器过一轮：主线四 `ce-tool-result` / `message-group` 改动本地没跑过。
+- [ ] **MCP 工具加载确认**：gateway 首次对话日志见 `ce-cost` 3 + `ce-task` 2 = 5 工具（`touch extensions_config.json` 刷缓存坑）。
+- [ ] **一轮完整回归**（逐条点）：登录 → 规范问答（带条文依据卡）→ 组价选码（依据卡）→ HITL `/workspace/cost` 走完
+  13 步到 done → 对话内嵌卡片走一遍。
+- [ ] **cost_compose 依据卡肉眼验**（主线四 follow-up，渲染同组件、没单独看过）。
+- [ ] **`ce-router` 前门 agent 服务器真跑**（主线四）：确认走 `ce-task_orchestrate` 骨架；没验过先别默认暴露给试用用户。
+
+### P3 · 内网试用可延后（别卡上线）
+- HTTPS / 反向代理（内网 http 可接受；公网再上）；召回质量提升（sparse 混检）、gold 扩充、置信度调参；
+  orchestrate 结果卡渲染；桌面壳（desktop 轨，非网页版）。
+
+---
+
 ## 主线一：造价规范问答 Norm-QA —— ✅ 流程打通（质量调优 follow-up）
 
 > 构件/计量计价类自然语言问题 → 造价规范条文检索 → Qwen3 带引用作答（强制引用/强条区分/无依据拒答）。
@@ -316,8 +365,10 @@
     - [ ] **🔴 阻塞2 · 知识层定额覆盖缺口（归 ce-code）**：正解码 `010502006`（现浇矩形柱）在 `bill_quota_map` **无定额映射**
       → quota 空 → 综合单价 missing_base → 算不出真总价（系统如实标「无映射定额子目」「missing_base」，未杜撰=红线对）。
       `bill_quota_map` 仅覆盖 ~53 清单码；有定额的 010503001 反是预制+模板措施码。**需 ce-code 补 010502006→现浇柱本体定额 映射**才能端到端出真总价。
-- [ ] **HITL 数据缺失应停而非算假总价（guard，待办）**：compose「未就绪（2013）」/ quota 空（无定额映射）两种情况现在仍继续走
-  费率/rollup、算出 missing_base 的空假总价（误导）。应路由到明确终态「无定额数据，无法组价到总价」，不再往下算。graph.py + 单测。
+- [x] **HITL 数据缺失应停而非算假总价（✅ 2026-07-02，本地 e2e 全过）**：quota 空（无定额映射）不再走费率/rollup 算
+  假总价——三段式「告知 `quota_missing` 闸 → 可补录人材机基价续算 → 放弃则 `no_pricing` 直达 blocked+原因」；空 decision
+  哨兵兜底 langgraph 死循环坑。详见上「🚀 内网试用上线 Checklist · P0」条。compose 501 未就绪(2013) 同享该终态保护
+  （env 无 envelope→跳 quota_gate→无 basis→no_pricing）。待服务器 `pnpm check` + :8101 真链路验。
 - [ ] **门控阈值调参**：τ 从保守（多停）逐步放松（§6）。
 
 **红线**：弱模型不驱动流程（跳闸判断在图代码）/ provenance 是字段不口述 / override 钉值不重跑 LLM / 缺口（no_source/need_review/501）如实透传不杜撰。

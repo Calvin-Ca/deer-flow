@@ -9,9 +9,12 @@ FROM pytorch/pytorch:2.5.1-cuda12.1-cudnn9-runtime
 
 RUN pip install --no-cache-dir \
     "FlagEmbedding>=1.3" \
+    "transformers==4.44.2" \
     "fastapi>=0.110" \
     "uvicorn[standard]>=0.29" \
     "pydantic>=2.7"
+# transformers 钉 4.44.2：更新版把 slow 版 XLMRobertaTokenizer 的 prepare_for_model 去掉，
+# 导致 FlagEmbedding bge-reranker compute_score 崩（AttributeError）。4.44.2 与 FlagEmbedding 1.3.x 实测配套。
 
 WORKDIR /app
 

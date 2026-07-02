@@ -12,6 +12,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import requests
+
 from ir.query import RetrievalQuery
 from ir.retrieval import RetrievedChunk
 from index import metadata_index
@@ -21,43 +23,40 @@ from retrieval.dense_retriever import DenseRetriever
 from retrieval.rrf import expand_references, merge_results
 
 
-# cross-encoder rerank 模型进程内单例（DEV §1：rerank 模型只在检索栈加载一份，唯一 owner）。
-# 旧 engine.rerank 每次检索都 new FlagReranker（重复加载模型权重，极慢）——本轮收口为单例。
-_RERANKER = None
-_RERANKER_FAILED = False
-
-
-def _get_reranker():
-    """惰性加载并缓存 rerank 模型（进程内一份）；加载失败缓存为「不可用」，后续不再重试。"""
-    global _RERANKER, _RERANKER_FAILED
-    if _RERANKER is not None or _RERANKER_FAILED:
-        return _RERANKER
-    from config import RERANK_DEVICE, RERANK_MODEL
-    try:
-        from FlagEmbedding import FlagReranker
-        # devices 钉死单卡：否则新版 FlagReranker 默认吃光全部可见 GPU，每次 compute_score 跨多卡
-        # spawn 多进程池（起池 ~21s），重排几十个候选反被池开销拖成分钟级（见 config.RERANK_DEVICE）。
-        _RERANKER = FlagReranker(RERANK_MODEL, use_fp16=True, devices=RERANK_DEVICE)
-    except Exception as e:
-        print(f"[retrieval] Rerank 模型加载失败（{e}），后续统一 fallback 到 RRF 排序")
-        _RERANKER_FAILED = True
-    return _RERANKER
+# cross-encoder 精排已拆为独立 GPU 服务（service.rerank_api，config.RERANK_URL，默认 :8098）——
+# 把唯一的本地 GPU 消费者移出知识层，:8100 检索栈即纯 CPU（embedding 早已在 :8097，同款做法）。
+# 服务不可达（连不上）→ 缓存「不可用」，后续本进程一律 fallback RRF，不再逐查询空等超时（呼应旧
+# _RERANKER_FAILED 语义：一次判定、不反复重试）。单次打分错（如 5xx）不缓存，仅该查询退回 RRF。
+_RERANK_UNREACHABLE = False
 
 
 def rerank(query: str, results: list[dict], top_k: int) -> list[dict]:
-    """cross-encoder 精排（进程内单例模型）；不可用时 fallback 到 RRF 顺序。"""
-    reranker = _get_reranker()
-    if reranker is None:
+    """cross-encoder 精排 —— HTTP 调 rerank 服务；不可用时 fallback 到 RRF 顺序。
+
+    参数：query 查询文本；results RRF 合并+扩展后的行 dict 列表；top_k 截断数。
+    返回：按精排分降序（服务可用）或原 RRF 顺序（服务不可达/打分失败）截断后的前 top_k 行。
+    """
+    global _RERANK_UNREACHABLE
+    if _RERANK_UNREACHABLE or not results:
         return results[:top_k]
+    from config import RERANK_TIMEOUT, RERANK_URL
     try:
-        pairs = [[query, r.get("content", "")] for r in results]
-        scores = reranker.compute_score(pairs, normalize=True)
+        passages = [r.get("content", "") for r in results]
+        resp = requests.post(f"{RERANK_URL}/rerank",
+                             json={"query": query, "passages": passages, "normalize": True},
+                             timeout=RERANK_TIMEOUT)
+        resp.raise_for_status()
+        scores = resp.json().get("scores", [])
         for item, score in zip(results, scores):
             item["_rerank_score"] = float(score)
         results_sorted = sorted(results, key=lambda x: x.get("_rerank_score", 0), reverse=True)
+    except (requests.ConnectionError, requests.Timeout) as e:
+        print(f"[retrieval] Rerank 服务不可达（{e}），本进程后续统一 fallback RRF 排序")
+        _RERANK_UNREACHABLE = True  # 连不上就别每查询空等超时，一次判定
+        return results[:top_k]
     except Exception as e:
-        print(f"[retrieval] Rerank 打分失败（{e}），使用 RRF 排序")
-        results_sorted = results
+        print(f"[retrieval] Rerank 打分失败（{e}），本次 fallback RRF 排序")
+        return results[:top_k]
     return results_sorted[:top_k]
 
 

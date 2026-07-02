@@ -156,3 +156,18 @@ PG `ce_cost`（:5433）已灌齐，组价取数链通（清单→定额→工料
 - [ ] **服务器验证**：① `cd ce-code && uv sync`（装 `mcp`）；② 重起 :8100（`.venv/bin/python -m service.knowledge_api`），
   `curl :8100/health` 仍 OK；③ 重起 deer-flow gateway，确认 agent 加载到 `ce-cost_bill_match` / `ce-cost_quota_lookup`
   / `ce-cost_price_compose` 三工具；④ 实调一次 `bill_match`（spec=2024）+ `price_compose`（缺价资源应见 `no_source`）。
+
+---
+
+## G. 部署 / Docker（2026-07-02）
+
+- [x] **精排 GPU 拆分（✅ 2026-07-02，本地 py_compile + compose config 过）**：知识层 :8100 唯一的本地 GPU
+  消费者=cross-encoder 精排（`hybrid_retriever` 进程内 `FlagReranker`）。拆成独立服务 `service/rerank_api.py`
+  （:8098，`POST /rerank`）；`hybrid_retriever.rerank` 改 HTTP 调 `config.RERANK_URL`（同 embedding :8097 做法），
+  服务不可达→静默 fallback RRF（连不上缓存一次判定、不逐查询空等超时）。`config.py` 加 `RERANK_URL`/`RERANK_TIMEOUT`。
+  Docker：新增 `docker/ce-rerank/{Dockerfile,docker-compose.yaml,.env.example}`（GPU）；`docker/ce-code/docker-compose.yaml`
+  的 knowledge 去 GPU reservation（现纯 CPU）。**待服务器**：起 :8098 + 重起 :8100，验 `/bill/match` 召回精排质量不回归。
+- [ ] **🔴 修 `docker/ce-code/Dockerfile`（重构前旧版，build 不出当前代码）**：`COPY ce-code/core/`（该目录已不存在）、
+  `CMD python -m retrieval.server`（入口早改 `service.knowledge_api`）、且缺 `psycopg[binary]`（cost 取数）/`mcp`
+  （:8100/mcp）。需重写 COPY 目录 + 依赖 + CMD；因精排已拆出，**基底可从 `pytorch-cuda` 换 `python:3.12-slim`**（纯 CPU、镜像大幅瘦身）。
+  （ce-services Dockerfile 的同类陈旧问题已于 2026-07-02 修，可参照。）

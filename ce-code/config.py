@@ -28,6 +28,11 @@ RERANK_MODEL = "BAAI/bge-reranker-large"
 # 默认 cuda:2（本机 0/1/3 被 vLLM 占满、仅 2 有空闲）；GPU 分配变动时用 env CE_RERANK_DEVICE 覆盖，
 # 不必改代码。所选卡需 ≥~2G 空闲（bge-reranker-large fp16），否则 OOM→静默 fallback RRF（精排失效）。
 RERANK_DEVICE = os.environ.get("CE_RERANK_DEVICE", "cuda:2")
+# 精排已拆为独立 GPU 服务（service.rerank_api，默认 :8098），知识层检索栈改 HTTP 调用（同 embedding :8097
+# 的做法）——把唯一的本地 GPU 消费者移出 :8100，知识服务本身即纯 CPU。RERANK_MODEL/RERANK_DEVICE 现由
+# 该 rerank 服务进程读取；检索侧只认 RERANK_URL。服务不可达 → 检索栈静默 fallback RRF（精排失效、召回不变）。
+RERANK_URL = os.environ.get("CE_RERANK_URL", "http://localhost:8098")
+RERANK_TIMEOUT = float(os.environ.get("CE_RERANK_TIMEOUT", "15"))
 EMBED_MODEL = "BAAI/bge-large-zh-v1.5"
 EMBED_DIM = 1024  # bge-large-zh-v1.5 输出维度
 COLLECTION_PREFIX = "building_code"

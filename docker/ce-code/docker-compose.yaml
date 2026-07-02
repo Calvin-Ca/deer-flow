@@ -1,8 +1,15 @@
 # 知识服务（:8100）—— 单独启动，或被 docker/ce-services/docker-compose.yaml include
 #
+# ⚠️ 本服务现为**纯 CPU**：唯一的本地 GPU 消费者（cross-encoder 精排）已拆到 docker/ce-rerank
+#    （:8098）。检索时经 CE_RERANK_URL HTTP 调它；rerank 服务不起 → 静默 fallback RRF（召回不变、精排失效）。
+#    embedding 早已在 :8097、Milvus/BM25/PG 皆非 GPU。故本 compose 不再 reserve GPU。
+#
 # 单独启动（从项目根执行）：
 #   cp docker/ce-code/.env.example docker/ce-code/.env
 #   docker compose -f docker/ce-code/docker-compose.yaml up -d
+#
+# ⚠️ 注：本目录 Dockerfile 尚为重构前旧版（COPY core/ 已不存在、CMD retrieval.server 已改名、缺 psycopg/mcp），
+#    build 不出当前代码——待单独修（见 ce-code TODO）。修后基底应从 pytorch-cuda 换 python:slim（本服务已纯 CPU）。
 
 services:
   knowledge:
@@ -11,26 +18,17 @@ services:
       dockerfile: docker/ce-code/Dockerfile
     image: rag-knowledge:latest
     container_name: rag-knowledge
-    network_mode: host                    # 直接复用宿主机网络，访问 Milvus/vLLM
+    network_mode: host                    # 直接复用宿主机网络，访问 Milvus/embed/vLLM/PG/rerank
     restart: unless-stopped
     environment:
-      - CUDA_VISIBLE_DEVICES=${CUDA_DEVICE:-2}
-      - NVIDIA_VISIBLE_DEVICES=${CUDA_DEVICE:-2}
-      - HF_ENDPOINT=https://hf-mirror.com
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              device_ids: ["${CUDA_DEVICE:-2}"]
-              capabilities: [gpu]
+      # 精排服务地址（已拆出，见 docker/ce-rerank）；不起 rerank 则检索降级 RRF
+      - CE_RERANK_URL=${CE_RERANK_URL:-http://localhost:8098}
     volumes:
       - ${DATA_DIR}:/app/data:ro
-      - ${HF_CACHE:-~/.cache/huggingface}:/root/.cache/huggingface
     healthcheck:
       test: ["CMD", "python", "-c",
              "import urllib.request; urllib.request.urlopen('http://localhost:8100/health')"]
       interval: 15s
       timeout: 5s
       retries: 5
-      start_period: 30s    # FlagEmbedding 首次加载模型较慢
+      start_period: 15s    # 纯 CPU 起得快（不再本地加载精排模型）

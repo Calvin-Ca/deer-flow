@@ -30,7 +30,7 @@
 > 系统在缺数据时「诚实拒答（blocked+原因）」而非「给错数」，符合红线，试用体验也更能接受。
 
 ### P0 · 功能阻塞（不做，试用频繁踩空/误导）
-- [x] **缺定额映射三段式机制**（✅ 2026-07-02，本地 e2e 全过；前端待服务器 `pnpm check`）：`quota` 空不再弹空白
+- [x] **缺定额映射三段式机制**（✅ 2026-07-02，本地 e2e 全过 + **服务器真链路验通**）：`quota` 空不再弹空白
   确认卡 / 不再往下算假总价，改为①**告知**（`quota_missing` 录入闸 + 醒目 message）②**可补录**人材机基价续算综合
   单价（`build_manual_basis`，补齐三项→钉用户基价走 quantity→rates→params→rollup 正常收尾）③**放弃则诚实终止**
   （`no_pricing` 节点直达 END，`status=blocked` + `rollup.blocked_reason`，**绝不弹费率/税率闸、绝不产虚构总价**）。
@@ -40,7 +40,10 @@
   前端 `gates.tsx`/`cost-hitl-inline.tsx`/`cost-hitl-panel.tsx`（message 高亮 + blocked_reason 透传）。
   本地 e2e（4 用例）：放弃→blocked（闸序列仅 `[quota_missing]`、无收尾闸）；补录→done 总价 379.76；正常单子目
   回归不破；compose 501 未就绪(2013)→start 直达 blocked（不弹任何闸、不算假总价）。
-  - **待服务器**：① 前端 `pnpm check`；② :8101 真链路走一遍缺定额构件（放弃→blocked 卡显原因 / 补录→出价）。
+  - **服务器验通**（✅ 2026-07-02）：① `pnpm check`（eslint+tsc）过；② :8101 真链路——start→编码闸
+    manual_override→`010502006`（真 :8100 确认无映射）→ **`quota_missing` 闸**（title/message 正确）→ 放弃 `{}`
+    →`status=blocked` + `blocked_reason`、**未弹费率/税率闸、无虚构总价**（空 `{}` 哨兵兜底真链路生效）。
+    补录→续算路径本地已验（379.76），服务器补一条 fresh session 到 `gate=quantity` 即可（同段代码，低风险）。
 - [ ] **补常见现浇构件本体定额映射**（归 ce-code，**数据填充、你来补**）：`010502006 钢筋混凝土柱 / 010502011 梁 /
   010401 砌体墙` 等 → SJG 子目写进 `bill_quota_map`。**根因非重跑匹配器**：清单名「钢筋混凝土柱」与定额名
   「非泵送现浇混凝土 矩形柱」(`010002-34`)/「矩形柱 木模板」(`010006-15`) 字面不重叠，名称匹配桥不过去，需**领域
@@ -368,7 +371,7 @@
 - [x] **HITL 数据缺失应停而非算假总价（✅ 2026-07-02，本地 e2e 全过）**：quota 空（无定额映射）不再走费率/rollup 算
   假总价——三段式「告知 `quota_missing` 闸 → 可补录人材机基价续算 → 放弃则 `no_pricing` 直达 blocked+原因」；空 decision
   哨兵兜底 langgraph 死循环坑。详见上「🚀 内网试用上线 Checklist · P0」条。compose 501 未就绪(2013) 同享该终态保护
-  （env 无 envelope→跳 quota_gate→无 basis→no_pricing）。待服务器 `pnpm check` + :8101 真链路验。
+  （env 无 envelope→跳 quota_gate→无 basis→no_pricing）。**服务器 `pnpm check` + :8101 真链路已验通**（2026-07-02）。
 - [ ] **门控阈值调参**：τ 从保守（多停）逐步放松（§6）。
 
 **红线**：弱模型不驱动流程（跳闸判断在图代码）/ provenance 是字段不口述 / override 钉值不重跑 LLM / 缺口（no_source/need_review/501）如实透传不杜撰。

@@ -1,0 +1,24 @@
+# CE 任务服务 :8101（裸机 uv）——开机自启
+#
+# 安装（服务器，sudo）：
+#   sudo cp scripts/systemd/ce-tasks.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now ce-tasks
+#   systemctl status ce-tasks ; journalctl -u ce-tasks -f
+#
+# 依赖知识服务 :8100（请求时懒连，故 After 软序即可）。env 默认即对（BCRAG_KNOWLEDGE_URL=localhost:8100 /
+# BCRAG_LLM_URL=localhost:8099 / CE_HITL_CHECKPOINT_DB 默认落 ce-services/.hitl_checkpoints.db）。
+[Unit]
+Description=CE Task Service (:8101, bare-metal uv)
+After=network-online.target ce-knowledge.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=caic
+WorkingDirectory=/mnt/nvme/calvin/code/deer-flow/ce-services
+ExecStart=/bin/bash -lc 'exec uv run python main.py'
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -7,7 +7,10 @@
 #   docker build -f docker/ce-rerank/Dockerfile -t ce-rerank .
 FROM pytorch/pytorch:2.5.1-cuda12.1-cudnn9-runtime
 
-RUN pip install --no-cache-dir \
+# pip 源（默认清华，build 加速；可 --build-arg PIP_INDEX_URL=... 覆盖回官方）
+ARG PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
+
+RUN pip install --no-cache-dir -i "$PIP_INDEX_URL" \
     "FlagEmbedding>=1.3" \
     "transformers==4.44.2" \
     "fastapi>=0.110" \

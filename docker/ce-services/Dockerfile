@@ -7,9 +7,12 @@
 #   docker build -f docker/ce-services/Dockerfile -t rag-tasks .
 FROM python:3.12-slim
 
+# pip 源（默认清华，build 加速；可 --build-arg PIP_INDEX_URL=... 覆盖回官方）
+ARG PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
+
 # 运行时依赖（与 ce-services/pyproject.toml 对齐）：
 #   langgraph + checkpoint-sqlite → HITL 可中断图；mcp → :8101/mcp 的 ce-task façade。缺则 import 即崩。
-RUN pip install --no-cache-dir \
+RUN pip install --no-cache-dir -i "$PIP_INDEX_URL" \
     "fastapi>=0.110" \
     "uvicorn[standard]>=0.29" \
     "requests>=2.32" \

@@ -9,9 +9,12 @@
 #   docker build -f docker/ce-code/Dockerfile -t rag-knowledge .
 FROM python:3.12-slim
 
+# pip 源（默认清华，build 加速；可 --build-arg PIP_INDEX_URL=... 覆盖回官方）
+ARG PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
+
 # 运行时依赖（service.knowledge_api 实际 import 链；**不含 torch/FlagEmbedding**——精排已拆出）：
 #   pymilvus 向量查询 / rank-bm25 BM25 / psycopg 造价取数(PG) / mcp façade / rich·click（cost 包部分模块 import）
-RUN pip install --no-cache-dir \
+RUN pip install --no-cache-dir -i "$PIP_INDEX_URL" \
     "fastapi>=0.110" \
     "uvicorn[standard]>=0.29" \
     "pydantic>=2.7" \

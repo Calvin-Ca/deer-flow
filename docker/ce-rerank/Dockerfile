@@ -1,4 +1,4 @@
-# CE Rerank 服务镜像（:8098）—— cross-encoder 精排（bge-reranker-large）
+# CE Rerank 服务镜像（:8095，env CE_RERANK_PORT 可配）—— cross-encoder 精排（bge-reranker-large）
 #
 # 从知识层 :8100 拆出的**唯一 GPU 消费者**：知识服务检索栈原本进程内加载 FlagReranker，
 # 现改 HTTP 调本服务（config.RERANK_URL）。用 pytorch-cuda 基底（torch 预装），只装精排所需。
@@ -24,5 +24,5 @@ COPY ce-code/service/rerank_api.py service/rerank_api.py
 ENV PYTHONUNBUFFERED=1 \
     HF_ENDPOINT=https://hf-mirror.com
 
-EXPOSE 8098
+EXPOSE 8095
 CMD ["python", "-m", "service.rerank_api"]

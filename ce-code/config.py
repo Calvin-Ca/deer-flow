@@ -31,7 +31,7 @@ RERANK_DEVICE = os.environ.get("CE_RERANK_DEVICE", "cuda:2")
 # 精排已拆为独立 GPU 服务（service.rerank_api，默认 :8098），知识层检索栈改 HTTP 调用（同 embedding :8097
 # 的做法）——把唯一的本地 GPU 消费者移出 :8100，知识服务本身即纯 CPU。RERANK_MODEL/RERANK_DEVICE 现由
 # 该 rerank 服务进程读取；检索侧只认 RERANK_URL。服务不可达 → 检索栈静默 fallback RRF（精排失效、召回不变）。
-RERANK_URL = os.environ.get("CE_RERANK_URL", "http://localhost:8098")
+RERANK_URL = os.environ.get("CE_RERANK_URL", "http://localhost:8095")
 RERANK_TIMEOUT = float(os.environ.get("CE_RERANK_TIMEOUT", "15"))
 EMBED_MODEL = "BAAI/bge-large-zh-v1.5"
 EMBED_DIM = 1024  # bge-large-zh-v1.5 输出维度

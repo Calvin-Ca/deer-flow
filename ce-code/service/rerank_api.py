@@ -91,5 +91,8 @@ def do_rerank(req: RerankRequest) -> dict:
 
 
 if __name__ == "__main__":
+    import os
+
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8098)
+    # 端口 env 可配（默认 8095；:8098 在部分机器被占）——与 config.RERANK_URL / compose 保持一致。
+    uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("CE_RERANK_PORT", "8095")))

@@ -22,7 +22,7 @@ services:
     restart: unless-stopped
     environment:
       # 精排服务地址（已拆出，见 docker/ce-rerank）；不起 rerank 则检索降级 RRF
-      - CE_RERANK_URL=${CE_RERANK_URL:-http://localhost:8098}
+      - CE_RERANK_URL=${CE_RERANK_URL:-http://localhost:8095}
     volumes:
       - ${DATA_DIR}:/app/data:ro
     healthcheck:

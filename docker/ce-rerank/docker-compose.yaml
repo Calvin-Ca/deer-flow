@@ -1,6 +1,6 @@
-# CE Rerank 服务（:8098）—— 从知识层拆出的 GPU 精排（bge-reranker-large）
+# CE Rerank 服务（:8095，env CE_RERANK_PORT 可配）—— 从知识层拆出的 GPU 精排（bge-reranker-large）
 #
-# 知识层 :8100 通过 config.RERANK_URL（默认 http://localhost:8098）HTTP 调本服务；本服务不可达 →
+# 知识层 :8100 通过 config.RERANK_URL（默认 http://localhost:8095）HTTP 调本服务；本服务不可达 →
 # 知识层检索栈静默 fallback RRF（精排失效、召回不变）。故本服务可独立起停、共卡、按需伸缩。
 #
 # 启动（从项目根执行）：
@@ -22,6 +22,8 @@ services:
     environment:
       # 容器内 torch 设备：reserve 单卡后它就是 cuda:0（不是宿主物理编号）
       - CE_RERANK_DEVICE=${CE_RERANK_DEVICE:-cuda:0}
+      # 监听端口（host 网络下即宿主端口；默认 8095，:8098 部分机器被占）
+      - CE_RERANK_PORT=${CE_RERANK_PORT:-8095}
       - HF_ENDPOINT=https://hf-mirror.com
     deploy:
       resources:
@@ -35,7 +37,7 @@ services:
       - ${HF_CACHE:-~/.cache/huggingface}:/root/.cache/huggingface
     healthcheck:
       test: ["CMD", "python", "-c",
-             "import urllib.request; urllib.request.urlopen('http://localhost:8098/health')"]
+             "import urllib.request; urllib.request.urlopen('http://localhost:8095/health')"]
       interval: 15s
       timeout: 5s
       retries: 5

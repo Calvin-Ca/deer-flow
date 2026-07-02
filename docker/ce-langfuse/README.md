@@ -5,7 +5,7 @@ LLM 可观测性：看每次模型调用的真实 system prompt、消息历史�
 ## 启动（在跑 deer-flow 的服务器上）
 
 ```bash
-cd docker/langfuse
+cd docker/ce-langfuse
 docker compose up -d          # 首次拉镜像 + 初始化，约 1-2 分钟
 docker compose ps             # 等 langfuse-web 变 healthy
 ```

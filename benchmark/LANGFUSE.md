@@ -2,7 +2,7 @@
 
 > 本文记录把 **Langfuse**（LLM 可观测性 + 评测平台）接入 deer-flow、并打通三件事的**架构、用法与踩坑过程**。
 > **文档对**：本文是 **「怎么用 Langfuse 测」（操作步骤 → [§9 runbook](#9-端到端测试步骤runbook)）**；**「测什么 / 分层指标口径」见 [`AGENT_BENCHMARK.md`](AGENT_BENCHMARK.md)**。看那份定指标、看本文跑评测。
-> 另：操作命令细节见 [`runner/README.md`](runner/README.md)；自托管部署见 [`../docker/langfuse/README.md`](../docker/langfuse/README.md)。
+> 另：操作命令细节见 [`runner/README.md`](runner/README.md)；自托管部署见 [`../docker/ce-langfuse/README.md`](../docker/ce-langfuse/README.md)。
 > 版本：langfuse **4.5.1**（自托管）；首次打通日期 2026-06-30。
 
 ---
@@ -231,7 +231,7 @@ config.yaml 里没有叫 `qwen-plus` 的模型。先用 `DeerFlowClient().list_m
 
 ### 步骤 0 · 前提（一次）
 
-1. 起 Langfuse 自托管栈（rootful docker，见 §6.6 双 daemon 坑）：`sudo docker compose -f docker/langfuse/docker-compose.yaml up -d`，UI 在 :3030。
+1. 起 Langfuse 自托管栈（rootful docker，见 §6.6 双 daemon 坑）：`sudo docker compose -f docker/ce-langfuse/docker-compose.yaml up -d`，UI 在 :3030。
 2. 根 `.env` 开上报四行并**重启 Gateway**：`LANGFUSE_TRACING=true` / `LANGFUSE_PUBLIC_KEY=...` / `LANGFUSE_SECRET_KEY=...` / `LANGFUSE_BASE_URL=http://localhost:3030`。
 3. 评测要 agent 真调脚本/取数，**四服务起齐**：:8100 知识检索、:8101 任务（cost/norm）、:8099 vLLM、Gateway。
 

@@ -13,7 +13,7 @@
 #     deer-flow 侧 LANGFUSE_PUBLIC_KEY/SECRET_KEY 直接对上，无需点 UI。
 #
 # 启动（在服务器上）：
-#   cd docker/langfuse && docker compose up -d
+#   cd docker/ce-langfuse && docker compose up -d
 # 访问：http://<服务器IP>:3030   登录邮箱见 LANGFUSE_INIT_USER_EMAIL，密码见 .env / 下方默认值
 
 # 公共 logging 配置，所有服务通过 <<: *default-logging 引用

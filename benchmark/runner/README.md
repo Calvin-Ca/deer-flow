@@ -4,7 +4,7 @@
 
 ## 前置（一次）
 
-1. 起 Langfuse 自托管栈：`cd docker/langfuse && docker compose up -d`（详见 `docker/langfuse/README.md`，UI 在 `:3030`）。
+1. 起 Langfuse 自托管栈：`cd docker/ce-langfuse && docker compose up -d`（详见 `docker/ce-langfuse/README.md`，UI 在 `:3030`）。
 2. 根 `.env` 开上报四行并**重启 Gateway**（env 仅启动时读）：
    `LANGFUSE_TRACING=true` / `LANGFUSE_PUBLIC_KEY=...` / `LANGFUSE_SECRET_KEY=...` / `LANGFUSE_BASE_URL=http://localhost:3030`
 

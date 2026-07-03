@@ -50,6 +50,9 @@ services:
       - --web.listen-address=:9100
 
   cadvisor:
+    # 默认不起：镜像在 gcr.io（国内墙）。要启用先解决镜像可达（可信 gcr.io 镜像源），再
+    #   sudo docker compose ... --profile cadvisor up -d，并放开 prometheus.yml 的 cadvisor 采集。
+    profiles: ["cadvisor"]
     image: gcr.io/cadvisor/cadvisor:v0.49.1
     container_name: ce-cadvisor
     network_mode: host

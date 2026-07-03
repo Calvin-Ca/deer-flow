@@ -12,9 +12,10 @@ import {
 } from "@/components/ui/card";
 import { getSessionState, resumeSession } from "@/core/cost/client";
 import { displayValue } from "@/core/cost/format";
-import type { CostDecision, CostInterrupt } from "@/core/cost/types";
+import type { CostDecision, CostEvent, CostInterrupt } from "@/core/cost/types";
 
 import { ConfirmGate, InputGate, ReviewGate, ROLLUP_LABELS } from "./gates";
+import { CostStepTimeline } from "./step-timeline";
 
 /** Normalized snapshot the widget renders from (works for both state + resume shapes). */
 interface Snapshot {
@@ -24,6 +25,7 @@ interface Snapshot {
   items: Array<Record<string, unknown>>;
   overrides: Array<Record<string, unknown>>;
   auditCount: number;
+  events: CostEvent[];
 }
 
 function asRecord(v: unknown): Record<string, unknown> | null {
@@ -111,6 +113,7 @@ export function CostHitlInline({ taskId }: { taskId: string }) {
           items: (v.items as Array<Record<string, unknown>>) ?? [],
           overrides: (v.overrides as Array<Record<string, unknown>>) ?? [],
           auditCount: Array.isArray(v.audit_log) ? v.audit_log.length : 0,
+          events: (v.events as CostEvent[]) ?? [],
         });
       })
       .catch((e: unknown) => {
@@ -134,6 +137,7 @@ export function CostHitlInline({ taskId }: { taskId: string }) {
           items: res.items ?? [],
           overrides: res.overrides ?? [],
           auditCount: res.audit_log?.length ?? 0,
+          events: res.events ?? [],
         });
       } catch (e) {
         setError(e instanceof Error ? e.message : "提交失败");
@@ -160,6 +164,8 @@ export function CostHitlInline({ taskId }: { taskId: string }) {
       </CardHeader>
       <CardContent className="space-y-2">
         {error && <div className="text-destructive text-xs">{error}</div>}
+
+        {snap && snap.events.length > 0 && <CostStepTimeline events={snap.events} />}
 
         {gate?.gate_type === "confirm" && (
           <ConfirmGate interrupt={gate} busy={busy} onDecide={decide} />

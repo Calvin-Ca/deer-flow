@@ -60,6 +60,21 @@
 - [ ] **L7 NFR 压测**：P95 延迟分桶（FR-K ≤3s / FR-P01 ≤2s / ReAct 单轮 ≤5s——PRD 硬指标，从未量过）+
   多租户隔离 + 可观测追溯
 
+## M4 · 组价步骤前端可视化（新线，独立于 benchmark，可并行）
+
+> 用户输入「实体名称 + 做法特征」触发组价后，**清单匹配 → 套定额 → 取价 → 单位工程汇总 → 单项工程汇总 → 总造价**
+> 各步骤在前端逐步显示。完整方案（文件清单/数据契约/红线自检）见 `ce-services/COST_STEP_DISPLAY_PLAN.md`。
+> 现状：后端每节点已发 `events`（`cost/state.py` 累积）、前端已有 HITL 内嵌卡，**唯缺时间线渲染**——数据管道全通。
+
+- [ ] **阶段 0 · 前端步骤时间线**（纯前端、零后端改动、最快见效）：新增 `step-timeline.tsx` 渲染 `events`，
+  `cost-hitl-inline.tsx` 的 `Snapshot` 接入 `events`。**验收**：逐闸 resume 时间线逐批展开，重开对话可从持久化 `events` 重建
+- [ ] **阶段 1 · SSE 逐节点流式**：`session.py` 加 `stream_start/stream_resume`（`.stream(stream_mode="updates")`）+
+  `router.py` 两个 `text/event-stream` 端点 + 代理 `route.ts` 改 body 透传 + 前端 fetch-stream 消费。**验收**：步骤秒级逐条点亮
+- [ ] **阶段 2 · 两级汇总（单位工程/单项工程）**：item 加 `unit_work/single_work` 分组标签 + `pricing.py` 新增
+  `rollup_hierarchy` 原语 + `rollup_node` 逐层发 `unit_rollup/single_rollup` 事件 + `price_gate_node` 补 `price` auto_pass 事件（时间线完整性）+ 前端层级树渲染。
+  **v1 范围**：措施/规费保持项目级（单位工程级费用留 v2，已在方案标注）。**验收**：单组退化=旧 rollup、多组层级 Σ 正确
+- [ ] **阶段 3（可选）· 点火型 MCP `start_cost_session`**：mcp_server 加只点火不编排的起会话工具，返回 `cost-hitl` marker
+
 ## 小尾巴（不阻塞主线，择机清）
 
 - [ ] 前端三条人工判读（B1 口径声明行 / A1→A9 会话粘性 / B11 出界话术转述）——gateway 热加载随时可测；

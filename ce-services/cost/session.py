@@ -76,6 +76,24 @@ def _format(task_id: str, result: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _norm_feature(entry: str | dict[str, Any]) -> dict[str, Any] | None:
+    """把 features 元素归一为 item dict：纯字符串 → ``{feature}``；dict → 保留 feature + 可选两级汇总分组标签。
+
+    参数：entry —— 字符串描述 或 ``{feature, single_work?, unit_work?}``。
+    返回：``{feature[, single_work, unit_work]}``；feature 为空 → None（由调用方过滤，不建空构件）。
+    """
+    if isinstance(entry, str):
+        return {"feature": entry} if entry else None
+    feat = entry.get("feature")
+    if not feat:
+        return None
+    item: dict[str, Any] = {"feature": feat}
+    for k in ("single_work", "unit_work"):
+        if entry.get(k):
+            item[k] = entry[k]
+    return item
+
+
 def start(
     feature: str | None = None,
     spec: str | None = None,
@@ -84,23 +102,25 @@ def start(
     price_source: str | None = None,
     rates: dict[str, Any] | None = None,
     quantity: float | None = None,
-    features: list[str] | None = None,
+    features: list[str | dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """起一个组价 HITL 会话，跑到首个闸或 done（支持单/多构件）。
 
-    参数：feature —— 单构件描述；features —— 多构件描述列表（给定则按外层循环逐件办，优先于 feature）；
+    参数：feature —— 单构件描述；features —— 多构件列表（给定则按外层循环逐件办，优先于 feature；
+      元素可为纯描述字符串，或 ``{feature, single_work?, unit_work?}`` 带两级汇总分组）；
       spec —— 国标版本（缺则 setup 闸采集）；region/period/price_source/rates —— setup 口径；
       quantity —— 可选工程量 Q（仅单构件时预供 items[0]；多构件各件经 quantity_gate 录入）。
     返回：会话响应（含 task_id；首个 interrupt 通常是编码确认闸，或 spec 缺失时的 setup 录入闸）。
     """
     task_id = uuid.uuid4().hex
-    descs = [f for f in (features or []) if f] or ([feature] if feature else [])
-    items: list[dict[str, Any]] = [{"feature": d} for d in descs]
+    items: list[dict[str, Any]] = [it for it in (_norm_feature(f) for f in (features or [])) if it]
+    if not items and feature:
+        items = [{"feature": feature}]
     if quantity is not None and len(items) == 1:  # Q 预供仅对单构件无歧义
         items[0]["quantity"] = quantity
     initial: dict[str, Any] = {
         "task_id": task_id,
-        "feature": descs[0] if descs else None,
+        "feature": items[0]["feature"] if items else None,
         "region": region,
         "current_item": 0,
         "items": items,

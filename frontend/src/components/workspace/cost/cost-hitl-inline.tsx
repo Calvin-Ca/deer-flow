@@ -14,7 +14,7 @@ import { getSessionState, resumeSession } from "@/core/cost/client";
 import { displayValue } from "@/core/cost/format";
 import type { CostDecision, CostEvent, CostInterrupt } from "@/core/cost/types";
 
-import { ConfirmGate, InputGate, ReviewGate, ROLLUP_LABELS } from "./gates";
+import { ConfirmGate, HierarchyTree, InputGate, ReviewGate, ROLLUP_LABELS } from "./gates";
 import { CostStepTimeline } from "./step-timeline";
 
 /** Normalized snapshot the widget renders from (works for both state + resume shapes). */
@@ -46,6 +46,8 @@ function DoneSummary({ snap }: { snap: Snapshot }) {
   return (
     <div className="space-y-2 text-sm">
       <div className="text-muted-foreground">组价完成 · 已确认明细</div>
+
+      <HierarchyTree rollup={r} />
 
       <div className="space-y-1">
         {Object.entries(ROLLUP_LABELS).map(([k, label]) => {

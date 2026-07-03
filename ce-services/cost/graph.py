@@ -27,8 +27,16 @@ from langgraph.types import interrupt
 
 from common.config import COST_DEFAULT_SPEC, HITL_TAU_HIGH, HITL_TAU_LOW, LLM_MODEL_ID, LLM_URL
 from cost import clarify, gates, provenance
-from cost.pricing import RollupInput, UnitPriceInput, compute_unit_price, rollup_cost
+from cost.pricing import (
+    HierarchyItem,
+    HierarchyRollupInput,
+    UnitPriceInput,
+    compute_unit_price,
+    rollup_hierarchy,
+)
 from cost.state import (
+    DEFAULT_SINGLE_WORK,
+    DEFAULT_UNIT_WORK,
     CostTaskState,
     audit_entry,
     gate_event,
@@ -344,6 +352,17 @@ def price_gate_node(state: CostTaskState) -> dict[str, Any]:
         out["audit_log"] = audits
     else:
         out["audit_log"] = [audit_entry("price_query", "auto_pass", {"materials": len(materials)})]
+    # 取价 event（时间线完整性）：命中/缺价录入都进依据时间线；无材料（未就绪/无定额）不发（避免「取价 0 项」噪音）。
+    if materials:
+        priced = sum(1 for m in materials if (m.get("price") or {}).get("value") is not None)
+        out["events"] = [{
+            "step": "price",
+            "status": "user_input" if overrides else "ok",
+            "auto_pass": not overrides,
+            "result": {"materials": len(materials), "priced": priced,
+                       "missing": len(materials) - priced},
+            "paused": bool(overrides),
+        }]
     return out
 
 
@@ -497,39 +516,58 @@ def params_gate_node(state: CostTaskState) -> dict[str, Any]:
 
 
 def _compute_rollup(state: CostTaskState) -> dict[str, Any]:
-    """汇总各 item 综合合价 + 项目级费用 → 总造价（确定性，复用 ``rollup_cost``）。
+    """两级汇总各 item 综合合价（单项工程 > 单位工程 > 分部分项）+ 项目级费用 → 总造价（确定性，复用 ``rollup_hierarchy``）。
 
-    参数：state（含 items[].unit_price 与 params）。返回：rollup_cost 结果（含 missing 计数提示）。
-    分部分项合价 = Σ 各 item 综合合价（total_price）；缺综合单价（missing_base）的 item 计入 missing、不计金额（不杜撰）。
+    参数：state（含 items[].unit_price / single_work / unit_work 与 params）。返回：rollup_hierarchy 结果
+      （含 single_works 两级明细 + missing 计数）。缺综合合价（missing_base/missing_quantity）的 item 逐层计入
+      missing、不计金额（不杜撰）；无 single_work/unit_work 标签的 item 归默认单项/单位工程（退化单组树）。
     """
-    subtotal = 0.0
-    missing = 0
-    for it in state.get("items") or []:
-        up = it.get("unit_price") or {}
-        total = up.get("total_price")
-        if total is not None:
-            subtotal += total
-        else:
-            missing += 1
     params = state.get("params") or {}
-    result = rollup_cost(RollupInput(
-        subtotal=subtotal,
+    rows = [
+        HierarchyItem(
+            single_work=(it.get("single_work") or DEFAULT_SINGLE_WORK),
+            unit_work=(it.get("unit_work") or DEFAULT_UNIT_WORK),
+            total_price=(it.get("unit_price") or {}).get("total_price"),
+            feature=it.get("feature"),
+        )
+        for it in (state.get("items") or [])
+    ]
+    return rollup_hierarchy(HierarchyRollupInput(
+        items=rows,
         measure_fee=float(params.get("measure_fee") or 0),
         other_fee=float(params.get("other_fee") or 0),
         fee_levy=float(params.get("fee_levy") or 0),
         tax_rate=params.get("tax_rate"),
     ))
-    result["missing_unit_price_items"] = missing
-    return result
+
+
+def rollup_compute_node(state: CostTaskState) -> dict[str, Any]:
+    """汇总 compute（§3⑬）：确定性算两级汇总 + 总造价，**逐层发事件、不暂停**（时间线在进复核闸前已展开）。
+
+    参数：state。返回：state.rollup（总造价 + single_works 明细）+ 逐层 events（单位工程汇总/单项工程汇总/总造价）。
+    与复核闸拆开（compute/gate 双拆）：本节点纯确定性、无 interrupt，让「单位工程汇总→单项工程汇总→总造价」
+      三类步骤在停到 review 闸**之前**就进依据时间线；review 闸（rollup 节点）只读 state.rollup 做暂停复核。
+    """
+    rollup = _compute_rollup(state)
+    events: list[dict[str, Any]] = []
+    for s in rollup.get("single_works", []):
+        for u in s.get("unit_works", []):
+            events.append({"step": f"unit_rollup:{u['name']}", "status": "ok",
+                           "result": u, "paused": False})
+        events.append({"step": f"single_rollup:{s['name']}", "status": "ok",
+                       "result": s, "paused": False})
+    events.append({"step": "rollup", "status": "ok", "provenance": rollup.get("provenance"),
+                   "result": rollup, "paused": False})
+    return {"rollup": rollup, "status": "running", "events": events}
 
 
 def rollup_node(state: CostTaskState) -> dict[str, Any]:
-    """末尾 review（§3⑬/§6）：确定性汇总总造价后**始终暂停**复核，resume(approve) → done。
+    """末尾 review 闸（§3⑬/§6）：读 rollup_compute 已算好的总造价，**始终暂停**复核，resume(approve) → done。
 
-    参数：state。返回：state.rollup（总造价明细）+ status=done + 审计。
-    §6「末尾 review 始终暂停」：总造价定稿前必看，故无条件 interrupt（汇总确定性、resume 重跑无漂移）。
+    参数：state（rollup 已由上游 rollup_compute 落 state）。返回：status=done + 审计（汇总事件已在 compute 发过，不重发）。
+    §6「末尾 review 始终暂停」：总造价定稿前必看，故无条件 interrupt；上游 compute 有 checkpoint，resume 不重算。
     """
-    rollup = _compute_rollup(state)
+    rollup = state.get("rollup") or _compute_rollup(state)
     interrupt({
         "gate_type": "review",
         "node": "rollup",
@@ -538,12 +576,9 @@ def rollup_node(state: CostTaskState) -> dict[str, Any]:
         "actions": ["approve"],
     })
     return {
-        "rollup": rollup,
         "status": "done",
         "audit_log": [audit_entry("rollup", "final_review", {"total": rollup.get("total"),
                                   "pre_tax_total": rollup.get("pre_tax_total")}, by="user")],
-        "events": [{"step": "rollup", "status": "ok", "provenance": rollup.get("provenance"),
-                    "result": rollup, "paused": True}],
     }
 
 
@@ -645,6 +680,7 @@ def build_graph(checkpointer: Any):
     g.add_node("advance", advance_node)
     g.add_node("rates_gate", rates_gate_node)
     g.add_node("params_gate", params_gate_node)
+    g.add_node("rollup_compute", rollup_compute_node)
     g.add_node("rollup", rollup_node)
     g.add_node("no_pricing", no_pricing_node)
     g.add_node("done", done_node)
@@ -664,7 +700,9 @@ def build_graph(checkpointer: Any):
     g.add_conditional_edges("advance", _after_advance,
                             {"list_match": "list_match", "rates_gate": "rates_gate", "no_pricing": "no_pricing"})
     g.add_edge("rates_gate", "params_gate")
-    g.add_edge("params_gate", "rollup")
+    # 汇总拆 compute/gate：params_gate → rollup_compute（两级汇总+逐层发事件，不停）→ rollup（复核闸，暂停）→ done。
+    g.add_edge("params_gate", "rollup_compute")
+    g.add_edge("rollup_compute", "rollup")
     g.add_edge("rollup", "done")
     g.add_edge("no_pricing", END)  # 无可算价：直达 END，不走费率/参数/汇总、不产虚构总价（P0）
     g.add_edge("done", END)

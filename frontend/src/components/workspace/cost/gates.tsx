@@ -20,12 +20,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { displayValue } from "@/core/cost/format";
-import type {
-  ConfirmDecision,
-  ConfirmInterrupt,
-  InputField,
-  InputInterrupt,
-  ReviewInterrupt,
+import {
+  type ConfirmDecision,
+  type ConfirmInterrupt,
+  type InputField,
+  type InputInterrupt,
+  type ReviewInterrupt,
+  readHierarchy,
 } from "@/core/cost/types";
 
 /** 依据卡 — renders a primitive's structured provenance (source + confidence). */
@@ -312,6 +313,36 @@ export const ROLLUP_LABELS: Record<string, string> = {
   total: "总造价",
 };
 
+/** 两级汇总树（单项工程 › 单位工程 › 分部分项合价）——从 rollup.single_works 渲染，无则不显。 */
+export function HierarchyTree({ rollup }: { rollup: Record<string, unknown> | null }) {
+  const tree = readHierarchy(rollup);
+  if (!tree) return null;
+  return (
+    <div className="space-y-1 rounded-md border p-2 text-xs">
+      <div className="text-muted-foreground font-medium">工程量清单汇总</div>
+      {tree.map((s, si) => (
+        <div key={`${s.name}-${si}`} className="space-y-0.5">
+          <div className="flex justify-between font-medium">
+            <span>单项工程 · {s.name}</span>
+            <span className="font-mono">{displayValue(s.subtotal)}</span>
+          </div>
+          {s.unit_works.map((u, ui) => (
+            <div key={`${u.name}-${ui}`} className="flex justify-between pl-3">
+              <span className="text-muted-foreground">
+                单位工程 · {u.name}
+                {u.missing_unit_price_items > 0 && (
+                  <span className="text-destructive"> （{u.missing_unit_price_items} 项未计价）</span>
+                )}
+              </span>
+              <span className="font-mono">{displayValue(u.subtotal)}</span>
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /** 末尾 review 闸（§13）—— 总造价明细 + 复核通过。 */
 export function ReviewGate({
   interrupt,
@@ -332,6 +363,7 @@ export function ReviewGate({
         <CardDescription>末尾复核 · {interrupt.node}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
+        <HierarchyTree rollup={r} />
         <div className="space-y-1 text-sm">
           {Object.entries(ROLLUP_LABELS).map(([k, label]) => {
             const v = r[k];

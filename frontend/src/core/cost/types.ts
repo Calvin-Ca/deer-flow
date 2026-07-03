@@ -67,6 +67,31 @@ export interface InputInterrupt {
   context?: Record<string, unknown>;
 }
 
+/** 单位工程汇总节点（两级汇总，rollup_hierarchy 输出）。 */
+export interface UnitWorkRollup {
+  name: string;
+  subtotal: number;
+  item_count: number;
+  missing_unit_price_items: number;
+}
+
+/** 单项工程汇总节点（含其下单位工程）。 */
+export interface SingleWorkRollup {
+  name: string;
+  subtotal: number;
+  item_count: number;
+  missing_unit_price_items: number;
+  unit_works: UnitWorkRollup[];
+}
+
+/** 从 rollup（松类型）里安全取两级汇总树；无 ``single_works`` → null（旧口径/未算价）。 */
+export function readHierarchy(
+  rollup: Record<string, unknown> | null | undefined,
+): SingleWorkRollup[] | null {
+  const sw = rollup?.single_works;
+  return Array.isArray(sw) && sw.length > 0 ? (sw as SingleWorkRollup[]) : null;
+}
+
 /** review-gate payload (末尾 review §13) — total cost overview, always pauses. */
 export interface ReviewInterrupt {
   gate_type: "review";

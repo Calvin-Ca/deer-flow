@@ -93,6 +93,19 @@ def cost_compose_endpoint(req: CostComposeRequest) -> dict:
     return result
 
 
+class FeatureSpec(BaseModel):
+    """多构件条目（两级汇总分组）——描述 + 可选单项/单位工程归属。
+
+    字段：feature —— 构件/做法描述（必填）；single_work / unit_work —— 所属单项工程 / 单位工程名
+      （可选，缺则归默认组，退化单组树，见 `pricing.rollup_hierarchy`）。``features`` 元素可为纯字符串
+      （无分组）或本结构（带分组）。
+    """
+
+    feature: str = Field(..., description="构件/做法描述")
+    single_work: str | None = Field(None, description="所属单项工程名（可选）")
+    unit_work: str | None = Field(None, description="所属单位工程名（可选）")
+
+
 class SessionStartRequest(BaseModel):
     """HITL 组价会话起始请求体。
 
@@ -100,11 +113,12 @@ class SessionStartRequest(BaseModel):
       §4.0 不反问；setup 节点留口径声明事件供审计与首答声明）；
       region —— 地区（默认深圳）；period —— 信息价期号；price_source —— 信息价来源（local/online/manual）；
       rates —— 可选费率块（给定则末步算综合单价）；quantity —— 可选工程量 Q（给定则 quantity_gate 自动过）；
-      features —— 多构件描述列表（给定则逐件办，优先于 feature）。
+      features —— 多构件列表（给定则逐件办，优先于 feature）；元素可为纯描述字符串或 ``FeatureSpec``（带两级汇总分组）。
     """
 
     feature: str | None = Field(None, description="单构件/做法描述（features 给定时可省）")
-    features: list[str] | None = Field(None, description="多构件描述列表，逐件外层循环办，优先于 feature")
+    features: list[str | FeatureSpec] | None = Field(
+        None, description="多构件列表，逐件外层循环办，优先于 feature；元素可为字符串或带分组的 FeatureSpec")
     spec: str | None = Field(None, description="国标版本 2013/2024，缺省默认深圳·2013（§4.0 不反问）")
     region: str = Field("深圳", description="地区，默认深圳")
     period: str | None = Field(None, description="信息价期号（年月）")
@@ -157,10 +171,14 @@ def cost_session_start_endpoint(req: SessionStartRequest) -> dict:
     from cost import session  # 懒加载：隔离 langgraph 依赖，不影响 /cost/compose 简单路径
     if not req.feature and not (req.features and any(f for f in req.features)):
         raise HTTPException(status_code=422, detail="需提供 feature（单构件）或 features（多构件，非空）")
+    # FeatureSpec → 普通 dict（session 层不依赖 pydantic 模型），纯字符串原样透传。
+    features = None
+    if req.features:
+        features = [f if isinstance(f, str) else f.model_dump() for f in req.features]
     try:
         result = session.start(req.feature, spec=req.spec, region=req.region,
                                period=req.period, price_source=req.price_source, rates=req.rates,
-                               quantity=req.quantity, features=req.features)
+                               quantity=req.quantity, features=features)
     except (requests.RequestException, ValueError) as exc:
         raise _map_session_exc(exc) from exc
     logger.info("/cost/session/start task=%s status=%s feature=%s", result.get("task_id"),

@@ -239,3 +239,104 @@ def rollup_cost(inp: RollupInput) -> dict[str, Any]:
             "措施/其他/规费为项目级费用，由调用方（HITL）录入，本工具只做带溯源的确定性汇总，不替用户定政策数。",
         ],
     }
+
+
+# ── 两级汇总（单位工程 / 单项工程）——造价层级 单项工程 > 单位工程 > 分部分项 ──
+
+
+class HierarchyItem(BaseModel):
+    """两级汇总的单条构件成本行（``rollup_hierarchy`` 入参元素）。
+
+    字段：single_work / unit_work —— 所属单项工程 / 单位工程名（分组键，必填）；
+      total_price —— 该构件综合合价（= 综合单价 × 工程量），≥0；**None=未计价**（缺定额基价/缺工程量，
+      逐层计入 missing、不计金额，不杜撰）；feature —— 构件描述（可选，仅展示/审计用）。
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    single_work: str = Field(..., description="所属单项工程名")
+    unit_work: str = Field(..., description="所属单位工程名")
+    total_price: float | None = Field(None, ge=0, allow_inf_nan=False, description="综合合价（元），None=未计价")
+    feature: str | None = Field(None, description="构件描述（展示/审计用）")
+
+
+class HierarchyRollupInput(BaseModel):
+    """``rollup_hierarchy`` 的入参 schema（两级汇总 + 项目级费用闸门）。
+
+    字段：items —— 各构件成本行（≥1）；measure_fee/other_fee/fee_levy —— 项目级费用（元，默认 0、≥0）；
+      tax_rate —— 税金率（%，可选，给定则算税金 + 总造价）。项目级费用 v1 仍挂**项目层**（非单位工程层），
+      两级汇总只对「分部分项合价」做树状聚合——见 COST_STEP_DISPLAY_PLAN 阶段 2「v1 范围诚实标注」。
+    校验：``extra=forbid`` 拒多余字段；金额非负有限。
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    items: list[HierarchyItem] = Field(..., min_length=1, description="各构件成本行")
+    measure_fee: float = Field(0.0, ge=0, allow_inf_nan=False, description="措施项目费（元）")
+    other_fee: float = Field(0.0, ge=0, allow_inf_nan=False, description="其他项目费（元）")
+    fee_levy: float = Field(0.0, ge=0, allow_inf_nan=False, description="规费（元）")
+    tax_rate: float | None = Field(None, ge=0, allow_inf_nan=False, description="税金率 %，给定则算税金+总造价")
+
+
+def rollup_hierarchy(inp: HierarchyRollupInput) -> dict[str, Any]:
+    """按 单项工程 > 单位工程 > 分部分项 两级聚合各构件综合合价，再叠项目级费用 → 总造价（确定性）。
+
+    参数：inp —— ``HierarchyRollupInput``（已过 pydantic 闸门）。
+    返回：在 ``rollup_cost`` 结果之上增两级明细：
+      - ``single_works`` —— 单项工程列表，每项 ``{name, subtotal, item_count, missing_unit_price_items, unit_works:[
+        {name, subtotal, item_count, missing_unit_price_items}]}``（保持 items 出现顺序）；
+      - ``subtotal`` —— Σ 各单项工程分部分项合价（= Σ 全部 total_price，与旧 flat rollup 口径一致，单组退化时数值相等）；
+      - ``pre_tax_total / tax / total / formula / provenance / notes`` —— 沿用 ``rollup_cost``（项目级费用 + 税金）；
+      - ``missing_unit_price_items`` —— 全单未计价构件数（逐层计数汇总）。
+    红线：未计价构件（total_price=None）逐层计入 missing、不计金额（不虚构总价）；分组保持插入序（可复现）。
+    """
+    # 分组聚合（插入序：dict 有序）。unit key 下暂存 Decimal 合价与计数。
+    singles: dict[str, dict[str, dict[str, Any]]] = {}
+    for it in inp.items:
+        units = singles.setdefault(it.single_work, {})
+        agg = units.setdefault(it.unit_work, {"subtotal": Decimal("0"), "count": 0, "missing": 0})
+        agg["count"] += 1
+        if it.total_price is None:
+            agg["missing"] += 1
+        else:
+            agg["subtotal"] += Decimal(str(it.total_price)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+    single_works: list[dict[str, Any]] = []
+    grand_sub = Decimal("0")
+    grand_missing = 0
+    for sname, units in singles.items():
+        unit_list: list[dict[str, Any]] = []
+        s_sub = Decimal("0")
+        s_count = 0
+        s_missing = 0
+        for uname, agg in units.items():
+            unit_list.append({
+                "name": uname,
+                "subtotal": float(agg["subtotal"]),
+                "item_count": agg["count"],
+                "missing_unit_price_items": agg["missing"],
+            })
+            s_sub += agg["subtotal"]
+            s_count += agg["count"]
+            s_missing += agg["missing"]
+        single_works.append({
+            "name": sname,
+            "subtotal": float(s_sub),
+            "item_count": s_count,
+            "missing_unit_price_items": s_missing,
+            "unit_works": unit_list,
+        })
+        grand_sub += s_sub
+        grand_missing += s_missing
+
+    # 项目级汇总复用 rollup_cost（税金公式单一真源），分部分项合价 = Σ 各单项工程。
+    result = rollup_cost(RollupInput(
+        subtotal=float(grand_sub),
+        measure_fee=inp.measure_fee,
+        other_fee=inp.other_fee,
+        fee_levy=inp.fee_levy,
+        tax_rate=inp.tax_rate,
+    ))
+    result["single_works"] = single_works
+    result["missing_unit_price_items"] = grand_missing
+    return result

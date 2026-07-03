@@ -15,6 +15,11 @@ import operator
 from datetime import datetime, timezone
 from typing import Annotated, Any, TypedDict
 
+# 两级汇总分组默认名（单构件/未分组时归一到此，退化为单组树；见 pricing.rollup_hierarchy）。
+# 造价层级：单项工程 > 单位工程 > 分部分项 > 清单项——item 缺分组标签时落此默认，整单仍出层级结构。
+DEFAULT_SINGLE_WORK = "默认单项工程"
+DEFAULT_UNIT_WORK = "默认单位工程"
+
 
 class CostTaskState(TypedDict, total=False):
     """组价 HITL 任务状态（§5.4）。
@@ -32,6 +37,7 @@ class CostTaskState(TypedDict, total=False):
         items —— §5.4 items：每项含 feature/clarify_rounds/code/missing_features/quota/quota_basis/materials/quantity/unit_price，
           确认后 locked（clarify_rounds=该件澄清回环轮次，达 MAX_CLARIFY_ROUNDS 不再反问；missing_features=待澄清缺失特征；
           quantity=工程量 Q，用户录入，综合合价 = 综合单价 × Q，§2 步骤 9）。多构件各件独立计澄清预算。
+          可选 single_work/unit_work —— 两级汇总分组标签（单项工程/单位工程名，缺则归 DEFAULT_*，退化单组树）。
         overrides —— 用户覆盖轨迹（§5.4）。
         audit_log —— 审计时间线（哪步谁改了什么）。
         events —— 逐节点 provenance 事件（前端依据卡数据源，无论是否暂停每节点都发）。

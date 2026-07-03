@@ -23,6 +23,9 @@ services:
     environment:
       # 精排服务地址（已拆出，见 docker/ce-rerank）；不起 rerank 则检索降级 RRF
       - CE_RERANK_URL=${CE_RERANK_URL:-http://localhost:8095}
+      # 造价库 PG 连接串（host-net 打宿主 :5433 的 ce-postgres；密码在 .env、不入 git）。
+      # 不设则回落无密码 DSN → PG 依赖端点（/price/compose /price/query /bill/get）fe_sendauth 报 503。
+      - CE_PG_DSN=${CE_PG_DSN:-postgresql://cost@localhost:5433/ce_cost}
     volumes:
       - ${DATA_DIR}:/app/data:ro
     healthcheck:

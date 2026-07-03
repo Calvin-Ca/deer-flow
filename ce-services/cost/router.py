@@ -6,11 +6,14 @@ HTTP 编排 + 异常→状态码映射 + 可观测性 meta。选码红线（need
 """
 from __future__ import annotations
 
+import json
 import logging
 import time
+from collections.abc import Iterator
 
 import requests
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from common.config import COST_DEFAULT_REGION, COST_DEFAULT_SPEC
@@ -200,6 +203,49 @@ def cost_session_resume_endpoint(task_id: str, req: SessionResumeRequest) -> dic
         raise _map_session_exc(exc) from exc
     logger.info("/cost/session/%s/resume status=%s", task_id, result.get("status"))
     return result
+
+
+def _sse(messages: Iterator[dict]) -> Iterator[str]:
+    """把会话流式消息逐条编成 SSE 帧（``data: {json}\\n\\n``）。生成器内异常已由 session 层转 error 消息。"""
+    for msg in messages:
+        yield f"data: {json.dumps(msg, ensure_ascii=False)}\n\n"
+
+
+# SSE 响应头：关缓存 + 关 nginx 代理缓冲（X-Accel-Buffering），保逐条即时下发。
+_SSE_HEADERS = {"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
+
+
+@router.post("/cost/session/start/stream")
+def cost_session_start_stream_endpoint(req: SessionStartRequest) -> StreamingResponse:
+    """起 HITL 会话并**逐节点 SSE 流式**到首个闸或终态（``/cost/session/start`` 的流式版）。
+
+    参数：req —— ``SessionStartRequest``（同非流式）。返回：``text/event-stream``，逐条
+      ``{type:start|event|interrupt|done|error,...}``（见 session.stream_start / _run_stream）。
+      入参校验失败（无 feature/features）→ 422；节点内依赖/LLM 异常在流内转 error 事件（不中断连接）。
+    """
+    from cost import session
+    if not req.feature and not (req.features and any(f for f in req.features)):
+        raise HTTPException(status_code=422, detail="需提供 feature（单构件）或 features（多构件，非空）")
+    features = None
+    if req.features:
+        features = [f if isinstance(f, str) else f.model_dump() for f in req.features]
+    gen = session.stream_start(req.feature, spec=req.spec, region=req.region,
+                               period=req.period, price_source=req.price_source, rates=req.rates,
+                               quantity=req.quantity, features=features)
+    logger.info("/cost/session/start/stream feature=%s", req.feature)
+    return StreamingResponse(_sse(gen), media_type="text/event-stream", headers=_SSE_HEADERS)
+
+
+@router.post("/cost/session/{task_id}/resume/stream")
+def cost_session_resume_stream_endpoint(task_id: str, req: SessionResumeRequest) -> StreamingResponse:
+    """以用户决策**逐节点 SSE 流式**续跑会话到下个闸或终态（``/cost/session/{id}/resume`` 的流式版）。
+
+    参数：task_id；req.decision —— 闸决策。返回：``text/event-stream``，逐条步骤事件 / 暂停闸 / 终态 / error。
+    """
+    from cost import session
+    logger.info("/cost/session/%s/resume/stream", task_id)
+    return StreamingResponse(_sse(session.stream_resume(task_id, req.decision)),
+                             media_type="text/event-stream", headers=_SSE_HEADERS)
 
 
 @router.post("/cost/session/{task_id}/rewind")

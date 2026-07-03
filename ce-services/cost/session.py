@@ -14,6 +14,7 @@ import sqlite3
 import uuid
 from typing import Any
 
+import requests
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.types import Command
 
@@ -113,6 +114,28 @@ def start(
     返回：会话响应（含 task_id；首个 interrupt 通常是编码确认闸，或 spec 缺失时的 setup 录入闸）。
     """
     task_id = uuid.uuid4().hex
+    initial = _initial_state(task_id, feature, region, rates, quantity, features,
+                             spec=spec, period=period, price_source=price_source)
+    result = _graph.invoke(initial, config=_config(task_id))
+    return _format(task_id, result)
+
+
+def _initial_state(
+    task_id: str,
+    feature: str | None,
+    region: str,
+    rates: dict[str, Any] | None,
+    quantity: float | None,
+    features: list[str | dict[str, Any]] | None,
+    *,
+    spec: str | None = None,
+    period: str | None = None,
+    price_source: str | None = None,
+) -> dict[str, Any]:
+    """构造图初始状态（start 与 stream_start 共用）——多构件归一 + Q 预供 + setup 口径。
+
+    参数同 ``start``。返回：图 ``invoke``/``stream`` 的 initial dict（仅含给定项，缺省交 setup 节点归一）。
+    """
     items: list[dict[str, Any]] = [it for it in (_norm_feature(f) for f in (features or [])) if it]
     if not items and feature:
         items = [{"feature": feature}]
@@ -134,9 +157,86 @@ def start(
         initial["price_source"] = price_source
     if rates:
         initial["rates"] = rates
+    return initial
 
-    result = _graph.invoke(initial, config=_config(task_id))
-    return _format(task_id, result)
+
+def _exc_detail(exc: Exception) -> str:
+    """把流式跑图时的依赖/LLM 异常映射成可读 detail（SSE error 事件用，与 router `_map_session_exc` 同款文案）。"""
+    if isinstance(exc, requests.HTTPError):
+        return exc.response.text if exc.response is not None else str(exc)
+    if isinstance(exc, requests.RequestException):
+        return f"依赖服务不可达（知识服务 :8100 / LLM :8099）: {exc}"
+    return f"LLM 选码输出非合法 JSON: {exc}"  # ValueError（含 json.JSONDecodeError）
+
+
+def _run_stream(task_id: str, graph_input: Any) -> Any:
+    """逐节点跑图并产出 SSE 消息（生成器）——事件即产即发，暂停/终态由跑完后读 state 判定。
+
+    参数：task_id —— 会话标识；graph_input —— 初始状态（start）或 ``Command(resume=...)``（resume）。
+    产出（dict，供 router 逐条 ``data: {json}``）：
+      - ``{type:"event", event}`` —— 每个节点新增的一条 provenance 事件（stream_mode=updates 的节点增量）；
+      - ``{type:"interrupt", gate}`` —— 跑到闸暂停（跑完后 state 有挂起 interrupt）；
+      - ``{type:"done", status, rollup, items, overrides, audit_count}`` —— 无暂停跑到终态（done/blocked）；
+      - ``{type:"error", detail}`` —— 节点内依赖/LLM 异常（如实透传，不静默）。
+    版本鲁棒：不依赖 ``__interrupt__`` 特殊块，跑完统一读 ``get_state`` 判暂停/终态（跳过非节点块）。
+    """
+    config = _config(task_id)
+    try:
+        for chunk in _graph.stream(graph_input, config=config, stream_mode="updates"):
+            if not isinstance(chunk, dict):
+                continue
+            for node, update in chunk.items():
+                if node == "__interrupt__" or not isinstance(update, dict):
+                    continue
+                for ev in update.get("events") or []:
+                    yield {"type": "event", "event": ev}
+    except (requests.RequestException, ValueError) as exc:
+        yield {"type": "error", "detail": _exc_detail(exc)}
+        return
+
+    snapshot = _graph.get_state(config)
+    interrupt = _pending_interrupt(snapshot)
+    if interrupt is not None:
+        yield {"type": "interrupt", "gate": interrupt}
+        return
+    values = snapshot.values if snapshot else {}
+    yield {
+        "type": "done",
+        "status": values.get("status", "done"),
+        "rollup": values.get("rollup"),
+        "items": values.get("items", []),
+        "overrides": values.get("overrides", []),
+        "audit_count": len(values.get("audit_log", [])),
+    }
+
+
+def stream_start(
+    feature: str | None = None,
+    spec: str | None = None,
+    region: str = "深圳",
+    period: str | None = None,
+    price_source: str | None = None,
+    rates: dict[str, Any] | None = None,
+    quantity: float | None = None,
+    features: list[str | dict[str, Any]] | None = None,
+) -> Any:
+    """起一个组价 HITL 会话并**逐节点流式**产出到首个闸或终态（参数同 ``start``）。
+
+    先产 ``{type:"start", task_id}`` 供前端拿会话 id，再逐条产步骤事件 / 暂停闸 / 终态（见 ``_run_stream``）。
+    """
+    task_id = uuid.uuid4().hex
+    initial = _initial_state(task_id, feature, region, rates, quantity, features,
+                             spec=spec, period=period, price_source=price_source)
+    yield {"type": "start", "task_id": task_id}
+    yield from _run_stream(task_id, initial)
+
+
+def stream_resume(task_id: str, decision: dict[str, Any]) -> Any:
+    """以用户决策**逐节点流式**续跑会话到下个闸或终态（``resume`` 的 SSE 版）。
+
+    参数：task_id；decision —— 闸决策（空 dict 归一哨兵，同 ``resume``）。产出见 ``_run_stream``。
+    """
+    yield from _run_stream(task_id, Command(resume=decision or {"__resume__": True}))
 
 
 def resume(task_id: str, decision: dict[str, Any]) -> dict[str, Any]:

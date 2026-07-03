@@ -32,9 +32,16 @@ async function proxyRequest(request: NextRequest, path: string[]) {
     body: hasBody ? await request.arrayBuffer() : undefined,
   });
 
-  return new Response(await response.arrayBuffer(), {
+  // Stream the body straight through (don't buffer) so SSE (text/event-stream)
+  // reaches the browser incrementally — the cost HITL step timeline relies on it.
+  // Drop hop-by-hop/length headers that break a streamed passthrough.
+  const outHeaders = new Headers(response.headers);
+  outHeaders.delete("content-length");
+  outHeaders.delete("content-encoding");
+  outHeaders.delete("transfer-encoding");
+  return new Response(response.body, {
     status: response.status,
-    headers: response.headers,
+    headers: outHeaders,
   });
 }
 

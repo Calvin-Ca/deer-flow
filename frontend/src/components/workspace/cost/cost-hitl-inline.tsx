@@ -10,7 +10,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { getSessionState, resumeSession } from "@/core/cost/client";
+import { getSessionState, streamResume } from "@/core/cost/client";
 import { displayValue } from "@/core/cost/format";
 import type { CostDecision, CostEvent, CostInterrupt } from "@/core/cost/types";
 
@@ -130,16 +130,35 @@ export function CostHitlInline({ taskId }: { taskId: string }) {
     async (decision: CostDecision) => {
       setBusy(true);
       setError(null);
+      // 提交即清当前闸（控件消失）、状态转「运行中」，随后逐节点事件流式追加到时间线。
+      setSnap((prev) => (prev ? { ...prev, gate: null, status: "running" } : prev));
       try {
-        const res = await resumeSession(taskId, decision);
-        setSnap({
-          status: res.status,
-          gate: res.interrupt,
-          rollup: asRecord(res.rollup),
-          items: res.items ?? [],
-          overrides: res.overrides ?? [],
-          auditCount: res.audit_log?.length ?? 0,
-          events: res.events ?? [],
+        await streamResume(taskId, decision, (msg) => {
+          if (msg.type === "event") {
+            setSnap((prev) =>
+              prev ? { ...prev, events: [...prev.events, msg.event] } : prev,
+            );
+          } else if (msg.type === "interrupt") {
+            setSnap((prev) =>
+              prev ? { ...prev, gate: msg.gate, status: "awaiting_input" } : prev,
+            );
+          } else if (msg.type === "done") {
+            setSnap((prev) =>
+              prev
+                ? {
+                    ...prev,
+                    status: msg.status,
+                    gate: null,
+                    rollup: asRecord(msg.rollup) ?? prev.rollup,
+                    items: msg.items ?? prev.items,
+                    overrides: msg.overrides ?? prev.overrides,
+                    auditCount: msg.audit_count ?? prev.auditCount,
+                  }
+                : prev,
+            );
+          } else if (msg.type === "error") {
+            setError(msg.detail);
+          }
         });
       } catch (e) {
         setError(e instanceof Error ? e.message : "提交失败");

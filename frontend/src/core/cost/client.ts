@@ -1,5 +1,6 @@
 import type {
   CostDecision,
+  CostEvent,
   CostInterrupt,
   CostSessionResponse,
 } from "./types";
@@ -67,4 +68,81 @@ export async function getSessionState(
     throw new Error(`cost state failed (${res.status})`);
   }
   return (await res.json()) as CostSessionState;
+}
+
+/**
+ * One SSE message from the streaming session endpoints (mirrors
+ * ``ce-services/cost/session.py`` ``_run_stream``). The graph runs node-by-node
+ * and each step is pushed as it completes, so the timeline reveals live.
+ */
+export type CostStreamMessage =
+  | { type: "start"; task_id: string }
+  | { type: "event"; event: CostEvent }
+  | { type: "interrupt"; gate: CostInterrupt }
+  | {
+      type: "done";
+      status: string;
+      rollup?: Record<string, unknown> | null;
+      items?: Array<Record<string, unknown>>;
+      overrides?: Array<Record<string, unknown>>;
+      audit_count?: number;
+    }
+  | { type: "error"; detail: string };
+
+/** Read an SSE (``text/event-stream``) body, parsing each ``data:`` frame as JSON. */
+async function consumeSSE(
+  res: Response,
+  onMessage: (msg: CostStreamMessage) => void,
+): Promise<void> {
+  if (!res.ok || !res.body) {
+    const detail = res.body ? await res.text() : "";
+    throw new Error(`cost stream failed (${res.status})${detail ? `: ${detail}` : ""}`);
+  }
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    // SSE frames are separated by a blank line; parse each complete frame.
+    for (;;) {
+      const sep = buffer.indexOf("\n\n");
+      if (sep === -1) break;
+      const frame = buffer.slice(0, sep);
+      buffer = buffer.slice(sep + 2);
+      for (const line of frame.split("\n")) {
+        if (!line.startsWith("data:")) continue;
+        const payload = line.slice(5).trim();
+        if (payload) onMessage(JSON.parse(payload) as CostStreamMessage);
+      }
+    }
+  }
+}
+
+/** Resume a paused session, streaming each node's step as it completes. */
+export async function streamResume(
+  taskId: string,
+  decision: CostDecision,
+  onMessage: (msg: CostStreamMessage) => void,
+): Promise<void> {
+  const res = await fetch(`${BASE}/session/${taskId}/resume/stream`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ decision }),
+  });
+  await consumeSSE(res, onMessage);
+}
+
+/** Start a session, streaming each node's step as it completes. */
+export async function streamStart(
+  input: StartSessionInput,
+  onMessage: (msg: CostStreamMessage) => void,
+): Promise<void> {
+  const res = await fetch(`${BASE}/session/start/stream`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  await consumeSSE(res, onMessage);
 }

@@ -57,6 +57,13 @@ python3 /mnt/skills/public/cost-agent/cost.py compose --description "C30现浇�
 
 ### 步骤 1：起会话
 
+**首选 MCP 工具 `ce-task_start_cost_session`**（对话主路径）：直接作为 function-calling 工具调用，参数
+`feature`（必填）/ `spec`（可缺省，缺省=默认深圳·2013，红线 1）/ `region`（默认深圳）。返回
+`{task_id, marker, first_gate, status}`——**把返回的 `marker`（```cost-hitl 代码块）一字不改贴进回复即可**（同下步骤 2）。
+注册见 `extensions_config.json` 的 `ce-task`，任务服务 :8101 起着即可用。
+
+兜底（curl/无 MCP 环境）：bash 调 `cost.py start`：
+
 ```bash
 python3 /mnt/skills/public/cost-agent/cost.py start \
   --description "C30现浇矩形柱" --spec 2024 --region 深圳

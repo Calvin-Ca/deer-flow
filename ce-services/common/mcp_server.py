@@ -9,7 +9,7 @@ bash 命令、不再把结论埋在 bash stdout 里看不见。
   - ``ce-cost``（:8100）—— **纯数据原语**：bill_match / quota_lookup / price_compose；
   - ``ce-task``（本文件，:8101）—— **带 LLM 编排的任务层能力**：orchestrate（四层骨架前门：
     确定性路由 → 单一直派 / 复合拆解-综合，§9 T-A4）、norm_qa（检索+带引用作答）、
-    cost_compose（候选召回 → LLM 选码 → 组价取数）。
+    cost_compose（候选召回 → LLM 选码 → 组价取数）、start_cost_session（起可中断 HITL 完整组价会话，只点火）。
 
 设计要点（与知识层 façade 一致）：
   - **复用同一份编排内核**：两个 ``@mcp.tool`` 直接调 ``knowledge_client.search`` + ``generation.answer``
@@ -17,8 +17,10 @@ bash 命令、不再把结论埋在 bash stdout 里看不见。
   - **红线下沉到工具边界**：``spec``/``standard`` 必填无默认（逼调用方选国标版本，杜绝 2013/2024
     串库）；零召回不喂空上下文给 LLM 编答案（norm_qa 直返「无依据」）；选不出码 need_review、缺价
     no_source、2013 未就绪等如实透传（compose 内核已保证），不杜撰。
-  - **无状态**（``stateless_http=True``）：每请求一新 transport。HITL 可中断组价会话**不在此暴露**
-    （那是有状态 + 交互式，已由前端内嵌 ``cost-hitl`` marker 卡片驱动，见 cost/router.py session 端点）。
+  - **无状态**（``stateless_http=True``）：每请求一新 transport。HITL 可中断组价会话经 ``start_cost_session``
+    **只暴露「点火」**（起会话、返回 ``cost-hitl`` marker），逐闸交互（有状态）仍由前端内嵌卡片驱动 REST
+    ``/cost/session/*``——编排在服务端图里，MCP 工具不当编排器（红线，见 HITL_DESIGN §10）。会话状态在
+    SqliteSaver 按 task_id 持久化，stateless transport 无碍。
 
 工具名前缀：deer-flow 加载 MCP 工具时按 server 名加前缀（``ce-task`` → agent 见 ``ce-task_norm_qa``
 ``ce-task_cost_compose``）。
@@ -29,7 +31,7 @@ bash 命令、不再把结论埋在 bash stdout 里看不见。
       "enabled": true,
       "type": "http",
       "url": "http://localhost:8101/mcp",
-      "description": "深圳房建任务层能力：norm_qa（规范问答）/ cost_compose（选码+组价取数）"
+      "description": "深圳房建任务层能力：norm_qa（规范问答）/ cost_compose（选码+组价取数）/ start_cost_session（起 HITL 完整组价会话）"
     }
 
 挂载/启动：
@@ -38,6 +40,7 @@ bash 命令、不再把结论埋在 bash stdout 里看不见。
 """
 from __future__ import annotations
 
+import json
 from typing import Annotated
 
 import requests
@@ -64,7 +67,9 @@ mcp = FastMCP(
         "或一句话含多诉求时用它，自动分流（内部调下面两能力）\n"
         "  · norm_qa —— 造价/计量/计价规范问题 → 检索条文 + 带引用结构化作答（零召回拒答，不编造条文）\n"
         "  · cost_compose —— 构件描述 → 清单候选召回 → LLM 选码 → 组价取数（缺价标 no_source、"
-        "选不出码转 HITL，绝不杜撰）"
+        "选不出码转 HITL，绝不杜撰）\n"
+        "  · start_cost_session —— 起可中断 HITL 完整组价会话（走到总造价、逐闸确认/录入）：只点火、"
+        "返回 cost-hitl marker 供前端内嵌控件驱动，你**不逐闸编排**"
     ),
     stateless_http=True,
     transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=False),
@@ -150,6 +155,44 @@ def cost_compose(
         raise ToolError(f"依赖服务不可达（知识服务 :8100 / LLM :8099）: {exc}") from exc
     except ValueError as exc:  # call_qwen3 的 json.JSONDecodeError
         raise ToolError(f"LLM 选码输出非合法 JSON: {exc}") from exc
+
+
+@mcp.tool()
+def start_cost_session(
+    feature: Annotated[str, Field(description="构件/做法描述，如「C30 现浇钢筋混凝土矩形柱」")],
+    spec: Annotated[str | None, Field(description="国标版本 2013 / 2024（可缺省）：缺则默认口径深圳·2013"
+                                                  "（§4.0 不反问）；2013 组价数据未就绪时会话仍起、走到取数处如实标未就绪")] = None,
+    region: Annotated[str, Field(description="地区（当前仅深圳）")] = "深圳",
+) -> dict:
+    """起一个**可中断 HITL 完整组价会话**（走到总造价），只点火、不逐闸编排（任务层 session.start 的 MCP 表面）。
+
+    **何时用**：用户要「走完整组价流程、算到总造价、要人逐步确认编码/定额/录入费率」——与 ``cost_compose``
+    （一把出、只到选码+取数、不算钱）分工。**你（agent）只做一件事**：调本工具起会话，把返回的 ``marker``
+    （```cost-hitl 代码块）**一字不改**贴进回复——前端识别后内嵌渲染交互式组价控件，用户在控件里逐闸点选/录入，
+    控件直接驱动会话（走 REST /cost/session/*），**全程不再经过你**。这是红线：组价 13 步编排在服务端的图里，
+    弱模型不当编排器（不逐闸 resume、不替用户做闸内决策、不跳闸）。
+
+    参数：feature —— 构件/做法描述；spec —— 国标版本 2013/2024（缺省默认深圳·2013）；region —— 地区（深圳）。
+    返回：``{task_id, marker, status, first_gate}``——marker 为须原样转贴的 cost-hitl 代码块；
+      first_gate 为首个 interrupt 闸 payload（供参考，实际交互交前端控件）；status 为会话状态。
+    异常：spec 非 2013/2024 → ToolError；知识服务/LLM 不可达或输出非法 JSON → ToolError（如实透传，不杜撰）。
+    """
+    if spec is not None and spec not in ("2013", "2024"):
+        raise ToolError(f"未知国标版本 spec={spec!r}（仅支持 2013 / 2024，同码不同义不可混）")
+    from cost import session  # 懒加载：隔离 langgraph 依赖，与 router 一致
+    try:
+        result = session.start(feature, spec=spec, region=region)
+    except requests.HTTPError as exc:
+        detail = exc.response.text if exc.response is not None else str(exc)
+        raise ToolError(f"依赖服务返回错误: {detail}") from exc
+    except requests.RequestException as exc:
+        raise ToolError(f"依赖服务不可达（知识服务 :8100 / LLM :8099）: {exc}") from exc
+    except ValueError as exc:  # LLM 选码输出非法 JSON
+        raise ToolError(f"LLM 选码输出非合法 JSON: {exc}") from exc
+    task_id = result.get("task_id")
+    marker = "```cost-hitl\n" + json.dumps({"task_id": task_id}, ensure_ascii=False) + "\n```"
+    return {"task_id": task_id, "marker": marker,
+            "status": result.get("status"), "first_gate": result.get("interrupt")}
 
 
 @mcp.tool()

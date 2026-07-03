@@ -76,7 +76,9 @@
 - [x] **阶段 2 · 两级汇总（单位工程/单项工程）**：item 加 `unit_work/single_work` 分组标签 + `pricing.py` 新增
   `rollup_hierarchy` 原语 + `graph.py` 拆 `rollup_compute` 逐层发 `unit_rollup/single_rollup/rollup` 事件 + `price_gate_node` 补 `price` auto_pass 事件 + 前端 `HierarchyTree` 层级树渲染。
   **v1 范围**：措施/规费保持项目级（单位工程级费用留 v2，已在方案标注）。**已验收**（后端 `tools/test_rollup_hierarchy.py` 4/4 + 前端 check 绿，2026-07-04）；⚠️ 端到端真跑（多构件带分组）待补
-- [ ] **阶段 3（可选）· 点火型 MCP `start_cost_session`**：mcp_server 加只点火不编排的起会话工具，返回 `cost-hitl` marker
+- [x] **阶段 3 · 点火型 MCP `start_cost_session`**：mcp_server 加只点火不编排的起会话工具（懒加载 session.start，
+  返回 task_id + `cost-hitl` marker + first_gate），extensions_config + cost-agent SKILL 同步；py_compile 过。
+  编排仍在图里，MCP 不当编排器（红线 HITL_DESIGN §10）。⚠️ 服务器起服务后真调一次待验
 
 ## 小尾巴（不阻塞主线，择机清）
 

@@ -107,8 +107,14 @@ services:
       - WATCHPACK_POLLING=true
       - CI=true
       - DEER_FLOW_INTERNAL_GATEWAY_BASE_URL=http://gateway:8001
+      # /ce-cost 代理目标（组价 HITL 会话）：ce-services 走 host 网络，前端在 bridge，
+      # 故经 host.docker.internal 打宿主机 :8101（route.ts 服务端运行时读）。
+      - CE_SERVICES_BASE_URL=${CE_SERVICES_BASE_URL:-http://host.docker.internal:8101}
     env_file:
       - ../frontend/.env
+    extra_hosts:
+      # 让前端容器能解析 host.docker.internal → 宿主机（打 host 网络的 ce-services :8101）
+      - "host.docker.internal:host-gateway"
     networks:
       - deer-flow-dev
     restart: unless-stopped

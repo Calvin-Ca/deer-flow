@@ -12,9 +12,18 @@ import type { NextRequest } from "next/server";
  * (catch-all) route handlers — so an ``/api/cost`` route would be shadowed and
  * land on the gateway (401/404). ``/ce-cost`` is outside that rewrite, so Next
  * serves it directly here. Keep this path off ``/api``.
+ *
+ * Target host: prefer the runtime ``CE_SERVICES_BASE_URL`` (this handler is
+ * server-only, so a plain — non ``NEXT_PUBLIC_`` — env is read at runtime and
+ * stays configurable without a rebuild). In Docker the frontend runs on a bridge
+ * network while ce-services binds the host network, so this must be set to
+ * ``http://host.docker.internal:8101`` (see docker-compose frontend service).
+ * ``NEXT_PUBLIC_*`` kept as a back-compat fallback; ``127.0.0.1`` suits bare-metal.
  */
 const CE_SERVICES_BASE_URL =
-  process.env.NEXT_PUBLIC_CE_SERVICES_BASE_URL ?? "http://127.0.0.1:8101";
+  process.env.CE_SERVICES_BASE_URL ??
+  process.env.NEXT_PUBLIC_CE_SERVICES_BASE_URL ??
+  "http://127.0.0.1:8101";
 
 async function proxyRequest(request: NextRequest, path: string[]) {
   const headers = new Headers(request.headers);

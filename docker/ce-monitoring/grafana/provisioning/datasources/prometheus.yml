@@ -4,6 +4,6 @@ datasources:
   - name: Prometheus
     type: prometheus
     access: proxy
-    url: http://localhost:9090      # grafana host 网络 → localhost 即本机 Prometheus
+    url: http://localhost:19090     # grafana host 网络 → localhost 即本机 Prometheus（:9090 已被占，改 19090）
     isDefault: true
     editable: true

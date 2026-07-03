@@ -10,7 +10,7 @@ cp docker/ce-monitoring/.env.example docker/ce-monitoring/.env    # 改 GRAFANA_
 sudo docker compose -f docker/ce-monitoring/docker-compose.yaml --env-file docker/ce-monitoring/.env up -d
 ```
 - **Grafana**：http://172.19.3.136:3001 （admin / 你设的密码）
-- **Prometheus**：http://172.19.3.136:9090 （Status→Targets 看各 exporter 是否 UP）
+- **Prometheus**：http://172.19.3.136:19090 （Status→Targets 看各 exporter 是否 UP）
 
 ## 采集内容 / 端口
 | exporter | 端口 | 采集 |
@@ -22,7 +22,7 @@ sudo docker compose -f docker/ce-monitoring/docker-compose.yaml --env-file docke
 | Milvus 自带 | 9091 | Milvus 指标 |
 | Prometheus/Grafana | 9090/3001 | 自身 |
 
-> 起前确认这些端口未被占：`sudo ss -ltnp | grep -E ':9090|:3001|:9100|:8081|:9400|:9115'`。
+> 起前确认这些端口未被占：`sudo ss -ltnp | grep -E ':19090|:3001|:9100|:8081|:9400|:9115'`。
 
 ## Grafana 看板（起栈后在 UI 导入）
 Prometheus 数据源已自动配好。看板按 ID 导入（Grafana → Dashboards → Import → 输入 ID → 选 Prometheus 源）：

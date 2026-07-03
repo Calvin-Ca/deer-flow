@@ -1,0 +1,46 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ['localhost:9090']
+
+  - job_name: node                 # 主机 CPU/内存/磁盘/网络
+    static_configs:
+      - targets: ['localhost:9100']
+
+  - job_name: cadvisor             # 每容器 CPU/内存/网络（rootless + sudo 两 daemon 全见）
+    static_configs:
+      - targets: ['localhost:8081']
+
+  - job_name: dcgm-gpu             # 4x RTX 4090 利用率/显存/温度/功耗
+    static_configs:
+      - targets: ['localhost:9400']
+
+  - job_name: milvus               # Milvus 自带 :9091/metrics
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['localhost:9091']
+
+  # 端点存活探测（blackbox 探各服务 /health → up/down + 响应时延）
+  - job_name: blackbox-health
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    static_configs:
+      - targets:
+          - http://localhost:8100/health      # 知识
+          - http://localhost:8101/health      # 任务
+          - http://localhost:8095/health      # 精排
+          - http://localhost:8001/health      # gateway
+          - http://localhost:8097/v1/models   # embed
+          - http://localhost:8099/v1/models   # vLLM
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: localhost:9115           # 转发给 blackbox-exporter

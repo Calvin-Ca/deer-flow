@@ -1,0 +1,15 @@
+# Grafana dashboard 自动加载：从 /var/lib/grafana/dashboards 读 JSON（本目录下丢 *.json 即自动出现）。
+# 首次用最省事：起栈后在 Grafana UI「Import」按 ID 拉社区看板（联网），或把导出的 JSON 放这。
+# 推荐 ID：Node Exporter Full=1860 / cadvisor=14282 / NVIDIA DCGM=12239 / Blackbox=7587。
+apiVersion: 1
+
+providers:
+  - name: ce-dashboards
+    orgId: 1
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: true

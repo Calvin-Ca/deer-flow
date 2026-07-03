@@ -1,0 +1,94 @@
+# CE 监控栈 —— Prometheus + Grafana + exporters
+#
+# 跑 **sudo/系统 daemon**（dcgm 需 GPU）、**host 网络**（Prometheus 直接 scrape localhost:<port>；
+# cadvisor 读 cgroup 能同时看到 rootless deps/harness + sudo ce/models 两个 daemon 的容器）。
+#
+# 起（服务器，从仓库根）：
+#   cp docker/ce-monitoring/.env.example docker/ce-monitoring/.env   # 改 Grafana 密码
+#   sudo docker compose -f docker/ce-monitoring/docker-compose.yaml --env-file docker/ce-monitoring/.env up -d
+# 访问：Grafana http://172.19.3.136:3001 · Prometheus http://172.19.3.136:9090
+#
+# 采集：GPU(dcgm :9400) / 主机(node :9100) / 容器(cadvisor :8081) / 端点存活(blackbox :9115) / Milvus(:9091 自带 metrics)
+
+services:
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    container_name: ce-prometheus
+    network_mode: host
+    restart: unless-stopped
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ce_prom_data:/prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=15d
+      - --web.listen-address=:9090
+
+  grafana:
+    image: grafana/grafana:11.3.0
+    container_name: ce-grafana
+    network_mode: host
+    restart: unless-stopped
+    environment:
+      - GF_SERVER_HTTP_PORT=3001                       # 避开前端 :3000
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ce_grafana_data:/var/lib/grafana
+
+  node-exporter:
+    image: prom/node-exporter:v1.8.2
+    container_name: ce-node-exporter
+    network_mode: host
+    pid: host
+    restart: unless-stopped
+    volumes:
+      - /:/host:ro,rslave
+    command:
+      - --path.rootfs=/host
+      - --web.listen-address=:9100
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    container_name: ce-cadvisor
+    network_mode: host
+    privileged: true
+    restart: unless-stopped
+    devices:
+      - /dev/kmsg
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    command:
+      - --port=8081                                    # 默认 8080 易冲突
+      - --housekeeping_interval=15s
+      - --docker_only=true
+
+  dcgm-exporter:
+    image: nvidia/dcgm-exporter:3.3.5-3.4.0-ubuntu22.04
+    container_name: ce-dcgm-exporter
+    network_mode: host
+    restart: unless-stopped
+    cap_add: [SYS_ADMIN]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu, utility]
+
+  blackbox-exporter:
+    image: prom/blackbox-exporter:v0.25.0
+    container_name: ce-blackbox-exporter
+    network_mode: host
+    restart: unless-stopped
+    command:
+      - --web.listen-address=:9115
+
+volumes:
+  ce_prom_data:
+  ce_grafana_data:

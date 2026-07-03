@@ -2,7 +2,8 @@
 复合编排器 T-A4 共用）。
 
 链路：``resolve_standard``（T-A2 规范选择确定化）→ ``knowledge_client.search``（:8100 检索）→
-零召回则 ``guards.reject_no_recall``（C-03）/ 否则 ``generation.answer``（Qwen3 带引用）→
+零召回则 **先 ``web_fallback``（FR-K07 联网兜底三道闸，仅本 norm 链路）**、仍无可信命中才
+``guards.reject_no_recall``（C-03 拒答给出路）/ 否则 ``generation.answer``（Qwen3 带引用）→
 ``guards.audit_answer``（C-01/C-02 校验闸）→ 组装 meta。
 
 抽出动机：此前 ``norm/router.py`` 与 ``common/mcp_server.py`` 各持一份**近乎一致**的实现，T-A4 还需
@@ -16,7 +17,8 @@ import time
 from typing import Any
 
 from common import knowledge_client
-from norm import generation, guards
+from common.config import NORM_WEB_FALLBACK
+from norm import generation, guards, web_fallback
 from norm.standard_router import resolve_standard
 
 logger = logging.getLogger("ce-services.norm")
@@ -59,9 +61,32 @@ def answer_query(
     search_meta = search_resp.get("meta", {})
     retrieve_ms = (time.perf_counter() - t0) * 1000
 
-    # ③ C-03 校验闸（零召回）：不喂空上下文给 LLM，集中化结构化拒答（给出路）。
+    # ③ 零召回：先联网兜底（FR-K07 三道闸，仅 norm 链路；组价/价格永不联网），仍无可信命中
+    # 才落 C-03 拒答（给出路：已查范围 = 本地库 + 联网）。
     if not clauses:
-        result, report = guards.reject_no_recall(standard, search_meta=search_meta)
+        if NORM_WEB_FALLBACK:
+            try:
+                web_result, web_report = web_fallback.answer_from_web(
+                    query, standard, llm_url=llm_url, model_id=model_id)
+            except Exception as exc:  # 兜底路径绝不反噬主链路：任何意外 → 当作无可信命中
+                logger.warning("联网兜底异常（降级拒答）：%s", exc)
+                web_result, web_report = None, None
+            if web_result is not None:
+                web_ms = (time.perf_counter() - t0) * 1000 - retrieve_ms
+                web_result["meta"] = {
+                    "standard": standard, "retrieved": 0, "retrieve_ms": round(retrieve_ms),
+                    "web_ms": round(web_ms), "standard_resolution": resolution.as_meta(),
+                    "guard": web_report.as_meta(), "search_meta": search_meta,
+                }
+                logger.info("norm pipeline standard=%s retrieved=0 → web fallback tier=web citations=%d",
+                            standard, len(web_result.get("web_citations", [])))
+                return web_result
+            searched_scope = ["本地规范库", "联网检索（无可信命中或不可用）"]
+        else:
+            searched_scope = ["本地规范库（联网兜底已关闭）"]
+        result, report = guards.reject_no_recall(
+            standard, search_meta=search_meta,
+            extra_aspects=[f"已查范围：{' + '.join(searched_scope)}"])
         result["meta"] = {
             "standard": standard, "retrieved": 0, "retrieve_ms": round(retrieve_ms),
             "standard_resolution": resolution.as_meta(), "guard": report.as_meta(),

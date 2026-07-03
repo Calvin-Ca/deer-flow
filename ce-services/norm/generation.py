@@ -93,6 +93,55 @@ def build_user_message(query: str, clauses: list[dict]) -> str:
     return "\n".join(lines)
 
 
+WEB_SYSTEM_PROMPT = """\
+你是建设工程造价领域的联网检索结果总结助手。给你的是**联网抓取的网页正文**（非本系统权威规范库），\
+请严格基于这些网页文本回答用户问题。
+
+**核心约束（必须遵守）**：
+1. 只使用所给网页文本中出现的内容；文本没有的条文号、数值、结论一概不得输出（不编造）。
+2. 每个事实陈述标注来源序号（如"[来源1]"），与所给来源列表对应。
+3. 网页内容与问题无关或不足以回答时，如实说明"检索到的网页未能回答该问题"。
+4. 这是**降级检索结果**，正文里不要冒充权威规范条文口径；不确定处列入 uncertain_aspects。
+5. 末尾免责：本回答仅供参考，不替代专业造价审核。
+
+**输出要求**：返回合法的 JSON 对象，不输出任何 JSON 以外的文字。
+"""
+
+
+def answer_web(
+    query: str,
+    sources: list,
+    llm_url: str,
+    model_id: str,
+    temperature: float = 0.1,
+    max_tokens: int = 2048,
+) -> dict[str, Any]:
+    """联网兜底总结（FR-K07 web 降级变体）：网页正文 → 带来源序号的总结回答。
+
+    参数：
+        query —— 用户问题；sources —— ``web_fallback.WebSource`` 列表（url/title/text）；
+        llm_url/model_id/temperature/max_tokens —— LLM 配置。
+    返回：``{answer, uncertain_aspects, out_of_scope_warnings}``（web_citations 与硬标注头由
+        ``web_fallback`` 在代码层组装，不经 LLM）；LLM 异常上抛由调用方吸收降级。
+    """
+    lines: list[str] = [f"用户问题：{query}", "", "联网检索到的网页正文（降级来源）："]
+    for i, s in enumerate(sources, 1):
+        if not getattr(s, "text", ""):
+            continue
+        lines += [f"--- 来源{i}：{getattr(s, 'title', '')}（{getattr(s, 'url', '')}）---",
+                  s.text, ""]
+    lines += [
+        "---",
+        "请严格基于以上网页文本回答问题，输出合法 JSON：",
+        '{\n  "answer": "回答正文，事实陈述标注[来源N]，末尾附免责声明",\n'
+        '  "uncertain_aspects": ["需人工核实的方面，若无则空数组"],\n'
+        '  "out_of_scope_warnings": ["网页内容与问题口径不符的提示，若无则空数组"]\n}',
+        "",
+        "/no_think",
+    ]
+    return call_qwen3(WEB_SYSTEM_PROMPT, "\n".join(lines), llm_url, model_id, temperature, max_tokens)
+
+
 def answer(
     query: str,
     clauses: list[dict],

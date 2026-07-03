@@ -33,8 +33,13 @@ COST_INTENT_KW: tuple[str, ...] = (
     "清单码", "清单编码", "清单编号", "选码", "选清单", "子目", "套子目", "定额子目",
 )
 # 价格取数意图（FR-I，动态来源）：问某材料的「当期价/趋势」。
-PRICE_INTENT_KW: tuple[str, ...] = (
+# 分两档：**强信号**（信息价/市场价/趋势等，明确指向动态价格源）与**泛化问价**（"多少钱"等，
+# 常只是组价诉求的口语尾巴）。复合判定（multi_capability）只认强信号——"这个柱子组价多少钱"
+# 是单一组价诉求，不该被"多少钱"误升复合。
+PRICE_STRONG_KW: tuple[str, ...] = (
     "信息价", "市场价", "当期价", "当月价", "本月价", "价格趋势", "价差", "行情",
+)
+PRICE_INTENT_KW: tuple[str, ...] = PRICE_STRONG_KW + (
     "多少钱", "单价是多少", "价格是多少", "什么价", "报价是多少",
 )
 # 动态来源时间信号（配合材料 → 价格取数）。
@@ -56,6 +61,9 @@ CONTEXT_KW: tuple[str, ...] = (
 CONTEXT_CHECK_KW: tuple[str, ...] = (
     "漏项", "漏了哪些", "错套", "高估冒算", "合理性", "是否合理", "偏差预警", "量价偏差",
 )
+# 显式规范号（如 gb50016 / GB/T 50854 / GB 50500）：点名了规范号即视作口径已明确，不再反问版本。
+_EXPLICIT_GB_RE = re.compile(r"(?i)gb\s*/?\s*t?\s*[-_]?\s*5\d{4}")
+
 # 数值计算（C-04）：量×价、合价、汇总、换算。
 CALC_KW: tuple[str, ...] = (
     "合价", "汇总", "总造价", "总价是多少", "算合价", "量乘价", "工程量×", "换算为", "换算成",
@@ -85,6 +93,28 @@ MATERIAL_KW: tuple[str, ...] = (
     "HRB400", "HRB500", "螺纹钢",
 )
 
+# ── 跨地域检测（EH-03，仅组价/价格侧）：本系统组价/价格严格锁深圳口径（C-02 分侧），用户显式
+# 要他省/他市口径 → 不路由到取数（防按深圳数据答他省问题），出「体面告知」模板。规范问答（norm）
+# 不在此拦——跨口径归 EH-05 确认后走联网兜底（FR-K07），是合法路径。
+# 只列常问的省/市级地名（穷举不现实，漏判的兜底是取数层零命中→C-03 拒答，不会给错数据）。
+OTHER_REGION_KW: tuple[str, ...] = (
+    "北京", "上海", "广州", "天津", "重庆", "杭州", "南京", "武汉", "成都", "西安", "长沙",
+    "东莞", "佛山", "珠海", "惠州", "中山", "厦门", "福州", "南宁", "海南", "河北", "山东",
+    "河南", "湖北", "湖南", "四川", "江苏", "浙江", "安徽", "江西", "云南", "贵州", "陕西",
+)
+
+
+def detect_out_of_scope_region(text: str) -> str | None:
+    """检测显式他省/他市口径诉求（EH-03）。参数：text 用户请求。返回：命中的地名或 None。
+
+    「广东」不算出界（深圳属广东、常见于"广东省标"类表述归 norm 侧处理）；「深圳」出现时
+    即便同句带他省名（如"深圳和北京对比"）也不拦——对比类会走复合/规范侧。
+    """
+    if "深圳" in text:
+        return None
+    hits = [kw for kw in OTHER_REGION_KW if kw in text]
+    return hits[0] if hits else None
+
 
 @dataclass
 class RouteDecision:
@@ -99,6 +129,8 @@ class RouteDecision:
         feature_complete —— 仅 cost：构件关键特征是否够（EH-04）；非 cost 为 None。
         caliber_complete —— 口径（版本）是否明确（§4.0）；缺则 norm 触发 EH-05 反问。
         clarify —— None / "feature"（EH-04 反问特征，仅 cost） / "caliber"（EH-05 反问口径，仅 norm）。
+        out_of_scope_region —— 仅 cost/price（EH-03）：显式他省/他市口径的地名；命中则下游出
+          「体面告知」模板、不做取数（组价/价格严格锁深圳，C-02 分侧）。
         matched —— 命中信号（审计）。reasons —— 人类可读判定理由。
     """
 
@@ -110,6 +142,7 @@ class RouteDecision:
     feature_complete: bool | None
     caliber_complete: bool
     clarify: str | None
+    out_of_scope_region: str | None = None
     matched: dict = field(default_factory=dict)
     reasons: list[str] = field(default_factory=list)
 
@@ -123,6 +156,7 @@ class RouteDecision:
             "feature_complete": self.feature_complete,
             "caliber_complete": self.caliber_complete,
             "clarify": self.clarify,
+            "out_of_scope_region": self.out_of_scope_region,
             "matched": self.matched,
             "reasons": self.reasons,
         }
@@ -181,11 +215,13 @@ def route(query: str, *, has_project_context: bool | None = None) -> RouteDecisi
     #      **刻意只认组价「动作词」、不认构件名(COMPONENT_KW)**——「现浇柱怎么计量」只是构件名+规范信号，
     #      属单一规范问答，不该误升复合（金标 routing_eval 回归防误触，见 tools/prerouter_eval.py）。
     price_like = bool(price_sig or (material_sig and time_sig))
+    # 复合判定只认价格**强信号**（信息价/市场价/趋势…或 材料+时间）——泛化"多少钱"不升复合。
+    price_strong = bool(_hits(text, PRICE_STRONG_KW) or (material_sig and time_sig))
     explicit_compound = bool(compound_sig) or compare_hit
     multi_capability = (
         (bool(cost_sig) and bool(norm_sig))     # 组价动作 + 规范口径（如「套定额 + 按什么计量」）
-        or (price_like and bool(cost_sig))       # 价格 + 组价
-        or (price_like and bool(norm_sig))       # 价格 + 规范
+        or (price_strong and bool(cost_sig))     # 价格（强）+ 组价
+        or (price_strong and bool(norm_sig))     # 价格（强）+ 规范
     )
 
     # ── 能力分流（优先级：复合 > 价格 > 组价 > 上下文核对 > 规范兜底）──
@@ -197,7 +233,8 @@ def route(query: str, *, has_project_context: bool | None = None) -> RouteDecisi
         else:
             reasons.append(
                 f"多能力并列（组价={cost_sig} 价格={price_like} 规范={norm_sig}）→ 判复合先拆解（EH-01）")
-    elif price_like:
+    elif price_strong or (price_like and not cost_sig):
+        # 泛化问价（"多少钱"）仅在无组价动作词时归 price——"组价多少钱"是组价诉求的口语尾巴，归 cost。
         capability, source_type = "price", "dynamic"
         reasons.append(f"价格取数信号 {price_sig or (material_sig + time_sig)} → 动态价格")
     elif cost_sig:
@@ -210,25 +247,34 @@ def route(query: str, *, has_project_context: bool | None = None) -> RouteDecisi
         capability, source_type = "norm", "static"
         reasons.append(f"无组价/价格意图{'，规范信号 ' + str(norm_sig) if norm_sig else '（默认）'} → 规范问答")
 
-    # ── 口径完整度（§4.0）：版本是否明确（2013/2024）──
+    # ── 口径完整度（§4.0）：版本明确（2013/2024），或**显式点名了规范号**（如「按 gb50016」）——
+    # 点名规范号=口径已明确表达，无需再反问版本；是否收录/可答由下游（检索零召回→FR-K07 兜底/拒答）裁定。
     _, version = family_version_of(text)
-    caliber_complete = version is not None
+    caliber_complete = version is not None or bool(_EXPLICIT_GB_RE.search(text))
 
-    # ── 形态：特征完整度（仅 cost，EH-04）+ 反问裁定 ──
+    # ── 形态：特征完整度（仅 cost，EH-04）+ 反问裁定 + 跨地域出界（EH-03）──
     feature_complete: bool | None = None
     clarify: str | None = None
+    out_of_scope_region: str | None = None
     if capability == "cost":
         feature_complete = _has_component(text) and _has_feature_qualifier(text)
         if not feature_complete:
             clarify = "feature"  # EH-04 反问特征
             reasons.append("构件特征不足（缺强度/规格/材料）→ 反问特征（EH-04）")
-        # §8 块1：cost 版本缺**不反问**，默认深圳2013/2024；仅标 caliber 状态供口径声明。
+        # §8 块1：cost 版本缺**不反问**，默认深圳2013；仅标 caliber 状态供口径声明。
         if not caliber_complete:
-            reasons.append("版本未给 → 默认深圳口径，不反问（§8 块1）")
+            reasons.append("版本未给 → 默认深圳·2013 口径，不反问（§4.0/T9-1）")
     elif capability == "norm":
         if not caliber_complete:
             clarify = "caliber"  # EH-05 会话粘性反问口径（软度在下游）
             reasons.append("规范问答缺口径（版本）→ 反问口径（EH-05，会话内仅首次）")
+
+    # EH-03：组价/价格显式他省口径 → 出界标记（体面告知在下游编排器，不做取数）。
+    if capability in ("cost", "price"):
+        out_of_scope_region = detect_out_of_scope_region(text)
+        if out_of_scope_region:
+            clarify = None  # 出界告知优先于特征反问：先说清超范围，别先问特征
+            reasons.append(f"显式他省口径「{out_of_scope_region}」→ 超出深圳范围，体面告知（EH-03）")
 
     # ── 意图数量（EH-01）──
     intent_count = "compound" if capability == "compound" else "single"
@@ -237,7 +283,7 @@ def route(query: str, *, has_project_context: bool | None = None) -> RouteDecisi
         capability=capability, source_type=source_type, needs_calc=needs_calc,
         needs_context=needs_context, intent_count=intent_count,
         feature_complete=feature_complete, caliber_complete=caliber_complete,
-        clarify=clarify,
+        clarify=clarify, out_of_scope_region=out_of_scope_region,
         matched={
             "cost": cost_sig, "price": price_sig, "compound": compound_sig,
             "compare": compare_hit, "multi_capability": multi_capability,
@@ -279,6 +325,19 @@ _SELFTEST_CASES: tuple[tuple[str, str, str | None], ...] = (
     ("这个柱子套定额，再查下HRB400钢筋当期信息价", "compound", None),     # 组价动作 + 价格
     # 反例·只有构件名 + 规范信号（无组价动作词）→ 仍是单一 norm，不误升复合
     ("现浇混凝土柱按什么规则计量", "norm", "caliber"),
+    # ── EH-03 跨地域出界（仅 cost/price；出界告知优先于特征反问）──
+    ("这个柱子按北京定额套价", "cost", None),                    # 他省组价→出界，不反问特征
+    ("上海本月钢筋信息价多少", "price", None),                   # 他省价格→出界
+    ("深圳本月钢筋信息价多少", "price", None),                   # 深圳→不出界（对照）
+)
+
+
+# EH-03 出界地名期望（None=不出界），与 _SELFTEST_CASES 尾部三例对应。
+_SELFTEST_REGION_CASES: tuple[tuple[str, str | None], ...] = (
+    ("这个柱子按北京定额套价", "北京"),
+    ("上海本月钢筋信息价多少", "上海"),
+    ("深圳本月钢筋信息价多少", None),
+    ("矩形柱按什么规则计量？", None),                            # norm 不拦跨地域
 )
 
 
@@ -302,7 +361,19 @@ def _selftest() -> int:
               f"src={d.source_type:<7} feat={d.feature_complete} cal={d.caliber_complete}  {query[:30]}")
         if not ok:
             print(f"    期望 cap={exp_cap} clarify={exp_clarify}；matched={d.matched}")
-    print(f"\n自测：{passed} 过 / {failed} 败 / 共 {len(_SELFTEST_CASES)}")
+
+    # EH-03 出界地名
+    for query, exp_region in _SELFTEST_REGION_CASES:
+        d = route(query)
+        ok = d.out_of_scope_region == exp_region
+        if ok:
+            passed += 1
+        else:
+            failed += 1
+        print(f"{'✓' if ok else '✗'} region={str(d.out_of_scope_region):<5} (期望 {exp_region})  {query[:30]}")
+
+    total = len(_SELFTEST_CASES) + len(_SELFTEST_REGION_CASES)
+    print(f"\n自测：{passed} 过 / {failed} 败 / 共 {total}")
     return 1 if failed else 0
 
 

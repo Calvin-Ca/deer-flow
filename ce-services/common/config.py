@@ -35,6 +35,21 @@ SELECT_LLM_MODEL_ID = os.environ.get("BCRAG_SELECT_LLM_MODEL_ID", ORCH_LLM_MODEL
 # ce-code 知识服务（裸检索原语 /search /expand /clause）
 KNOWLEDGE_URL = os.environ.get("BCRAG_KNOWLEDGE_URL", "http://localhost:8100")
 
+# ── 口径默认（§8 块1 / T9-1，PRD §4.0/C-05）：组价/价格缺省口径 = 深圳·2013 ──
+# PRD 钉死唯一默认作答口径为深圳·2013（2024 为试行版、非默认）；缺版本**不反问**，直接归一
+# 到默认口径并在输出带口径声明（meta.caliber）。
+# ⚠️ 数据前置：2013 组价数据（定额/价格/映射）未就绪（supports_compose=False）——默认 2013 时
+# /price/compose 会如实 501「数据未就绪」+ 给出路（宁缺毋造，不静默换版本）；/bill/match 可用
+# （2013 清单向量库已建）。2013 数据入库后本默认无需改代码即完全可用；过渡期若要体验完整组价，
+# export CE_COST_DEFAULT_SPEC=2024 一行切换。
+COST_DEFAULT_SPEC = os.environ.get("CE_COST_DEFAULT_SPEC", "2013")
+COST_DEFAULT_REGION = os.environ.get("CE_COST_DEFAULT_REGION", "深圳")
+
+# ── 规范问答联网兜底（§8 块2 / T9-4，PRD FR-K07）：仅 FR-K 开放，FR-P/FR-I 永不联网 ──
+# 三道闸在服务端确定性执行（norm/web_fallback.py），弱模型不碰查询口径/可信度筛查。
+# 默认开；无外网环境 export CE_NORM_WEB_FALLBACK=0 关闭（回落零召回直接拒答）。
+NORM_WEB_FALLBACK = os.environ.get("CE_NORM_WEB_FALLBACK", "1").lower() not in ("0", "false", "no")
+
 # ── HITL 可中断组价图（langgraph）配置 ──
 # checkpointer 持久化文件：SqliteSaver 落盘于此，进程重启后会话状态仍在（设计原则 4「可跨会话恢复」）。
 # 默认放 ce-services 根下、随 .gitignore 排除；env 可覆盖到别处。
@@ -44,6 +59,12 @@ HITL_CHECKPOINT_DB = os.environ.get("CE_HITL_CHECKPOINT_DB", _HITL_DEFAULT_DB)
 # 编码闸置信阈值 τ：select_code 自评 confidence ≥ τ 且无多候选才自动过，否则停闸复核。
 # 保守起步偏高（§6「保守起步设高，跑顺了再放松」）。
 HITL_CONFIDENCE_TAU = float(os.environ.get("CE_HITL_CONFIDENCE_TAU", "0.75"))
+
+# ── 双阈值门控（PRD §4.4 三段式）：≥τ_high 直配自动过 / [τ_low, τ_high) 停闸人工确认 /
+# <τ_low 低置信段（额外提示补充特征描述）。τ_high 承担原单 τ 的「自动过」判据（缺省沿用
+# CE_HITL_CONFIDENCE_TAU 以兼容既有部署调参），τ_low 只影响停闸时的分段提示与审计标注。
+HITL_TAU_HIGH = float(os.environ.get("CE_HITL_TAU_HIGH", str(HITL_CONFIDENCE_TAU)))
+HITL_TAU_LOW = float(os.environ.get("CE_HITL_TAU_LOW", "0.60"))
 
 # ── 选码置信外部校准（路 2：用 bill_match cosine score 客观校准 LLM 自报置信）──
 # 背景：Qwen3-8B 自报 confidence 几乎恒 0.95（无区分度），致 confidence<阈值 兜底与 HITL 闸从不触发。

@@ -25,7 +25,7 @@ import requests
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import interrupt
 
-from common.config import HITL_CONFIDENCE_TAU, LLM_MODEL_ID, LLM_URL
+from common.config import COST_DEFAULT_SPEC, HITL_TAU_HIGH, HITL_TAU_LOW, LLM_MODEL_ID, LLM_URL
 from cost import clarify, gates, provenance
 from cost.pricing import RollupInput, UnitPriceInput, compute_unit_price, rollup_cost
 from cost.state import (
@@ -69,39 +69,31 @@ def _put_item(state: CostTaskState, item: dict[str, Any]) -> list[dict[str, Any]
 # ── 节点 ──
 
 def setup_node(state: CostTaskState) -> dict[str, Any]:
-    """setup 闸（§3①/§6）：必填项（spec/region）缺失才暂停收集，齐了直接过。
+    """setup 节点（§3①/§6 + §4.0 口径归一）：缺版本**不反问**，默认深圳·2013 并留口径声明事件。
 
     参数：state —— 当前任务状态。
-    返回：状态增量。spec/region 缺失 → ``interrupt(input_payload)`` 收集
-      spec/region/period/price_source；齐全（start 已带）→ 不暂停、直接置 running（§6「已有默认值自动过」）。
+    返回：状态增量。spec 缺失 → 归一为 ``COST_DEFAULT_SPEC``（PRD §4.0/C-05：组价口径唯一、
+      无歧义不反问；T9-1 行为反转——此前是 setup 闸强制收集版本）；region 缺省深圳。默认口径
+      写入 events（``caliber`` 事件）供前端首答口径声明与审计；用户显式给了 spec 则原样沿用、
+      不发默认事件。period/price_source 维持缺省不停闸。
     """
-    missing = [f for f in ("spec_version", "region") if not state.get(f)]
-    if missing:
-        data = interrupt(
-            gates.input_payload(
-                "setup",
-                "请确认组价口径",
-                [
-                    {"key": "spec_version", "type": "enum", "label": "国标版本",
-                     "options": ["2013", "2024"], "required": True},
-                    {"key": "region", "type": "text", "label": "地区", "default": "深圳"},
-                    {"key": "period", "type": "month", "label": "信息价期号（年月）", "required": False},
-                    {"key": "price_source", "type": "enum", "label": "信息价来源",
-                     "options": ["local", "online", "manual"], "default": "local"},
-                ],
-            )
-        )
-        return {
-            "spec_version": data.get("spec_version") or state.get("spec_version"),
-            "region": data.get("region") or state.get("region") or "深圳",
-            "period": data.get("period") or state.get("period"),
-            "price_source": data.get("price_source") or state.get("price_source") or "local",
-            "status": "running",
-        }
+    spec = state.get("spec_version")
+    events: list[dict[str, Any]] = []
+    if not spec:
+        spec = COST_DEFAULT_SPEC
+        events.append({
+            "step": "caliber", "paused": False, "status": "defaulted",
+            "provenance": {"source_type": "policy",
+                           "source_ref": f"版本未指明 → 默认口径 深圳·{spec}（PRD §4.0/C-05，不反问）"},
+            "detail": {"spec_version": spec, "region": state.get("region") or "深圳",
+                       "spec_source": "default"},
+        })
     return {
+        "spec_version": spec,
         "region": state.get("region") or "深圳",
         "price_source": state.get("price_source") or "local",
         "status": "running",
+        **({"events": events} if events else {}),
     }
 
 
@@ -175,9 +167,19 @@ def list_gate_node(state: CostTaskState) -> dict[str, Any]:
     """
     item = _item(state)
     env = item["code"]["envelope"]
-    pause = gates.should_pause_coding(env, HITL_CONFIDENCE_TAU)
+    conf = env.get("provenance", {}).get("confidence")
+    # 双阈值三段式（PRD §4.4）：≥τ_high 直配自动过；[τ_low, τ_high) 停闸人工确认；
+    # <τ_low 同样停闸并额外提示「置信过低，建议补充特征描述」（分段标签进 payload 与审计）。
+    band = gates.confidence_band(conf, HITL_TAU_HIGH, HITL_TAU_LOW)
+    pause = gates.should_pause_coding(env, HITL_TAU_HIGH)
     if pause:
-        decision = interrupt(gates.confirm_payload("list_coding", env, "请确认清单编码"))
+        payload = gates.confirm_payload("list_coding", env, "请确认清单编码")
+        payload["confidence_band"] = band
+        if band == "low":
+            payload.setdefault("context", {})["hint"] = (
+                f"选码置信 {conf if conf is not None else '缺失'} 低于 τ_low={HITL_TAU_LOW}，"
+                "候选可能都不贴切；可回退补充构件特征描述后重新匹配。")
+        decision = interrupt(payload)
         value, prov, action = gates.apply_confirm_decision(env, decision)
         by = "user"
     else:
@@ -188,11 +190,12 @@ def list_gate_node(state: CostTaskState) -> dict[str, Any]:
     idx = state.get("current_item", 0)
     out: dict[str, Any] = {
         "items": _put_item(state, item),
-        "audit_log": [audit_entry("list_coding", action, {"code": value, "item": idx}, by=by)],
-        # 门控决策入依据时间线：自动过时带 confidence/τ，让「为什么没问你」可见（≥τ 故自动采纳）。
+        "audit_log": [audit_entry("list_coding", action, {"code": value, "item": idx, "band": band}, by=by)],
+        # 门控决策入依据时间线：自动过时带 confidence/τ，让「为什么没问你」可见（≥τ_high 故自动采纳）。
         "events": [gate_event("list_gate", paused=pause,
-                              confidence=env.get("provenance", {}).get("confidence"),
-                              tau=HITL_CONFIDENCE_TAU, provenance=prov, detail={"code": value})],
+                              confidence=conf,
+                              tau=HITL_TAU_HIGH, provenance=prov,
+                              detail={"code": value, "band": band, "tau_low": HITL_TAU_LOW})],
     }
     if by == "user" and action in ("manual_override", "select_alternative"):
         out["overrides"] = [override_entry("code", idx, value, by="user")]

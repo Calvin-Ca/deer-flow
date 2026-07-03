@@ -20,13 +20,17 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from typing import Any, Callable
 
 import requests
 
+from common import cost_client
 from common.config import (
+    COST_DEFAULT_REGION, COST_DEFAULT_SPEC,
     LLM_MODEL_ID, LLM_URL, ORCH_LLM_MODEL_ID, ORCH_LLM_URL,
 )
+from common.guards import GUARD_C01, GUARD_C03, VERDICT_PASS, VERDICT_REJECT, GuardReport
 from common.llm import call_qwen3
 from norm import pipeline
 from norm.standard_router import family_version_of
@@ -36,9 +40,10 @@ logger = logging.getLogger("ce-services.orchestrator")
 
 # 拆解上限：避免一句话被拆成过多子任务压垮下游 / 失控调用。
 MAX_SUBTASKS = 5
-# cost 子任务默认国标版本（query 未显式给版本时）。**版本默认策略属 §8 块1/T9-1**，此处取与当前
-# 组价数据就绪一致的 2024 作过渡缺省；T9-1 落地后由那条统管。
-_COST_DEFAULT_SPEC = "2024"
+
+# 期号解析（FR-I）：「2026年5月 / 2026-5 / 2026.05」→ "2026-05"；「本月/当月」等相对期不解析，
+# 缺期由知识层取各资源最新期（确定性，不猜日期）。
+_PERIOD_RE = re.compile(r"(20\d{2})\s*[年./-]\s*(\d{1,2})\s*月?")
 
 
 # ─────────────────────────── ① 拆解（32b，EH-01）───────────────────────────
@@ -96,10 +101,98 @@ def decompose(query: str, llm_url: str = ORCH_LLM_URL, model_id: str = ORCH_LLM_
 
 
 # ─────────────────────────── ② 派发（子任务 → 能力层，桶 A 8b）───────────────────────────
-def _spec_of(query: str) -> str:
-    """cost 子任务取国标版本：query 显式 2013/2024 优先，否则默认。"""
+def _spec_of(query: str) -> tuple[str, str]:
+    """cost 子任务取国标版本：query 显式 2013/2024 优先，否则默认深圳·2013（§4.0/T9-1）。
+
+    返回：``(spec, spec_source)``——spec_source ∈ {"user", "default"}，供口径声明（meta.caliber）。
+    """
     _, version = family_version_of(query)
-    return version or _COST_DEFAULT_SPEC
+    return (version, "user") if version else (COST_DEFAULT_SPEC, "default")
+
+
+def _out_of_scope_envelope(cap: str, query: str, region: str) -> dict[str, Any]:
+    """EH-03 跨地域体面告知（T9-5）：组价/价格显式要他省口径 → 不取数、说清范围 + 给出路（C-03）。
+
+    参数：cap —— cost/price；query —— 子任务原文；region —— 命中的他省/他市地名。
+    返回：统一信封 ``{capability, query, status="out_of_scope", answer, meta.guard}``。
+    """
+    action = "组价/套定额" if cap == "cost" else "查询信息价/市场价"
+    answer = (
+        f"本系统的组价与价格能力仅覆盖【深圳·{COST_DEFAULT_SPEC}】口径，无法按「{region}」口径{action}"
+        f"（地域口径严格分侧，非深圳数据不进入答案）。"
+        f"建议渠道：{region}当地工程造价管理机构发布的定额与信息价（住建部门造价站官网），"
+        f"或全国性询价平台按地区检索。若您要问的是**规范条文**类问题（计量/计价规则），"
+        f"可注明地区与版本改走规范问答——支持联网兜底并带降级标注。"
+    )
+    report = GuardReport(verdict=VERDICT_REJECT, tier="none")
+    report.add(GUARD_C03, "error", f"EH-03 跨地域出界：显式「{region}」口径，超出深圳范围 → 体面告知，不取数")
+    return {"capability": cap, "query": query, "status": "out_of_scope",
+            "answer": answer, "meta": {"guard": report.as_meta(),
+                                       "caliber": {"declared": f"深圳·{COST_DEFAULT_SPEC}",
+                                                   "requested_region": region}}}
+
+
+def _dispatch_price(query: str, decision: RouteDecision) -> dict[str, Any]:
+    """FR-I 价格取数派发（确定性，零 LLM）：材料名 → 知识层 /price/query 当期信息价。
+
+    材料名取自 prerouter 命中的材料词（最长者）；期号从 query 解析（2026年5月→2026-05），
+    缺期由知识层取各资源最新期。零命中 → C-03 诚实拒答（no_source 不杜撰）；多期数据 →
+    附确定性价差（FR-I02，计算在代码里、不入 LLM，C-04）。
+    """
+    env: dict[str, Any] = {"capability": "price", "query": query}
+    materials = decision.matched.get("material") or []
+    if not materials:
+        env.update(status="need_input",
+                   note="未识别出材料/设备名称，请指明（如「HRB400 钢筋」「商品混凝土 C30」）后再查当期价")
+        return env
+    name = max(materials, key=len)
+    m = _PERIOD_RE.search(query)
+    period = f"{m.group(1)}-{int(m.group(2)):02d}" if m else None
+
+    resp = cost_client.price_query(name, region=COST_DEFAULT_REGION, period=period)
+    rows = resp.get("results", [])
+    caliber = {"declared": f"{COST_DEFAULT_REGION}·信息价", "region": COST_DEFAULT_REGION,
+               "period": period or "最新期", "material": name}
+
+    if not rows:
+        report = GuardReport(verdict=VERDICT_REJECT, tier="none")
+        report.add(GUARD_C03, "error", f"信息价零命中：{name}（{period or '最新期'}），拒答不编价")
+        env.update(status="ok",
+                   answer=(f"未在深圳信息价库中查到「{name}」（期：{period or '最新期'}）的价格，"
+                           f"不编造报价（no_source）。建议核对材料名称/规格写法，或查阅深圳市工程造价"
+                           f"管理站发布的当期《深圳建设工程价格信息》原刊。"),
+                   data={"count": 0, "results": []},
+                   meta={"guard": report.as_meta(), "caliber": caliber})
+        return env
+
+    lines = [f"深圳信息价查询「{name}」（{period or '各资源最新期'}）命中 {len(rows)} 条："]
+    for r in rows[:8]:
+        spec_txt = f" {r['spec']}" if r.get("spec") else ""
+        lines.append(f"· {r['name']}{spec_txt}｜{r.get('category', '')}｜{r['price']} 元/{r['unit']}"
+                     f"｜期 {r.get('period_start', '?')}~{r.get('period_end', '?')}｜{r.get('price_type', '信息价')}")
+    # FR-I02 价差（确定性，C-04 在代码不入 LLM）：同名同规格同单位、多期 → 最新两期差值。
+    by_key: dict[tuple, list[dict]] = {}
+    for r in rows:
+        by_key.setdefault((r["name"], r.get("spec"), r["unit"]), []).append(r)
+    for key, group in by_key.items():
+        if len(group) >= 2:
+            g = sorted(group, key=lambda x: str(x.get("period_start") or ""))
+            delta = float(g[-1]["price"]) - float(g[-2]["price"])
+            lines.append(f"· 价差（{key[0]}）：{g[-2]['period_start']} → {g[-1]['period_start']} "
+                         f"变动 {delta:+.2f} 元/{key[2]}")
+    periods = {str(r.get("period_start")) for r in rows}
+    if len(periods) == 1:
+        lines.append(f"（库内当前仅 {next(iter(periods))} 起一期数据，趋势分析需多期入库后支持）")
+    lines.append("来源：深圳信息价（月刊）入库数据，带期段时效；本回答仅供参考，不替代专业造价审核。")
+
+    report = GuardReport(verdict=VERDICT_PASS, tier="local")
+    if any(not r.get("doc_id") for r in rows):
+        report.add(GUARD_C01, "warn", "部分价目行缺 doc_id 溯源")
+        report.provenance_complete = False
+    env.update(status="ok", answer="\n".join(lines),
+               data={"count": resp.get("count", len(rows)), "results": rows},
+               meta={"guard": report.as_meta(), "caliber": caliber})
+    return env
 
 
 def dispatch_subtask(query: str, decision: RouteDecision, *,
@@ -108,12 +201,16 @@ def dispatch_subtask(query: str, decision: RouteDecision, *,
 
     返回信封：``{capability, query, status, ...}``：
       - norm：``status=ok`` + ``answer`` + ``cited_clauses`` + ``meta``（走 norm.pipeline，含校验闸）。
-      - cost：``status=ok`` + ``result``（orchestration.compose 全量）。
-      - price：``status=unsupported``（FR-I 价格取数后端尚未接入编排器，诚实标注不杜撰）。
+      - cost：``status=ok`` + ``result``（orchestration.compose 全量，含 meta.caliber 口径声明）。
+      - price：``status=ok`` + ``answer`` + ``data``（FR-I 确定性取数，零命中 C-03 拒答不编价）。
+      - cost/price 显式他省口径（EH-03）：``status=out_of_scope`` + 体面告知（不取数）。
       - 异常：``status=error`` + ``error``（不拖垮整单）。
     """
     cap = decision.capability
     env: dict[str, Any] = {"capability": cap, "query": query}
+    # EH-03 出界拦截（仅 cost/price；norm 跨口径走 EH-05→联网兜底，是合法路径不拦）。
+    if decision.out_of_scope_region and cap in ("cost", "price"):
+        return _out_of_scope_envelope(cap, query, decision.out_of_scope_region)
     try:
         if cap == "norm":
             res = pipeline.answer_query(query, standard_hint=None,
@@ -123,11 +220,11 @@ def dispatch_subtask(query: str, decision: RouteDecision, *,
         elif cap == "cost":
             from cost import orchestration  # 局部 import：避免 routing 包在无 langgraph 环境下连带失败
             # 选码走桶 B 32b（compose 内 select_code 自定，§9.3）；cap_* 仅供 norm 生成（桶 A 8b）。
-            res = orchestration.compose(query, _spec_of(query), "深圳")
+            spec, spec_source = _spec_of(query)
+            res = orchestration.compose(query, spec, COST_DEFAULT_REGION, spec_source=spec_source)
             env.update(status="ok", result=res)
         elif cap == "price":
-            env.update(status="unsupported",
-                       note="价格取数（FR-I）后端尚未接入编排器，建议人工查当期信息价")
+            env = _dispatch_price(query, decision)
         else:  # compound 嵌套：不递归，标记交人核（拆解应已展平）
             env.update(status="unsupported", note=f"未支持的子任务能力：{cap}")
     except (requests.RequestException, ValueError) as exc:

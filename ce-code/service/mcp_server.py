@@ -31,6 +31,7 @@
 """
 from __future__ import annotations
 
+import re
 from datetime import date
 from typing import Annotated
 
@@ -50,7 +51,8 @@ mcp = FastMCP(
         "深圳房建组价取数原语（按国标版本 spec 严格隔离 2013/2024）：\n"
         "  · bill_match —— 构件描述 → 清单候选召回（只给候选，选码归调用方）\n"
         "  · quota_lookup —— 定额子目 + 人材机含量直取\n"
-        "  · price_compose —— 清单 → 定额 → 含量 ⋈ 信息价（缺价标 no_source，绝不杜撰）"
+        "  · price_compose —— 清单 → 定额 → 含量 ⋈ 信息价（缺价标 no_source，绝不杜撰）\n"
+        "  · price_query —— 当期信息价查询（名称模糊 + 期号；动态数据无关 spec，零命中如实返回空）"
     ),
     stateless_http=True,
     transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=False),
@@ -121,6 +123,39 @@ def bill_match(
         "query": description, "spec": spec, "region": region,
         "count": len(candidates), "candidates": candidates,
     }
+
+
+@mcp.tool()
+def price_query(
+    name: Annotated[str, Field(description="材料/人工/机械名称（子串模糊匹配，如「钢筋」「商品混凝土」）")],
+    region: Annotated[str, Field(description="地区（当前仅深圳）")] = "深圳",
+    period: Annotated[str | None, Field(description="期号 YYYY-MM（如 2026-05）；缺省各资源取最新期")] = None,
+    category: Annotated[str | None, Field(description="类别过滤：人工 / 材料 / 机械（可选）")] = None,
+    top_k: Annotated[int, Field(ge=1, le=50, description="返回行数上限")] = 10,
+) -> dict:
+    """当期信息价查询（FR-I01）：名称模糊匹配 → 登载价 + 期段时效。纯数据访问原语，确定性。
+
+    **红线**：零命中如实返回 ``count=0``（no_source，调用方不得据此编价）；价格为月刊登载值
+    原样返回，不做差价/合价计算（C-04 归计算工具）。信息价是动态数据、与国标版本无关（无 spec 参数），
+    地域口径由 region 锁定（C-02）。
+
+    参数：name —— 名称（必填）；region —— 地区；period —— 期号 YYYY-MM（缺省最新期）；
+        category —— 人工/材料/机械 过滤；top_k —— 行数上限（1–50）。
+    返回：``{"name","region","period","count","results":[{name,spec,unit,category,price,price_type,
+        period_start,period_end,doc_id}...]}``。
+    异常：name 为空 / period 格式非法 → ToolError；PG 不可达 → ToolError。
+    """
+    if not name.strip():
+        raise ToolError("name 不能为空")
+    if period is not None and not re.fullmatch(r"20\d{2}-\d{2}", period):
+        raise ToolError("period 须为 YYYY-MM（如 2026-05）")
+    try:
+        with cost_query.connect() as conn:
+            rows = cost_query.query_resource_price(conn, name.strip(), region=region,
+                                                   period=period, category=category, top_k=top_k)
+    except Exception as exc:                           # psycopg.OperationalError 等：PG 不可达
+        raise ToolError(f"造价库不可达: {exc}") from exc
+    return {"name": name, "region": region, "period": period, "count": len(rows), "results": rows}
 
 
 @mcp.tool()

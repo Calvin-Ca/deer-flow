@@ -9,23 +9,27 @@
 
 | 字段 | 含义 |
 |---|---|
-| `id` | 用例号（对应 `ce-services/前端测试用例.md` 的 A*/B*） |
-| `agent` | 期望命中的能力：`norm-qa`（规范问答）/ `cost-agent`（算量计价） |
-| `group` | `no_version`（不带版本，红线主判据样本）/ `with_version`（带版本）/ `boundary`（越界，应拒答不调脚本） |
+| `id` | 用例号（对应 `ce-services/前端测试用例.md` 的 A*/B*；C*=价格 FR-I、D*=核对 FR-C 为 T9 后新增） |
+| `agent` | 期望命中的能力：`norm-qa`（规范问答）/ `cost-agent`（算量计价）/ `price`（价格取数）/ `cost-check`（清单核对） |
+| `group` | `no_version`（不带版本）/ `no_feature`（特征缺）/ `with_version`（带版本）/ `boundary`（越界拒答）/ `out_of_scope`（EH-03 他省口径体面告知）/ `web_fallback`（FR-K07 联网兜底）/ `session_sticky`（EH-05 会话粘性）/ `context_check`（FR-C）等 |
 | `query` | 喂给对话框的原始问法 |
-| `expect_route` | 是否**应该去调脚本**（`qa.py`/`cost.py`）。`boundary` 越界用例为 `false`（应识别不支持并拒答） |
-| `expect_clarify` | 是否**应该先 `ask_clarification` 反问版本/补描述**。`no_version` 组为 `true` |
-| `gold` | 澄清后应使用的 standard/spec（`no_version` 组取第二轮应回的版本）；越界用例为 `null` |
+| `expect_route` | 是否**应该去调能力**（脚本/MCP 工具）。`boundary`/`out_of_scope` 用例为 `false`（应拒答/体面告知，不取数） |
+| `expect_clarify` | 是否**应该先 `ask_clarification` 反问**。**T9-1 后口径分侧**：norm 缺口径→会话内**首次** `true`（EH-05）；cost 缺版本→`false`（默认深圳·2013，不反问）；cost 缺**特征**→`true`（EH-04，只问特征） |
+| `gold` | 应使用的 standard/spec（cost 缺版本时为默认 `2013`）；越界/出界用例为 `null` |
 | `note` | 判读提示 / 已知召回缺口归因 |
 
-## 两项指标（§0 升级判定门）
+## 指标（§0 升级判定门 + T9 口径策略回归）
 
-设 R = `expect_route=true` 的用例集，C = `group=no_version` 的用例集。
+设 R = `expect_route=true` 的用例集。
 
-1. **路由率** = (R 中模型**真去调了 `cost.py`/`qa.py`** 的条数) / |R|
-   - 衡量弱模型（Qwen3-8B）能否从渐进披露的 skill 简介里正确识别并调用脚本，而非自己瞎答。
-2. **红线遵守率（主判据，安全攸关）** = (C 中模型**真先 `ask_clarification` 反问**版本的条数) / |C|
-   - 衡量「不带版本必反问」这条命根子红线在渐进披露下的强制力。版本错 = 串库 = 错价，容错率低，权重高于路由率。
+1. **路由率** = (R 中模型**真去调了对应能力** 的条数) / |R|
+   - 衡量弱模型能否正确识别并调用能力，而非自己瞎答。
+2. **口径红线遵守率（主判据，安全攸关，分侧）**：
+   - **cost 不反问率**（`group=no_version` 的 B 组）：缺版本**不反问**、默认深圳·2013 且首答带口径声明的比例（T9-1 行为反转后的新红线；反问=违例）；
+   - **norm 首次反问率**（`group=no_version` 的 A 组）：会话首次缺口径真反问的比例；
+   - **会话粘性达成率**（`group=session_sticky`）：同会话第二问**不再反问**的比例（EH-05）。
+3. **出界告知率**（`group=out_of_scope`）：他省口径体面告知（不取数、不给深圳数据冒充）的比例（EH-03/C-02）。
+4. **联网兜底呈现合规率**（`group=web_fallback`）：降级标注头 + URL/访问日期完整保留的比例（FR-K07 Tier-2）。
 
 ## 判定（§0）
 

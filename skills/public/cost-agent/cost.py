@@ -12,8 +12,9 @@
   适合「要走完整组价流程、要人确认/录入、要可审计」的场景——agent 逐闸用 ``ask_clarification`` 收用户
   决策、再 ``resume`` 续跑（流程编排在服务端的图里，本脚本只转发）。
 
-⚠️ ``--spec`` **必填、无默认**（compose/start）：清单计量国标 2013/2024 同 9 位码不同义，版本错了就串库；
-调用前必须确认用户要按哪版国标组价。2013 组价数据未就绪，只出选码不出价。
+⚠️ ``--spec`` **缺省默认 2013**（compose/start，PRD §4.0/C-05：组价口径唯一=深圳·2013，缺版本
+**不反问**，输出带口径声明）：2013/2024 同 9 位码不同义，用户**显式**给版本时按给的传；2013 组价
+数据未就绪时只出选码不出价（服务端如实 501 透传，不静默换版本）。
 
 ⚠️ **不杜撰**：选码 need_review / 缺价 no_source / 费率税率等政策数，一律如实透传 / 由用户录入，不替补。
 
@@ -201,7 +202,8 @@ def main() -> None:
 
     p_compose = sub.add_parser("compose", help="一次性组价（选码 + 取数，无人介入）")
     p_compose.add_argument("--description", "-d", required=True, help="构件/做法描述")
-    p_compose.add_argument("--spec", required=True, help=f"国标版本（必填）：{', '.join(VALID_SPECS)}")
+    p_compose.add_argument("--spec", default="2013",
+                           help=f"国标版本 {', '.join(VALID_SPECS)}；缺省默认深圳·2013（PRD §4.0 不反问）")
     p_compose.add_argument("--region", default="深圳", help="地区，默认深圳")
     p_compose.add_argument("--top-k", type=int, default=10, help="清单候选召回数（默认 10）")
     _add_common(p_compose)
@@ -209,7 +211,8 @@ def main() -> None:
 
     p_start = sub.add_parser("start", help="起 HITL 会话，跑到首个闸或 done")
     p_start.add_argument("--description", "-d", required=True, help="构件/做法描述")
-    p_start.add_argument("--spec", required=True, help=f"国标版本（必填）：{', '.join(VALID_SPECS)}")
+    p_start.add_argument("--spec", default="2013",
+                         help=f"国标版本 {', '.join(VALID_SPECS)}；缺省默认深圳·2013（PRD §4.0 不反问）")
     p_start.add_argument("--region", default="深圳", help="地区，默认深圳")
     _add_common(p_start)
     p_start.set_defaults(func=cmd_start)

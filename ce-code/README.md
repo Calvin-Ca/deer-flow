@@ -156,7 +156,10 @@ uv run python -m ingest.splitter toc --input "data/parsed/<basename>/auto/<basen
 ## HTTP 服务脚本（知识服务 :8100，统一入口）
 
 `service.knowledge_api` 为 :8100 统一入口——挂载组价取数（cost_router：/bill/match /price/compose
-/quota）+ 规范条文检索（/search /expand /clause，供 Norm-QA）。仅起组价测试可单跑 `service.cost_api`。
+/quota + **/price/query** 当期信息价查询（FR-I，名称模糊+期号，动态数据无关 spec）+ **/bill/get/{code}**
+清单编码精确查询（FR-C 核对原语，spec 必填））+ 规范条文检索（/search /expand /clause，供 Norm-QA）。
+MCP façade `ce-cost` 四原语：bill_match / quota_lookup / price_compose / price_query。
+仅起组价测试可单跑 `service.cost_api`。
 
 ```bash
 # 统一知识服务（组价取数 + 规范条文检索，:8100）—— 从 ce-code 根，模块式

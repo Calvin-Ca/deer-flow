@@ -72,6 +72,56 @@ def price_compose(
     return resp.json()
 
 
+def price_query(
+    name: str,
+    region: str = "深圳",
+    period: str | None = None,
+    category: str | None = None,
+    top_k: int = 10,
+    base_url: str | None = None,
+    timeout: int = 60,
+) -> dict:
+    """打 /price/query：材料/人工/机械名称 → 当期信息价（FR-I01，动态数据、与国标版本无关）。
+
+    参数：name —— 名称（模糊匹配，如「钢筋」「商品混凝土」）；region —— 地区（默认深圳）；
+      period —— 期号 ``YYYY-MM``（缺省各资源取最新期）；category —— 人工/材料/机械 过滤（可选）；
+      top_k —— 返回行数。
+    返回：``{"name","region","period","count","results":[{name,spec,unit,category,price,price_type,
+      period_start,period_end,doc_id}...]}``；零命中 count=0（诚实 no_source，非 404）；
+      PG 不可达→503 经 HTTPError 上抛。
+    """
+    base = (base_url or KNOWLEDGE_URL).rstrip("/")
+    params: dict = {"name": name, "region": region, "top_k": top_k}
+    if period:
+        params["period"] = period
+    if category:
+        params["category"] = category
+    resp = requests.get(f"{base}/price/query", params=params, timeout=timeout)
+    resp.raise_for_status()
+    return resp.json()
+
+
+def bill_get(
+    code: str,
+    spec: str,
+    base_url: str | None = None,
+    timeout: int = 60,
+) -> dict | None:
+    """打 /bill/get/{code}：清单编码精确查询（FR-C 核对用：编码有效性 / 单位一致性）。
+
+    参数：code —— 9 位清单编码；spec —— 国标版本（必填，按版本隔离同码不同义）。
+    返回：``{code, name, unit, unit_options, feature, work_content, chapter, spec_version, doc_id}``；
+      编码不存在 → None（404 吞掉转 None，核对场景「查无此码」是正常结论不是错误）；
+      未知 spec→400、PG 不可达→503 仍经 HTTPError 上抛。
+    """
+    base = (base_url or KNOWLEDGE_URL).rstrip("/")
+    resp = requests.get(f"{base}/bill/get/{quote(code)}", params={"spec": spec}, timeout=timeout)
+    if resp.status_code == 404:
+        return None
+    resp.raise_for_status()
+    return resp.json()
+
+
 def quota(
     region: str,
     code: str,

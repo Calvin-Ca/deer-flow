@@ -439,14 +439,20 @@ L1 路由 + L6-B 工具调用——标签由 §4.3 决策表 / 工具 schema 机
 
 ---
 
-## 9. 调优 backlog（§9 四层骨架落地后 · 2026-07-01）
+## 9. 调优 backlog（§9 四层骨架落地后 · 2026-07-01；**2026-07-03 T9 收官，本阶段正式开工**）
 
 > 定位：骨架代码已落地并端到端闭环验通（见 `../AGENT_DEV.md` §9 T-A1~A6）；本节收口**落地后暴露的调优/补功能项**，与「落骨架代码」任务**区分开**。每项挂到上面 L1~L7 层做验收，避免另立一套验收标准。**这些不阻塞闭环**，按优先级择机推进。
+>
+> **阶段状态（2026-07-03，T9 批次 + 服务端 T9-7 收官后）**：项目进入本文档定义的 benchmark 测试-优化-迭代阶段。
+> P0 开工条件已齐：① B1 前置——2013 选码 gold n=91 **与 T9-1 默认口径 2013 对上，可直接用**；② 双阈值
+> τ_high/τ_low（PRD §4.4 三段式）已落码待 dev 集扫参（L2 调参曲线）；③ §7 阶段 0/1 评测管线待建（L1+L6-B
+> 机判金标，从零、不复用 routing_eval）。并行数据前置：**2013 定额/信息价/映射入库**（归 ce-code，L6-A 的
+> init_context=深圳2013 依赖它）。
 
 | # | 项 | 现象 | 根因 | 修法（代码位置） | 验收（benchmark 层/指标） | 优先级 |
 |---|---|---|---|---|---|:--:|
 | B1 | **选码置信校准 + 8b/32b 决策** | 服务器实测 96% 转人工、置信被校准压到 ~0（benchmark 8b/32b 见对话） | `CE_SELECT_{FLOOR,CEIL,MARGIN}` 盲拍，cosine 量纲随 embedder 变；且需定选码用 8b 还是 32b | 用 `tools/benchmark.py` 暴露的真实 chosen_score 分布（选对 vs 选错）精调 `CE_SELECT_*`（`ce-services/common/config.py`）；8b vs 32b 对比（`tools/models.json` 已备）定选码模型 | **L2 门控**：高置信错码=0 且转人工率不过高（误直配率）+ **L6-A** Top-1 | **高** |
-| B2 | **FR-I 价格/比选后端** | 「哪种更省」落 norm、答计量规则而非真成本对比 | orchestrator `dispatch_subtask` price=`unsupported`；FR-X02 比选无价差后端 | 建价格取数/比选后端并接 `routing/orchestrator.py` dispatch（承 §9.2 ④「FR-I 价格后端接入」） | **L5 复合拆解**（比选子任务出真价差）+ **L6-A** 组价终态 | 中 |
+| B2 | **FR-I 价格/比选后端** · **半修（2026-07-03）** | ~~price=`unsupported`~~ → **FR-I01/02 已接入**：知识层 `/price/query`（名称模糊+期号/最新期）+ 编排器 `_dispatch_price` 确定性取数（零命中 no_source 不编价、多期确定性价差 C-04 在代码算），Docker 真跑验通（钢筋 2026-05 期 10 条命中）| **剩 FR-X02 比选**：「哪种更省」的真成本对比仍缺（需两方案各自组价→价差，依赖 2013/2024 组价数据 + L6-A 终态判定） | 比选逻辑接 `routing/orchestrator.py` compound 路径（拆解出的两个 cost 子任务结果做确定性价差对比） | **L5 复合拆解**（比选子任务出真价差）+ **L6-A** 组价终态 | 中 |
 | B3 | ~~**复合路由精度**~~ ✅ **已修（2026-07-01）** | ~~「哪种做法更省」漏配；cost∧norm 判 single~~ → 两档都落地：`_COMPARE_RE` 兜比选柔性变体 + 多能力并列启发式（组价**动作词**∧规范 / 价格∧另一能力，**刻意不认构件名**防误触）；`ce-services/routing/prerouter.py` | 本地自测 20/20 + 金标 `routing_eval` 17/17=100%**零误升复合**（反例「现浇柱按什么计量」仍判 norm） | **剩 L1/L5 真跑抽检**：`benchmark/routing_eval` 尚无 compound 金标用例，compound 召回率待补金标后量化（现仅单一用例回归防误触已通） | 中→低 |
 | B4 | **lead 呈现层稳定性** | qwen3-8b 偶发 prose 加料（编码/条文），一次干净≠永远稳 | 弱模型呈现层不可靠（[[project_skill_invocation_model]]） | 已做：前端 guard 卡兜底（`ce-tool-result.tsx`）+ lead prompt 硬化；要更硬则 lead 基座换 qwen-plus（`config.yaml` gateway-llm） | **L6-B** 工具调用忠实 + 人工抽检 prose 杜撰率（对照 orchestrate 原始返回） | 低（卡已兜底，观察） |
 

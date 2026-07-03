@@ -23,8 +23,22 @@ PG `ce_cost`（:5433）已灌齐，组价取数链通（清单→定额→工料
 | 清单→定额映射 | `bill_quota_map` | ✅ 313 边 / 53 清单（名称匹配 P0，带 bill_spec_version 版本隔离） |
 | 资源↔信息价对齐 | `resource_price_map` | ✅ 43 确定性边（同物异名归一 + 单位换算） |
 
-取数原语（:8100，`spec` 必填）：`/bill/match`（清单召回）、`/price/compose`（组价）、`/quota`（定额直取）——
-均服务器实测通过。
+取数原语（:8100）：`/bill/match`（清单召回，spec 必填）、`/price/compose`（组价，spec 必填）、`/quota`（定额
+直取）、**`/price/query`（当期信息价，FR-I01，名称模糊+期号/最新期，动态数据无关 spec）**、
+**`/bill/get/{code}`（编码精确查询，FR-C 核对原语，spec 必填）**——均服务器实测通过。
+MCP `ce-cost` 四原语：bill_match / quota_lookup / price_compose / **price_query**。
+
+### 2026-07-03 · T9 批次新增原语 + Docker 部署修复（真跑验证 ✅）
+
+- 新增 `/price/query` + `/bill/get` +（MCP）`price_query`（`cost/query.py::query_resource_price/get_bill`）——
+  任务层消费方：编排器 price 派发（FR-I）+ `POST /cost/check`（FR-C v1），见 `../ce-services/TODO.md` T9 节。
+- Docker 部署修复：`docker/ce-code/docker-compose.yaml` 补 `CE_PG_DSN` 透传（此前容器只传 CE_RERANK_URL，
+  容器内 PG 依赖端点全 fe_sendauth 503；真实密码走 `.env` 不入 git）。
+- 🔴 **数据任务提级：深圳·2013 定额 / 信息价 / 清单→定额映射入库**——T9-1 后组价**默认口径 = 深圳·2013**
+  （PRD C-05），当前 2013 `supports_compose=False`、默认路径 happy path 是诚实 501「仅选码」；同时是
+  benchmark **L6-A 组价终态评测**（init_context=深圳2013）的数据前提。管道全套现成（parser→splitter→
+  `cost.*` 抽取→`load_pg` 幂等），缺的是 2013 源文档的解析抽取实跑；入库后 `SPEC_REGISTRY` 翻
+  `supports_compose` 一个标志即全链可用，任务层零改码。
 
 ## 二、国标版本严格隔离 —— ✅ 全栈闭环（2026-06-18）
 

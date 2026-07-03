@@ -16,10 +16,34 @@
 >   待服务器调参）** + 多模型 benchmark（8B vs 32B-AWQ，工具就位待跑）。
 > - **两 agent 编排层共同待办**：norm-qa / cost-agent 的 HTTP 端点(:8101)均已实测，但 **deer-flow agent 编排层
 >   （gateway :8001 加载 custom_agent + qwen-plus 多轮反问）两条都未在服务器跑过**——下一道共同工序。
->   注：agent 基座=qwen-plus(DashScope，function-calling 可靠)，生成/选码=Qwen3-8B :8099，已规避 Qwen3 调 skill 不稳的坑。
+>   注（2026-07 更新）：agent 基座已**切回 qwen3-8b**——可靠性不再靠换强模型，靠「造价原话整条交
+>   `ce-task_orchestrate` 前门」的 prompt 收敛 + 前端 orchestrate 结果卡/guard 徽标兜底（AGENT_DEV §9 T-A6）。
 >
 > Norm-QA 是从 git 历史**恢复+适配**被删的 hybrid 检索引擎接造价类规范语料（GB 50500/50854/50856、深圳费率/
 > 消耗量标准），与 §2.1「去 RAG」无关（非防火）；ce-code 侧进度见 `../ce-code/TODO.md` 同名章节。
+
+---
+
+## ✅ T9 批次 · PRD 对齐落地 + 服务端验证收官（2026-07-03）
+
+> 详设与逐项验证记录见 `../AGENT_DEV.md` §8（T9-1~T9-7 全勾）；本节只记进度结论与下一阶段。
+
+- **落地九块**：T9-1 口径默认收窄（缺版本不反问→默认深圳·2013 + meta.caliber 口径声明，单点
+  `CE_COST_DEFAULT_SPEC`）/ T9-2 EH-05 会话粘性（prompt 软实现）/ T9-3+4 FR-K07 联网兜底三道闸
+  （`norm/web_fallback.py`，ce-services 直连 DDG+Jina、agent 不开 web 工具）/ T9-5 输出模板（EH-03 跨地域
+  体面告知 + 拒答给出路）/ T9-6 金标按新语义重标 + `prerouter_eval` 硬判升级 / **FR-I 价格取数**（编排器 price
+  派发接真后端，unsupported 退役）/ **FR-C 核对 v1**（`POST /cost/check` 四项确定性核对）/ **双阈值门控**
+  （τ_high/τ_low 三段式）。
+- **验证**：离线自测 77 例 + 金标 24/24=100%（修出 2 个真路由 bug）；**T9-7 Docker 服务端真跑全绿**，并修掉
+  3 个只有真跑才暴露的部署问题（PG DSN 透传 / fastapi 0.139 懒挂载 / 无公网→联网兜底显式关）。
+- **残留**：前端三条人工判读（B1 口径声明行 / A1→A9 会话粘性 / B11 出界话术转述）——不阻塞，结果卡已兜底。
+- **闭环评估（2026-07-03）**：工程闭环成立（需求→代码→部署→验证→回归护栏→可观测）；产品闭环差两块——
+  **2013 组价数据未入库**（默认口径 happy path 现为诚实 501，归 ce-code 数据任务）+ **真实用户流量=0**。
+- **➡️ 下一阶段 = benchmark 测试-优化-迭代**（`../benchmark/AGENT_BENCHMARK.md` 七层体系）。P0 三件并行：
+  ① **B1 选码置信校准**（最痛：实测 96% 转人工；2013 选码 gold n=91 与默认口径正好对上，用
+  `tools/benchmark.py` 真实 score 分布精调 `CE_SELECT_*` + 8b/32b 选码对比）；② **τ_high/τ_low 调参曲线**
+  （L2，与 B1 同批实验数据）；③ **阶段 0/1 评测管线**（L1 路由 + L6-B 工具调用机判金标，按 §4.2/§4.4 schema
+  从零建，现有 routing_eval 24 例只作编排层回归护栏、不作种子）。
 
 ---
 

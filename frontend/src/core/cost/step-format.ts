@@ -47,8 +47,8 @@ export function stepSuffix(step: string | undefined): string {
 
 export function stepLabel(step: string | undefined): string {
   const base = baseStep(step);
-  // 用 || 而非 ??：base 为空串（step 缺失）时也落到「步骤」兜底，未知非空 step 仍原样透出。
-  const label = STEP_LABELS[base] || base || "步骤";
+  if (!base) return "步骤"; // step 缺失/空 → 显式兜底（?? 不接空串）
+  const label = STEP_LABELS[base] ?? base; // 已知步骤查表，未知非空 step 原样透出
   const suffix = stepSuffix(step);
   return suffix ? `${label} · ${suffix}` : label;
 }

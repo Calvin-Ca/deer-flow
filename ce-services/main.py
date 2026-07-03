@@ -67,16 +67,35 @@ app.include_router(norm_router)
 app.include_router(cost_router)
 
 
+def _iter_api_routes(routes) -> list[APIRoute]:
+    """递归收集 APIRoute（兼容 fastapi≥0.139 的懒挂载 ``_IncludedRouter``：include_router 不再摊平进
+    ``app.routes``，需下钻其内部 routes；旧版摊平结构同样适用）。
+
+    参数：routes —— ``app.routes`` 或子 router 的 routes 列表。
+    返回：全部 APIRoute（Mount 内的 Starlette Route 非 APIRoute，自然跳过）。
+    """
+    out: list[APIRoute] = []
+    for r in routes:
+        if isinstance(r, APIRoute):
+            out.append(r)
+        else:
+            sub = getattr(r, "routes", None) or getattr(getattr(r, "router", None), "routes", None)
+            if sub:
+                out.extend(_iter_api_routes(sub))
+    return out
+
+
 @app.get("/health")
 def health() -> dict:
     """健康检查 + 路由清单。
 
     返回：``{status, service, knowledge_url, llm_url, routes}``——routes 从 ``app.routes`` **动态生成**
-      （含真实 path 参数名如 ``{task_id}``），新增端点自动出现、不再手维护漏列（如曾漏 rewind）。
+      （含真实 path 参数名如 ``{task_id}``，经 ``_iter_api_routes`` 递归下钻兼容新版 fastapi 懒挂载），
+      新增端点自动出现、不再手维护漏列（如曾漏 rewind）。
     """
     routes = sorted(
-        r.path for r in app.routes
-        if isinstance(r, APIRoute) and r.path not in ("/health", "/openapi.json")
+        r.path for r in _iter_api_routes(app.routes)
+        if r.path not in ("/health", "/openapi.json")
     )
     return {
         "status": "ok",

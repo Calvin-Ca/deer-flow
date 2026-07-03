@@ -62,40 +62,25 @@ async def _lifespan(_: FastAPI):
 
 app = FastAPI(title="CE Task Services · Norm-QA + CostAgent", version="4.0.0",
               lifespan=_lifespan)
-app.include_router(routing_router)
-app.include_router(norm_router)
-app.include_router(cost_router)
-
-
-def _iter_api_routes(routes) -> list[APIRoute]:
-    """递归收集 APIRoute（兼容 fastapi≥0.139 的懒挂载 ``_IncludedRouter``：include_router 不再摊平进
-    ``app.routes``，需下钻其内部 routes；旧版摊平结构同样适用）。
-
-    参数：routes —— ``app.routes`` 或子 router 的 routes 列表。
-    返回：全部 APIRoute（Mount 内的 Starlette Route 非 APIRoute，自然跳过）。
-    """
-    out: list[APIRoute] = []
-    for r in routes:
-        if isinstance(r, APIRoute):
-            out.append(r)
-        else:
-            sub = getattr(r, "routes", None) or getattr(getattr(r, "router", None), "routes", None)
-            if sub:
-                out.extend(_iter_api_routes(sub))
-    return out
+# 注册与 /health 清单共用同一份 router 列表（单一事实源）：新增 router 只改这里，清单自动跟上。
+# 不从 app.routes 反推——fastapi≥0.139 include_router 改懒挂载（app.routes 里是 _IncludedRouter
+# 包装、不摊平也不暴露内部 routes），isinstance(APIRoute) 清单会归零；APIRouter.routes 是历代稳定 API。
+APP_ROUTERS = (routing_router, norm_router, cost_router)
+for _router in APP_ROUTERS:
+    app.include_router(_router)
 
 
 @app.get("/health")
 def health() -> dict:
     """健康检查 + 路由清单。
 
-    返回：``{status, service, knowledge_url, llm_url, routes}``——routes 从 ``app.routes`` **动态生成**
-      （含真实 path 参数名如 ``{task_id}``，经 ``_iter_api_routes`` 递归下钻兼容新版 fastapi 懒挂载），
-      新增端点自动出现、不再手维护漏列（如曾漏 rewind）。
+    返回：``{status, service, knowledge_url, llm_url, routes}``——routes 从 ``APP_ROUTERS`` 各
+      router 的 ``routes`` **动态生成**（含真实 path 参数名如 ``{task_id}``），新增端点自动出现、
+      不再手维护漏列（如曾漏 rewind）。
     """
     routes = sorted(
-        r.path for r in _iter_api_routes(app.routes)
-        if r.path not in ("/health", "/openapi.json")
+        r.path for router in APP_ROUTERS for r in router.routes
+        if isinstance(r, APIRoute) and r.path not in ("/health", "/openapi.json")
     )
     return {
         "status": "ok",

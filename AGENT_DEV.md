@@ -165,6 +165,7 @@ ce-services 任务层 `:8101`，挂在 `cost_router`（`main.py:46`，无额外 
 ### 8.4 决策点（已拍板，2026-07-03）
 
 1. **搜索后端**:✅ **DDG 召回 + Jina 取原文，但以 ce-services 直连方式实现**（`norm/web_fallback.py` 零新依赖：requests 打 DDG HTML 端点 + r.jina.ai）——**不启用 agent 侧 web 工具**（config.yaml web 工具组保持注释停用），三道闸全在服务端确定性执行，弱模型全程碰不到联网（比「取消注释给 agent 开 web_search」更严格地守住 §8.3/红线「组价/价格联网=0」）。关闭开关:`CE_NORM_WEB_FALLBACK=0`（无外网环境回落零召回直接拒答）。
+   **网络排查结论（2026-07-03，服务器实测）**:服务器**有公网**（百度 200 OK、default 路由在），但 `html.duckduckgo.com` 与 `r.jina.ai` **被墙（curl 000）**、无公司代理（env 无 proxy）→ **决定保持关闭**（`.env` 已置 `CE_NORM_WEB_FALLBACK=0`），零召回走诚实拒答给出路，合规且 T9-7 实测本地库覆盖良好。**重开两路线**（备查，勿重复排查）:A) 拿到代理 → compose tasks 段加 `HTTPS_PROXY` 透传 + 删 .env 开关，零代码；B) 无代理 → 接国内搜索 API（倾向博查 bochaai，`web_fallback.search_fn` 可注入、三道闸复用，正文腿可省 fetch 用 API 自带摘要），半天工作量。
 2. **会话粘性强度**:✅ 先软（agent prompt 层，config.yaml norm-qa + SKILL.md 措辞「会话内仅首次」）。
 3. **块1 默认 2013 行为反转**:✅ 确认执行（用户拍板忠实 PRD）。**数据前置如实处理**:默认 2013 时 `/bill/match` 可用（2013 清单库在）、`price_compose` 如实 501「未就绪，仅选码」不静默换版本；默认值收敛单点 `CE_COST_DEFAULT_SPEC`（`ce-services/common/config.py`），2013 组价数据入库后零改码、过渡期想体验完整组价一行 env 切 2024。**2013 定额/信息价/映射入库是遗留数据任务**（归 ce-code）。
 

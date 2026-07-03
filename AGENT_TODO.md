@@ -72,9 +72,10 @@
   （`.stream(stream_mode="updates")`）+ `router.py` 两个 `text/event-stream` 端点（`X-Accel-Buffering:no`）+
   代理 `route.ts` 改 body 透传（运行时 `CE_SERVICES_BASE_URL`）+ `client.ts` `consumeSSE`/`streamResume` +
   `cost-hitl-inline` decide 流式增量 + docker-compose frontend 加 extra_hosts/CE_SERVICES_BASE_URL 打通容器→:8101。
-  **前端 check+vitest 绿 + 后端 SSE curl 实测通过（2026-07-04：start→event→interrupt 逐帧流出）**。
-  ⚠️ 部署坑见记忆 docker-daemon-split（ce-services 在 rootful，须 `sudo docker`+`--no-cache`）；
-  **前端浏览器 e2e 仍待验**（需在正确 daemon 重建前端 + 逐闸 resume 看时间线秒级点亮 + 层级树）
+  **前端 check+vitest 绿 + 后端 SSE curl 逐帧 + 全链路代理实测通过**（2026-07-04：`curl :2026/ce-cost/session/start`
+  穿 nginx→前端新 route.ts→:8101 回真实会话，证前端新代码 + extra_hosts/CE_SERVICES_BASE_URL 生效）。
+  部署坑见记忆 docker-daemon-split（app/ce-services 在 rootful sudo，改码须 `--no-cache`+`--force-recreate`）；
+  **仅剩浏览器 UI 视觉确认**（时间线逐条点亮、层级树）——headless 全通
 - [x] **阶段 2 · 两级汇总（单位工程/单项工程）**：item 加 `unit_work/single_work` 分组标签 + `pricing.py` 新增
   `rollup_hierarchy` 原语 + `graph.py` 拆 `rollup_compute` 逐层发 `unit_rollup/single_rollup/rollup` 事件 + `price_gate_node` 补 `price` auto_pass 事件 + 前端 `HierarchyTree` 层级树渲染。
   **v1 范围**：措施/规费保持项目级（单位工程级费用留 v2，已在方案标注）。**已验收**（后端 `tools/test_rollup_hierarchy.py` 4/4 + 前端 check 绿，2026-07-04）；⚠️ 端到端真跑（多构件带分组）待补

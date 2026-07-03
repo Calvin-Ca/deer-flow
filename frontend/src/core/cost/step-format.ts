@@ -74,7 +74,7 @@ export function stepSummary(ev: CostEvent): string | null {
     // 无 result 的节点（如 from_price_compose）退回 source_ref
     return ev.provenance?.source_ref ? String(ev.provenance.source_ref) : null;
   }
-  const pick = (k: string): unknown => (r as Record<string, unknown>)[k];
+  const pick = (k: string): unknown => r[k];
   switch (base) {
     case "list_gate":
       return pick("code") != null ? `编码 ${displayValue(pick("code"))}` : null;

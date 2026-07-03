@@ -68,8 +68,11 @@
 
 - [x] **阶段 0 · 前端步骤时间线**：新增 `step-timeline.tsx` + `core/cost/step-format.ts` 渲染 `events`，
   `cost-hitl-inline.tsx` 的 `Snapshot` 接入 `events`。**已验收**（服务器 pnpm check + vitest 95/95 绿，2026-07-04）
-- [ ] **阶段 1 · SSE 逐节点流式**：`session.py` 加 `stream_start/stream_resume`（`.stream(stream_mode="updates")`）+
-  `router.py` 两个 `text/event-stream` 端点 + 代理 `route.ts` 改 body 透传 + 前端 fetch-stream 消费。**验收**：步骤秒级逐条点亮
+- [~] **阶段 1 · SSE 逐节点流式**：`session.py` 抽 `_initial_state` + 加 `_run_stream`/`stream_start`/`stream_resume`
+  （`.stream(stream_mode="updates")`）+ `router.py` 两个 `text/event-stream` 端点（`X-Accel-Buffering:no`）+
+  代理 `route.ts` 改 body 透传 + `client.ts` `consumeSSE`/`streamResume` + `cost-hitl-inline` decide 流式增量。
+  **前端 check+vitest 已绿（2026-07-04）**；⚠️ **服务器 e2e 待验**：逐闸 resume 观察时间线是否秒级逐条点亮（非批量跳）——
+  若 nginx 缓冲致批量，查 `proxy_buffering off`（已加 `X-Accel-Buffering:no`）
 - [x] **阶段 2 · 两级汇总（单位工程/单项工程）**：item 加 `unit_work/single_work` 分组标签 + `pricing.py` 新增
   `rollup_hierarchy` 原语 + `graph.py` 拆 `rollup_compute` 逐层发 `unit_rollup/single_rollup/rollup` 事件 + `price_gate_node` 补 `price` auto_pass 事件 + 前端 `HierarchyTree` 层级树渲染。
   **v1 范围**：措施/规费保持项目级（单位工程级费用留 v2，已在方案标注）。**已验收**（后端 `tools/test_rollup_hierarchy.py` 4/4 + 前端 check 绿，2026-07-04）；⚠️ 端到端真跑（多构件带分组）待补

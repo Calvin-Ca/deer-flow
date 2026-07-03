@@ -42,6 +42,82 @@ def connect(dsn: str | None = None) -> psycopg.Connection:
     return psycopg.connect(resolve_dsn(dsn), row_factory=dict_row)
 
 
+def get_bill(conn: psycopg.Connection, code: str,
+             spec_versions: list[str] | None = None) -> dict | None:
+    """按清单编码精确取一条清单项规范（FR-C 核对原语：编码有效性 / 单位一致性判据）。
+
+    功能：从 ``bill_spec`` 按 9 位编码取清单项（名称/单位/特征/工作内容），供任务层核对
+      「这份清单」里的编码是否存在、单位是否与规范一致。
+    参数：
+      conn —— psycopg 连接（dict_row）。
+      code —— 9 位清单编码。
+      spec_versions —— 国标版本隔离（同 ``compose_price``）：限定 spec_version 集合；None=不限。
+    返回：``{code, name, unit, unit_options, feature_schema, work_content, chapter, doc_id,
+      spec_version}`` 或 None（该版本下查无此码）。
+    """
+    with conn.cursor() as cur:
+        sql = ("SELECT code, name, unit, unit_options, feature_schema, work_content, "
+               "chapter, doc_id, spec_version FROM bill_spec WHERE code = %s")
+        params: list = [code]
+        if spec_versions:
+            sql += " AND spec_version = ANY(%s)"
+            params.append(list(spec_versions))
+        sql += " LIMIT 1"
+        cur.execute(sql, params)
+        return cur.fetchone()
+
+
+def query_resource_price(conn: psycopg.Connection, name: str, region: str = "深圳",
+                         period: str | None = None, category: str | None = None,
+                         top_k: int = 10) -> list[dict]:
+    """按名称模糊查信息价（FR-I01 价格取数原语：动态数据、与国标版本无关）。
+
+    功能：``resource_price ⋈ resource`` 按名称 ILIKE 模糊匹配 + region 过滤，按期取价；
+      缺期时每资源取最新可用期（DISTINCT ON + lower(period) DESC）。价格为登载值原样返回，
+      不做任何加工换算（C-04：算差价/合价归任务层计算工具）。
+    参数：
+      conn —— psycopg 连接（dict_row）。
+      name —— 材料/人工/机械名称（子串模糊，如「钢筋」「商品混凝土」）。
+      region —— 地区（默认深圳）。
+      period —— 期号 ``YYYY-MM``；None=各资源最新期。
+      category —— 人工/材料/机械 过滤（可选）。
+      top_k —— 返回行数上限（名称越短越贴切者优先）。
+    返回：``[{name, spec, unit, category, price, price_type, period_start, period_end, doc_id}...]``；
+      零命中返回空列表（诚实 no_source，调用方不据此编价）。
+    """
+    conds = ["rp.region = %(region)s", "r.name ILIKE %(pattern)s"]
+    params: dict = {"region": region, "pattern": f"%{name}%", "top_k": top_k}
+    if category:
+        conds.append("r.category = %(category)s")
+        params["category"] = category
+    if period:
+        # 期号 YYYY-MM → 该月首日落在时效区间内（信息价按月登载，effective_period=[月首,次月首)）
+        conds.append("rp.effective_period @> %(period_date)s::date")
+        params["period_date"] = f"{period}-01"
+        distinct = ""
+        order = "ORDER BY length(r.name) ASC, r.name"
+    else:
+        # 缺期：每资源取最新一期（DISTINCT ON 按 resource_id 保留 lower(period) 最大行）
+        distinct = "DISTINCT ON (r.id) "
+        order = "ORDER BY r.id, lower(rp.effective_period) DESC"
+    sql = (
+        f"SELECT * FROM (SELECT {distinct}r.name, r.spec, r.unit, r.category, "
+        "rp.price, rp.price_type, lower(rp.effective_period) AS period_start, "
+        "upper(rp.effective_period) AS period_end, rp.doc_id "
+        "FROM resource_price rp JOIN resource r ON r.id = rp.resource_id "
+        f"WHERE {' AND '.join(conds)} {order}) t "
+        "ORDER BY length(t.name) ASC, t.name LIMIT %(top_k)s"
+    )
+    with conn.cursor() as cur:
+        cur.execute(sql, params)
+        rows = cur.fetchall()
+    for r in rows:  # date/Decimal → JSON 可序列化
+        r["price"] = float(r["price"]) if r["price"] is not None else None
+        r["period_start"] = r["period_start"].isoformat() if r["period_start"] else None
+        r["period_end"] = r["period_end"].isoformat() if r["period_end"] else None
+    return rows
+
+
 def get_quota(conn: psycopg.Connection, region: str, code: str) -> dict | None:
     """按地区 + 定额子目编号直取定额子目及其工料机含量（CONSUMES 关系）。
 

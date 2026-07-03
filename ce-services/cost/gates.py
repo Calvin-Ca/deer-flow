@@ -22,9 +22,9 @@ PARAM_REQUIRED = ("tax_rate",)
 def should_pause_coding(env: dict[str, Any], tau: float) -> bool:
     """编码闸门控（§6）：是否暂停等人工确认编码。
 
-    参数：env —— ``list_match`` 信封；tau —— 置信阈值。
+    参数：env —— ``list_match`` 信封；tau —— 置信阈值（双阈值语义下＝τ_high，见 ``confidence_band``）。
     返回：True=暂停。规则：``status==need_review`` / 选不出码 / ``confidence < τ`` / 多候选并列 → 暂停；
-      唯一高置信（≥τ 且 alternatives 为空）→ 自动过。
+      唯一高置信（≥τ 且 alternatives 为空）→ 自动过（=PRD §4.4「≥τ_high 直配」段）。
     """
     if env.get("status") == "need_review":
         return True
@@ -36,6 +36,20 @@ def should_pause_coding(env: dict[str, Any], tau: float) -> bool:
     if env.get("provenance", {}).get("alternatives"):
         return True
     return False
+
+
+def confidence_band(conf: float | None, tau_high: float, tau_low: float) -> str:
+    """置信分段（PRD §4.4 三段式）：``high``（≥τ_high 可直配）/ ``mid``（[τ_low, τ_high) 人工确认）/
+    ``low``（<τ_low 或缺失，建议补充特征描述再匹配）。
+
+    参数：conf —— 选码置信（None=缺失）；tau_high / tau_low —— 双阈值（τ_high>τ_low）。
+    返回：分段标签字符串。只做标注供闸 payload/审计分段呈现，是否停闸仍由 ``should_pause_coding`` 判。
+    """
+    if conf is None or conf < tau_low:
+        return "low"
+    if conf < tau_high:
+        return "mid"
+    return "high"
 
 
 def should_pause_quota(env: dict[str, Any]) -> bool:

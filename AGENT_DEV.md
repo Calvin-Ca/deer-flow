@@ -121,7 +121,7 @@ ce-services 任务层 `:8101`，挂在 `cost_router`（`main.py:46`，无额外 
 
 ---
 
-## 8. 深圳·2013 口径收窄 + 规范问答联网兜底（落地方案，待开工）
+## 8. 深圳·2013 口径收窄 + 规范问答联网兜底（**已落码，2026-07-03；待服务器端到端验证 T9-7**）
 
 > 对应 AGENT_PROBLEM 问题 9「智能体能力有界」、AGENT_PRD（commit 52ac6008）C-02 分侧 / C-05 版本固定 / §4.0 口径归一 / FR-K07 联网兜底 / EH-05 会话粘性反问。
 > 核心思想：**边界内权威作答、边界处按"答案是否唯一"决定要不要反问、边界外诚实告知或非权威降级兜底**。落地 = 在既有 norm-qa / cost-agent / `:8101` 骨架上做 6 处定向改造,不是重写。
@@ -162,23 +162,28 @@ ce-services 任务层 `:8101`，挂在 `cost_router`（`main.py:46`，无额外 
 
 来源分级（PRD FR-K07 表，呈现层契约）:Tier-1 本地权威(标准号+版本+条款号,直接答) / Tier-2 联网(URL+访问日期,降级标注) / Tier-3 无可信命中(拒答给出路)。
 
-### 8.4 需拍板的决策点（开工前）
+### 8.4 决策点（已拍板，2026-07-03）
 
-1. **搜索后端**:① DDG 社区工具(repo 已有、免费、质量一般) ② Bing/Serper API(要 key、质量好) ③ Jina(repo 已有,擅长 fetch 原文)。**倾向 DDG 召回 + Jina 取原文**(都在 repo、零额外 key)。
-2. **会话粘性强度**:块3 软实现(agent 上下文,够用) vs 硬实现(thread 级口径缓存,工程量大)。**倾向先软**。
-3. **块1 组价默认 2013 不反问 = 行为反转**,确认按场景 A 决定执行?(silent 默认 2013 的错版风险由口径声明显著化兜底)
+1. **搜索后端**:✅ **DDG 召回 + Jina 取原文，但以 ce-services 直连方式实现**（`norm/web_fallback.py` 零新依赖：requests 打 DDG HTML 端点 + r.jina.ai）——**不启用 agent 侧 web 工具**（config.yaml web 工具组保持注释停用），三道闸全在服务端确定性执行，弱模型全程碰不到联网（比「取消注释给 agent 开 web_search」更严格地守住 §8.3/红线「组价/价格联网=0」）。关闭开关:`CE_NORM_WEB_FALLBACK=0`（无外网环境回落零召回直接拒答）。
+2. **会话粘性强度**:✅ 先软（agent prompt 层，config.yaml norm-qa + SKILL.md 措辞「会话内仅首次」）。
+3. **块1 默认 2013 行为反转**:✅ 确认执行（用户拍板忠实 PRD）。**数据前置如实处理**:默认 2013 时 `/bill/match` 可用（2013 清单库在）、`price_compose` 如实 501「未就绪，仅选码」不静默换版本；默认值收敛单点 `CE_COST_DEFAULT_SPEC`（`ce-services/common/config.py`），2013 组价数据入库后零改码、过渡期想体验完整组价一行 env 切 2024。**2013 定额/信息价/映射入库是遗留数据任务**（归 ce-code）。
 
 ### 8.5 落地顺序与任务清单
 
 顺序:块1(配置) → 块3(prompt) → 块5(启用工具) → 块2(联网兜底主体,核心) → 块4(模板) → 块6(评测)。
 
-- [ ] T9-1 块1:`config.yaml` cost-agent 去版本反问 + 默认深圳2013;`cost.py --spec` 默认 2013;口径声明行
-- [ ] T9-2 块3:`config.yaml` norm-qa 改 B1 会话粘性反问措辞
-- [ ] T9-3 块5:`config.yaml` 启用 ddg_search + jina web_fetch（按 §8.5 决策）
-- [ ] T9-4 块2:新建 `norm/web_fallback.py`(三道闸)+ 改 `norm/router.py:65` 零召回分支 + `norm/generation.py` web 降级变体
-- [ ] T9-5 块4:`cost.py`/`qa.py` + 两 agent prompt 输出模板(跨地域告知 / 拒答给出路 / 降级标注)
-- [ ] T9-6 块6:评测集补 EH-05 / FR-K07;指标=Tier-2 降级标注覆盖率、域名白名单分级正确率、会话粘性「仅首次反问」达成率、**组价/价格联网调用=0**
-- [ ] T9-7 服务器端到端验证(参照 §7 真 LLM + :8100/:8101)
+- [x] **T9-1 块1 · 已落地（2026-07-03）**:默认收敛单点 `common/config.py::COST_DEFAULT_SPEC`（env `CE_COST_DEFAULT_SPEC`，默认 2013）+ `COST_DEFAULT_REGION`。接线全链:`/cost/compose` 与 MCP `cost_compose` 的 spec 改可选缺省默认（知识层边界 spec 仍必填，任务层作为调用方补默认）;HITL `setup_node` 缺 spec 不再停闸、直接归一并发 `caliber` 口径声明事件;编排器 `_spec_of` 缺省走同一默认;`cost.py --spec` 默认 2013;compose 结果挂 `meta.caliber{declared, spec_source}`（default 时 agent 首答带口径声明行）;config.yaml cost-agent + SKILL.md 红线反转（缺版本不反问、特征缺才反问）
+- [x] **T9-2 块3 · 已落地**:config.yaml norm-qa + `skills/public/norm-qa/SKILL.md` 改会话粘性措辞（仅首次问「哪个地区+哪个版本」，确认后沿用;哪部规范不用问，T-A2 服务端定族）;`qa.py --standard` 改可选 hint（`--no-generate` 仍必填，知识层无默认）
+- [x] **T9-3 块5 · 已落地（按 §8.4 决策 1 改道）**:不开 agent web 工具，ce-services 直连 DDG+Jina（零新依赖），`CE_NORM_WEB_FALLBACK` 开关
+- [x] **T9-4 块2 · 已落地**:新建 `norm/web_fallback.py`（三道闸:域名分级 `domain_tier` 政府>行业>其他/文库博客排除、查询口径注入 `_build_query` + 结果筛污染 `_filter_pollution`（冲突版年份/他省杂质）、闸③无可信源→None）;`norm/generation.py::answer_web` web 降级变体（只基于网页正文、来源序号引用）;**接线在 `norm/pipeline.py` 零召回分支**（比原计划 router.py 更内层——pipeline 是端点/MCP/编排器三调用点的单一事实源）;硬标注头「⚠️ 非本系统深圳·2013 权威口径…」由代码强制前置，`web_citations` 带 URL+访问日期+域名层级，`meta.guard.tier="web"`（`common/guards.py` tier 契约加 web 档）;联网失败/LLM 失败/异常一律降级拒答不反噬主链路。自测 16/16（离线 stub）
+- [x] **T9-5 块4 · 已落地**:EH-03 跨地域=prerouter `detect_out_of_scope_region`（RouteDecision 加 `out_of_scope_region`，出界告知优先于特征反问）+ 编排器 `_out_of_scope_envelope`（status=out_of_scope，体面告知+建议渠道+guard C-03，cost/price 不取数;norm 跨口径不拦=EH-05→联网兜底合法路径）;norm 拒答给出路加「已查范围（本地库+联网）」;两 agent prompt/SKILL.md 模板同步
+- [x] **T9-6 块6 · 金标+回归已落地（服务器人工判读待 T9-7）**:`benchmark/routing_eval/agent_routing_eval.jsonl` 按新语义更新（B 组 no_version expect_clarify→false/gold 2013）+ 新增 A8 联网兜底、A9 会话粘性、B11/C2 出界、C1/C3 价格、D1 核对;README 指标改分侧（cost 不反问率/norm 首次反问率/粘性达成率/出界告知率/Tier-2 标注合规率）;`tools/prerouter_eval.py` 升级为硬判 clarify+出界（**24/24=100%**，修出 2 个真 bug:显式规范号应视作口径明确、泛化"多少钱"误升复合/误归 price）
+- [ ] **T9-7 服务器端到端验证**（参照 §7 真 LLM + :8100/:8101）:重启两服务 + gateway;验口径声明行/联网兜底真实网络/会话粘性人工判读/`/price/query`（需 PG）/`/cost/check`/32b 环境不回归
+
+**同批落地的 DEV 清单外差距**（详见 §9.5 T-A6 残留对照）:
+- **FR-I 价格取数后端**:ce-code `cost/query.py::query_resource_price`（名称 ILIKE + region + 期号/最新期 DISTINCT ON）+ `GET /price/query` + MCP `ce-cost_price_query`;任务层 `cost_client.price_query` + 编排器 `_dispatch_price`（确定性零 LLM:材料词取自 prerouter 命中、期号正则解析、零命中 C-03 拒答不编价、多期确定性价差 C-04 在代码算）——原「price→unsupported」退役
+- **FR-C 项目上下文核对 v1**:ce-code `GET /bill/get/{code}`（编码精确查询原语）+ 任务层 `cost/check.py` + `POST /cost/check`（编码有效性/单位一致性/名称偏离/合价算术四项确定性核对;漏项/高估冒算/单价偏差 v1 诚实标 unsupported;BOQ 行随请求进出不落盘）。自测 9/9
+- **双阈值门控（PRD §4.4 三段式）**:`HITL_TAU_HIGH/TAU_LOW`（env 可调，high 缺省沿用原单 τ 保持部署行为）+ `gates.confidence_band`;`list_gate` payload/审计带 `confidence_band`，low 段附「建议补充特征描述」提示
 
 ### 8.6 红线（落地必守）
 

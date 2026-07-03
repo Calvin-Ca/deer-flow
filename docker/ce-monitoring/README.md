@@ -36,3 +36,19 @@ Prometheus 数据源已自动配好。看板按 ID 导入（Grafana → Dashboar
 - **dcgm 镜像 tag**：`3.3.5-3.4.0-ubuntu22.04` 配驱动 535.x；若拉取/启动失败，换 dcgm-exporter 兼容你驱动的 tag。
 - 全 host 网络 + sudo daemon：Prometheus `localhost:<port>` 直达各 exporter；cadvisor 读 cgroup 故两个 docker daemon 的容器都统计到。
 - 停：`sudo docker compose -f docker/ce-monitoring/docker-compose.yaml down`（数据在 named volume，删卷才丢历史）。
+
+## 账号 / 登录
+
+- **Grafana**（`:3001`）：用户 `admin` / 密码 = `docker/ce-monitoring/.env` 的 `GRAFANA_PASSWORD`（未设则默认 `admin`）。该 env 只在**首次启动**（数据卷为空）初始化；改密：`sudo docker exec -it ce-grafana grafana cli admin reset-admin-password 新密码`。
+- **Prometheus**（`:19090`）：无鉴权（内网）。
+
+## 健康检查 / 排障
+
+**先确认 Prometheus 有数据，再谈 Grafana**（宿主机执行）：
+```
+curl -s localhost:19090/-/healthy; echo                                    # Prometheus 活
+for p in 9400 9100 9115; do printf "$p "; curl -s -o /dev/null -w "%{http_code}\n" localhost:$p/metrics; done   # dcgm/node/blackbox exporter
+curl -s 'http://localhost:19090/api/v1/query?query=up' | python3 -c "import sys,json;r=json.load(sys.stdin)['data']['result'];print('up targets:',sum(1 for x in r if x['value'][1]=='1'),'/',len(r))"
+```
+- **`up targets: N/N` 全 up** → Prometheus 正常。Prometheus **Graph 页默认空白是没输查询**（去 Status→Targets，或查询框输 `up`），不是没数据。
+- **Grafana 空 = 没导看板**（不是没数据）：数据源 `Prometheus`→`localhost:19090` 已自动 provisioning，但看板要**手动导**（见上「Grafana 看板」节，UI → New→Import → 输 ID → 选 Prometheus 源）。`grafana/dashboards` 未 bind-mount，丢 JSON 不自动加载，只能 UI Import 或给 compose 加挂载 `- ./grafana/dashboards:/var/lib/grafana/dashboards` 后 `--force-recreate grafana`。

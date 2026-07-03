@@ -57,11 +57,14 @@ def compose(
     region: str,
     top_k: int = 10,
     rates: dict[str, Any] | None = None,
+    spec_source: str = "user",
 ) -> dict[str, Any]:
     """构件描述 → 候选 → 选码 → 组价取数，组装端到端结果。
 
     参数：
-        description —— 构件/做法描述；spec —— 国标版本（2013/2024，必填）；region —— 地区（如「深圳」）；
+        description —— 构件/做法描述；spec —— 国标版本（2013/2024）；region —— 地区（如「深圳」）；
+        spec_source —— 版本来源：``user``（用户显式给定）/ ``default``（缺省归一到深圳·2013，
+        PRD §4.0/C-05 不反问）；进 ``meta.caliber`` 供输出层做首答口径声明。
         top_k —— 候选召回数；
         选码模型不在本层选：唯一的 LLM 步 ``select_code`` 自定桶 B 32b（§9.3），本层不透传；取数
         （bill_match/price_compose）与算价（compute_unit_price）均无 LLM。
@@ -95,10 +98,14 @@ def compose(
         "price_status": None,
     }
 
+    # 口径声明（§4.0/T9-1）：地区·版本 + 版本来源（default=缺省归一，输出层据此做首答声明）。
+    caliber = {"declared": f"{region}·{spec}", "region": region, "spec": spec, "spec_source": spec_source}
+
     # ③ 选不出码 → 不调组价，转 HITL
     if not code:
         result["price_status"] = "skipped(need_review)"
-        result["meta"] = {"guard": audit_cost_result(result, spec=spec, region=region).as_meta()}
+        result["meta"] = {"guard": audit_cost_result(result, spec=spec, region=region).as_meta(),
+                          "caliber": caliber}
         return result
 
     # ④ 组价取数；spec=2013 未就绪（501）降级透传，不丢选码结果
@@ -116,5 +123,6 @@ def compose(
         else:
             raise  # 404/503 等交 router 映射
     # ③ 校验闸（C-01/02/03 → GuardReport，进 meta.guard，对齐 norm 侧同契约）
-    result["meta"] = {"guard": audit_cost_result(result, spec=spec, region=region).as_meta()}
+    result["meta"] = {"guard": audit_cost_result(result, spec=spec, region=region).as_meta(),
+                      "caliber": caliber}
     return result

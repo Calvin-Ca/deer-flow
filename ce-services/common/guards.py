@@ -35,7 +35,8 @@ class GuardReport:
         caliber_pure —— C-02：口径是否纯净（norm=无他部/跨版条文；cost=取数无跨版串库）。
         cited_total —— 进闸前引用/计数（norm 用；cost 留 0）。
         cited_dropped —— 被 C-02 剔除数（norm 用；cost 留 0）。
-        tier —— 来源层级（§8.3）：``local`` 本地权威命中 / ``none`` 无可信命中（拒答/转人工）。
+        tier —— 来源层级（§8.3/FR-K07）：``local`` 本地权威命中（Tier-1）/ ``web`` 联网兜底
+          （Tier-2，答案带硬降级标注 + URL + 访问日期）/ ``none`` 无可信命中（Tier-3，拒答/转人工）。
     """
 
     verdict: str

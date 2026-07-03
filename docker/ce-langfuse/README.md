@@ -39,3 +39,14 @@ docker compose down -v         # 连数据卷一起删（trace 全清）
 ## 端口与冲突
 
 只有 `3030`（Web UI）对外暴露。Postgres / ClickHouse / Redis / MinIO 全部仅容器内网可见，**不占用宿主端口**，与 vLLM(8097-8099)/Milvus(19530)/RAG(8100/8101) 互不冲突。
+
+## 账号 / key / rootless 运维（生产 = docker gateway，2026-07-03 定案）
+
+> 以下为**全 Docker 生产**的权威做法，取代上文 bare-metal 的 `make gateway` / `localhost:3030` 说法。
+
+- **Langfuse 跑 rootless daemon**（`docker compose -p langfuse ... up -d`，**无 sudo**）；数据是 named volume，`down -v` 会清空。**reboot 存活**：`sudo loginctl enable-linger caic` + `systemctl --user enable docker`（不加 sudo）。
+- **建账号/项目**：首次 UI `http://172.19.3.136:3030` → `/setup` 建账号 → 建项目 → **Create API keys**（secret **只显示一次**，当场存好）。
+- **key 填 gateway `.env`**：`LANGFUSE_PUBLIC_KEY` / `LANGFUSE_SECRET_KEY` 用刚建的**一对**，**必须和当前项目里某对有效 key 完全一致**（不一致 → gateway 上报 401，trace 进不去）。
+- **gateway 是 bridge 容器**：`LANGFUSE_BASE_URL=http://host.docker.internal:3030`（**不能用 `localhost`**，容器里指自身）。
+- **改完必须 recreate gateway**（`.env` 是创建容器时注入的环境变量，`docker restart` **不重读**）：`sudo ./scripts/deploy.sh start` 或 `sudo docker compose -p deer-flow -f docker/docker-compose.yaml up -d --force-recreate gateway`。核对生效：`sudo docker exec deer-flow-gateway env | grep -i langfuse`。
+- 日志：`docker logs -f langfuse-langfuse-web-1`（**rootless，无 sudo**）。

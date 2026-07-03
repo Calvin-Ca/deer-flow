@@ -50,7 +50,7 @@ try:  # ToolError 在不同 mcp 版本路径略有差异，缺则退化为 Value
 except ImportError:  # pragma: no cover
     ToolError = ValueError  # type: ignore[assignment,misc]
 
-from common.config import LLM_MODEL_ID, LLM_URL
+from common.config import COST_DEFAULT_SPEC, LLM_MODEL_ID, LLM_URL
 from cost import orchestration
 from norm import pipeline
 from routing.orchestrator import orchestrate as _orchestrate
@@ -117,7 +117,8 @@ def norm_qa(
 @mcp.tool()
 def cost_compose(
     description: Annotated[str, Field(description="构件/做法的自然语言描述，如「C30 现浇钢筋混凝土矩形柱」")],
-    spec: Annotated[str, Field(description="国标版本（必填，无默认）：2013 / 2024。按版本隔离清单库/组价取数，避免串库")],
+    spec: Annotated[str | None, Field(description="国标版本 2013 / 2024（可缺省）：缺则归一到默认口径深圳·2013"
+                                                  "（PRD §4.0 不反问）；显式给定仍按版本严格隔离")] = None,
     region: Annotated[str, Field(description="地区（当前仅深圳），用于定额过滤与信息价取价")] = "深圳",
     top_k: Annotated[int, Field(ge=1, le=50, description="清单候选召回数")] = 10,
 ) -> dict:
@@ -126,18 +127,21 @@ def cost_compose(
     **红线**：选不出码（need_review / code=None）→ 不调组价、price_status="skipped(need_review)"，转 HITL；
     缺信息价的工料机 ``unit_price=None`` + ``price_status="no_source"``，绝不杜撰；2013 组价数据未就绪 →
     仅返回选码、price_status 标未就绪。**本工具不算综合单价/总造价**（费率/税率是政策数，走 HITL 录入）。
+    **口径（§4.0/T9-1）**：spec 缺省默认深圳·2013、不反问；``meta.caliber`` 带口径声明
+    （spec_source=default 时应在首答向用户显示「口径：深圳·2013」）。
 
     参数：
-        description —— 构件/做法描述；spec —— 国标版本（必填）：2013 / 2024；
+        description —— 构件/做法描述；spec —— 国标版本 2013 / 2024（缺省默认 2013）；
         region —— 地区（深圳）；top_k —— 候选召回数（1–50）。
     返回：``{description, spec, region, candidates_count, selection:{code,confidence,reason,
-        need_review,alternatives}, code, price, price_status}``；price 为组价取数结果
+        need_review,alternatives}, code, price, price_status, meta:{guard, caliber}}``；price 为组价取数结果
         （定额 + 工料机含量 + 信息价单价），未就绪/选不出码时为 None。
     异常：未知 spec / 知识服务不可达 / 清单项不存在 / LLM 不可达或输出非法 JSON → ToolError。
     """
     try:
         return orchestration.compose(
-            description, spec, region, top_k=top_k,
+            description, spec or COST_DEFAULT_SPEC, region, top_k=top_k,
+            spec_source="user" if spec else "default",
         )
     except requests.HTTPError as exc:
         detail = exc.response.text if exc.response is not None else str(exc)

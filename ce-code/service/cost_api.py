@@ -8,6 +8,8 @@
 端点：
   GET /quota/{region}/{code}            定额子目直取（子目字段 + 工料机含量）
   GET /price/compose/{region}/{code}    组价取数（清单 → 定额 → 工料机含量 + 信息价单价）
+  GET /price/query                      当期信息价查询（名称模糊 + 期号，FR-I01；动态数据、无关 spec）
+  GET /bill/get/{code}                  清单编码精确查询（FR-C 核对原语：编码有效性/单位一致性）
 
 独立启动（仅造价端点，调试用，从 ce-code 根）：
   .venv/bin/python -m service.cost_api
@@ -15,6 +17,7 @@
 """
 from __future__ import annotations
 
+import re
 from datetime import date
 
 import psycopg
@@ -80,6 +83,53 @@ def price_compose_endpoint(region: str, code: str, spec: str, on_date: date | No
     if result is None:
         raise HTTPException(status_code=404, detail=f"清单项 {code} 不存在（{cfg['label']}）")
     return result
+
+
+@router.get("/price/query")
+def price_query_endpoint(name: str, region: str = "深圳", period: str | None = None,
+                         category: str | None = None, top_k: int = 10) -> dict:
+    """当期信息价查询（FR-I01）：材料/人工/机械名称模糊匹配 → 登载价 + 期段时效。
+
+    参数：name —— 名称（子串模糊，必填）；region —— 地区（默认深圳）；period —— 期号 ``YYYY-MM``
+      （缺省各资源取最新期）；category —— 人工/材料/机械 过滤（可选）；top_k —— 返回行数（1–50）。
+    返回：``{name, region, period, count, results:[...]}``；零命中 count=0（诚实 no_source，
+      不是 404——「查无此料」是正常结论）；PG 不可达→503。信息价是动态数据、与国标版本无关，
+      故本端点无 spec 参数（C-02 地域口径仍由 region 锁定）。
+    """
+    if not name.strip():
+        raise HTTPException(status_code=400, detail="name 不能为空")
+    if period is not None and not re.fullmatch(r"20\d{2}-\d{2}", period):
+        raise HTTPException(status_code=400, detail="period 须为 YYYY-MM（如 2026-05）")
+    top_k = max(1, min(top_k, 50))
+    try:
+        with cost_query.connect() as conn:
+            rows = cost_query.query_resource_price(conn, name.strip(), region=region,
+                                                   period=period, category=category, top_k=top_k)
+    except psycopg.OperationalError as exc:
+        raise HTTPException(status_code=503, detail=f"造价库不可达: {exc}") from exc
+    return {"name": name, "region": region, "period": period, "count": len(rows), "results": rows}
+
+
+@router.get("/bill/get/{code}")
+def bill_get_endpoint(code: str, spec: str) -> dict:
+    """清单编码精确查询（FR-C 核对原语）：按 9 位码 + 国标版本取清单项规范。
+
+    参数：code —— 9 位清单编码；spec —— **国标版本（query，必填）**：2013 / 2024（同码跨版不同义）。
+    返回：``{code, name, unit, unit_options, feature_schema, work_content, chapter, doc_id,
+      spec_version}``；未知 spec→400；该版本查无此码→404；PG 不可达→503。
+    """
+    try:
+        cfg = config.resolve_spec(spec)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    try:
+        with cost_query.connect() as conn:
+            bill = cost_query.get_bill(conn, code, spec_versions=cfg["bill_spec_versions"])
+    except psycopg.OperationalError as exc:
+        raise HTTPException(status_code=503, detail=f"造价库不可达: {exc}") from exc
+    if bill is None:
+        raise HTTPException(status_code=404, detail=f"清单编码 {code} 不存在（{cfg['label']}）")
+    return bill
 
 
 @router.post("/bill/match")

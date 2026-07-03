@@ -8,13 +8,15 @@
   - 默认（问答）→ 任务服务 :8101 的 /norm/qa（检索造价规范条文 + Qwen3 带引用作答）
   - --no-generate（裸条款）→ 知识服务 :8100 的 /search（给算量/审图等场景复用）
 
-⚠️ ``--standard`` **必填、无默认**：造价计量计价规范 2013/2024 同 9 位码不同义，
-版本错了就串库；调用前必须确认用户要查哪部哪版规范（见下表代号）。
+``--standard`` **可选 hint**（默认问答路径）：选哪部规范由服务端 ``standard_router`` 按问题类型
+确定性裁定（计量→50854/计价→50500/安装→50856，T-A2），hint 仅零命中时回退、错族被夺回。
+会话内已确认口径则带上对应代号（EH-05 会话粘性：仅首次缺口径才反问）。
+⚠️ ``--no-generate``（裸条款，直打知识层 /search）时 **standard 仍必填**——知识层边界无默认。
 
 用法（通过 deer-flow agent 的 bash 工具）：
-    python3 qa.py --query "矩形柱按什么计量？" --standard gb50854-2024
+    python3 qa.py --query "矩形柱按什么计量？"                       # 服务端确定性选规范
     python3 qa.py -q "..." --standard gb50500-2024 --output /tmp/result.json
-    python3 qa.py -q "..." --standard gb50854-2013 --no-generate   # 只检索裸条款
+    python3 qa.py -q "..." --standard gb50854-2013 --no-generate   # 只检索裸条款（standard 必填）
 
 地址默认任务服务 http://localhost:8101、知识服务 http://localhost:8100，
 可分别用环境变量 NORM_QA_URL / NORM_QA_KNOWLEDGE_URL 覆盖。
@@ -55,8 +57,8 @@ def _fail(obj: dict) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description="造价规范条文检索 + 带引用问答（HTTP 客户端）")
     parser.add_argument("--query", "-q", required=True, help="自然语言问题")
-    parser.add_argument("--standard", required=True,
-                        help=f"规范代号（必填，无默认）：{', '.join(VALID_STANDARDS)}")
+    parser.add_argument("--standard", default=None,
+                        help=f"规范代号 hint（可选，服务端确定性裁定；--no-generate 时必填）：{', '.join(VALID_STANDARDS)}")
     parser.add_argument("--top-k", type=int, default=15, help="检索召回条数（默认 15）")
     parser.add_argument("--skip-rerank", action="store_true", help="跳过 cross-encoder 精排（调试用）")
     parser.add_argument(
@@ -69,13 +71,20 @@ def main() -> None:
     parser.add_argument("--output", default=None, help="结果写入 JSON 文件；不指定则输出到 stdout")
     args = parser.parse_args()
 
-    # 版本红线：代号必须在已建索引的造价规范内，错版即拒（防 2013/2024 串库）。
-    if args.standard not in VALID_STANDARDS:
+    # 版本红线：给了代号则必须在已建索引的造价规范内，错版即拒（防 2013/2024 串库）；
+    # 未给 → 问答路径交服务端 standard_router 确定性裁定（T-A2），裸条款路径必填（知识层无默认）。
+    if args.standard is not None and args.standard not in VALID_STANDARDS:
         _fail({
             "error": "未知规范代号",
             "detail": f"--standard={args.standard!r} 不在支持列表内",
             "valid_standards": list(VALID_STANDARDS),
             "hint": "造价计量计价规范 2013/2024 同码不同义，请向用户确认要查哪部哪版规范",
+        })
+    if args.no_generate and args.standard is None:
+        _fail({
+            "error": "缺 standard",
+            "detail": "--no-generate 直打知识层 /search，standard 必填（知识层边界无默认）",
+            "valid_standards": list(VALID_STANDARDS),
         })
 
     # 默认打任务服务 /norm/qa（检索 + 生成）；--no-generate 打知识服务 /search（裸条款）

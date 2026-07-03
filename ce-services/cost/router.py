@@ -13,6 +13,7 @@ import requests
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
+from common.config import COST_DEFAULT_REGION, COST_DEFAULT_SPEC
 from cost import orchestration
 from cost.pricing import RollupInput, UnitPriceInput, compute_unit_price, rollup_cost
 
@@ -41,15 +42,17 @@ class CostComposeRequest(BaseModel):
 
     字段：
         description —— 构件/做法自然语言描述。
-        spec —— 国标版本（2013/2024）；**必填**，按版本隔离清单库/组价取数，不设默认避免错版串库。
+        spec —— 国标版本（2013/2024）；**可缺省**：缺则归一到默认口径深圳·2013（PRD §4.0/C-05
+        不反问，T9-1 行为反转；此前必填）。显式给定仍按版本严格隔离；知识层边界 spec 依旧必填，
+        默认值由本任务层作为调用方补齐。
         region —— 地区（如「深圳」），用于信息价/定额取数。
         top_k —— 清单候选召回数。
         rates —— 可选费率块（``PricingRates``）；给定则末步算综合单价，否则维持 P1 仅选码+取数。
     """
 
     description: str = Field(..., description="构件/做法描述")
-    spec: str = Field(..., description="国标版本 2013/2024")
-    region: str = Field("深圳", description="地区，默认深圳")
+    spec: str | None = Field(None, description="国标版本 2013/2024；缺省默认深圳·2013（§4.0 不反问）")
+    region: str = Field(COST_DEFAULT_REGION, description="地区，默认深圳")
     top_k: int = 10
     rates: PricingRates | None = Field(None, description="可选费率块，给定则算综合单价")
 
@@ -64,10 +67,12 @@ def cost_compose_endpoint(req: CostComposeRequest) -> dict:
       选码 need_review 与 price_status（skipped / 未就绪 / ok）原样返回，由调用方据此走 HITL。
     """
     t0 = time.perf_counter()
+    spec = req.spec or COST_DEFAULT_SPEC  # §4.0 口径归一：缺版本不反问，默认深圳·2013（T9-1）
     try:
         result = orchestration.compose(
-            req.description, req.spec, req.region, top_k=req.top_k,
+            req.description, spec, req.region, top_k=req.top_k,
             rates=req.rates.model_dump() if req.rates else None,
+            spec_source="user" if req.spec else "default",
         )
     except requests.HTTPError as exc:
         code = exc.response.status_code if exc.response is not None else 503
@@ -79,8 +84,9 @@ def cost_compose_endpoint(req: CostComposeRequest) -> dict:
         raise HTTPException(status_code=502, detail=f"LLM 选码输出非合法 JSON: {exc}") from exc
 
     elapsed_ms = (time.perf_counter() - t0) * 1000
-    logger.info("/cost/compose spec=%s region=%s candidates=%d code=%s need_review=%s price_status=%s (%.0fms)",
-                req.spec, req.region, result.get("candidates_count", 0), result.get("code"),
+    logger.info("/cost/compose spec=%s(%s) region=%s candidates=%d code=%s need_review=%s price_status=%s (%.0fms)",
+                spec, "user" if req.spec else "default", req.region,
+                result.get("candidates_count", 0), result.get("code"),
                 result.get("selection", {}).get("need_review"), result.get("price_status"), elapsed_ms)
     # compose 已在 meta 里挂 guard（③ 校验闸）；这里 merge 计时/参数，勿 clobber。
     result.setdefault("meta", {}).update({"elapsed_ms": round(elapsed_ms), "top_k": req.top_k})
@@ -90,7 +96,8 @@ def cost_compose_endpoint(req: CostComposeRequest) -> dict:
 class SessionStartRequest(BaseModel):
     """HITL 组价会话起始请求体。
 
-    字段：feature —— 构件/做法描述（必填）；spec —— 国标版本 2013/2024（缺则首个闸为 setup 录入）；
+    字段：feature —— 构件/做法描述（必填）；spec —— 国标版本 2013/2024（缺则默认深圳·2013，
+      §4.0 不反问；setup 节点留口径声明事件供审计与首答声明）；
       region —— 地区（默认深圳）；period —— 信息价期号；price_source —— 信息价来源（local/online/manual）；
       rates —— 可选费率块（给定则末步算综合单价）；quantity —— 可选工程量 Q（给定则 quantity_gate 自动过）；
       features —— 多构件描述列表（给定则逐件办，优先于 feature）。
@@ -98,7 +105,7 @@ class SessionStartRequest(BaseModel):
 
     feature: str | None = Field(None, description="单构件/做法描述（features 给定时可省）")
     features: list[str] | None = Field(None, description="多构件描述列表，逐件外层循环办，优先于 feature")
-    spec: str | None = Field(None, description="国标版本 2013/2024，缺则 setup 闸采集")
+    spec: str | None = Field(None, description="国标版本 2013/2024，缺省默认深圳·2013（§4.0 不反问）")
     region: str = Field("深圳", description="地区，默认深圳")
     period: str | None = Field(None, description="信息价期号（年月）")
     price_source: str | None = Field(None, description="信息价来源 local/online/manual")
@@ -203,6 +210,52 @@ def cost_session_state_endpoint(task_id: str) -> dict:
     """
     from cost import session
     return session.get_state(task_id)
+
+
+class BoqRow(BaseModel):
+    """一条 BOQ 清单行（FR-C 核对输入）。除 code 外均可选——给什么核什么。"""
+
+    code: str = Field(..., description="清单编码（9 位全国码或 12 位含顺序码）")
+    name: str | None = Field(None, description="清单项名称")
+    unit: str | None = Field(None, description="计量单位")
+    quantity: float | None = Field(None, description="工程量")
+    unit_price: float | None = Field(None, description="综合单价（元）")
+    amount: float | None = Field(None, description="合价（元）")
+
+
+class CostCheckRequest(BaseModel):
+    """FR-C 清单核对请求体。
+
+    字段：rows —— BOQ 行列表（1–500）；spec —— 国标版本（缺省默认深圳·2013，§4.0 不反问）；
+      region —— 地区（声明用，默认深圳）。BOQ 行随请求进出、服务端不落盘（多租户边界在 deer-flow 层）。
+    """
+
+    rows: list[BoqRow] = Field(..., min_length=1, max_length=500, description="BOQ 清单行")
+    spec: str | None = Field(None, description="国标版本 2013/2024，缺省默认深圳·2013")
+    region: str = Field(COST_DEFAULT_REGION, description="地区，默认深圳")
+
+
+@router.post("/cost/check")
+def cost_check_endpoint(req: CostCheckRequest) -> dict:
+    """FR-C 项目上下文核对 v1：BOQ 清单行确定性核对（编码有效性/单位一致性/名称偏离/合价算术）。
+
+    参数：req —— ``CostCheckRequest``。返回：``{spec, region, total, rows_with_issues,
+      issues:[{row_index, code, checks:[{type,severity,detail}], bill}], unsupported, meta}``；
+      漏项/高估冒算/单价偏差 v1 诚实列入 unsupported（宁缺毋造）。知识服务不可达→503、未知 spec→400。
+    """
+    from cost import check as boq_check  # 轻模块，与 compose 依赖隔离
+    try:
+        result = boq_check.check_boq([r.model_dump() for r in req.rows],
+                                     spec=req.spec, region=req.region)
+    except requests.HTTPError as exc:
+        code = exc.response.status_code if exc.response is not None else 503
+        detail = exc.response.text if exc.response is not None else str(exc)
+        raise HTTPException(status_code=code, detail=f"知识服务返回错误: {detail}") from exc
+    except requests.RequestException as exc:
+        raise HTTPException(status_code=503, detail=f"知识服务不可达（:8100 /bill/get）: {exc}") from exc
+    logger.info("/cost/check spec=%s rows=%d issues=%d",
+                result.get("spec"), result.get("total"), result.get("rows_with_issues"))
+    return result
 
 
 @router.post("/cost/unit-price")

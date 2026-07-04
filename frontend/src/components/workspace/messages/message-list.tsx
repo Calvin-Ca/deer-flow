@@ -197,14 +197,16 @@ export function MessageList({
     const map = new Map<number, string>();
     let turnStart = -1;
     for (let i = 0; i < groupedMessages.length; i++) {
-      if (groupedMessages[i].type === "human") {
+      const group = groupedMessages[i];
+      if (!group) continue;
+      if (group.type === "human") {
         turnStart = -1;
         continue;
       }
       if (turnStart === -1) turnStart = i;
       const isTurnEnd =
         i === groupedMessages.length - 1 ||
-        groupedMessages[i + 1].type === "human";
+        groupedMessages[i + 1]?.type === "human";
       if (isTurnEnd) {
         const turnMessages = groupedMessages
           .slice(turnStart, i + 1)

@@ -68,20 +68,47 @@
 
 - [x] **阶段 0 · 前端步骤时间线**：新增 `step-timeline.tsx` + `core/cost/step-format.ts` 渲染 `events`，
   `cost-hitl-inline.tsx` 的 `Snapshot` 接入 `events`。**已验收**（服务器 pnpm check + vitest 95/95 绿，2026-07-04）
-- [~] **阶段 1 · SSE 逐节点流式**：`session.py` 抽 `_initial_state` + 加 `_run_stream`/`stream_start`/`stream_resume`
+- [x] **阶段 1 · SSE 逐节点流式**：`session.py` 抽 `_initial_state` + 加 `_run_stream`/`stream_start`/`stream_resume`
   （`.stream(stream_mode="updates")`）+ `router.py` 两个 `text/event-stream` 端点（`X-Accel-Buffering:no`）+
   代理 `route.ts` 改 body 透传（运行时 `CE_SERVICES_BASE_URL`）+ `client.ts` `consumeSSE`/`streamResume` +
   `cost-hitl-inline` decide 流式增量 + docker-compose frontend 加 extra_hosts/CE_SERVICES_BASE_URL 打通容器→:8101。
   **前端 check+vitest 绿 + 后端 SSE curl 逐帧 + 全链路代理实测通过**（2026-07-04：`curl :2026/ce-cost/session/start`
   穿 nginx→前端新 route.ts→:8101 回真实会话，证前端新代码 + extra_hosts/CE_SERVICES_BASE_URL 生效）。
-  部署坑见记忆 docker-daemon-split（app/ce-services 在 rootful sudo，改码须 `--no-cache`+`--force-recreate`）；
-  **仅剩浏览器 UI 视觉确认**（时间线逐条点亮、层级树）——headless 全通
+  部署坑见记忆 docker-daemon-split（app/ce-services 在 rootful sudo，改码须 `--no-cache`+`--force-recreate`）。
+  **浏览器 e2e 已过**（2026-07-04 生产栈：时间线逐条 + 层级树，见下方 Option B 收官行）
 - [x] **阶段 2 · 两级汇总（单位工程/单项工程）**：item 加 `unit_work/single_work` 分组标签 + `pricing.py` 新增
   `rollup_hierarchy` 原语 + `graph.py` 拆 `rollup_compute` 逐层发 `unit_rollup/single_rollup/rollup` 事件 + `price_gate_node` 补 `price` auto_pass 事件 + 前端 `HierarchyTree` 层级树渲染。
   **v1 范围**：措施/规费保持项目级（单位工程级费用留 v2，已在方案标注）。**已验收**（后端 `tools/test_rollup_hierarchy.py` 4/4 + 前端 check 绿，2026-07-04）；⚠️ 端到端真跑（多构件带分组）待补
 - [x] **阶段 3 · 点火型 MCP `start_cost_session`**：mcp_server 加只点火不编排的起会话工具（懒加载 session.start，
   返回 task_id + `cost-hitl` marker + first_gate），extensions_config + cost-agent SKILL 同步；py_compile 过。
-  编排仍在图里，MCP 不当编排器（红线 HITL_DESIGN §10）。⚠️ 服务器起服务后真调一次待验
+  编排仍在图里，MCP 不当编排器（红线 HITL_DESIGN §10）。
+- [x] **Option B · 前门确定性点火 HITL**（治「弱模型不调 start / 漏贴 marker → 卡不出」）：`prerouter` 加
+  确定性 `compose_full` 形态（cost + 「到总造价/逐步确认」信号）+ `orchestrator` 单一意图 `_ignite_hitl` 点火
+  session.start 返回 `{mode:hitl,task_id}`（去 first_gate 抑制弱模型转述）+ 前端 message-group 泛化扫任意
+  `ce-task_*` 结果里的 task_id 渲染卡（不靠模型贴 marker）。**Docker 生产栈 e2e 全绿**（2026-07-04：卡片 +
+  11 步时间线 + 两级层级树 + 算到真总价 45314.8）。prerouter 27 / orchestrator 11 自测过。
+- [x] **M4 阶段 0/1/2 浏览器 e2e 收官**（2026-07-04 生产栈实跑通过，阶段 1 不再仅 headless）。
+
+### M4 backlog（已论证、未排期）
+
+- [ ] **UI 抛光**：note 已改（去照抄话术/方向词，治重复+方向矛盾）；可选 ①「引导在上、卡在下」布局
+  （前端 message-list 组合顺序）②深修默认 lead prompt「mode:hitl 只产极简回合」（要先定位 lead prompt，
+  DEV §9 说「默认 lead + 改后 prompt」，不在 config.yaml subagents）。**先验 note 效果，大概率够。**
+- [ ] **B2 · Claude 原生「停-答-续」HITL（可选深修）**：让 agent 回合真暂停在每个闸、人答完再续、done 后
+  agent 收尾。详细改造清单 + 工作量 + 前置调研见 `ce-services/COST_STEP_DISPLAY_PLAN.md §7`。要点：**非阻塞**
+  （阻塞会死锁）——走 deer-flow agent 图内自定义节点 + **节点内嵌套 interrupt**（LLM 只调 2 次、不撞 §10 红线）；
+  **代价大一个量级**（动 `backend/` 上游 harness 核心 + 前端 interrupt 渲染）。**前置调研先行**（deer-flow 图是否
+  支持节点内循环 interrupt，0.5–1 人日）。仅当「agent 必须在场」被确认为刚需才启动；**未排期**。
+
+## 意图混合路由（确定性 + LLM 兜底，归 benchmark M1 路由线，未排期）
+
+- [ ] **prerouter 加 LLM 兜底分类**（治关键词穷举疲劳 + 口语变体漏判，不把红线交给弱模型）：确定性命中
+  **强信号**（COST/PRICE_STRONG/COMPOUND/显式GB/`_COMPARE_RE`）→ 直接走（多数流量、零延迟、金标可回归）；
+  未命中 / 只命中泛词（`区别/构成/包含哪些`）→ **32b 兜底分类器**（temp=0、enum JSON schema、校验 + fail-safe
+  跌回确定性默认）。**红线 guard（出界 EH-03 / 口径 C-02）两条路都确定性**，LLM 只补 capability+form 分类、
+  不碰安全闸、不覆盖。改动：`prerouter` 加「命中强信号 vs 兜底默认」置信信号 + 一个 LLM 兜底函数；
+  orchestrator/router 低置信时调兜底。测：确定性层金标（`routing_eval`）不动 + 兜底层建「难例/含糊」集，
+  量**升级率 + LLM 路由准确率 + 延迟**（对齐 FR-K ≤3s NFR）。量：中（后端 + 新 eval）。详见对话 2026-07-04 讨论。
 
 ## 小尾巴（不阻塞主线，择机清）
 

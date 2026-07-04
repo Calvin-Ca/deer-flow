@@ -132,3 +132,65 @@
 
 阶段 0（前端，独立）→ 阶段 1（流式，依赖代理透传）→ 阶段 2（两级汇总，后端+前端，独立于 1，但时间线复用 0/1）→ 阶段 3（可选）。
 **建议先做阶段 0**：纯前端、零风险、立刻可见步骤显示。
+
+阶段 0/1/2/3 已全部落码并在 Docker 生产栈 e2e 验证通过（2026-07-04：卡片渲染 + 11 步时间线 +
+两级层级树 + 算到真总价 45314.8；前门 Option B 确定性点火 HITL）。当前交互模型 = **点火型解耦**
+（agent 点火即返回、卡片旁路驱动、agent 不在环）。下节 B2 是**可选**的「Claude 原生停-答-续」升级。
+
+---
+
+## 7. 附录 B2 · Claude 原生「停-答-续」HITL（可选深修，未排期）
+
+> 背景与取舍详见对话 2026-07-04：当前「点火型解耦」下，agent 点完火就产出一段文字（易多嘴、
+> 位置在卡下、说反方向），且 agent 不在环、不知道 HITL 何时完成。B2 让 **agent 回合真正暂停在
+> 每个闸、人答完再续、done 后由 agent 收尾**——体验对齐 Claude 的权限/计划审批式 HITL。
+
+### 7.1 为什么「阻塞工具等 done」不行（死锁）
+
+让 `orchestrate` 起会话后不返回、原地等 done 会死锁：工具不返回 → 前端拿不到 `task_id` → 卡片不渲染
+→ 用户无处可点 → 闸推进不了 → 会话永停首闸 → 工具永远等不到 done。**「卡片要 task_id 才能渲染」与
+「工具阻塞等完」互斥**，故工具必须立刻返回（现状解耦即由此逼出）。B2 不走阻塞，走**节点内嵌套 interrupt**。
+
+### 7.2 B1（坏）vs B2（好）—— 关键区分
+
+- **B1**：LLM 每闸进环（读闸→转述→收决策→resume）。🔴 撞 HITL_DESIGN §10 / AGENT_DEV §9 line 279
+  弱模型转述事故。**不做。**
+- **B2**：deer-flow agent 图里加**一个确定性节点**，用 langgraph **节点内多次 `interrupt()`** 托管闸循环。
+  resume 一个被 interrupt 的节点是**从中断点继续该节点、不回 LLM 节点**，故闸1→闸2 之间 **LLM 不被重调**。
+  **LLM 全程只调 2 次**：开头「判要完整组价 → 调 bridge 节点」+ 结尾「拿真 rollup 总结一句」。**不撞红线。**
+
+### 7.3 改造清单（按层）
+
+| 层 | 改动 | 量 |
+|---|---|---|
+| **deer-flow 后端核心**（`backend/`，gateway langgraph）🔴 | 新增自定义节点 `cost_hitl_bridge` 挂进 lead agent 图：起 `/cost/session/start` → `interrupt(闸payload)` 挂起回合 → resume 拿决策 → `/cost/session/{id}/resume` → 下一闸 → 再 interrupt，循环至 done → 返回 rollup。需对齐两个 langgraph（deer-flow agent 图 + ce-services cost 图）的 interrupt/resume 语义 + checkpointer 持久化中间态 | **中-大**（主要不确定性）|
+| **deer-flow 前端核心** | interrupt UI（现渲染通用澄清框）改渲染**富 cost 闸**：把现有 `gates.tsx`(ConfirmGate/InputGate/ReviewGate) + `step-timeline.tsx` + 层级树接进 deer-flow 的 interrupt 渲染路径；resume 提交带 cost 决策格式（confirm action / input dict）。**组件可复用**，数据源从「tool result + getSessionState」换成「interrupt payload」 | **中** |
+| **ce-services（任务层）** | 基本不改（session API 已就绪）；`resume` 已返回下一闸完整 payload | **小/零** |
+| **协议 + lead prompt** | 定义 deer-flow interrupt ↔ cost gate payload 映射契约；lead prompt 约定「起=调 bridge、结尾=拿 rollup 总结不编」 | **小** |
+
+### 7.4 🚩 前置调研（决定 B2 可行性，先做）
+
+**deer-flow 的 agent 图是否支持「自定义节点 + 节点内多次 `interrupt()`」？** 看 `backend/` 的 lead agent
+图定义 + `ask_clarification` 的 interrupt 实现。
+- 若支持节点内循环 interrupt → B2 干净形态成立，按 7.3 推进。
+- 若只支持「工具触发单次 interrupt」→ B2 干净形态打折，退化 B2-lite 或需更大改造（重估）。
+**此调研是 B2 排期前提，约 0.5–1 人日。**
+
+### 7.5 工作量与风险
+
+- **粗估**：前置调研 0.5–1 人日；若 deer-flow 图易扩展，bridge 节点 + 前端接线 **2–4 人日**；若要动 lead
+  图核心 / 涉上游回流对账，更多。**相对现状 D 大一个量级。**
+- **风险**：① 动 `backend/` 上游 harness 核心（`[backend]` 标注 + 回流对账）；② agent 回合长时间挂起
+  （整个 HITL 时长）——checkpointer 支持但需验超时/恢复；③ 两 checkpointer（deer-flow + cost）状态一致性；
+  ④ 弱模型在 start/summarize 两端仍可能加料（summarize 有真 rollup、风险低）。
+
+### 7.6 中间档 B2-lite（回调，不动核心）
+
+只要「done 后 agent 收尾」而非「停在每个闸」：保持现点火 + 卡片旁路，卡片 **done 时前端自动发一条消息**
+给 agent（「组价完成，总造价 X，请收尾」）→ agent 总结。**不动 deer-flow 核心**（仅前端一处），但**不给
+「停在每个闸」**、开头点火文字仍在。量：**小**。
+
+### 7.7 决策口径
+
+先把现状 D 抛光（note 已改 + 可选「引导在上/卡在下」布局）跑顺——**大概率够用**。仅当「agent 必须在场、
+停在每个闸」被确认为刚需，才启动 B2（先做 7.4 前置调研再排期）。**B2 未排期，本节为存档。**

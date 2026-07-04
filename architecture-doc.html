@@ -243,7 +243,7 @@
 
 <table>
   <tr><th style="width:150px">机制</th><th>设计要点</th><th>状态</th></tr>
-  <tr><td><b>意图路由</b></td><td>两级混合：确定性 prerouter（关键词/信号，强信号零延迟直配，金标可回归）→ 低置信才升 32b 兜底分类（temp=0、enum、代码校验、fail-safe 跌回）。LLM 只出能力标签；出界/口径/特征/形态四个红线闸两条路都确定性重推。<b>补</b>：<s>out_of_domain 第五标签＋顶层直答</s>✅、<s>「列清单/列项」词条＋金标</s>✅（2026-07-04 落地，47+8+12 自测、30/30 金标全绿）；余 prior_capability 会话粘性入参。</td><td class="good">已建，余一项</td></tr>
+  <tr><td><b>意图路由</b></td><td>两级混合：确定性 prerouter（关键词/信号，强信号零延迟直配，金标可回归）→ 低置信才升 32b 兜底分类（temp=0、enum、代码校验、fail-safe 跌回）。LLM 只出能力标签；出界/口径/特征/形态四个红线闸两条路都确定性重推。<b>补</b>：<s>out_of_domain 第五标签＋顶层直答</s>✅、<s>「列清单/列项」词条＋金标</s>✅（2026-07-04 落地，47+8+12 自测、30/30 金标全绿；32b 兜底服务器实测 <b>17/17=100%</b>、P95 639ms，提示词反例锚点修复口语误判后收口）；余 prior_capability 会话粘性入参。</td><td class="good">已建，余一项</td></tr>
   <tr><td><b>第零跳收权</b></td><td>RouteContextMiddleware（deer-flow 中间件，照抄 DynamicContextMiddleware 模式）：每轮消息先调 /route，RouteDecision 以 system-reminder 注入；模型从「自由分诊」降为「按判定执行」；:8101 不可达则不注入（fail-open）。路由单一源留在 ce-services，harness 只做消费者。</td><td class="warn">规划</td></tr>
   <tr><td><b>HITL 门控</b></td><td>门控不逐步 gate：τ 双阈值三段式（≥τ_high 直配 / 中段人工确认 / &lt;τ_low 提示补描述）＋多候选/缺价/缺政策数才停；末尾 review 恒停。compute/gate 双拆——interrupt resume 从节点头重跑，昂贵 LLM 调用放上游有 checkpoint 的 compute 节点。用户决策 lock_value 钉死，下游确定性重算不重跑 LLM。</td><td class="good">已建</td></tr>
   <tr><td><b>Provenance</b></td><td>来源是字段不是散文：每个数字带 {source_type, source_ref, confidence, alternatives}；前端只从结构化字段渲染，不解析模型自然语言。audit_log + overrides 支撑交付对账。待知识层补文件+行号级 source_ref。</td><td class="good">已建，粒度待补</td></tr>
@@ -291,7 +291,7 @@
       <li>并发：SqliteSaver per-task 锁；graph invoke 线程池隔离；PG 连接池</li>
       <li>测试：tools/_selftest 收编 pytest＋CI；graph 暂停/恢复/回退/半填/what-if 全路径 stub 回归</li>
     </ul>
-    <div class="gatebox"><b>验收：</b>路由金标 ≥95%（含域外/承接负例）；curl 全流程脚本绿；前端类型零手抄；并发 10 会话压测不阻塞。</div>
+    <div class="gatebox"><b>验收：</b>路由金标 ≥95%（含域外/承接负例）——<b>已达</b>：金标 30/30、兜底 17/17、pytest 11 passed（07-04 服务器实测）；curl 全流程脚本绿；前端类型零手抄（契约模型已立，codegen 待接）；并发 10 会话压测不阻塞（待做）。</div>
   </div>
 </div>
 

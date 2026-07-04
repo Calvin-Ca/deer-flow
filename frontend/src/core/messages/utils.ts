@@ -204,7 +204,7 @@ function splitInlineReasoning(content: string) {
   // 剥掉闭合块后若仍有悬挂的未闭合 <think>（流式进行中），从它到结尾整段剥成推理。
   const open = OPEN_THINK_TAG_RE.exec(cleaned);
   if (open) {
-    const normalized = open[1].trim();
+    const normalized = (open[1] ?? "").trim();
     if (normalized) {
       reasoningParts.push(normalized);
     }

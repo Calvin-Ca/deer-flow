@@ -48,6 +48,27 @@ _DECISION_KEYS = (
 )
 
 
+def _extract_prior_capability(messages: list) -> str | None:
+    """从历史里最近一条路由 reminder 解析上一轮能力（供 /route 会话粘性）；无/解析失败 → None。
+
+    当轮 reminder 尚未注入，故逆序扫到的第一条 route reminder 即上一轮的判定；其正文里有
+    一行 compact JSON（``_build_reminder`` 产出），取其中 capability 字段。任何异常按无处理。
+    """
+    for message in reversed(messages):
+        if isinstance(message, HumanMessage) and message.additional_kwargs.get(_ROUTE_REMINDER_KEY):
+            content = message.content if isinstance(message.content, str) else ""
+            for line in content.splitlines():
+                line = line.strip()
+                if line.startswith("{"):
+                    try:
+                        cap = json.loads(line).get("capability")
+                    except json.JSONDecodeError:
+                        return None
+                    return cap if isinstance(cap, str) else None
+            return None
+    return None
+
+
 def _is_real_user_message(message: object) -> bool:
     """Return whether *message* is a genuine user turn (not an injected reminder/summary)."""
     return (
@@ -73,8 +94,11 @@ class RouteContextMiddleware(AgentMiddleware):
         self._timeout = timeout_seconds
 
     # ── /route 调用（纯标准库，fail-open）─────────────────────────────────
-    def _fetch_decision(self, query: str) -> dict | None:
-        payload = json.dumps({"query": query, "use_llm_fallback": True}).encode("utf-8")
+    def _fetch_decision(self, query: str, prior_capability: str | None = None) -> dict | None:
+        body: dict = {"query": query, "use_llm_fallback": True}
+        if prior_capability:
+            body["prior_capability"] = prior_capability  # 会话粘性：承接句沿用上一轮能力（EH-05 扩展）
+        payload = json.dumps(body).encode("utf-8")
         request = urllib.request.Request(
             self._route_url, data=payload,
             headers={"Content-Type": "application/json"}, method="POST",
@@ -119,7 +143,7 @@ class RouteContextMiddleware(AgentMiddleware):
         if not isinstance(target.content, str) or not target.content.strip():
             return None  # 多模态/空消息：路由无从判，跳过（fail-open）
 
-        decision = self._fetch_decision(target.content)
+        decision = self._fetch_decision(target.content, _extract_prior_capability(messages))
         if decision is None:
             return None
 

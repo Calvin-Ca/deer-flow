@@ -147,6 +147,26 @@ def _ignite_hitl(query: str, decision: RouteDecision) -> dict[str, Any]:
                      "严禁：转述闸/编码/条文内容、罗列操作选项、重复语句、编造任何编码或数字。")}
 
 
+# 域外直答文案（M1 域外出口）：路由判 out_of_domain → 顶层说明能力范围，不进检索/取数管道白跑。
+_CAPABILITY_STATEMENT = (
+    "我是深圳房建造价助手，可以帮您：\n"
+    "① **规范问答**——计量/计价规则、条文解释（GB 50500 / GB 50854 / GB 50856，2013/2024 双版）；\n"
+    "② **构件组价**——描述构件（如「C30现浇矩形柱」）→ 清单编码 → 定额与工料机价，支持完整组价到总造价（逐闸确认）；\n"
+    "③ **深圳信息价查询**——材料/设备当期价与价差。\n"
+    "您这个问题看起来不在上述范围内，我无法提供专业解答。"
+    "若确与造价相关而被我误判，请换个说法（点明构件、规范或材料名）再试。"
+)
+
+
+def _out_of_domain_envelope(query: str) -> dict[str, Any]:
+    """域外直答信封（M1）：capability=out_of_domain 的统一返回——不调任何能力层。
+
+    参数：query —— 用户原句。返回：``{capability, query, status="ok", answer}``（answer=能力范围声明）。
+    """
+    return {"capability": "out_of_domain", "query": query, "status": "ok",
+            "answer": _CAPABILITY_STATEMENT}
+
+
 def _out_of_scope_envelope(cap: str, query: str, region: str) -> dict[str, Any]:
     """EH-03 跨地域体面告知（T9-5）：组价/价格显式要他省口径 → 不取数、说清范围 + 给出路（C-03）。
 
@@ -381,6 +401,12 @@ def orchestrate(
     decision = route_hybrid(query, has_project_context=has_project_context,
                             use_llm_fallback=use_llm_fallback)
 
+    # 域外出口（M1）：与造价无关 → 顶层直答能力范围，不进 norm 检索管道白跑、不联网兜底。
+    if decision.capability == "out_of_domain":
+        logger.info("orchestrate out_of_domain：%s", query[:40])
+        return {"mode": "single", "route": decision.as_meta(),
+                "result": _out_of_domain_envelope(query)}
+
     # 单一意图：无需拆解/综合，直接派发到能力层（编排器也作统一入口）。
     if decision.capability != "compound":
         # Option B：完整组价形态（到总造价/逐步确认）+ 非出界 → 点火 HITL 会话（前门只点火）。
@@ -494,6 +520,20 @@ def _selftest() -> int:
         check("出界他省完整组价：不点火（体面告知）", o3.get("mode") == "single" and len(ignited) == 1)
     finally:
         globals()["_ignite_hitl"] = _orig_ignite
+
+    # ⑤ 域外出口（M1）：路由判 out_of_domain → 顶层直答能力范围、零派发（打桩 route_hybrid 注入域外判定）
+    dispatched.clear()
+    _orig_rh = globals()["route_hybrid"]
+    globals()["route_hybrid"] = lambda q, **kw: route(q, capability_override="out_of_domain")
+    try:
+        o_ood = orchestrate("今天天气怎么样", dispatch_fn=stub_dispatch,
+                            decompose_fn=stub_decompose, synthesize_fn=stub_synth)
+        check("域外：mode=single 直答能力范围、不派发",
+              o_ood["mode"] == "single"
+              and o_ood["result"]["capability"] == "out_of_domain"
+              and "范围" in o_ood["result"]["answer"] and len(dispatched) == 0)
+    finally:
+        globals()["route_hybrid"] = _orig_rh
 
     # ③ 综合降级：确定性拼接不丢引用（综合 LLM 不可用时的兜底形态）
     fb_out = _synth_fallback("原问", [

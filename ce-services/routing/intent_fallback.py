@@ -39,23 +39,25 @@ _FALLBACK_SYSTEM = """\
 
 能力枚举（只能选其一）：
 - norm —— 规范问答：问计量/计价规则、项目特征、工作内容、综合单价构成、条文含义、两版区别等（要「规则/解释」）。
-- cost —— 组价：要给某个构件套清单/套定额/选编码/组综合单价（要「给某构件算价/选码」）。
+- cost —— 组价：要给某个构件套清单/套定额/选编码/列清单/组综合单价（要「给某构件算价/选码/出清单」）。
 - price —— 价格取数：问某材料/设备的信息价、市场价、当期价、价差、价格趋势（要「某材料多少钱/价怎么变」）。
 - compound —— 复合：一句话里含多个独立诉求（如「先套定额再算合价并判合规」「A、B 两方案比选」）。
+- out_of_domain —— 与建设工程造价领域完全无关：闲聊问候、天气、写代码、旅游、通用百科等。
 
 判定要点：
 1. 拿不准是 norm 还是 cost 时——若在**问规则/解释**归 norm，若在**要给具体构件算价/选码**归 cost。
 2. 只有明确的多诉求并列才判 compound，不要硬拆单一问题。
 3. **不要**判断规范版本、地区口径、特征是否齐全——那些由下游确定性处理，你只出能力标签。
+4. 域内但表述含糊时**不要**判 out_of_domain（宁可归 norm 交下游检索兜底）；只有明显与造价无关才判。
 
-只返回合法 JSON：{"capability": "norm|cost|price|compound", "reason": "一句话依据"}，不输出任何 JSON 以外的文字。\
+只返回合法 JSON：{"capability": "norm|cost|price|compound|out_of_domain", "reason": "一句话依据"}，不输出任何 JSON 以外的文字。\
 """
 
 
 def _fallback_user(query: str) -> str:
     return (
         f"用户请求：{query}\n\n"
-        '判定主能力落点，只返回合法 JSON：{"capability": "norm|cost|price|compound", "reason": "一句话依据"}'
+        '判定主能力落点，只返回合法 JSON：{"capability": "norm|cost|price|compound|out_of_domain", "reason": "一句话依据"}'
         "\n\n/no_think"
     )
 
@@ -173,6 +175,11 @@ def _selftest() -> int:
     d = route_hybrid("这两个有什么区别", use_llm_fallback=True, classify_fn=lambda q: None)
     check("fail-safe：兜底 None → 保持确定性 norm", d.capability == "norm"
           and d.route_source == "deterministic")
+
+    # ④b 低置信 + 兜底判 out_of_domain（域外闲聊）→ 升级域外标签（编排器据此直答能力范围，不进检索）
+    d = route_hybrid("今天天气怎么样", use_llm_fallback=True, classify_fn=lambda q: "out_of_domain")
+    check("低置信→兜底 out_of_domain", d.capability == "out_of_domain"
+          and d.route_source == "llm_fallback" and d.clarify is None)
 
     # ⑤ 兜底判定与确定性同为 norm → 不改判、保持 deterministic
     d = route_hybrid("综合单价的构成是什么", use_llm_fallback=True, classify_fn=lambda q: "norm")

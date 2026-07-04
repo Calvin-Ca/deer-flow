@@ -32,6 +32,15 @@ COST_INTENT_KW: tuple[str, ...] = (
     "组价", "套定额", "套价", "套清单", "套什么定额", "套什么清单", "套哪个定额",
     "清单码", "清单编码", "清单编号", "选码", "选清单", "子目", "套子目", "定额子目",
 )
+# 列清单/列项意图（M1 补盲区）：从项目/构件描述「生成清单」的方向——区别于「套/选清单」给单构件找码。
+# 批量列清单的专属落点在 M2（设计说明解析→批量组价）；当前先归 cost 能力，避免误落 norm
+# 被反问规范版本（答非所问）。注意**不含裸「列项」**：「能同时列项吗」是规范问答（金标 A9），
+# 裸词二义 → 只在伴随「清单/构件」时算列清单意图（见 route() 内条件判）。
+LISTING_INTENT_KW: tuple[str, ...] = (
+    "列清单", "清单列项", "编制清单", "清单编制", "编制工程量清单", "开清单",
+)
+# 柔性变体（同 _COMPARE_RE 治法）：「列一下清单 / 开个清单 / 列份清单」——中缀量词隔断精确子串。
+_LISTING_RE = re.compile(r"[列开]\s*[一两]?[下个份张]?\s*(工程量)?清单")
 # 价格取数意图（FR-I，动态来源）：问某材料的「当期价/趋势」。
 # 分两档：**强信号**（信息价/市场价/趋势等，明确指向动态价格源）与**泛化问价**（"多少钱"等，
 # 常只是组价诉求的口语尾巴）。复合判定（multi_capability）只认强信号——"这个柱子组价多少钱"
@@ -88,7 +97,9 @@ NORM_KW: tuple[str, ...] = (
 # （或纯默认、且无版本锁）→ 判**低置信**，交 LLM 兜底复核（不把「未命中/只命中泛词」硬吞成 norm）。
 GENERIC_NORM_KW: tuple[str, ...] = ("区别", "差异", "包含哪些", "构成")
 # 合法能力枚举（LLM 兜底分类的校验白名单；越界 → fail-safe 跌回确定性默认）。
-VALID_CAPABILITIES: tuple[str, ...] = ("norm", "cost", "price", "compound")
+# out_of_domain（M1 补域外出口）：与造价领域完全无关（闲聊/天气/写代码…）——确定性层无法穷举
+# 域外说法，故只由 LLM 兜底分类判出；编排器据此顶层直答能力范围，不进检索/取数管道白跑。
+VALID_CAPABILITIES: tuple[str, ...] = ("norm", "cost", "price", "compound", "out_of_domain")
 
 # ── 形态判定：构件 / 特征槽（cost 特征完整度 EH-04，确定性粗判，精判仍走 cost/clarify.py 的 LLM）──
 COMPONENT_KW: tuple[str, ...] = (
@@ -219,6 +230,13 @@ def route(query: str, *, has_project_context: bool | None = None,
     reasons: list[str] = []
 
     cost_sig = _hits(text, COST_INTENT_KW)
+    # 列清单意图：词表 + 柔性正则；裸「列项」二义（金标 A9「能同时列项吗」是 norm），
+    # 只在伴随「清单/构件」时计入（如「清单列项」「把这几个构件列项」）。
+    listing_sig = _hits(text, LISTING_INTENT_KW)
+    if not listing_sig and _LISTING_RE.search(text):
+        listing_sig = ["列…清单(柔性)"]
+    if not listing_sig and "列项" in text and ("清单" in text or "构件" in text):
+        listing_sig = ["列项(伴随清单/构件)"]
     price_sig = _hits(text, PRICE_INTENT_KW)
     compound_sig = _hits(text, COMPOUND_KW)
     compare_hit = bool(_COMPARE_RE.search(text))
@@ -248,9 +266,10 @@ def route(query: str, *, has_project_context: bool | None = None,
     # 复合判定只认价格**强信号**（信息价/市场价/趋势…或 材料+时间）——泛化"多少钱"不升复合。
     price_strong = bool(_hits(text, PRICE_STRONG_KW) or (material_sig and time_sig))
     explicit_compound = bool(compound_sig) or compare_hit
+    cost_action = bool(cost_sig or listing_sig)  # 组价类动作词（套码/组价/列清单）
     multi_capability = (
-        (bool(cost_sig) and bool(norm_sig))     # 组价动作 + 规范口径（如「套定额 + 按什么计量」）
-        or (price_strong and bool(cost_sig))     # 价格（强）+ 组价
+        (cost_action and bool(norm_sig))         # 组价动作 + 规范口径（如「套定额 + 按什么计量」）
+        or (price_strong and cost_action)        # 价格（强）+ 组价
         or (price_strong and bool(norm_sig))     # 价格（强）+ 规范
     )
 
@@ -259,7 +278,7 @@ def route(query: str, *, has_project_context: bool | None = None,
     #   源标 llm_fallback。非法值忽略、退回确定性。**强信号命中率（strong_signal）仍照确定性算**，
     #   仅用于置信度审计。
     strong_signal = bool(
-        cost_sig or price_strong or explicit_compound or multi_capability
+        cost_sig or listing_sig or price_strong or explicit_compound or multi_capability
         or _EXPLICIT_GB_RE.search(text))
     route_source = "deterministic"
     if capability_override in VALID_CAPABILITIES:
@@ -279,9 +298,12 @@ def route(query: str, *, has_project_context: bool | None = None,
         # 泛化问价（"多少钱"）仅在无组价动作词时归 price——"组价多少钱"是组价诉求的口语尾巴，归 cost。
         capability, source_type = "price", "dynamic"
         reasons.append(f"价格取数信号 {price_sig or (material_sig + time_sig)} → 动态价格")
-    elif cost_sig:
+    elif cost_sig or listing_sig:
         capability, source_type = "cost", "static"
-        reasons.append(f"组价意图 {cost_sig} → 组价 Agent")
+        if cost_sig:
+            reasons.append(f"组价意图 {cost_sig} → 组价 Agent")
+        else:
+            reasons.append(f"列清单/列项意图 {listing_sig} → 组价能力（批量列清单落点在 M2，先归 cost 防误落 norm）")
     elif ctx_check_sig:
         capability, source_type = "cost", "static"
         reasons.append(f"项目核对 {ctx_check_sig} → 组价 + 上下文（FR-C）")
@@ -348,7 +370,7 @@ def route(query: str, *, has_project_context: bool | None = None,
         compose_full=compose_full,
         route_confidence=route_confidence, route_source=route_source,
         matched={
-            "cost": cost_sig, "price": price_sig, "compound": compound_sig,
+            "cost": cost_sig, "listing": listing_sig, "price": price_sig, "compound": compound_sig,
             "compare": compare_hit, "multi_capability": multi_capability,
             "norm": norm_sig, "context": ctx_sig, "context_check": ctx_check_sig,
             "calc": calc_sig, "material": material_sig, "time": time_sig,
@@ -392,6 +414,15 @@ _SELFTEST_CASES: tuple[tuple[str, str, str | None], ...] = (
     ("这个柱子按北京定额套价", "cost", None),                    # 他省组价→出界，不反问特征
     ("上海本月钢筋信息价多少", "price", None),                   # 他省价格→出界
     ("深圳本月钢筋信息价多少", "price", None),                   # 深圳→不出界（对照）
+    # ── 列清单/列项（M1 补盲区）：归 cost，缺构件特征→feature 反问（不再误落 norm 反问版本）──
+    ("帮我列一下清单", "cost", "feature"),                       # 柔性正则「列一下清单」
+    ("给这个项目列清单", "cost", "feature"),
+    ("根据设计说明编制工程量清单", "cost", "feature"),
+    ("清单列项", "cost", "feature"),
+    ("帮我把这几个构件列项", "cost", "feature"),                 # 「列项」伴随「构件」才计
+    ("这个工程开个清单", "cost", "feature"),                     # 柔性正则「开个清单」
+    # 反例·裸「列项」无清单/构件伴随 → 仍是 norm（金标 A9 同款句式，不误吞）
+    ("综合脚手架和单项脚手架能同时列项吗", "norm", "caliber"),
 )
 
 
@@ -418,6 +449,7 @@ _SELFTEST_CONFIDENCE_CASES: tuple[tuple[str, str], ...] = (
     ("这两个有什么区别", "low"),                                 # 只命中泛词「区别」
     ("帮我把这根柱子弄一下", "low"),                             # 口语变体、无任何关键词（纯默认）
     ("独立基础和条形基础包含哪些", "low"),                       # 只命中泛词「包含哪些」，无版本
+    ("帮我列一下清单", "high"),                                  # 列清单强信号→直配 cost，不调兜底
 )
 
 
@@ -470,8 +502,16 @@ def _selftest() -> int:
     failed += not ovr_ok
     print(f"{'✓' if ovr_ok else '✗'} override→cost src={d_ovr.route_source} clarify={d_ovr.clarify}（红线闸确定性重推）")
 
+    # capability_override→out_of_domain（M1 域外出口）：域外标签生效、不触发任何反问/出界闸
+    d_ood = route("今天天气怎么样", capability_override="out_of_domain")
+    ood_ok = (d_ood.capability == "out_of_domain" and d_ood.route_source == "llm_fallback"
+              and d_ood.clarify is None and d_ood.out_of_scope_region is None)
+    passed += ood_ok
+    failed += not ood_ok
+    print(f"{'✓' if ood_ok else '✗'} override→out_of_domain src={d_ood.route_source} clarify={d_ood.clarify}（域外直答出口）")
+
     total = (len(_SELFTEST_CASES) + len(_SELFTEST_REGION_CASES)
-             + len(_SELFTEST_CONFIDENCE_CASES) + 1)
+             + len(_SELFTEST_CONFIDENCE_CASES) + 2)
     print(f"\n自测：{passed} 过 / {failed} 败 / 共 {total}")
     return 1 if failed else 0
 

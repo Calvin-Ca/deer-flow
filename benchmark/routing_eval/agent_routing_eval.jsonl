@@ -22,3 +22,9 @@
 {"id": "C2", "agent": "price", "group": "out_of_scope", "query": "上海本月螺纹钢信息价多少？", "expect_route": false, "expect_clarify": false, "gold": null, "note": "EH-03 价格侧：他省口径→体面告知不取数（价格严格锁深圳，C-02 分侧）"}
 {"id": "C3", "agent": "price", "group": "trend", "query": "近三个月商品混凝土价差是多少？", "expect_route": true, "expect_clarify": false, "gold": null, "note": "FR-I02：库内仅一期数据时如实说「仅 X 期，趋势需多期入库后支持」；多期则确定性算价差（C-04 在代码不入 LLM）"}
 {"id": "D1", "agent": "cost-check", "group": "context_check", "query": "帮我核对这份清单有没有错套：010401002 实心砖墙 m3 100×500=49000", "expect_route": true, "expect_clarify": false, "gold": null, "note": "FR-C v1（/cost/check）：编码有效性/单位一致性/合价算术确定性核对（本例应报 amount_mismatch 100×500=50000≠49000）；漏项/高估冒算 v1 如实标 unsupported"}
+{"id": "E1", "agent": "cost-agent", "group": "listing", "query": "帮我列一下清单", "expect_route": true, "expect_clarify": true, "gold": "2013", "note": "M1 列清单盲区修复：柔性正则「列一下清单」→ cost；缺构件特征→feature 反问（此前误落 norm 反问版本=答非所问）。批量列清单专属落点在 M2"}
+{"id": "E2", "agent": "cost-agent", "group": "listing", "query": "给这个项目列清单", "expect_route": true, "expect_clarify": true, "gold": "2013", "note": "关键词「列清单」→ cost + feature 反问"}
+{"id": "E3", "agent": "cost-agent", "group": "listing", "query": "根据设计说明编制工程量清单", "expect_route": true, "expect_clarify": true, "gold": "2013", "note": "关键词「编制工程量清单」→ cost；M2 后应改派批量解析入口（设计说明→多构件）"}
+{"id": "E4", "agent": "cost-agent", "group": "listing", "query": "清单列项", "expect_route": true, "expect_clarify": true, "gold": "2013", "note": "关键词「清单列项」→ cost"}
+{"id": "E5", "agent": "cost-agent", "group": "listing", "query": "帮我把这几个构件列项", "expect_route": true, "expect_clarify": true, "gold": "2013", "note": "「列项」伴随「构件」才计（裸「列项」二义，见 A9 反例：能同时列项吗=norm）"}
+{"id": "E6", "agent": "cost-agent", "group": "listing", "query": "这个工程开个清单", "expect_route": true, "expect_clarify": true, "gold": "2013", "note": "柔性正则「开个清单」→ cost"}

@@ -179,6 +179,8 @@ services:
       - DEER_FLOW_SANDBOX_HOST=host.docker.internal
     env_file:
       - ../.env
+      # 灰度开关（经 ../.env 注入）：CE_ROUTE_CONTEXT_URL=http://host.docker.internal:8101/route
+      # 开启后 lead_agent 每轮注入确定性路由判定（RouteContextMiddleware）；删行 recreate 即回滚。
     extra_hosts:
       # For Linux: map host.docker.internal to host gateway
       - "host.docker.internal:host-gateway"

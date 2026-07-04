@@ -68,6 +68,8 @@ mcp = FastMCP(
         "  · norm_qa —— 造价/计量/计价规范问题 → 检索条文 + 带引用结构化作答（零召回拒答，不编造条文）\n"
         "  · cost_compose —— 构件描述 → 清单候选召回 → LLM 选码 → 组价取数（缺价标 no_source、"
         "选不出码转 HITL，绝不杜撰）\n"
+        "  · quota_lookup —— 【已知清单码】直查套定额取数（纯键查、不选码；从描述选码必走 cost_compose）\n"
+        "  · price_lookup —— 【材料/人工/机械名】直查当期信息价（纯键查，零命中诚实返回）\n"
         "  · start_cost_session —— 起可中断 HITL 完整组价会话（走到总造价、逐闸确认/录入）：只点火、"
         "返回 cost-hitl marker 供前端内嵌控件驱动，你**不逐闸编排**"
     ),
@@ -155,6 +157,65 @@ def cost_compose(
         raise ToolError(f"依赖服务不可达（知识服务 :8100 / LLM :8099）: {exc}") from exc
     except ValueError as exc:  # call_qwen3 的 json.JSONDecodeError
         raise ToolError(f"LLM 选码输出非合法 JSON: {exc}") from exc
+
+
+@mcp.tool()
+def quota_lookup(
+    code: Annotated[str, Field(description="已知清单编码（9 位），如「010502001」")],
+    spec: Annotated[str | None, Field(description="国标版本 2013 / 2024（可缺省）：缺则默认深圳·2013（§4.0 不反问）")] = None,
+    region: Annotated[str, Field(description="地区（当前仅深圳），用于定额过滤与信息价取价")] = "深圳",
+) -> dict:
+    """**已知清单编码** → 套定额取数（定额子目 + 工料机含量 + 信息价单价）：纯键查、**不选码**。
+
+    **何时用**：用户**直接给了清单码**、只想查「这码套什么定额 / 工料机取数」——键查场景。
+    **与 ``cost_compose`` 分工（红线）**：从**构件描述**选码是判断题、有红线兜底，必须走 ``cost_compose``；
+    本工具**不做任何选码判断**，只对给定 code 确定性取数。若 code 有歧义/不确定，别用本工具猜，转 ``cost_compose``。
+
+    参数：code —— 已知清单编码；spec —— 国标版本 2013/2024（缺省默认深圳·2013）；region —— 地区（深圳）。
+    返回：``{code, spec, region, price, caliber}``——price 为组价取数结果（定额工料机含量 + 信息价单价 + 小计，
+      未命中信息价的资源 price_status=no_source，不杜撰）；caliber 为口径声明（spec_source=default 时首答应显示）。
+    异常：spec 非 2013/2024 / 该版本组价数据未就绪（501）/ 清单项不存在（404）/ 知识服务不可达（503）→ ToolError。
+    """
+    _spec = spec or COST_DEFAULT_SPEC
+    if _spec not in ("2013", "2024"):
+        raise ToolError(f"未知国标版本 spec={spec!r}（仅支持 2013 / 2024，同码不同义不可混）")
+    from common import cost_client
+    try:
+        price = cost_client.price_compose(region, code, _spec)
+    except requests.HTTPError as exc:
+        detail = exc.response.text if exc.response is not None else str(exc)
+        raise ToolError(f"依赖服务返回错误: {detail}") from exc
+    except requests.RequestException as exc:
+        raise ToolError(f"知识服务不可达（:8100 /price/compose）: {exc}") from exc
+    caliber = {"declared": f"{region}·{_spec}", "region": region, "spec": _spec,
+               "spec_source": "user" if spec else "default"}
+    return {"code": code, "spec": _spec, "region": region, "price": price, "caliber": caliber}
+
+
+@mcp.tool()
+def price_lookup(
+    name: Annotated[str, Field(description="材料/人工/机械名称（模糊匹配），如「商品混凝土」「螺纹钢」")],
+    region: Annotated[str, Field(description="地区（当前仅深圳）")] = "深圳",
+    period: Annotated[str | None, Field(description="期号 YYYY-MM（可缺省，缺则各资源取最新期）")] = None,
+    category: Annotated[str | None, Field(description="类别过滤：人工 / 材料 / 机械（可选）")] = None,
+    top_k: Annotated[int, Field(ge=1, le=50, description="返回行数")] = 10,
+) -> dict:
+    """**材料/人工/机械名称** → 当期信息价：纯键查（动态价格数据，与国标版本无关）。
+
+    **何时用**：用户直接问「某材料/人工/机械的信息价（当期价）多少」。零命中如实返回 count=0（诚实 no_source，非错误）。
+    参数：name —— 名称（模糊）；region —— 地区（深圳）；period —— 期号 YYYY-MM（缺省最新）；
+      category —— 人工/材料/机械 过滤；top_k —— 行数。
+    返回：``{name, region, period, count, results:[{name,spec,unit,category,price,price_type,period_start,period_end,doc_id}...]}``。
+    异常：PG/知识服务不可达（503）→ ToolError。
+    """
+    from common import cost_client
+    try:
+        return cost_client.price_query(name, region=region, period=period, category=category, top_k=top_k)
+    except requests.HTTPError as exc:
+        detail = exc.response.text if exc.response is not None else str(exc)
+        raise ToolError(f"依赖服务返回错误: {detail}") from exc
+    except requests.RequestException as exc:
+        raise ToolError(f"知识服务不可达（:8100 /price/query）: {exc}") from exc
 
 
 @mcp.tool()

@@ -26,7 +26,7 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.types import interrupt
 
 from common.config import COST_DEFAULT_SPEC, HITL_TAU_HIGH, HITL_TAU_LOW, LLM_MODEL_ID, LLM_URL
-from cost import clarify, gates, provenance
+from cost import clarify, gates, provenance, quota_selection
 from cost.pricing import (
     HierarchyItem,
     HierarchyRollupInput,
@@ -291,15 +291,23 @@ def quota_gate_node(state: CostTaskState) -> dict[str, Any]:
                                   detail={"子目号": basis["子目号"]})],
         }
 
-    # ── 有子目：唯一自动过 / 多子目人工确认 ──
-    paused = len(quotas) > 1
-    if paused:
-        decision = interrupt(gates.confirm_payload("quota", env, "请确认套用定额子目"))
-        value, prov, action = gates.apply_confirm_decision(env, decision)
-        by = "user"
-    else:
+    # ── 有子目：唯一自动过 / 多子目走套定额门控（默认无模型→人工确认；训练模型高置信→自动过，§8 决策4）──
+    conf: float | None = None
+    if len(quotas) <= 1:
         value = quotas[0].get("子目号")
-        prov, action, by = env["provenance"], "auto_pass", "model"
+        prov, action, by, paused = env["provenance"], "auto_pass", "model", False
+    else:
+        sel = quota_selection.select_quota(item.get("feature"), (item.get("code") or {}).get("value"), quotas)
+        conf = sel.get("confidence")
+        if sel.get("子目号") and not sel.get("need_review"):
+            # 套定额模型高置信 → 自动过（子目号已经红线校验在候选内）。
+            value = sel["子目号"]
+            prov = {**env["provenance"], "confidence": conf, "selector": "quota_model", "reason": sel.get("reason")}
+            action, by, paused = "auto_pass_model", "model", False
+        else:
+            decision = interrupt(gates.confirm_payload("quota", env, "请确认套用定额子目"))
+            value, prov, action = gates.apply_confirm_decision(env, decision)
+            by, paused = "user", True
 
     item["quota"] = lock_value(value, prov, by=by)
     # 保留所选子目的定额基价（人材机净价）供 §8 综合单价计算；越界子目无对应基价 → None（下游 missing_base 透传）。
@@ -307,8 +315,8 @@ def quota_gate_node(state: CostTaskState) -> dict[str, Any]:
     return {
         "items": _put_item(state, item),
         "audit_log": [audit_entry("quota", action, {"子目号": value}, by=by)],
-        # 自动过=唯一子目，无 LLM 置信（tau=None）；停闸=多子目人工选。
-        "events": [gate_event("quota_gate", paused=paused, provenance=prov, detail={"子目号": value})],
+        # 自动过=唯一子目（conf=None）或模型高置信（conf 有值）；停闸=多子目人工选。
+        "events": [gate_event("quota_gate", paused=paused, confidence=conf, provenance=prov, detail={"子目号": value})],
     }
 
 
@@ -539,6 +547,40 @@ def _compute_rollup(state: CostTaskState) -> dict[str, Any]:
         fee_levy=float(params.get("fee_levy") or 0),
         tax_rate=params.get("tax_rate"),
     ))
+
+
+def recompute_rollup(
+    state: CostTaskState | dict[str, Any],
+    *,
+    params_override: dict[str, Any] | None = None,
+    rates_override: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """what-if 重算总造价：套用修正后的费率/项目费用，确定性重算两级汇总 + 总造价（纯函数、不碰图/会话/LLM）。
+
+    用于「已完成组价后改费率/税率/项目费用要新总价」（COST_STEP_DISPLAY_PLAN §8 决策5 / red line 7）——
+    重算走**确定性图原语**，杜绝弱模型在对话里凭文本数字重算造价。
+
+    参数：
+        state —— 会话累积态（含 items[].quota_basis/quantity/unit_price、rates、params、single_work/unit_work）；
+        rates_override —— 费率覆盖（management_fee_rate/profit_rate/risk_rate/fee_base）；给定则**逐件重算综合单价**
+          （复用 ``_unit_price_for``，缺 Q → missing_quantity、缺基价 → missing_base，不杜撰）；
+        params_override —— 项目费用/税率覆盖（measure_fee/other_fee/fee_levy/tax_rate）；仅重算顶层费用/税金。
+    返回：``{rollup, rates, params}``——rollup 为 ``rollup_hierarchy`` 结果（含两级明细 + missing 计数）；
+      rates/params 为套用覆盖后的有效值。不修改入参 state、不落 checkpoint（纯 what-if）。
+    """
+    working = dict(state)
+    if rates_override:
+        rates = {**(working.get("rates") or {}), **rates_override}
+        items = [dict(it) for it in (working.get("items") or [])]
+        for it in items:
+            quantity, basis = it.get("quantity"), it.get("quota_basis")
+            it["unit_price"] = ({"status": "missing_quantity"} if basis is not None and quantity is None
+                                else _unit_price_for(basis, rates, quantity))
+        working["items"], working["rates"] = items, rates
+    if params_override:
+        working["params"] = {**(working.get("params") or {}), **params_override}
+    return {"rollup": _compute_rollup(working),
+            "rates": working.get("rates"), "params": working.get("params")}
 
 
 def rollup_compute_node(state: CostTaskState) -> dict[str, Any]:

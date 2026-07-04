@@ -11,6 +11,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { getSessionState, streamResume } from "@/core/cost/client";
+import { emitCostDone } from "@/core/cost/cost-hitl-events";
 import { displayValue } from "@/core/cost/format";
 import type { CostDecision, CostEvent, CostInterrupt } from "@/core/cost/types";
 
@@ -143,19 +144,26 @@ export function CostHitlInline({ taskId }: { taskId: string }) {
               prev ? { ...prev, gate: msg.gate, status: "awaiting_input" } : prev,
             );
           } else if (msg.type === "done") {
+            const doneRollup = asRecord(msg.rollup);
             setSnap((prev) =>
               prev
                 ? {
                     ...prev,
                     status: msg.status,
                     gate: null,
-                    rollup: asRecord(msg.rollup) ?? prev.rollup,
+                    rollup: doneRollup ?? prev.rollup,
                     items: msg.items ?? prev.items,
                     overrides: msg.overrides ?? prev.overrides,
                     auditCount: msg.audit_count ?? prev.auditCount,
                   }
                 : prev,
             );
+            // B2-lite（§8 决策2）：仅在本次交互真实完成时广播，触发 agent 收尾；重开会话不触发。
+            emitCostDone({
+              taskId,
+              total: typeof doneRollup?.total === "number" ? doneRollup.total : null,
+              status: msg.status,
+            });
           } else if (msg.type === "error") {
             setError(msg.detail);
           }

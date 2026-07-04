@@ -289,6 +289,30 @@ def rewind(task_id: str, to_node: str) -> dict[str, Any]:
     return _format(task_id, result)
 
 
+def re_rollup(
+    task_id: str,
+    params_override: dict[str, Any] | None = None,
+    rates_override: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """what-if 重算已完成组价的总造价：读持久化累积态、套修正费率/项目费用、确定性重算（不改会话、不重跑 LLM）。
+
+    用途（COST_STEP_DISPLAY_PLAN §8 决策5 / cost-agent 红线7）：用户「改费率/税率/项目费用后要新总价」时，
+    重算走**服务端确定性图原语**（``graph.recompute_rollup``），而不是让弱模型在对话里凭回复文本数字反推。
+
+    参数：task_id —— 已起过的会话；params_override —— measure_fee/other_fee/fee_levy/tax_rate 覆盖；
+      rates_override —— management_fee_rate/profit_rate/risk_rate/fee_base 覆盖（变则逐件重算综合单价）。
+    返回：``{task_id, status:"recomputed", rollup, rates, params}``；会话无构件数据 → status=error。
+      **纯 what-if**：不修改 checkpoint、不推进图；要把新值写回需另走 rewind + resume。
+    """
+    from cost.graph import recompute_rollup
+    snapshot = _graph.get_state(_config(task_id))
+    values = snapshot.values if snapshot else {}
+    if not values.get("items"):
+        return _error(task_id, "会话无构件数据，无法重算总造价")
+    out = recompute_rollup(values, params_override=params_override, rates_override=rates_override)
+    return {"task_id": task_id, "status": "recomputed", **out}
+
+
 def get_state(task_id: str) -> dict[str, Any]:
     """读会话当前持久化状态（不推进图）。
 

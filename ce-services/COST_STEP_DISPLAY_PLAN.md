@@ -224,23 +224,25 @@
 | # | 决策 | 状态 | 依据 |
 |---|---|---|---|
 | **1 交互模型** | 维持**点火型解耦**：agent 调 `start_cost_session` 点火即返回 marker，逐闸走 REST `/cost/session/*` 由前端卡片驱动，agent 不在环 | ✅ 已实现 | 全系统**单 checkpointer**，图内 compute/gate 双拆已解重放安全 → 零跨状态机一致性风险 |
-| **2 agent 收尾** | **B2-lite**：卡片 `done` 时前端自动发「组价完成，总造价 X，请收尾」→ agent 总结一句。只动前端一处，不碰 backend 核心 | ⬜ backlog | 拿"收尾"体验不付全 B2 代价；summarize 有真 rollup、风险低 |
+| **2 agent 收尾** | **B2-lite**：卡片 `done` 时前端自动发「组价完成，总造价 X，请收尾」（`hide_from_ui`）→ agent 总结一句。只动前端一处，不碰 backend 核心 | ✅ 本次落地 | 拿"收尾"体验不付全 B2 代价；summarize 有真 rollup、风险低 |
 | **3 步骤可视化** | 卡片 + 时间线 + 两级层级树，只从结构化 `events` 渲染 | ✅ 已实现（阶段0/1/2） | 显示由"图 emit events"决定，与"是否 MCP"无关 |
-| **4 训练模型套定额** | 落成图内**一个 compute 节点外呼**（同 `bill_match`/`price_compose`），**置信门控**（复用混合路由）：高置信自动过、低置信升人闸；算一次写进 session 持久化，gate 只确认 | 🔒 阻塞（模型未训） | 贵+非确定性副作用必须留图内 compute 节点、不进重放区；它减少人闸→削弱全 B2 的 ROI |
+| **4 训练模型套定额** | 落成图内**一个 compute 节点外呼**（同 `bill_match`/`price_compose`），**置信门控**（复用混合路由）：高置信自动过、低置信升人闸；算一次写进 session 持久化，gate 只确认 | 🔒 模型未训；**接口已预留** | 贵+非确定性副作用必须留图内 compute 节点、不进重放区；它减少人闸→削弱全 B2 的 ROI |
 | **5 红线守卫** | 套定额模型只在真实候选内选、`消耗量/费率`走确定性库查表；费率/税率必须人录入；缺价 `no_source`、选不出码 `need_review` 如实透传；自动过的闸必留依据卡；**改已完成组价的参数不在对话里重算**（导回卡片重开闸/重起会话） | ✅ 本次补齐 | `HITL_DESIGN §1.2/§10`；类型 B 杜撰重算护栏见 cost-agent skill 红线 7 |
 | **6 MCP 粒度** | 维持不拆：ce-cost 取数原语 + ce-task（orchestrate/norm_qa/cost_compose/start_cost_session）。HITL 逐闸**不暴露成 MCP** | ✅ 已实现 | 拆 HITL 步骤=逼弱模型当编排器（红线）+ 无状态失配 + 一致性倒退 |
 
-### 8.2 本次落地内容
+### 8.2 本次落地内容（已实现，代码级）
 
-- **cost-agent skill 新增红线 7**：组价 `done` 后改费率/税率/定额/工程量再算，**禁止用回复里的文本数字自行重算造价**，导回卡片重开对应闸或按修正参数重起会话（重算走服务端确定性图）。
-- 本决策记录（§8）写入存档。
+- **cost-agent skill 红线 7**：组价 `done` 后改费率/税率/定额/工程量再算，**禁止用回复文本数字自行重算造价**，导回卡片重开闸或按修正参数重起会话（重算走服务端确定性图）。
+- **B2-lite 前端收尾**（决策 2）：`cost-hitl-inline.tsx` 在 resume 流 `done` 分支 emit `cost-hitl-events`；`useThreadStream` 订阅后自动向 thread 发一条 `hide_from_ui` 触发消息 → agent 收尾。按 taskId 去重、只发一次；**只在本次交互真实完成时触发，重开会话不触发**。
+- **纯键查任务层薄能力**（Backlog 2）：`ce-task` MCP 新增 `quota_lookup`（已知清单码直查套定额取数）+ `price_lookup`（材料/人工/机械名直查信息价），均纯键查、带 spec 归一 + 口径声明；**docstring 钉红线：从描述选码必走 `cost_compose`，本工具不选码**。底层复用 `cost_client.price_compose`/`price_query`。
+- **re-rollup 确定性重算**（Backlog 3）：`graph.recompute_rollup`（纯函数：套修正费率/项目费用，复用 `_unit_price_for`/`rollup_hierarchy` 确定性重算，不碰图/会话/LLM）+ `session.re_rollup`（读持久化累积态调之）+ `POST /cost/session/{id}/re_rollup`。兜住类型 B 的**正确**重算（红线 7 只挡杜撰、本能力提供确定性重算通道）。
+- **训练模型套定额接口预留**（决策 4）：新增 `cost/quota_selection.py` —— `select_quota(feature, code, quotas)` + `register_quota_selector(fn)` 挂点，红线兜底（只选候选内子目、越界作废、低置信 need_review）与 `select_code` 同构；`quota_gate_node` 多子目分支改走 `select_quota` 置信门控。**默认无模型 → need_review（多子目维持人工确认，行为不变）**；训练模型就绪后 `register_quota_selector` 注入即生效，无需再改图。
+- 自测 `tools/test_backlog.py`（recompute_rollup 4 项 + select_quota 红线 4 项，无 pytest 依赖，服务器 `uv run python tools/test_backlog.py`）。
 
-### 8.3 Backlog（需单独开工，非本次）
+### 8.3 Backlog 剩余
 
-1. **B2-lite 前端收尾**（决策 2）：`cost-hitl-inline.tsx` 侦测 `done` → 自动向 thread 发一条收尾消息给 agent。量小，仅前端一处。
-2. **纯键查任务层薄能力**：`ce-task` 补 `quota_lookup`/`price_lookup`（已知码查定额 / 材料查信息价，带 spec 归一 + 口径 + guard 信封），补上"用户直接给码只想查"这条现状缺口——**选码类仍走 `cost_compose`，不放任模型裸调 ce-cost 自行选码**。
-3. **"修改已完成组价"能力（re-rollup）**：ce-services 加"读会话累积态 + 换参数 + 复用 `rollup_cost` 确定性重算"的端点/图能力，兜住类型 B 的正确重算（现状红线 7 只挡杜撰、不提供重算）。
-4. **训练模型套定额**（决策 4）：模型就绪后按 8.1 落图内 compute 节点 + 置信门控。
+- **训练模型套定额**（决策 4）：**接口已就位**，待模型训好后实现 `QuotaSelector` 并 `register_quota_selector` 注入；届时补 compute 节点持久化 + benchmark。
+- **前端类型检查/e2e**：本次前端改动（cost-hitl-events + hooks 订阅）须在服务器/CI 跑 `pnpm check`。
 
 ### 8.4 存档（不启动）
 

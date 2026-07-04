@@ -48,7 +48,7 @@
       "enabled": true,
       "type": "http",
       "url": "http://host.docker.internal:8101/mcp",
-      "description": "深圳房建任务层能力：orchestrate（四层骨架前门，确定性路由→单一直派/复合拆解-综合）/ norm_qa（规范问答，检索+带引用作答）/ cost_compose（构件→选码→组价取数）/ start_cost_session（起可中断 HITL 完整组价会话，只点火返回 cost-hitl marker）"
+      "description": "深圳房建任务层能力：orchestrate（四层骨架前门，确定性路由→单一直派/复合拆解-综合）/ norm_qa（规范问答，检索+带引用作答）/ cost_compose（构件→选码→组价取数）/ quota_lookup（已知清单码直查套定额取数，纯键查不选码）/ price_lookup（材料/人工/机械名直查当期信息价）/ start_cost_session（起可中断 HITL 完整组价会话，只点火返回 cost-hitl marker）"
     }
   },
   "skills": {

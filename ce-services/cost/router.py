@@ -265,6 +265,32 @@ def cost_session_rewind_endpoint(task_id: str, req: SessionRewindRequest) -> dic
     return result
 
 
+class SessionReRollupRequest(BaseModel):
+    """会话总造价 what-if 重算请求 —— 改费率/项目费用后重算（不改会话，红线7 的确定性重算通道）。
+
+    字段：params_override —— 项目费用/税率覆盖（measure_fee/other_fee/fee_levy/tax_rate，仅重算顶层）；
+      rates_override —— 费率覆盖（management_fee_rate/profit_rate/risk_rate/fee_base，变则逐件重算综合单价）。
+      两者皆可空（都空=按现值重算，等价于读一次总造价）。
+    """
+
+    params_override: dict | None = Field(None, description="项目费用/税率覆盖 measure_fee/other_fee/fee_levy/tax_rate")
+    rates_override: dict | None = Field(None, description="费率覆盖 management_fee_rate/profit_rate/risk_rate/fee_base")
+
+
+@router.post("/cost/session/{task_id}/re_rollup")
+def cost_session_re_rollup_endpoint(task_id: str, req: SessionReRollupRequest) -> dict:
+    """读会话累积态 + 套修正费率/项目费用 → 确定性重算总造价（不改会话、不重跑 LLM）。
+
+    参数：task_id —— 已完成/进行中的会话；req —— 费率/项目费用覆盖。
+    返回：``{task_id, status:"recomputed", rollup, rates, params}``；会话无构件数据 → status="error"。
+      用途：已出总价后改税率/费率要新总价——重算走服务端确定性图，避免弱模型对话内凭文本重算（红线7）。
+    """
+    from cost import session
+    result = session.re_rollup(task_id, params_override=req.params_override, rates_override=req.rates_override)
+    logger.info("/cost/session/%s/re_rollup status=%s", task_id, result.get("status"))
+    return result
+
+
 @router.get("/cost/session/{task_id}/state")
 def cost_session_state_endpoint(task_id: str) -> dict:
     """读会话当前持久化状态（不推进图）。

@@ -20,5 +20,13 @@ dependencies = [
     "mcp>=1.2",
 ]
 
+[dependency-groups]
+# 测试组（M1 pytest 收编）：服务器 `uv sync` 默认装 dev 组；CI 跑 `uv run pytest tests/ -q`。
+# 本地无 pytest 亦可直跑各测试模块（__main__ 兜底，见 tests/*.py 文件头）。
+dev = ["pytest>=8"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
 [tool.uv]
 package = false

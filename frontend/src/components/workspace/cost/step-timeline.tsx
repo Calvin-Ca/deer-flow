@@ -48,7 +48,7 @@ function StepRow({ ev }: { ev: CostEvent }) {
           )}
           {ev.confidence != null && ev.tau != null && (
             <span className="text-muted-foreground">
-              置信 {ev.confidence} ≥ τ{ev.tau}
+              置信 {ev.confidence} {ev.confidence >= ev.tau ? "≥" : "＜"} τ{ev.tau}
             </span>
           )}
           {summary && <span className="text-muted-foreground font-mono break-all">{summary}</span>}

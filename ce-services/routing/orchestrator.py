@@ -134,8 +134,14 @@ def _ignite_hitl(query: str, decision: RouteDecision) -> dict[str, Any]:
     task_id = res.get("task_id")
     marker = "```cost-hitl\n" + json.dumps({"task_id": task_id}, ensure_ascii=False) + "\n```"
     logger.info("orchestrate hitl-ignite task=%s status=%s", task_id, res.get("status"))
+    # **刻意不返回 first_gate**：前端内嵌控件自己 getSessionState 拿闸，无需它；返回给弱模型 lead 反而
+    # 被它读去用文字转述首闸（编「1/13、请选择 1确认2覆盖3补充」等，与卡片真按钮重复且误导）。只留 note
+    # 明示「只回一句就停、勿转述闸」——素材少了、弱模型没得发挥（红线不靠自觉：能不给的素材就不给）。
     return {"mode": "hitl", "route": decision.as_meta(), "task_id": task_id,
-            "marker": marker, "status": res.get("status"), "first_gate": res.get("interrupt")}
+            "marker": marker, "status": res.get("status"),
+            "note": ("HITL 组价会话已起、前端已内嵌交互控件。请**只回一句**"
+                     "「已为你起好组价会话，请在下方控件逐步确认编码/定额/价格/费率直到总造价」并停下——"
+                     "勿转述闸内容、勿列操作选项、勿编造编码/条文（逐闸交互全在控件里、不经你）。")}
 
 
 def _out_of_scope_envelope(cap: str, query: str, region: str) -> dict[str, Any]:

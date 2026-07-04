@@ -14,6 +14,8 @@
  * tool UIs render inline in the conversation.
  */
 
+import type { Message } from "@langchain/langgraph-sdk";
+
 const COST_HITL_BLOCK = /```cost-hitl\s*\r?\n([\s\S]*?)```/;
 
 export interface CostHitlMarker {
@@ -34,4 +36,59 @@ export function extractCostHitlMarker(content: string): CostHitlMarker | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * 从造价 MCP 工具结果里抠出组价 HITL 会话 task_id（结果可能是 JSON 字符串或已解析对象）。
+ * 覆盖两条点火路径：① 前门 ``ce-task_orchestrate`` → ``{mode:"hitl", task_id}``；
+ * ② 直连 ``ce-task_start_cost_session`` → ``{task_id, marker}``。非 HITL 结果 → null。
+ */
+export function hitlTaskIdFromResult(
+  result?: string | Record<string, unknown> | null,
+): string | null {
+  if (!result) return null;
+  let obj: Record<string, unknown> | undefined;
+  if (typeof result === "string") {
+    try {
+      obj = JSON.parse(result) as Record<string, unknown>;
+    } catch {
+      return extractCostHitlMarker(result)?.taskId ?? null;
+    }
+  } else {
+    obj = result;
+  }
+  const taskId = obj?.task_id;
+  if (typeof taskId === "string" && taskId) return taskId;
+  const marker = obj?.marker;
+  if (typeof marker === "string") return extractCostHitlMarker(marker)?.taskId ?? null;
+  return null;
+}
+
+/**
+ * 扫描一个回合的消息，取出被点火的组价 HITL 会话 task_id（优先结构化的 ce-task 工具**结果**，
+ * 不依赖弱模型把 marker 贴进正文）。返回最后一个命中的 task_id，无则 null。用于把组价控件渲染到
+ * 回合**末尾**（agent 文字之后），而非钉在工具调用处（中间过程块）导致「卡上、字下」方位错乱。
+ */
+export function extractHitlTaskIdFromMessages(messages: Message[]): string | null {
+  const resultByToolCallId = new Map<string, string>();
+  for (const message of messages) {
+    if (
+      message.type === "tool" &&
+      message.tool_call_id &&
+      typeof message.content === "string"
+    ) {
+      resultByToolCallId.set(message.tool_call_id, message.content);
+    }
+  }
+  let taskId: string | null = null;
+  for (const message of messages) {
+    if (message.type !== "ai" || !message.tool_calls) continue;
+    for (const toolCall of message.tool_calls) {
+      if (!toolCall.name?.startsWith("ce-task_")) continue;
+      const result = toolCall.id ? resultByToolCallId.get(toolCall.id) : undefined;
+      const id = hitlTaskIdFromResult(result);
+      if (id) taskId = id;
+    }
+  }
+  return taskId;
 }

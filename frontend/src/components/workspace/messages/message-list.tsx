@@ -1,7 +1,14 @@
 import type { Message } from "@langchain/langgraph-sdk";
 import type { BaseStream } from "@langchain/langgraph-sdk/react";
 import { ChevronUpIcon, Loader2Icon } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import {
+  Fragment,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+} from "react";
 
 import {
   Conversation,
@@ -25,6 +32,7 @@ import {
   hasPresentFiles,
   hasReasoning,
 } from "@/core/messages/utils";
+import { extractHitlTaskIdFromMessages } from "@/core/cost/marker";
 import { useRehypeSplitWordsIntoSpans } from "@/core/rehype";
 import type { Subtask } from "@/core/tasks";
 import { useUpdateSubtask } from "@/core/tasks/context";
@@ -35,6 +43,8 @@ import { cn } from "@/lib/utils";
 import { ArtifactFileList } from "../artifacts/artifact-file-list";
 import { CopyButton } from "../copy-button";
 import { StreamingIndicator } from "../streaming-indicator";
+
+import { CostHitlInline } from "../cost/cost-hitl-inline";
 
 import { MarkdownContent } from "./markdown-content";
 import { MessageGroup } from "./message-group";
@@ -181,6 +191,31 @@ export function MessageList({
   const groupedMessages = getMessageGroups(messages);
   const turnUsageMessagesByGroupIndex =
     getAssistantTurnUsageMessages(groupedMessages);
+  // 组价 HITL 控件：把它渲染到**回合末尾**（agent 文字之后），而不是钉在工具调用处（中间过程块）
+  // 导致「卡片在上、文字在下、方位词相反」。按 taskId 从回合工具结果抽取，映射到回合最后一个分组的 index。
+  const hitlCardByGroupIndex = useMemo(() => {
+    const map = new Map<number, string>();
+    let turnStart = -1;
+    for (let i = 0; i < groupedMessages.length; i++) {
+      if (groupedMessages[i].type === "human") {
+        turnStart = -1;
+        continue;
+      }
+      if (turnStart === -1) turnStart = i;
+      const isTurnEnd =
+        i === groupedMessages.length - 1 ||
+        groupedMessages[i + 1].type === "human";
+      if (isTurnEnd) {
+        const turnMessages = groupedMessages
+          .slice(turnStart, i + 1)
+          .flatMap((g) => g.messages);
+        const taskId = extractHitlTaskIdFromMessages(turnMessages);
+        if (taskId) map.set(i, taskId);
+        turnStart = -1;
+      }
+    }
+    return map;
+  }, [groupedMessages]);
   const tokenDebugSteps = useMemo(
     () => buildTokenDebugSteps(messages, t),
     [messages, t],
@@ -270,6 +305,7 @@ export function MessageList({
         {groupedMessages.map((group, groupIndex) => {
           const turnUsageMessages = turnUsageMessagesByGroupIndex[groupIndex];
 
+          const groupElement: ReactNode = (() => {
           if (group.type === "human") {
             return (
               <div key={group.id} className="w-full">
@@ -455,6 +491,18 @@ export function MessageList({
                 inlineDebug: false,
               })}
             </div>
+          );
+          })();
+
+          const hitlTaskId = hitlCardByGroupIndex.get(groupIndex);
+          if (!hitlTaskId) return groupElement;
+          return (
+            <Fragment key={`hitl-turn-${group.id}`}>
+              {groupElement}
+              <div className="w-full">
+                <CostHitlInline taskId={hitlTaskId} />
+              </div>
+            </Fragment>
           );
         })}
         {thread.isLoading && <StreamingIndicator className="my-4" />}

@@ -23,7 +23,6 @@ import {
   ChainOfThoughtStep,
 } from "@/components/ai-elements/chain-of-thought";
 import { CodeBlock } from "@/components/ai-elements/code-block";
-import { extractCostHitlMarker } from "@/core/cost/marker";
 import { useI18n } from "@/core/i18n/hooks";
 import { formatTokenCount } from "@/core/messages/usage";
 import type { TokenDebugStep } from "@/core/messages/usage-model";
@@ -37,38 +36,10 @@ import { env } from "@/env";
 import { cn } from "@/lib/utils";
 
 import { useArtifacts } from "../artifacts";
-import { CostHitlInline } from "../cost/cost-hitl-inline";
 import { Tooltip } from "../tooltip";
 
 import { CeToolResult, isCeTool } from "./ce-tool-result";
 import { MarkdownContent } from "./markdown-content";
-
-/**
- * 从造价 MCP 工具结果里抠出组价 HITL 会话 task_id，用来直接内嵌渲染组价控件——**不依赖弱模型把
- * ``cost-hitl`` marker 原样贴进正文**（Qwen3-8B 常把闸转述成散文、漏贴 marker，导致控件不出）。
- * 覆盖两条点火路径：① 前门 ``ce-task_orchestrate`` 判「完整组价形态」→ 结果 ``{mode:"hitl", task_id}``；
- * ② 直连 ``ce-task_start_cost_session`` → 结果 ``{task_id, marker}``。工具结果是结构化的：优先取
- * ``task_id``，兼容 ``marker`` 字段或整串里内嵌的 marker。非 HITL 结果（无 task_id）→ 返回 null。
- */
-function hitlTaskIdFromResult(result?: string | Record<string, unknown>): string | null {
-  if (!result) return null;
-  // 工具结果运行时可能是字符串(JSON) 或已解析对象——两种都兼容（同 ce-tool-result 的 resultObj）。
-  let obj: Record<string, unknown> | undefined;
-  if (typeof result === "string") {
-    try {
-      obj = JSON.parse(result) as Record<string, unknown>;
-    } catch {
-      return extractCostHitlMarker(result)?.taskId ?? null;
-    }
-  } else {
-    obj = result;
-  }
-  const taskId = obj?.task_id;
-  if (typeof taskId === "string" && taskId) return taskId;
-  const marker = obj?.marker;
-  if (typeof marker === "string") return extractCostHitlMarker(marker)?.taskId ?? null;
-  return null;
-}
 
 export function MessageGroup({
   className,
@@ -114,18 +85,6 @@ export function MessageGroup({
   const lastToolCallStep = useMemo(() => {
     const filteredSteps = steps.filter((step) => step.type === "toolCall");
     return filteredSteps[filteredSteps.length - 1];
-  }, [steps]);
-  // 组价 HITL 会话：若本轮某个 ce-task 工具结果带 task_id（前门 orchestrate 判完整组价形态点火，
-  // 或直连 start_cost_session），从结果拿 task_id 直接内嵌控件（不靠模型贴 marker）。
-  // 放在折叠的「中间过程」之外，保证控件对用户可见。
-  const hitlTaskId = useMemo(() => {
-    for (const step of steps) {
-      if (step.type === "toolCall" && step.name.startsWith("ce-task_")) {
-        const id = hitlTaskIdFromResult(step.result);
-        if (id) return id;
-      }
-    }
-    return null;
   }, [steps]);
   const rehypePlugins = useRehypeSplitWordsIntoSpans(isLoading);
   const firstEligibleDebugSummaryStepIndexByMessageId = useMemo(() => {
@@ -291,12 +250,7 @@ export function MessageGroup({
     </ChainOfThought>
   );
 
-  return (
-    <>
-      {cot}
-      {hitlTaskId && <CostHitlInline taskId={hitlTaskId} />}
-    </>
-  );
+  return cot;
 }
 
 function formatDebugToken(

@@ -176,6 +176,22 @@
 - 若只支持「工具触发单次 interrupt」→ B2 干净形态打折，退化 B2-lite 或需更大改造（重估）。
 **此调研是 B2 排期前提，约 0.5–1 人日。**
 
+#### 调研结论（2026-07-04，已看代码）
+
+**核心答案：7.3 的「加自定义节点 `cost_hitl_bridge` + 节点内多次 `interrupt()`」形态在 deer-flow 现架构下不成立。** 三条已验证事实：
+
+1. **lead agent 不是手写 `StateGraph`，是 `langchain.agents.create_agent` 预制环**（`backend/…/agents/factory.py:139`，model↔tools ReAct 循环）。**没有一张图能"插节点"**——`create_deerflow_agent` 的唯一扩展面是 14 段 **middleware 链**（`_assemble_from_features`），钩子只有 `before_model / after_model / wrap_model_call / wrap_tool_call`。7.3 里「把 bridge 节点挂进 lead agent 图」这个动作在架构上没有落点。
+2. **全库无 native `interrupt()`**（grep `\binterrupt(` = 0 命中）。现有 HITL（`ask_clarification`）**不用** langgraph 的 checkpoint 挂起：`ClarificationMiddleware.wrap_tool_call` 命中即返回 `Command(update={messages:[toolmsg]}, goto=END)`——**直接把这一 run 送到 END 结束**。所谓"续"= 前端下一轮提交一条新 HumanMessage 起新 run（`clarification_middleware.py:153`）。这与 B2 设想的「同一 agent 回合挂起在闸、resume 从中断点续」是**两种模型**。
+3. **resume-via-`Command(resume=…)` 未接通**：gateway `RunCreateRequest` 虽声明了 `command`/`checkpoint_id`/`checkpoint`（LangGraph Platform 兼容 schema，`thread_runs.py:39/44-45`），但 `services.py:338 start_run` 构造入参时**只读 `body.input`**（`graph_input = normalize_input(body.input)`），**`body.command` 全程被忽略**。即便 checkpointer 已挂载（worker 有快照/回滚逻辑），也**没有把 `Command(resume=…)` 喂回图的通路**。native interrupt/resume 是"schema 有、链路无"。
+
+**据此对 7.4 分支判定：落在第二分支「只支持单次 interrupt / 需更大改造」。** 现架构原生 HITL 能力 = 「`Command(goto=END)` 结束回合 + 下一轮新 HumanMessage」，本质就是**现状点火型/ B2-lite 的模型**——无法在不接通新链路的前提下把「一个 agent 回合"暂停"着跨多个闸」。
+
+**若仍要 B2 干净形态（停在每闸、agent 在环），最小诚实路径（较 7.3 重估上移）：**
+- **bridge 落成"工具"而非"节点"**（挂在 create_agent 的 tools 节点里），工具体内调 langgraph `interrupt()`。langgraph 支持单节点多次 interrupt，但**每次 resume 会从节点顶重放**——工具体每过一闸就整体重跑一遍，故对 `/cost/session/*` 的 HTTP 调用**必须幂等/带进度守卫**，否则重复起会话/重复推进。这正是 7.5「两 checkpointer 一致性」风险的具体化。
+- **接通 interrupt/resume 全链路**（backend 核心改动，`[backend]` + 上游回流对账）：gateway `body.command → graph_input`、worker 支持以 `Command(resume=…)` 驱动 astream、前端 interrupt UI 提交 resume 命令。**工作量从 7.3 的「加一个节点」上移为「接通全链路 + 工具重放安全」**，7.5 三条风险（动核心 / 长挂起 / 双 checkpointer 一致性）全部坐实。
+
+**修订建议**：B2 干净形态**打折确认**，不建议现在启动。**优先 7.6 B2-lite**（done 后前端自动发消息给 agent 收尾，不动核心，量小）或维持现状 D。仅当「agent 必须在场、停在每闸」被确认为硬需求，才按上面"最小诚实路径"重新排期（量级 ≈ 中-大，动 backend 核心）。前端组件（gates/timeline/层级树）无论走哪条都可复用，非瓶颈。
+
 ### 7.5 工作量与风险
 
 - **粗估**：前置调研 0.5–1 人日；若 deer-flow 图易扩展，bridge 节点 + 前端接线 **2–4 人日**；若要动 lead
@@ -194,3 +210,38 @@
 
 先把现状 D 抛光（note 已改 + 可选「引导在上/卡在下」布局）跑顺——**大概率够用**。仅当「agent 必须在场、
 停在每个闸」被确认为刚需，才启动 B2（先做 7.4 前置调研再排期）。**B2 未排期，本节为存档。**
+
+---
+
+## 8. 最终落地决策（2026-07-04 综合结论）
+
+> 经 §7 一系列调研（B2 可行性 / 节点重放 × 双 checkpointer 一致性 / subagent / 训练模型 / MCP 粒度）后的定案。
+> **总纲：交互维持"点火型解耦"为主干，把智能投在"训练模型 + 置信门控自动过闸"，不投在"全 B2 连续暂停回合"；
+> 全 B2（方案 A）仅存档，待"agent 必须在环、停在每闸"被确认为硬需求再启动。**
+
+### 8.1 六条决策
+
+| # | 决策 | 状态 | 依据 |
+|---|---|---|---|
+| **1 交互模型** | 维持**点火型解耦**：agent 调 `start_cost_session` 点火即返回 marker，逐闸走 REST `/cost/session/*` 由前端卡片驱动，agent 不在环 | ✅ 已实现 | 全系统**单 checkpointer**，图内 compute/gate 双拆已解重放安全 → 零跨状态机一致性风险 |
+| **2 agent 收尾** | **B2-lite**：卡片 `done` 时前端自动发「组价完成，总造价 X，请收尾」→ agent 总结一句。只动前端一处，不碰 backend 核心 | ⬜ backlog | 拿"收尾"体验不付全 B2 代价；summarize 有真 rollup、风险低 |
+| **3 步骤可视化** | 卡片 + 时间线 + 两级层级树，只从结构化 `events` 渲染 | ✅ 已实现（阶段0/1/2） | 显示由"图 emit events"决定，与"是否 MCP"无关 |
+| **4 训练模型套定额** | 落成图内**一个 compute 节点外呼**（同 `bill_match`/`price_compose`），**置信门控**（复用混合路由）：高置信自动过、低置信升人闸；算一次写进 session 持久化，gate 只确认 | 🔒 阻塞（模型未训） | 贵+非确定性副作用必须留图内 compute 节点、不进重放区；它减少人闸→削弱全 B2 的 ROI |
+| **5 红线守卫** | 套定额模型只在真实候选内选、`消耗量/费率`走确定性库查表；费率/税率必须人录入；缺价 `no_source`、选不出码 `need_review` 如实透传；自动过的闸必留依据卡；**改已完成组价的参数不在对话里重算**（导回卡片重开闸/重起会话） | ✅ 本次补齐 | `HITL_DESIGN §1.2/§10`；类型 B 杜撰重算护栏见 cost-agent skill 红线 7 |
+| **6 MCP 粒度** | 维持不拆：ce-cost 取数原语 + ce-task（orchestrate/norm_qa/cost_compose/start_cost_session）。HITL 逐闸**不暴露成 MCP** | ✅ 已实现 | 拆 HITL 步骤=逼弱模型当编排器（红线）+ 无状态失配 + 一致性倒退 |
+
+### 8.2 本次落地内容
+
+- **cost-agent skill 新增红线 7**：组价 `done` 后改费率/税率/定额/工程量再算，**禁止用回复里的文本数字自行重算造价**，导回卡片重开对应闸或按修正参数重起会话（重算走服务端确定性图）。
+- 本决策记录（§8）写入存档。
+
+### 8.3 Backlog（需单独开工，非本次）
+
+1. **B2-lite 前端收尾**（决策 2）：`cost-hitl-inline.tsx` 侦测 `done` → 自动向 thread 发一条收尾消息给 agent。量小，仅前端一处。
+2. **纯键查任务层薄能力**：`ce-task` 补 `quota_lookup`/`price_lookup`（已知码查定额 / 材料查信息价，带 spec 归一 + 口径 + guard 信封），补上"用户直接给码只想查"这条现状缺口——**选码类仍走 `cost_compose`，不放任模型裸调 ce-cost 自行选码**。
+3. **"修改已完成组价"能力（re-rollup）**：ce-services 加"读会话累积态 + 换参数 + 复用 `rollup_cost` 确定性重算"的端点/图能力，兜住类型 B 的正确重算（现状红线 7 只挡杜撰、不提供重算）。
+4. **训练模型套定额**（决策 4）：模型就绪后按 8.1 落图内 compute 节点 + 置信门控。
+
+### 8.4 存档（不启动）
+
+**全 B2 = 方案 A**（纯消费桥接工具 + 图外协调者 exactly-once 推进 + `start` 幂等）：需补通 `command→graph_input`（`services.py:338`）/ worker `Command(resume)` 驱动 / `__interrupt__` SSE 三条链路。**仅当硬需求确认后按方案 A 做，绝不用方案 C（端点逐个加守卫）。** 论证见 §7.4 调研结论。

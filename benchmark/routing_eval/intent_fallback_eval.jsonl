@@ -18,6 +18,6 @@
 {"id": "C_F4", "query": "按 gb50854-2024 矩形柱计量规则", "group": "strong_ctrl", "expect_confidence": "high", "gold_capability": "norm", "note": "显式GB→high 直配，不应升级"}
 {"id": "C_F5", "query": "满堂脚手架工程量怎么计算", "group": "strong_ctrl", "expect_confidence": "high", "gold_capability": "norm", "note": "强 norm 实词「工程量怎么」→high 直配，不应升级"}
 {"id": "C_F6", "query": "这批钢筋现在什么行情", "group": "strong_ctrl", "expect_confidence": "high", "gold_capability": "price", "note": "强价词「行情」→high 直配 price，不应升级"}
-{"id": "F14", "query": "今天天气怎么样", "group": "out_of_domain", "expect_confidence": "low", "gold_capability": "out_of_domain", "note": "M1 域外出口：闲聊→low，LLM 应判 out_of_domain；编排器顶层直答能力范围，不进 norm 检索管道白跑"}
-{"id": "F15", "query": "帮我写个Python爬虫", "group": "out_of_domain", "expect_confidence": "low", "gold_capability": "out_of_domain", "note": "写代码请求与造价无关→out_of_domain 直答"}
-{"id": "F16", "query": "你好，你是谁", "group": "out_of_domain", "expect_confidence": "low", "gold_capability": "out_of_domain", "note": "问候/自我介绍→out_of_domain（答案即能力范围声明，恰好兼作自我介绍）"}
+{"id": "F15", "query": "今天天气怎么样", "group": "out_of_domain", "expect_confidence": "low", "gold_capability": "out_of_domain", "note": "M1 域外出口：闲聊→low，LLM 应判 out_of_domain；编排器顶层直答能力范围，不进 norm 检索管道白跑（撞号修正：原误编 F14 与既有口语出界例重号）"}
+{"id": "F16", "query": "帮我写个Python爬虫", "group": "out_of_domain", "expect_confidence": "low", "gold_capability": "out_of_domain", "note": "写代码请求与造价无关→out_of_domain 直答"}
+{"id": "F17", "query": "你好，你是谁", "group": "out_of_domain", "expect_confidence": "low", "gold_capability": "out_of_domain", "note": "问候/自我介绍→out_of_domain（答案即能力范围声明，恰好兼作自我介绍）"}

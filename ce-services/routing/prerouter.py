@@ -68,6 +68,15 @@ _EXPLICIT_GB_RE = re.compile(r"(?i)gb\s*/?\s*t?\s*[-_]?\s*5\d{4}")
 CALC_KW: tuple[str, ...] = (
     "合价", "汇总", "总造价", "总价是多少", "算合价", "量乘价", "工程量×", "换算为", "换算成",
 )
+# 完整组价形态（Option B）：走「到总造价 / 逐步确认」的完整 HITL 流程（vs 一次性选码取数）。
+# 仅在 capability=cost 时判定；命中即由编排器点火 HITL 会话（前端内嵌控件逐闸办到总造价）。
+COMPOSE_FULL_KW: tuple[str, ...] = (
+    "完整组价", "走完整", "走流程", "组价流程", "全流程", "完整流程",
+    "逐步确认", "逐项确认", "逐闸", "算到总价", "算到总造价", "到总造价",
+    "算总价", "算总造价", "出总造价",
+)
+# 指向「总价/汇总」的计算信号（CALC_KW 子集，区别于纯换算）——配 cost 意图即判完整组价形态。
+TOTAL_CALC_KW: tuple[str, ...] = ("总造价", "总价", "汇总", "合价")
 # 规范/计量/计价口径信号（FR-K）：兜底归 norm，亦用于消歧。
 NORM_KW: tuple[str, ...] = (
     "计算规则", "按什么计量", "怎么计量", "工程量怎么", "工程量如何", "计量单位", "规范",
@@ -143,6 +152,7 @@ class RouteDecision:
     caliber_complete: bool
     clarify: str | None
     out_of_scope_region: str | None = None
+    compose_full: bool = False
     matched: dict = field(default_factory=dict)
     reasons: list[str] = field(default_factory=list)
 
@@ -157,6 +167,7 @@ class RouteDecision:
             "caliber_complete": self.caliber_complete,
             "clarify": self.clarify,
             "out_of_scope_region": self.out_of_scope_region,
+            "compose_full": self.compose_full,
             "matched": self.matched,
             "reasons": self.reasons,
         }
@@ -276,6 +287,15 @@ def route(query: str, *, has_project_context: bool | None = None) -> RouteDecisi
             clarify = None  # 出界告知优先于特征反问：先说清超范围，别先问特征
             reasons.append(f"显式他省口径「{out_of_scope_region}」→ 超出深圳范围，体面告知（EH-03）")
 
+    # ── 完整组价形态（Option B）：cost + 「到总造价/逐步确认」信号 → 编排器点火 HITL 会话 ──
+    #   （vs 一次性选码取数）。出界他省（out_of_scope）优先体面告知、不点火——由编排器据此二者裁定。
+    compose_full = False
+    if capability == "cost":
+        full_sig = _hits(text, COMPOSE_FULL_KW) + _hits(text, TOTAL_CALC_KW)
+        compose_full = bool(full_sig)
+        if compose_full:
+            reasons.append(f"完整组价形态 {full_sig} → 点火 HITL 会话（到总造价/逐步确认，Option B）")
+
     # ── 意图数量（EH-01）──
     intent_count = "compound" if capability == "compound" else "single"
 
@@ -284,6 +304,7 @@ def route(query: str, *, has_project_context: bool | None = None) -> RouteDecisi
         needs_context=needs_context, intent_count=intent_count,
         feature_complete=feature_complete, caliber_complete=caliber_complete,
         clarify=clarify, out_of_scope_region=out_of_scope_region,
+        compose_full=compose_full,
         matched={
             "cost": cost_sig, "price": price_sig, "compound": compound_sig,
             "compare": compare_hit, "multi_capability": multi_capability,

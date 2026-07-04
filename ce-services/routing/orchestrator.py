@@ -110,6 +110,34 @@ def _spec_of(query: str) -> tuple[str, str]:
     return (version, "user") if version else (COST_DEFAULT_SPEC, "default")
 
 
+def _ignite_hitl(query: str, decision: RouteDecision) -> dict[str, Any]:
+    """完整组价形态（Option B）：**点火**一个可中断 HITL 组价会话，返回 task_id + cost-hitl marker。
+
+    前门只点火、不编排（HITL_DESIGN §10）：起会话跑到首个闸，前端据 marker/task_id 内嵌渲染交互式
+    组价控件，用户在控件里逐闸办到总造价——全程不经弱模型。版本：query 显式 2013/2024 优先，否则
+    传 None 让图 setup 归一到默认深圳·2013（留口径声明事件）。点火失败（服务/LLM 不可达）→ 降级为
+    一次性 compose（不致命，用户至少拿到选码），status 标降级。
+    返回：``{mode:"hitl", route, task_id, marker, status, first_gate}``。
+    """
+    from cost import session  # 局部 import：隔离 langgraph 依赖，与 dispatch_subtask 一致
+    spec, spec_source = _spec_of(query)
+    try:
+        res = session.start(query, spec=(spec if spec_source == "user" else None),
+                            region=COST_DEFAULT_REGION)
+    except (requests.RequestException, ValueError) as exc:
+        logger.warning("HITL 点火失败 → 降级一次性 compose：%s", exc)
+        from cost import orchestration
+        fallback = orchestration.compose(query, spec, COST_DEFAULT_REGION, spec_source=spec_source)
+        return {"mode": "single", "route": decision.as_meta(),
+                "result": {"capability": "cost", "query": query, "status": "ok",
+                           "result": fallback, "note": f"HITL 点火失败降级一次性选码：{exc}"}}
+    task_id = res.get("task_id")
+    marker = "```cost-hitl\n" + json.dumps({"task_id": task_id}, ensure_ascii=False) + "\n```"
+    logger.info("orchestrate hitl-ignite task=%s status=%s", task_id, res.get("status"))
+    return {"mode": "hitl", "route": decision.as_meta(), "task_id": task_id,
+            "marker": marker, "status": res.get("status"), "first_gate": res.get("interrupt")}
+
+
 def _out_of_scope_envelope(cap: str, query: str, region: str) -> dict[str, Any]:
     """EH-03 跨地域体面告知（T9-5）：组价/价格显式要他省口径 → 不取数、说清范围 + 给出路（C-03）。
 
@@ -341,6 +369,11 @@ def orchestrate(
 
     # 单一意图：无需拆解/综合，直接派发到能力层（编排器也作统一入口）。
     if decision.capability != "compound":
+        # Option B：完整组价形态（到总造价/逐步确认）+ 非出界 → 点火 HITL 会话（前门只点火）。
+        #   出界他省优先体面告知（不点火）——交 dispatch_subtask 的 EH-03 拦截走一次性信封。
+        if (decision.capability == "cost" and decision.compose_full
+                and not decision.out_of_scope_region):
+            return _ignite_hitl(query, decision)
         result = _dispatch(query, decision)
         logger.info("orchestrate single cap=%s status=%s", decision.capability, result.get("status"))
         return {"mode": "single", "route": decision.as_meta(), "result": result}
@@ -423,6 +456,30 @@ def _selftest() -> int:
           str([s["route"]["capability"] for s in out["subtasks"]]))
     check("复合：综合答非空 + 汇集引用",
           bool(out["answer"]["answer"]) and len(out["answer"]["cited_clauses"]) == 1)
+
+    # ④ Option B：完整组价形态 → 点火 HITL；一次性/出界他省 → 不点火（打桩 _ignite_hitl 验分支，不起真会话）
+    #   经 globals() 改本模块全局（orchestrate 同模块按全局名查 _ignite_hitl），避免 -m 下 __main__ 与
+    #   routing.orchestrator 两份拷贝导致打桩打空。
+    ignited: list[str] = []
+
+    def _stub_ignite(q: str, d: RouteDecision) -> dict:
+        ignited.append(q)
+        return {"mode": "hitl", "task_id": "stub", "route": d.as_meta()}
+
+    _orig_ignite = globals()["_ignite_hitl"]
+    globals()["_ignite_hitl"] = _stub_ignite
+    try:
+        o1 = orchestrate("走完整组价算到总造价：C30现浇矩形柱，按2024版", dispatch_fn=stub_dispatch,
+                         decompose_fn=stub_decompose, synthesize_fn=stub_synth)
+        check("完整组价：mode=hitl 点火", o1.get("mode") == "hitl" and len(ignited) == 1)
+        o2 = orchestrate("C30现浇矩形柱套什么清单码", dispatch_fn=stub_dispatch,
+                         decompose_fn=stub_decompose, synthesize_fn=stub_synth)
+        check("一次性选码：不点火（mode=single）", o2.get("mode") == "single" and len(ignited) == 1)
+        o3 = orchestrate("北京的柱子完整组价算总造价", dispatch_fn=stub_dispatch,
+                         decompose_fn=stub_decompose, synthesize_fn=stub_synth)
+        check("出界他省完整组价：不点火（体面告知）", o3.get("mode") == "single" and len(ignited) == 1)
+    finally:
+        globals()["_ignite_hitl"] = _orig_ignite
 
     # ③ 综合降级：确定性拼接不丢引用（综合 LLM 不可用时的兜底形态）
     fb_out = _synth_fallback("原问", [

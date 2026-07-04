@@ -364,9 +364,11 @@ function Orchestrate({ args, r }: { args: Rec; r?: Rec }) {
   const desc =
     r === undefined
       ? "编排中…"
-      : mode === "compound"
-        ? `复合拆解（${subtasks.length} 子任务）`
-        : `单一直派 → ${str(route?.capability) ?? "能力层"}`;
+      : mode === "hitl"
+        ? "完整组价 → 已起 HITL 会话（见下方交互控件）"
+        : mode === "compound"
+          ? `复合拆解（${subtasks.length} 子任务）`
+          : `单一直派 → ${str(route?.capability) ?? "能力层"}`;
 
   const synthCited = asArr(asRec(r?.answer)?.cited_clauses)
     .map(asRec)

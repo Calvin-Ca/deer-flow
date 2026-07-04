@@ -44,9 +44,11 @@ import { CeToolResult, isCeTool } from "./ce-tool-result";
 import { MarkdownContent } from "./markdown-content";
 
 /**
- * 从 ``start_cost_session`` 工具结果里抠出组价 HITL 会话 task_id，用来直接内嵌渲染组价控件——
- * **不依赖弱模型把 ``cost-hitl`` marker 原样贴进正文**（Qwen3-8B 常把闸转述成散文、漏贴 marker，
- * 导致控件不出）。工具结果是结构化的：优先取 ``task_id``，兼容 ``marker`` 字段或整串里内嵌的 marker。
+ * 从造价 MCP 工具结果里抠出组价 HITL 会话 task_id，用来直接内嵌渲染组价控件——**不依赖弱模型把
+ * ``cost-hitl`` marker 原样贴进正文**（Qwen3-8B 常把闸转述成散文、漏贴 marker，导致控件不出）。
+ * 覆盖两条点火路径：① 前门 ``ce-task_orchestrate`` 判「完整组价形态」→ 结果 ``{mode:"hitl", task_id}``；
+ * ② 直连 ``ce-task_start_cost_session`` → 结果 ``{task_id, marker}``。工具结果是结构化的：优先取
+ * ``task_id``，兼容 ``marker`` 字段或整串里内嵌的 marker。非 HITL 结果（无 task_id）→ 返回 null。
  */
 function hitlTaskIdFromResult(result?: string): string | null {
   if (!result) return null;
@@ -107,11 +109,12 @@ export function MessageGroup({
     const filteredSteps = steps.filter((step) => step.type === "toolCall");
     return filteredSteps[filteredSteps.length - 1];
   }, [steps]);
-  // 组价 HITL 会话：若本轮调了 start_cost_session，从工具结果拿 task_id 直接内嵌控件
-  // （不靠模型贴 marker）。放在折叠的「中间过程」之外，保证控件对用户可见。
+  // 组价 HITL 会话：若本轮某个 ce-task 工具结果带 task_id（前门 orchestrate 判完整组价形态点火，
+  // 或直连 start_cost_session），从结果拿 task_id 直接内嵌控件（不靠模型贴 marker）。
+  // 放在折叠的「中间过程」之外，保证控件对用户可见。
   const hitlTaskId = useMemo(() => {
     for (const step of steps) {
-      if (step.type === "toolCall" && step.name.endsWith("start_cost_session")) {
+      if (step.type === "toolCall" && step.name.startsWith("ce-task_")) {
         const id = hitlTaskIdFromResult(step.result);
         if (id) return id;
       }

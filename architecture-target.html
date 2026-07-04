@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>造价 Agent · 目标架构：确定性内核先行，对话皮肤最后</title>
+<style>
+  :root {
+    --det: #1d6fd1;   --det-bg: #eaf2fc;
+    --llm: #d97706;   --llm-bg: #fef3e2;
+    --data: #15803d;  --data-bg: #e9f7ee;
+    --hitl: #7c3aed;  --hitl-bg: #f3ecfe;
+    --skin: #db2777;  --skin-bg: #fdeef5;
+    --agent: #0d9488; --agent-bg: #e6faf6;
+    --gate: #b91c1c;  --gate-bg: #fee2e2;
+    --line: #cbd5e1;  --ink: #1e293b;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: "PingFang SC","Microsoft YaHei",system-ui,sans-serif; color: var(--ink);
+         margin: 0; background: #f8fafc; line-height: 1.55; }
+  .wrap { max-width: 1150px; margin: 0 auto; padding: 28px 24px 80px; }
+  h1 { font-size: 25px; margin: 0 0 4px; }
+  h2 { font-size: 19px; margin: 40px 0 12px; border-left: 4px solid var(--det); padding-left: 10px; }
+  .meta { color: #64748b; font-size: 13px; margin-bottom: 14px; }
+  .motto { background: #fff; border: 1.5px solid var(--det); border-radius: 10px; padding: 12px 18px;
+           font-size: 15px; font-weight: 600; color: var(--det); margin: 18px 0; }
+  .legend { display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0 4px; font-size: 12.5px; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 20px;
+          border: 1px solid var(--line); background: #fff; }
+  .dot { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+
+  /* 层卡片 */
+  .stage { border: 1.5px solid var(--line); border-radius: 12px; background: #fff;
+           margin-bottom: 0; overflow: hidden; }
+  .stage-head { display: flex; align-items: baseline; gap: 12px; padding: 10px 16px;
+                border-bottom: 1px solid #e2e8f0; background: #f8fafc; }
+  .stage-num { font-size: 13px; font-weight: 800; color: #fff; background: var(--det);
+               border-radius: 6px; padding: 2px 9px; white-space: nowrap; }
+  .stage-title { font-weight: 700; font-size: 15px; }
+  .stage-dur { margin-left: auto; color: #64748b; font-size: 12px; white-space: nowrap; }
+  .stage-body { padding: 12px 16px; display: grid; grid-template-columns: 1.3fr 1fr; gap: 14px; }
+  @media (max-width: 860px){ .stage-body { grid-template-columns: 1fr; } }
+  .boxes { display: flex; flex-wrap: wrap; gap: 7px; align-content: flex-start; }
+  .box { border-radius: 8px; padding: 6px 10px; font-size: 12.5px; border: 1px solid; }
+  .box .path { display: block; font-size: 11px; opacity: .65; font-family: ui-monospace,Consolas,monospace; }
+  .det  { background: var(--det-bg);  border-color: #b6d2f2; }
+  .llm  { background: var(--llm-bg);  border-color: #f2d4a7; }
+  .data { background: var(--data-bg); border-color: #b7e3c5; }
+  .hitl { background: var(--hitl-bg); border-color: #d9c6f7; }
+  .skin { background: var(--skin-bg); border-color: #f5c2dc; }
+  .agent { background: var(--agent-bg); border-color: #93dcd0; }
+  .plan { border-style: dashed; }
+  .gatebox { background: var(--gate-bg); border: 1px solid #f3b4b4; border-radius: 8px;
+             padding: 8px 12px; font-size: 12.5px; }
+  .gatebox b { color: var(--gate); display: block; margin-bottom: 4px; font-size: 12px; }
+  .gatebox ul { margin: 0; padding-left: 18px; }
+  .gatebox li { margin: 2px 0; }
+  .gate-arrow { text-align: center; padding: 6px 0; }
+  .gate-pill { display: inline-block; background: var(--gate); color: #fff; font-size: 11.5px;
+               font-weight: 700; border-radius: 20px; padding: 3px 14px; }
+  .gate-arrow .v { color: #94a3b8; font-size: 14px; display: block; line-height: 1.1; }
+
+  table { border-collapse: collapse; width: 100%; font-size: 12.5px; background: #fff;
+          border-radius: 10px; overflow: hidden; border: 1px solid var(--line); }
+  th, td { padding: 7px 10px; border-bottom: 1px solid #e2e8f0; text-align: left; vertical-align: top; }
+  th { background: #f1f5f9; font-size: 12px; }
+  tr:last-child td { border-bottom: none; }
+  code { font-family: ui-monospace,Consolas,monospace; font-size: 11.5px; background: #f1f5f9;
+         padding: 1px 5px; border-radius: 4px; }
+  .runtime { background: #fff; border: 1.5px solid var(--line); border-radius: 12px; padding: 16px; }
+  .rt-layer { border-radius: 10px; border: 1.5px dashed var(--line); padding: 10px 14px; margin-bottom: 8px; }
+  .rt-title { font-weight: 700; font-size: 13px; margin-bottom: 7px; display: flex; gap: 8px; align-items: baseline; }
+  .rt-title .sub { font-weight: 400; color: #64748b; font-size: 11.5px; }
+  .down { text-align: center; color: #94a3b8; font-size: 12px; padding: 2px 0 8px; }
+  .note { font-size: 12px; color: #64748b; margin-top: 6px; }
+  .principle { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+  @media (max-width: 860px){ .principle { grid-template-columns: 1fr; } }
+  .pcard { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; font-size: 13px; }
+  .pcard b { color: var(--det); display: block; margin-bottom: 4px; }
+  .bad { color: #b91c1c; } .good { color: #15803d; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>造价 Agent · 目标架构</h1>
+<div class="meta">「先做确定性内核和 benchmark，后接对话皮肤」的落地蓝图 · 五层建造顺序 + 数字验收闸 + 运行时分层 + Agent 定位 · 2026-07</div>
+
+<div class="motto">核心纪律：每层通过「无 UI 验收」才允许往上盖；benchmark 不是最后的考试，是每一层的准入闸；皮肤是消费者，永远不许补偿内核。</div>
+
+<div class="legend">
+  <span class="chip"><span class="dot" style="background:var(--det)"></span>确定性代码</span>
+  <span class="chip"><span class="dot" style="background:var(--llm)"></span>LLM 触点（可注入/可评测）</span>
+  <span class="chip"><span class="dot" style="background:var(--data)"></span>数据/金标</span>
+  <span class="chip"><span class="dot" style="background:var(--hitl)"></span>HITL 交互</span>
+  <span class="chip"><span class="dot" style="background:var(--skin)"></span>对话皮肤（可替换）</span>
+  <span class="chip"><span class="dot" style="background:var(--agent)"></span>Agent 原语（开放任务，收编入籍）</span>
+  <span class="chip"><span class="dot" style="background:var(--gate)"></span>验收闸（不达标不往上盖）</span>
+  <span class="chip" style="border-style:dashed">虚线 = 规划中、未建</span>
+</div>
+
+<h2>1. 建造顺序（自下而上，五层五闸）</h2>
+
+<!-- L0 -->
+<div class="stage">
+  <div class="stage-head"><span class="stage-num">L0</span><span class="stage-title">契约层 —— 写代码前先钉死数据形状</span><span class="stage-dur">~半周</span></div>
+  <div class="stage-body">
+    <div class="boxes">
+      <div class="box det">原语信封（pydantic 单一源）<span class="path">{step, status, result, provenance{source_type, source_ref, confidence, alternatives}}</span></div>
+      <div class="box det">路由判定 RouteDecision<span class="path">capability / 形态 / 红线 / 置信 / 审计字段</span></div>
+      <div class="box det">闸 payload 三型<span class="path">confirm / input / review</span></div>
+      <div class="box det">错误语义表<span class="path">404·501·503 / need_review / no_source（不杜撰的编码化）</span></div>
+    </div>
+    <div class="gatebox"><b>验收闸 G0</b>
+      <ul><li>契约可导出 JSON Schema</li><li>上层类型（未来 TS）由 Schema 生成，禁止手抄镜像</li></ul>
+    </div>
+  </div>
+</div>
+<div class="gate-arrow"><span class="v">▼</span><span class="gate-pill">过 G0 才开工</span></div>
+
+<!-- L1 -->
+<div class="stage">
+  <div class="stage-head"><span class="stage-num">L1</span><span class="stage-title">知识原语层 —— 零 LLM 的取数与检索</span><span class="stage-dur">~2–3 周</span></div>
+  <div class="stage-body">
+    <div class="boxes">
+      <div class="box det">清单候选召回 bill_match<span class="path">Milvus 向量 + 结构约束重排（按 spec 版本隔离）</span></div>
+      <div class="box det">组价取数 price_compose / quota<span class="path">PG：清单→定额→工料机含量+信息价</span></div>
+      <div class="box det">规范条文检索<span class="path">BM25 + dense + RRF 混合</span></div>
+      <div class="box det">每个原语带 CLI 直调入口<span class="path">不依赖任何服务编排即可单测</span></div>
+      <div class="box data">召回金标 ≥100 条构件描述<span class="path">benchmark/retrieval_eval/</span></div>
+    </div>
+    <div class="gatebox"><b>验收闸 G1（数字说话）</b>
+      <ul><li>召回 Recall@10 ≥ 85%（不达标在<b>本层</b>修分词/embedding/重排，不许上抛给选码层硬选）</li>
+      <li>取数正确性：抽 50 码人工核对定额/价格零错</li><li>全部进 pytest + CI</li></ul>
+    </div>
+  </div>
+</div>
+<div class="gate-arrow"><span class="v">▼</span><span class="gate-pill">过 G1 才引入 LLM</span></div>
+
+<!-- L2 -->
+<div class="stage">
+  <div class="stage-head"><span class="stage-num">L2</span><span class="stage-title">判断原语层 —— 唯一引入模型自治的层：LLM 窄点 ＋ Agent 原语，金标先于实现</span><span class="stage-dur">~2–3 周</span></div>
+  <div class="stage-body">
+    <div class="boxes">
+      <div class="box llm">候选内选码 select_code<span class="path">接口即评测：select_code(desc, candidates, llm_fn=…)，stub 可测、8b/32b 可对比</span></div>
+      <div class="box llm">套定额消歧 / 缺特征抽取<span class="path">同样可注入、越界作废、不确定标 need_review</span></div>
+      <div class="box det">置信校准 calibration<span class="path">cosine 客观分校准自报置信（第一周就会暴露"8b 自报恒 0.95"）——τ 初值在本层定</span></div>
+      <div class="box data">选码金标 ≥200 条「描述→正确码」<span class="path">金标工具先写（build_match_gold），实现后写</span></div>
+      <div class="box agent plan">清单生成 Agent（规划）<span class="path">设计说明 → 迭代读文档 + 反复调 bill_match + 自查遗漏 → 清单草表信封（逐项 provenance+置信）</span></div>
+      <div class="box agent plan">组合套定额规划 Agent（规划）<span class="path">一清单项 → 多定额组合提案（解空间开放，规划枚举是模型强项）</span></div>
+      <div class="box agent plan">清单核对 Agent（规划）<span class="path">上传 BOQ → 漏项/错套/合理性探索式核对提案</span></div>
+      <div class="box agent">Agent 入籍守则（与 select_code 同规）<span class="path">契约进 · 信封出 · 金标评 · 降级兜 · 只出提案不落账——内部自治关在原语边界内，钉值权在闸和人</span></div>
+    </div>
+    <div class="gatebox"><b>验收闸 G2</b>
+      <ul><li>选码 Top-1 ≥ 80%</li><li>置信分桶后，高置信桶实际准确率 ≥ 95%（τ 自动放行的前提）</li>
+      <li>8b vs 32b 对比表落盘（模型分桶的依据）</li>
+      <li>Agent 原语同规入列：产出必须是带 provenance 的提案信封 + 有金标（如构件抽取召回率）+ 有确定性降级，缺一不收</li></ul>
+    </div>
+  </div>
+</div>
+<div class="gate-arrow"><span class="v">▼</span><span class="gate-pill">过 G2 才做编排</span></div>
+
+<!-- L3 -->
+<div class="stage">
+  <div class="stage-head"><span class="stage-num">L3</span><span class="stage-title">编排内核层 —— 状态机 + 门控 + 确定性路由（stub 跑流程）</span><span class="stage-dur">~2 周</span></div>
+  <div class="stage-body">
+    <div class="boxes">
+      <div class="box hitl">langgraph 可中断组价图<span class="path">compute/gate 双拆 · interrupt/resume · SqliteSaver · 多构件循环</span></div>
+      <div class="box det">门控 gates（是否跳闸全在代码）<span class="path">τ 双阈值 / 多候选 / 缺价 / 缺政策数；末尾 review 恒停</span></div>
+      <div class="box det">确定性意图路由 prerouter<span class="path">含 out_of_domain 出口 + 会话粘性入参（prior_capability）</span></div>
+      <div class="box llm">低置信 32b 兜底分类<span class="path">enum+校验+fail-safe；红线闸两条路都确定性</span></div>
+      <div class="box det">复合编排（拆解→派发→综合）<span class="path">三段固定管线，LLM 失败→确定性降级</span></div>
+    </div>
+    <div class="gatebox"><b>验收闸 G3</b>
+      <ul><li>路由金标 ≥ 95%（含<b>负例</b>：域外句/误判句/承接句）</li>
+      <li>graph 全路径 stub 回归绿（暂停/恢复/回退/半填/what-if，零 LLM 秒级）</li>
+      <li>一个 shell 脚本纯 curl 走完「描述→总造价」全程</li></ul>
+      <div class="note">走到这里，产品可靠性上限已全部确定——上面的层只消费、不提高。</div>
+    </div>
+  </div>
+</div>
+<div class="gate-arrow"><span class="v">▼</span><span class="gate-pill">过 G3 才做入口</span></div>
+
+<!-- L4 -->
+<div class="stage">
+  <div class="stage-head"><span class="stage-num">L4</span><span class="stage-title">结构化入口层 —— API 即产品，表单版先于聊天版</span><span class="stage-dur">~1 周</span></div>
+  <div class="stage-body">
+    <div class="boxes">
+      <div class="box det">HTTP 会话 API（一等入口）<span class="path">/cost/session/{start,resume,state,rewind,re_rollup}</span></div>
+      <div class="box det">OpenAPI → TS 类型自动生成<span class="path">G0 契约的兑现：前端类型不手写</span></div>
+      <div class="box hitl">朴素调试 UI / 表单版<span class="path">Swagger + 一页表单即可，逐闸办到总造价</span></div>
+    </div>
+    <div class="gatebox"><b>验收闸 G4</b>
+      <ul><li>非开发者能靠表单版独立完成一次组价</li>
+      <li>闸文案/字段/顺序/依据卡的交互问题在<b>这一层</b>暴露并修完——在它们和"模型行为问题"混在一起之前</li></ul>
+    </div>
+  </div>
+</div>
+<div class="gate-arrow"><span class="v">▼</span><span class="gate-pill">过 G4 才接皮肤</span></div>
+
+<!-- L5 -->
+<div class="stage">
+  <div class="stage-head"><span class="stage-num">L5</span><span class="stage-title">对话皮肤层 —— 最后接、最薄、可替换</span><span class="stage-dur">~1–2 周</span></div>
+  <div class="stage-body">
+    <div class="boxes">
+      <div class="box skin">lead_agent = 带嘴的手<span class="path">执行注入的路由判定 + 指代消解 + 澄清交互 + 转述；不判断、不编排、不算钱</span></div>
+      <div class="box det">路由中间件第一天就前置<span class="path">RouteContextMiddleware：每轮先调 /route，判定以 system-reminder 注入（照抄 DynamicContextMiddleware 模式，fail-open）</span></div>
+      <div class="box det">HITL 握手走结构化通道<span class="path">tool-result 携带 task_id，前端从工具结果取——marker 正则方案从一开始就不会诞生</span></div>
+      <div class="box skin">prompt = 执行手册（~40 行）<span class="path">身份/服从路由/执行规范/红线/风格；零判断规则、零词表散文</span></div>
+      <div class="box skin">皮肤可替换<span class="path">聊天 / 表单 / 飞书机器人共用同一内核（L4 API）</span></div>
+    </div>
+    <div class="gatebox"><b>验收闸 G5（行为回归，跑在 trace 上）</b>
+      <ul><li>20 条对话式请求：该点火的点火、该拒的拒、标记原样传、错误如实转述</li>
+      <li>皮肤层不含任何判断逻辑的静态检查（prompt diff 审查）</li></ul>
+    </div>
+  </div>
+</div>
+
+<h2>2. 建成后的运行时分层（皮肤在最外、钱在最里）</h2>
+<div class="runtime">
+  <div class="rt-layer" style="border-color:#f5c2dc; background:var(--skin-bg)">
+    <div class="rt-title">皮肤层（可替换）<span class="sub">模型负责说话</span></div>
+    <div class="boxes">
+      <div class="box skin">deer-flow lead_agent（Qwen3-8B）＝ 低权限小 agent：指代消解 / 澄清交互 / 按判定执行，＋ 路由注入中间件</div>
+      <div class="box skin">或：表单版 / IM 机器人 / API 直调</div>
+      <div class="box hitl">HITL 控件直连内核 API（物理旁路，不经模型）</div>
+    </div>
+  </div>
+  <div class="down">▼ 只消费 L4 结构化 API（同源代理 / MCP / CLI 三面同一内核）</div>
+  <div class="rt-layer" style="border-color:#b6d2f2; background:var(--det-bg)">
+    <div class="rt-title">编排内核（:8101）<span class="sub">代码负责拍板</span></div>
+    <div class="boxes">
+      <div class="box det">确定性路由（+32b 低置信兜底，红线永确定）</div>
+      <div class="box hitl">langgraph 状态机（门控/钉值/审计/checkpoint）</div>
+      <div class="box det">确定性算钱（unit_price / rollup，pydantic 闸）</div>
+      <div class="box llm">LLM 窄点：选码 / 套定额消歧 / 缺特征抽取 / 拆解综合（全部可注入+有降级）</div>
+      <div class="box agent plan">Agent 原语（开放任务·规划中）：列清单 / 组合套定额 / BOQ 核对——内部 agentic loop 自治，出口提案信封，闸后人审</div>
+    </div>
+  </div>
+  <div class="down">▼ 纯 HTTP 客户端（不 import 对方代码）</div>
+  <div class="rt-layer" style="border-color:#b7e3c5; background:var(--data-bg)">
+    <div class="rt-title">知识原语（:8100）＋ 数据<span class="sub">零 LLM</span></div>
+    <div class="boxes">
+      <div class="box det">bill_match / price_compose / 条文检索</div>
+      <div class="box data">PG ce_cost · Milvus · BM25 索引</div>
+      <div class="box data">金标集 benchmark/（每层的准入闸，进 CI）</div>
+    </div>
+  </div>
+</div>
+<div class="note">信任梯度自外向内递增：皮肤（概率的）→ 编排（确定的）→ 数据（不可变的）。用户决策经 interrupt 钉值后成为权威输入，LLM 永不重解。</div>
+
+<h2>3. Agent 在这张图的哪里 —— workflow 与 agent 的分界</h2>
+<table>
+  <tr><th>任务性质</th><th>机制</th><th>本项目实例</th><th>为什么</th></tr>
+  <tr>
+    <td>可枚举、顺序固定、要审计</td>
+    <td><span class="box det" style="padding:2px 8px">状态机 / 确定性管线</span></td>
+    <td>组价 13 步、算钱、汇总、路由红线闸</td>
+    <td>路径能预先画出来的，不让模型现场决定——错一步是钱，且要可复现可审计</td>
+  </tr>
+  <tr>
+    <td>解空间开放、路径不可枚举</td>
+    <td><span class="box agent" style="padding:2px 8px">Agent 原语（收编入籍）</span></td>
+    <td>列清单（设计说明→草表）、组合套定额规划、BOQ 漏项/错套核对、规范多源核证</td>
+    <td>迭代探索＋组合判断是模型强项、规则枚举不动；自治关在原语边界内：契约进、信封出、金标评、降级兜</td>
+  </tr>
+  <tr>
+    <td>会话、指代、澄清、转述</td>
+    <td><span class="box skin" style="padding:2px 8px">皮肤小 agent（低权限）</span></td>
+    <td>lead_agent 残留裁量：多轮指代消解、澄清怎么问、结果怎么说</td>
+    <td>多轮上下文只有模型握着；但判断权已由路由注入上收，它只剩执行权和表达权</td>
+  </tr>
+</table>
+<div class="motto" style="border-color:var(--agent); color:#0f766e; margin-top:14px">
+这张图不是「不用 agent」，而是「不用不受问责的 agent」：agent 以判断原语身份入籍——内部爱循环几轮循环几轮，
+产出永远只是带 provenance 的提案；钉值权在闸和人手里。多 agent 编排（planner + workers + critic）从外面看，
+也只是一个更大号的判断原语。
+</div>
+
+<h2>4. 三条设计原则（面试提炼版）</h2>
+<div class="principle">
+  <div class="pcard"><b>① 契约单一源</b>pydantic 定形状 → JSON Schema → TS 代码生成。三处手抄镜像 = 三处漂移；生成即报错，胜过 5 分钟 Docker build 后才发现。</div>
+  <div class="pcard"><b>② benchmark 是准入闸不是期末考</b>金标先于实现;每层数字达标才往上盖。"8b 自报置信恒 0.95"这类事实应在 L2 第一周暴露，而不是接完前端后倒查。</div>
+  <div class="pcard"><b>③ 皮肤不补偿内核</b>交互问题在表单版（G4）修完，模型行为问题在 trace 回归（G5）里治——两类问题永不混在同一层调试。皮肤可整体替换,内核纹丝不动。</div>
+</div>
+
+<h2>5. 与「皮肤先行」的对照（实际踩过的代价）</h2>
+<table>
+  <tr><th>维度</th><th class="bad">皮肤先行（实际发生）</th><th class="good">内核先行（本蓝图）</th></tr>
+  <tr><td>缺陷暴露时机</td><td class="bad">置信度无区分度、τ 待调——上线后倒查补 calibration</td><td class="good">G2 分桶数据当场暴露、当层修</td></tr>
+  <tr><td>调试面</td><td class="bad">全栈联调，前端类型漂移靠 5 分钟 Docker build 发现</td><td class="good">单层 CLI/pytest 秒级；类型自动生成</td></tr>
+  <tr><td>HITL 握手</td><td class="bad">marker 寄生在模型正文，多个 commit 打渲染补丁</td><td class="good">结构化通道，正则方案根本不会诞生</td></tr>
+  <tr><td>指令重叠</td><td class="bad">词表散文在 skill / subagent / lead prompt 三处手工同步</td><td class="good">判断归路由、执行归 prompt、用法归 SKILL.md，各一份</td></tr>
+  <tr><td>皮肤形态</td><td class="bad">与 marker/prompt 深度耦合，难替换</td><td class="good">聊天/表单/IM 共用内核，随时换</td></tr>
+</table>
+
+</div>
+</body>
+</html>

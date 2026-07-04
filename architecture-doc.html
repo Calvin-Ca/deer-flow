@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>建筑造价 Agent 系统 · 完整架构文档与技术路线</title>
+<style>
+  :root {
+    --det: #1d6fd1;   --det-bg: #eaf2fc;
+    --llm: #d97706;   --llm-bg: #fef3e2;
+    --data: #15803d;  --data-bg: #e9f7ee;
+    --hitl: #7c3aed;  --hitl-bg: #f3ecfe;
+    --skin: #db2777;  --skin-bg: #fdeef5;
+    --agent: #0d9488; --agent-bg: #e6faf6;
+    --gate: #b91c1c;  --gate-bg: #fee2e2;
+    --wf: #334155;    --wf-bg: #f1f5f9;
+    --line: #cbd5e1;  --ink: #1e293b;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: "PingFang SC","Microsoft YaHei",system-ui,sans-serif; color: var(--ink);
+         margin: 0; background: #f8fafc; line-height: 1.6; }
+  .wrap { max-width: 1150px; margin: 0 auto; padding: 30px 26px 90px; }
+  h1 { font-size: 26px; margin: 0 0 4px; }
+  h2 { font-size: 20px; margin: 44px 0 12px; border-left: 4px solid var(--det); padding-left: 10px; }
+  h3 { font-size: 15.5px; margin: 22px 0 8px; color: #334155; }
+  .meta { color: #64748b; font-size: 13px; margin-bottom: 10px; }
+  .toc { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 12px 18px;
+         font-size: 13px; columns: 2; column-gap: 30px; }
+  .toc a { color: var(--det); text-decoration: none; display: block; padding: 2px 0; }
+  .motto { background: #fff; border: 1.5px solid var(--det); border-radius: 10px; padding: 12px 18px;
+           font-size: 15px; font-weight: 600; color: var(--det); margin: 16px 0; }
+  .motto.teal { border-color: var(--agent); color: #0f766e; font-weight: 500; font-size: 13.5px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 9px; margin: 12px 0 4px; font-size: 12.5px; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 20px;
+          border: 1px solid var(--line); background: #fff; }
+  .dot { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+  .layer { border: 1.5px solid var(--line); border-radius: 12px; background: #fff;
+           padding: 13px 16px; }
+  .layer > .ltitle { font-weight: 700; font-size: 14px; margin-bottom: 9px; display: flex;
+                     align-items: baseline; gap: 8px; }
+  .ltitle .sub { font-weight: 400; color: #64748b; font-size: 11.5px; }
+  .boxes { display: flex; flex-wrap: wrap; gap: 7px; }
+  .box { border-radius: 8px; padding: 6px 10px; font-size: 12.5px; border: 1px solid; }
+  .box .path { display: block; font-size: 11px; opacity: .65; font-family: ui-monospace,Consolas,monospace; }
+  .det  { background: var(--det-bg);  border-color: #b6d2f2; }
+  .llm  { background: var(--llm-bg);  border-color: #f2d4a7; }
+  .data { background: var(--data-bg); border-color: #b7e3c5; }
+  .hitl { background: var(--hitl-bg); border-color: #d9c6f7; }
+  .skin { background: var(--skin-bg); border-color: #f5c2dc; }
+  .agent{ background: var(--agent-bg);border-color: #93dcd0; }
+  .wf   { background: var(--wf-bg);   border-color: #c3cdd9; }
+  .plan { border-style: dashed; }
+  .down { text-align: center; color: #94a3b8; font-size: 12px; padding: 4px 0 9px; }
+  table { border-collapse: collapse; width: 100%; font-size: 12.5px; background: #fff;
+          border-radius: 10px; overflow: hidden; border: 1px solid var(--line); margin: 8px 0; }
+  th, td { padding: 7px 10px; border-bottom: 1px solid #e2e8f0; text-align: left; vertical-align: top; }
+  th { background: #f1f5f9; font-size: 12px; }
+  tr:last-child td { border-bottom: none; }
+  code { font-family: ui-monospace,Consolas,monospace; font-size: 11.5px; background: #f1f5f9;
+         padding: 1px 5px; border-radius: 4px; }
+  .flowchart { background:#fff; border:1px solid var(--line); border-radius:10px; padding:16px 20px;
+               font-family: ui-monospace,Consolas,monospace; font-size: 12.5px; overflow-x: auto;
+               white-space: pre; line-height: 1.75; }
+  .tag { font-size: 10.5px; padding: 1px 7px; border-radius: 8px; margin-left: 4px; vertical-align: 1px; white-space: nowrap; }
+  .tag.w { background: var(--wf-bg);   color: var(--wf);   border: 1px solid #c3cdd9; }
+  .tag.a { background: var(--agent-bg);color: #0f766e;     border: 1px solid #93dcd0; }
+  .tag.l { background: var(--llm-bg);  color: var(--llm);  border: 1px solid #f2d4a7; }
+  .tag.d { background: var(--det-bg);  color: var(--det);  border: 1px solid #b6d2f2; }
+  .tag.h { background: var(--hitl-bg); color: var(--hitl); border: 1px solid #d9c6f7; }
+  .gatebox { background: var(--gate-bg); border: 1px solid #f3b4b4; border-radius: 8px;
+             padding: 8px 12px; font-size: 12.5px; margin: 6px 0; }
+  .gatebox b { color: var(--gate); }
+  .m { border: 1.5px solid var(--line); border-radius: 12px; background: #fff; margin-bottom: 14px; overflow: hidden; }
+  .m-head { display: flex; align-items: baseline; gap: 12px; padding: 10px 16px;
+            border-bottom: 1px solid #e2e8f0; background: #f8fafc; }
+  .m-num { font-size: 13px; font-weight: 800; color: #fff; background: var(--det);
+           border-radius: 6px; padding: 2px 10px; white-space: nowrap; }
+  .m-title { font-weight: 700; font-size: 14.5px; }
+  .m-dur { margin-left: auto; color: #64748b; font-size: 12px; white-space: nowrap; }
+  .m-body { padding: 12px 16px; }
+  .m-body ul { margin: 4px 0; padding-left: 20px; }
+  .m-body li { margin: 3px 0; font-size: 13px; }
+  .note { font-size: 12px; color: #64748b; margin-top: 6px; }
+  .cols2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 880px){ .cols2 { grid-template-columns: 1fr; } .toc { columns: 1; } }
+  .good { color: #15803d; } .bad { color: #b91c1c; } .warn { color: #d97706; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>建筑造价 Agent 系统 · 架构文档与技术路线</h1>
+<div class="meta">v1.0 · 2026-07 · 模式定名：<b>确定性 Workflow 编排 × Agent 原语 × 可替换对话皮肤</b> · 配套：architecture.html（现状勘察）/ architecture-target.html（建造顺序）</div>
+
+<div class="motto">总纲：模型负责说话和提案，代码负责拍板和算钱。可枚举的流程归 workflow，开放式的子任务归 agent，agent 以「判断原语」身份入籍——契约进、信封出、金标评、降级兜、只出提案不落账。</div>
+
+<div class="toc">
+  <a href="#s1">§1 背景、目标与约束</a>
+  <a href="#s2">§2 总体架构（运行时四层）</a>
+  <a href="#s3">§3 核心模式：Workflow 编排 Agents</a>
+  <a href="#s4">§4 关键机制设计</a>
+  <a href="#s5">§5 现状与差距</a>
+  <a href="#s6">§6 技术路线（M1–M4）</a>
+  <a href="#s7">§7 评测体系</a>
+  <a href="#s8">§8 红线与风险</a>
+  <a href="#s9">§9 技术栈</a>
+</div>
+
+<h2 id="s1">§1 背景、目标与约束</h2>
+
+<h3>1.1 用户与起点场景</h3>
+<p style="font-size:13.5px">目标用户是<b>造价员</b>。真实起点：手头有<b>项目实体名称 + 项目特征描述（设计说明）</b>，需要完成
+「列清单 → 套定额 → 综合单价 → 汇总费用」的计价链条。系统的价值不在复现计价软件已做好的算术，而在
+<b>解决传统计价软件难解决的判断类问题</b>：</p>
+<table>
+  <tr><th>判断类难题（本系统主攻）</th><th>传统软件现状</th><th>本质</th></tr>
+  <tr><td>特征描述 → 清单编码（语义选码）</td><td>人工翻规范、凭记忆</td><td>语义匹配</td></tr>
+  <tr><td>整份设计说明 → 清单草表（列清单/列项）</td><td>逐条手工建</td><td>抽取＋规划</td></tr>
+  <tr><td>清单项 → 套哪些定额（组合规划）</td><td>靠老师傅经验</td><td>组合判断</td></tr>
+  <tr><td>描述缺什么关键特征、该反问什么</td><td>软件不会问</td><td>知识驱动澄清</td></tr>
+  <tr><td>BOQ 漏项 / 错套 / 合理性核对</td><td>人工复核</td><td>探索式对照</td></tr>
+  <tr><td>规范条文问答（计量/计价规则）</td><td>翻书</td><td>检索＋引用生成</td></tr>
+</table>
+<p class="note">算术段（综合单价、取费、报表）是计价软件的主场：本系统只做<b>内部验证 + 可导出</b>，不做用户向打磨。</p>
+
+<h3>1.2 硬约束（架构的三个输入）</h3>
+<table>
+  <tr><th>约束</th><th>含义</th><th>架构后果</th></tr>
+  <tr><td>审计域</td><td>错一个编码/价格是真金白银，成果要交付、要对账</td><td>控制流必须确定、可复现；每个数字带 provenance；用户确认钉值后不再被模型重解</td></tr>
+  <tr><td>弱模型本地部署</td><td>Qwen3-8B 主力、32B 消歧（内网 vLLM）</td><td>模型不当编排器；LLM 只进窄点/受约束 agent；全部触点可注入、可评测、有确定性降级</td></tr>
+  <tr><td>口径边界</td><td>深圳房建 · 国标 2013/2024 双版隔离</td><td>版本进契约（spec 必填），跨版本不串库；他省口径体面出界</td></tr>
+</table>
+
+<h2 id="s2">§2 总体架构（运行时四层）</h2>
+
+<div class="legend">
+  <span class="chip"><span class="dot" style="background:var(--wf)"></span>Workflow（确定性编排）</span>
+  <span class="chip"><span class="dot" style="background:var(--agent)"></span>Agent 原语（受约束自治）</span>
+  <span class="chip"><span class="dot" style="background:var(--llm)"></span>LLM 窄点（单次调用）</span>
+  <span class="chip"><span class="dot" style="background:var(--det)"></span>确定性代码</span>
+  <span class="chip"><span class="dot" style="background:var(--hitl)"></span>HITL 交互</span>
+  <span class="chip"><span class="dot" style="background:var(--data)"></span>数据/金标</span>
+  <span class="chip"><span class="dot" style="background:var(--skin)"></span>对话皮肤（可替换）</span>
+  <span class="chip" style="border-style:dashed">虚线 = 规划中</span>
+</div>
+
+<div class="layer" style="border-color:#f5c2dc; background:var(--skin-bg)">
+  <div class="ltitle">第 4 层 · 交互皮肤（可整体替换，多形态并存）<span class="sub">模型说话，不拍板</span></div>
+  <div class="boxes">
+    <div class="box skin">deer-flow lead_agent（低权限小 agent）<span class="path">指代消解 / 澄清交互 / 按路由判定执行 / 域外兜底；prompt=执行手册（~40 行）</span></div>
+    <div class="box det">路由注入中间件<span class="path">每轮先调 /route，判定以 system-reminder 注入（fail-open）——第零跳收权</span></div>
+    <div class="box skin">表单版 / IM 机器人 / API 直调<span class="path">与聊天版共用同一内核 API</span></div>
+    <div class="box hitl">HITL 控件直连内核（物理旁路）<span class="path">闸交互与 task_id 握手走结构化通道，不经模型正文</span></div>
+  </div>
+</div>
+<div class="down">▼ 只消费第 3 层结构化 API（HTTP / MCP / CLI 三面同一内核）</div>
+
+<div class="layer" style="border-color:#c3cdd9; background:var(--wf-bg)">
+  <div class="ltitle">第 3 层 · Workflow 编排层（:8101，控制流的唯一拥有者）<span class="sub">代码拍板</span></div>
+  <div class="boxes">
+    <div class="box det">意图路由<span class="path">确定性 prerouter（含 out_of_domain 出口 + 会话粘性）→ 低置信 32b 兜底（enum+校验+fail-safe）；红线闸永确定</span></div>
+    <div class="box wf">组价 HITL 图（现有，langgraph）<span class="path">setup→选码→定额→取价→费率→汇总；compute/gate 双拆 · interrupt/resume · 钉值 · checkpoint</span></div>
+    <div class="box wf plan">批量组价 Workflow（规划，主打场景）<span class="path">解析→fan-out 逐件组价→critic 复核→评审表→算钱→导出（§3.1）</span></div>
+    <div class="box det">门控 gates<span class="path">是否停闸全在代码：τ 双阈值 / 多候选 / 缺价 / 缺政策数；末尾 review 恒停</span></div>
+    <div class="box det">确定性算钱<span class="path">unit_price / rollup / what-if 重算（pydantic 闸，零 LLM）</span></div>
+    <div class="box det">复合编排<span class="path">拆解→逐子任务回路由→派发→综合（三段固定管线，LLM 失败→确定性拼接）</span></div>
+  </div>
+</div>
+<div class="down">▼ Workflow 调用判断层成员：进有契约、出有信封；agent 间不互聊，数据经 state（黑板）传递</div>
+
+<div class="layer" style="border-color:#93dcd0; background:var(--agent-bg)">
+  <div class="ltitle">第 2 层 · 判断层（唯一引入模型的层 = LLM 窄点 ＋ Agent 原语）<span class="sub">模型提案，信封出</span></div>
+  <div class="boxes">
+    <div class="box llm">LLM 窄点（单次调用）<span class="path">候选内选码（32b+cosine 校准）/ 套定额消歧 / 缺特征抽取 / 拆解综合 —— 全部可注入、有降级</span></div>
+    <div class="box agent plan">清单生成 Agent<span class="path">设计说明 → 迭代读文档＋反复调 bill_match＋自查遗漏 → 清单草表信封（逐项 provenance+置信）</span></div>
+    <div class="box agent plan">组合套定额规划 Agent<span class="path">一清单项 → 多定额组合提案（解空间开放）</span></div>
+    <div class="box agent plan">核对 / Critic Agent<span class="path">对草表或上传 BOQ 做漏项/错套/合理性对抗式审查</span></div>
+    <div class="box agent">入籍守则（全体成员同规）<span class="path">契约进 · 信封出 · 金标评 · 降级兜 · 只出提案不落账；内部自治关在原语边界内</span></div>
+  </div>
+</div>
+<div class="down">▼ 纯 HTTP 客户端（任务层不 import 知识层代码）</div>
+
+<div class="layer" style="border-color:#b7e3c5; background:var(--data-bg)">
+  <div class="ltitle">第 1 层 · 知识原语与数据（:8100，零 LLM）<span class="sub">事实层</span></div>
+  <div class="boxes">
+    <div class="box det">bill_match 候选召回<span class="path">Milvus 向量＋结构约束重排，spec 版本隔离</span></div>
+    <div class="box det">price_compose / quota / price_query<span class="path">PG：清单→定额→工料机含量＋信息价</span></div>
+    <div class="box det">规范条文检索<span class="path">BM25＋dense＋RRF 混合，引用图扩展</span></div>
+    <div class="box data">PG ce_cost · Milvus · BM25 索引</div>
+    <div class="box data">金标集 benchmark/<span class="path">召回 / 选码 / 路由 / 图回归 / 行为回归（每层准入闸，进 CI）</span></div>
+  </div>
+</div>
+<div class="note">信任梯度自外向内递增：皮肤（概率的）→ workflow（确定的）→ 数据（不可变的）。用户决策经 interrupt 钉值后成为权威输入，模型永不重解（Override 优于重算）。</div>
+
+<h2 id="s3">§3 核心模式：Workflow 编排 Agents（倒置的 supervisor）</h2>
+
+<p style="font-size:13.5px">常见 multi-agent 是「supervisor agent 在顶指挥 workers」——在审计域 + 弱模型下不可复现、不可审计、指挥官本身最不可靠。
+本架构<b>倒置</b>：确定性 workflow 在顶拥有控制流，agent 只在开放式子任务节点内部自治。并行、上下文隔离等 multi-agent 收益全保留，失败被局部化，审计天然成立。</p>
+
+<h3>3.1 主打场景管线：设计说明 → 清单-定额建议表（批量，规划中）</h3>
+<div class="flowchart">顶层 Workflow（确定性代码，非模型）
+│
+├─ ① 解析      [清单生成 Agent]<span class="tag a">agent</span>   迭代读设计说明 · 调 bill_match · 自查遗漏
+│                  ↓ 信封：items[]（逐项 provenance + confidence）
+├─ ② 门控      代码判定<span class="tag d">确定</span>            高置信直过 / 低置信标黄待审 —— 不弹对话，进评审表标注
+├─ ③ 组价      并行 fan-out：每件一个 [组价 Agent]<span class="tag a">agent</span> × N（独立上下文）
+│                  内部：选码 → 组合套定额 → 取数     ↓ 每件一个提案信封
+├─ ④ 复核      [Critic Agent]<span class="tag a">agent</span>       对抗式审查：漏项？错套？组合合理？ → 质疑清单
+├─ ⑤ 评审      评审表 HITL<span class="tag h">人</span>            造价员像审 diff 一样一遍过（批量确认，不逐件弹闸）
+├─ ⑥ 算钱      确定性原语<span class="tag d">确定</span>           unit_price / rollup（政策数由录入闸收，零 LLM）
+└─ ⑦ 导出      Excel / 计价软件格式<span class="tag d">确定</span>  造价员在既有软件完成交付</div>
+<p class="note">交互范式变化：从「逐闸对话串行确认」→「批处理＋集中评审表」。门控逻辑完全复用（τ 阈值、多候选、缺价），只是呈现从"暂停对话"变为"表格标注"。现有单构件 HITL 图保留为精查路径。</p>
+
+<h3>3.2 分工铁律</h3>
+<div class="cols2">
+<table>
+  <tr><th colspan="2">归 Workflow（代码）</th></tr>
+  <tr><td>控制流</td><td>步骤顺序、分支、循环、并行 fan-out</td></tr>
+  <tr><td>安全</td><td>是否停闸问人、重试、超时、降级</td></tr>
+  <tr><td>状态</td><td>持久化、checkpoint、审计日志、钉值</td></tr>
+  <tr><td>通信</td><td>agent 间数据一律经 state（黑板），<b>禁止 agent 互聊</b></td></tr>
+</table>
+<table>
+  <tr><th colspan="2">归 Agent（模型）</th></tr>
+  <tr><td>子任务</td><td>单个开放式任务内部怎么做（读、试探、自查）</td></tr>
+  <tr><td>产出</td><td>带 provenance 的<b>提案</b>（永远不是定稿）</td></tr>
+  <tr><td>自治边界</td><td>内部循环几轮自便；出口必须是契约信封</td></tr>
+  <tr><td>问责</td><td>金标评测＋确定性降级，缺一不得入籍</td></tr>
+</table>
+</div>
+
+<h3>3.3 何时用什么（判据表）</h3>
+<table>
+  <tr><th>任务性质</th><th>机制</th><th>本系统实例</th></tr>
+  <tr><td>可枚举、顺序固定、要审计</td><td><span class="tag w">workflow / 确定管线</span></td><td>组价 13 步骨架、算钱、汇总、路由红线闸</td></tr>
+  <tr><td>解空间开放、路径不可枚举</td><td><span class="tag a">agent 原语</span></td><td>列清单、组合套定额、BOQ 核对、规范多源核证</td></tr>
+  <tr><td>单步判断、候选封闭</td><td><span class="tag l">LLM 窄点</span></td><td>候选内选码、消歧、抽取——套 agent 是浪费</td></tr>
+  <tr><td>会话、指代、澄清、转述</td><td><span class="tag h">皮肤小 agent</span></td><td>lead_agent 残留裁量（判断权已被路由注入上收）</td></tr>
+</table>
+<div class="motto teal">Agent 数量不是设计目标，「知道哪里不用 agent」才是。本系统预计仅 3~4 个节点值得 agent 化，其余保持窄点与纯函数。</div>
+
+<h2 id="s4">§4 关键机制设计</h2>
+
+<table>
+  <tr><th style="width:150px">机制</th><th>设计要点</th><th>状态</th></tr>
+  <tr><td><b>意图路由</b></td><td>两级混合：确定性 prerouter（关键词/信号，强信号零延迟直配，金标可回归）→ 低置信才升 32b 兜底分类（temp=0、enum、代码校验、fail-safe 跌回）。LLM 只出能力标签；出界/口径/特征/形态四个红线闸两条路都确定性重推。<b>补</b>：<s>out_of_domain 第五标签＋顶层直答</s>✅、<s>「列清单/列项」词条＋金标</s>✅（2026-07-04 落地，47+8+12 自测、30/30 金标全绿）；余 prior_capability 会话粘性入参。</td><td class="good">已建，余一项</td></tr>
+  <tr><td><b>第零跳收权</b></td><td>RouteContextMiddleware（deer-flow 中间件，照抄 DynamicContextMiddleware 模式）：每轮消息先调 /route，RouteDecision 以 system-reminder 注入；模型从「自由分诊」降为「按判定执行」；:8101 不可达则不注入（fail-open）。路由单一源留在 ce-services，harness 只做消费者。</td><td class="warn">规划</td></tr>
+  <tr><td><b>HITL 门控</b></td><td>门控不逐步 gate：τ 双阈值三段式（≥τ_high 直配 / 中段人工确认 / &lt;τ_low 提示补描述）＋多候选/缺价/缺政策数才停；末尾 review 恒停。compute/gate 双拆——interrupt resume 从节点头重跑，昂贵 LLM 调用放上游有 checkpoint 的 compute 节点。用户决策 lock_value 钉死，下游确定性重算不重跑 LLM。</td><td class="good">已建</td></tr>
+  <tr><td><b>Provenance</b></td><td>来源是字段不是散文：每个数字带 {source_type, source_ref, confidence, alternatives}；前端只从结构化字段渲染，不解析模型自然语言。audit_log + overrides 支撑交付对账。待知识层补文件+行号级 source_ref。</td><td class="good">已建，粒度待补</td></tr>
+  <tr><td><b>模型分桶</b></td><td>桶 A Qwen3-8B（延迟敏感：生成/澄清/皮肤）；桶 B 32B（真推理：选码消歧/拆解综合/意图兜底）；URL+model 成对回落防半错配。置信校准：8b 自报置信无区分度 → cosine 客观分校准、只拉低不抬高。未来强模型可入桶 C 供 agent 原语用。</td><td class="good">已建</td></tr>
+  <tr><td><b>契约单一源</b></td><td>信封/闸 payload/路由判定升级为 pydantic model → OpenAPI/JSON Schema → TS 类型代码生成（openapi-typescript），替换三处手抄镜像；CI 做 schema diff。</td><td class="warn">规划（现为手抄）</td></tr>
+  <tr><td><b>HITL 握手</b></td><td>结构化通道替代 marker：task_id 从工具结果（tool-result）通道取，前端不再用正则从模型正文抠 fenced block——消除最脆接缝。</td><td class="warn">规划（现为 marker）</td></tr>
+  <tr><td><b>会话并发</b></td><td>SqliteSaver 单连接改 per-task 锁或短连接；langgraph 同步 invoke 显式线程池隔离，防 LLM 慢调用拖垮 :8101；PG 加连接池。</td><td class="warn">规划</td></tr>
+</table>
+
+<h2 id="s5">§5 现状与差距</h2>
+<div class="cols2">
+<div>
+<h3 class="good">已建成（可复用资产）</h3>
+<table>
+  <tr><td>知识原语</td><td>bill_match / price_compose / 条文混合检索（:8100）</td></tr>
+  <tr><td>判断窄点</td><td>选码＋校准、套定额消歧、缺特征抽取（全部可注入）</td></tr>
+  <tr><td>Workflow</td><td>单构件 HITL 图全链路（15 节点，含多构件循环、rewind、what-if）</td></tr>
+  <tr><td>路由</td><td>两级混合路由＋30+ 自测＋金标工具</td></tr>
+  <tr><td>红线体系</td><td>不杜撰/诚实失败/降级成对/钉值/审计，全代码落地</td></tr>
+  <tr><td>皮肤</td><td>deer-flow 会话基建＋HITL 前端控件（三类闸卡片＋依据时间线）</td></tr>
+</table>
+</div>
+<div>
+<h3 class="bad">差距（按痛感排序）</h3>
+<table>
+  <tr><td>1</td><td><b>列清单批量落点不存在</b>——路由层已修复（07-04：六句实测句正确落 cost＋特征反问，词表+柔性正则+金标 E1~E6）；但批量能力入口（设计说明→多构件）仍缺，归 M2</td></tr>
+  <tr><td>2</td><td><b>Agent 原语零个建成</b>——三个虚线框（生成/规划/核对）待接电</td></tr>
+  <tr><td>3</td><td>第零跳未收权——lead_agent 分诊无金标无审计</td></tr>
+  <tr><td>4</td><td>契约三处手抄；marker 寄生模型正文；session 并发隐患</td></tr>
+  <tr><td>5</td><td>benchmark 未完全 CI 化（tools 自测未收编 pytest；τ/校准待真实分布调参）</td></tr>
+  <tr><td>6</td><td><s>域外问题无出口</s>——已修复（07-04）：out_of_domain 第五标签＋编排器顶层直答能力范围，不再吞进 norm 检索管道（金标 F14~F16；兜底准确率待服务器 --llm 实测）</td></tr>
+</table>
+</div>
+</div>
+
+<h2 id="s6">§6 技术路线（四个里程碑）</h2>
+
+<div class="m">
+  <div class="m-head"><span class="m-num">M1</span><span class="m-title">加固基线 —— 把已建内核修到「可托付」</span><span class="m-dur">1–2 周</span></div>
+  <div class="m-body">
+    <ul>
+      <li>🟢 <s>路由：加 <code>out_of_domain</code> 标签＋顶层直答模板；补「列清单/列项/编制清单」词条；六句实测句进金标</s>（2026-07-04 完成，全部自测/金标绿）</li>
+      <li>第零跳：RouteContextMiddleware 落地（独立文件＋一行注册＋config 开关，[backend] 标注、上游冲突面最小）</li>
+      <li>契约：闸 payload / 会话响应升 pydantic → OpenAPI → TS 代码生成，删手抄 types.ts</li>
+      <li>并发：SqliteSaver per-task 锁；graph invoke 线程池隔离；PG 连接池</li>
+      <li>测试：tools/_selftest 收编 pytest＋CI；graph 暂停/恢复/回退/半填/what-if 全路径 stub 回归</li>
+    </ul>
+    <div class="gatebox"><b>验收：</b>路由金标 ≥95%（含域外/承接负例）；curl 全流程脚本绿；前端类型零手抄；并发 10 会话压测不阻塞。</div>
+  </div>
+</div>
+
+<div class="m">
+  <div class="m-head"><span class="m-num">M2</span><span class="m-title">批量列清单主线 —— 打通价值链第一步（§3.1 管线 ①②⑤）</span><span class="m-dur">2–3 周</span></div>
+  <div class="m-body">
+    <ul>
+      <li>清单生成 Agent v0：先做<b>抽取式</b>（LLM 从设计说明抽构件列表，单次调用起步），产 items[] 信封；金标 = 30~50 份说明的构件抽取召回率</li>
+      <li>入口：<code>session.start</code> 支持多 feature（图的 items[] 循环是现成的）；路由挂 listing 落点</li>
+      <li>评审表 UI：批处理交互范式——高置信直填、低置信标黄，造价员一遍过（复用门控逻辑，替换呈现方式）</li>
+      <li>导出：清单-定额-单价表 → Excel（对齐计价软件可导入格式）</li>
+    </ul>
+    <div class="gatebox"><b>验收：</b>一份真实设计说明 → 评审表 → 导出 Excel 全程 ≤10 分钟人工介入；构件抽取召回 ≥85%；HITL 图旧路径回归不破。</div>
+  </div>
+</div>
+
+<div class="m">
+  <div class="m-head"><span class="m-num">M3</span><span class="m-title">Agent 原语深化 —— 从抽取式升级为受约束 agentic loop</span><span class="m-dur">2–3 周</span></div>
+  <div class="m-body">
+    <ul>
+      <li>清单生成 Agent v1：迭代式（分段读→检索验证→自查遗漏→补抽），对比 v0 的召回增益</li>
+      <li>组合套定额规划 Agent：一项多定额组合提案（先确认知识层是否已返回组合候选，再定建能力还是接线）</li>
+      <li>Critic Agent：对草表做对抗式复核（漏项/错套/组合合理性），质疑进评审表</li>
+      <li>多 agent 编排 demo：③ 组价 fan-out（planner-worker-critic 全形态），与单 agent / 确定性版同 benchmark 对比</li>
+    </ul>
+    <div class="gatebox"><b>验收：</b>每个 agent 过入籍审查（信封＋金标＋降级）；三方案对比表落盘（准确率 / token 成本 / 延迟）——这张表同时是面试的核心叙事材料。</div>
+  </div>
+</div>
+
+<div class="m">
+  <div class="m-head"><span class="m-num">M4</span><span class="m-title">评测收口与可观测 —— 数据说话</span><span class="m-dur">~1 周</span></div>
+  <div class="m-body">
+    <ul>
+      <li>行为回归：20 条对话式请求跑 trace 断言（该点火/该拒/如实转述），接 Langfuse 既有接线</li>
+      <li>τ 双阈值 / 校准三参按真实 score 分布调参（保守起步→放松）；停闸率 / 自动过准确率进看板</li>
+      <li>端到端金标：若干真实项目「说明→总价」对账（后段算钱作为验证工具的价值兑现）</li>
+      <li>文档定版：本文档随实现更新，PRD 范围修订（批量主线入 PRD，算钱段降级为验证+导出）</li>
+    </ul>
+    <div class="gatebox"><b>验收：</b>全部金标进 CI，任何 PR 破线即红；一页对比报告（确定性 / 单 agent / 多 agent × 三指标）。</div>
+  </div>
+</div>
+
+<h2 id="s7">§7 评测体系（benchmark 是准入闸，不是期末考）</h2>
+<table>
+  <tr><th>层</th><th>金标集</th><th>指标与阈值</th><th>触发</th></tr>
+  <tr><td>知识原语</td><td>构件描述→正解码 ≥100 条（retrieval_eval）</td><td>Recall@10 ≥ 85%；取数抽检零错</td><td>CI + 数据/索引变更</td></tr>
+  <tr><td>判断窄点</td><td>描述→正确码 ≥200 条；8b/32b 对比</td><td>选码 Top-1 ≥ 80%；高置信桶实际准确率 ≥ 95%</td><td>CI + prompt/模型变更</td></tr>
+  <tr><td>Agent 原语</td><td>设计说明→构件清单 30~50 份；组合套定额金标</td><td>构件抽取召回 ≥ 85%；组合命中率（定后补）</td><td>入籍审查 + CI</td></tr>
+  <tr><td>路由</td><td>routing_eval（含域外/误判/承接负例）</td><td>能力判定 ≥ 95%；红线闸 100%</td><td>CI + 词表变更</td></tr>
+  <tr><td>Workflow</td><td>graph 全路径 stub 用例</td><td>暂停/恢复/回退/半填/what-if 全绿（零 LLM）</td><td>CI</td></tr>
+  <tr><td>皮肤行为</td><td>20 条对话请求 trace 断言</td><td>点火/拒答/转述行为 100% 合规</td><td>CI + prompt 变更</td></tr>
+</table>
+
+<h2 id="s8">§8 红线与风险</h2>
+<div class="cols2">
+<div>
+<h3>不可协商红线</h3>
+<table>
+  <tr><td>1</td><td>数值与编码只来自工具返回：<b>不杜撰</b>——缺价 no_source、缺政策数停闸、无映射诚实 blocked，绝不虚构总价</td></tr>
+  <tr><td>2</td><td>是否停闸问人、路由红线（出界/口径）<b>永远确定性</b>，任何模型不碰</td></tr>
+  <tr><td>3</td><td>LLM/agent 不算钱：算术全在 pydantic 闸的纯函数里</td></tr>
+  <tr><td>4</td><td>agent 只出提案：钉值权在闸和人；用户确认 = 权威锁定，不再重跑模型</td></tr>
+  <tr><td>5</td><td>每个模型触点必有确定性降级，且成对回落（URL+model）</td></tr>
+</table>
+</div>
+<div>
+<h3>主要风险与对策</h3>
+<table>
+  <tr><td>知识层数据完整度<br>（2013 组价未就绪、source_ref 粒度粗）</td><td>如实 501/标注，不静默换版本；M4 端到端对账倒逼补数;判断质量优先于编排打磨</td></tr>
+  <tr><td>弱模型驱动 agent 不稳</td><td>agent 原语从抽取式 v0 起步；planner 类角色用 32b/API;入籍守则强制降级路径</td></tr>
+  <tr><td>复杂度税（图/闸/契约四处联动）</td><td>契约单一源＋代码生成；agent 化克制（3~4 节点）;评审表复用门控不新造逻辑</td></tr>
+  <tr><td>诚实的 UX 代价（政策数全要人填）</td><td>项目级默认值/记忆上次输入/批量录入;评审表批处理替代逐闸串行</td></tr>
+</table>
+</div>
+</div>
+
+<h2 id="s9">§9 技术栈</h2>
+<table>
+  <tr><th>层</th><th>技术</th></tr>
+  <tr><td>皮肤</td><td>deer-flow harness（lead_agent + 中间件链 + skills + MCP）· Next.js 16 前端 · 同源代理</td></tr>
+  <tr><td>Workflow</td><td>langgraph（StateGraph + interrupt/resume + SqliteSaver）· FastAPI :8101</td></tr>
+  <tr><td>判断层</td><td>vLLM：Qwen3-8B（桶 A）/ Qwen3-32B-AWQ（桶 B）· 直出 JSON（8b function-calling 不可靠）· cosine 置信校准</td></tr>
+  <tr><td>知识层</td><td>FastAPI :8100 · Milvus（清单/条文向量）· BM25 · PostgreSQL ce_cost（定额/信息价）· MinerU 摄取</td></tr>
+  <tr><td>评测/观测</td><td>pytest + 分层金标 CI · Langfuse/LangSmith tracing · benchmark/ 金标集</td></tr>
+  <tr><td>契约</td><td>pydantic → OpenAPI/JSON Schema → openapi-typescript（规划）</td></tr>
+</table>
+
+<div class="motto" style="margin-top:34px">一句话收束：这套架构对「agent」的回答不是拥抱或拒绝，而是<b>分层问责</b>——workflow 拥有骨架与钱，agent 贡献判断与提案，皮肤只负责把这一切说成人话。模型每变强一档，被收编的疆域可以扩大一格；但骨架、闸门与账本，永远在代码手里。</div>
+
+</div>
+</body>
+</html>

@@ -35,6 +35,8 @@ class RouteRequest(BaseModel):
         None, description="是否已挂项目上下文（BOQ/算量）；None 则由文本推断")
     use_llm_fallback: bool = Field(
         False, description="低置信时启用 32b LLM 兜底分类（默认关，保端点纯确定性）")
+    prior_capability: str | None = Field(
+        None, description="上一轮能力落点（会话粘性 EH-05 扩展）：承接句且本句无强信号时沿用")
 
 
 @router.post("/route")
@@ -44,13 +46,14 @@ def route_endpoint(req: RouteRequest) -> dict:
     默认**纯确定性**（无 LLM，金标 routing_eval 可回归）；``use_llm_fallback=true`` 时对低置信
     query（落 norm 兜底、只泛词/纯默认）调 32b 兜底补能力分类（红线闸仍确定性重推，见 intent_fallback）。
     返回：``RouteDecision.as_meta()`` —— 含 ``route_confidence``（high/low）与 ``route_source``
-      （deterministic/llm_fallback）。
+      （deterministic/llm_fallback/session_sticky）。
     """
     if req.use_llm_fallback:
         decision = route_hybrid(req.query, has_project_context=req.has_project_context,
-                                use_llm_fallback=True)
+                                use_llm_fallback=True, prior_capability=req.prior_capability)
     else:
-        decision = route(req.query, has_project_context=req.has_project_context)
+        decision = route(req.query, has_project_context=req.has_project_context,
+                         prior_capability=req.prior_capability)
     logger.info("/route cap=%s clarify=%s src=%s conf=%s route_src=%s",
                 decision.capability, decision.clarify, decision.source_type,
                 decision.route_confidence, decision.route_source)
@@ -67,6 +70,8 @@ class OrchestrateRequest(BaseModel):
 
     query: str = Field(..., description="用户请求（可复合）")
     has_project_context: bool | None = Field(None, description="是否已挂项目上下文（BOQ/算量）")
+    prior_capability: str | None = Field(
+        None, description="上一轮能力落点（会话粘性 EH-05 扩展，透传前置路由）")
 
 
 @router.post("/orchestrate")
@@ -78,6 +83,7 @@ def orchestrate_endpoint(req: OrchestrateRequest) -> dict:
     返回 502 仅当能力层依赖（知识服务/LLM）整体不可达且未被内部降级吸收。
     """
     try:
-        return orchestrate(req.query, has_project_context=req.has_project_context)
+        return orchestrate(req.query, has_project_context=req.has_project_context,
+                           prior_capability=req.prior_capability)
     except requests.RequestException as exc:
         raise HTTPException(status_code=502, detail=f"依赖服务不可达（知识服务 :8100 / LLM）: {exc}") from exc

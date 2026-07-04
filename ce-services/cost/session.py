@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import sqlite3
+import threading
 import uuid
 from typing import Any
 
@@ -25,6 +26,24 @@ from cost.graph import build_graph
 _conn = sqlite3.connect(HITL_CHECKPOINT_DB, check_same_thread=False)
 _checkpointer = SqliteSaver(_conn)
 _graph = build_graph(_checkpointer)
+
+# ── 会话级并发闸（M1 加固）：同一 task_id 的写路径（resume/rewind）串行化 ──
+# SqliteSaver 内部有语句级锁（单条 checkpoint 读写安全），但**同一会话**并发 resume/rewind 在图
+# 逻辑层会交错：两次 invoke 各自「读 checkpoint → 跑节点 → 写回」，后写覆盖先写、审计乱序。
+# 按 task_id 上锁：同会话串行（第二个请求等第一个跑完），不同会话互不阻塞。
+# start/stream_start 用全新 uuid 无竞争不上锁；get_state/re_rollup 只读不上锁（快照读自洽）。
+# 锁表随会话数线性增长（每会话一把 Lock，字节级），POC 量级不做回收。
+_locks_guard = threading.Lock()
+_task_locks: dict[str, threading.Lock] = {}
+
+
+def _task_lock(task_id: str) -> threading.Lock:
+    """取（惰性建）task_id 专属锁；建锁本身经 guard 锁保护（dict 写入非原子安全区）。"""
+    with _locks_guard:
+        lock = _task_locks.get(task_id)
+        if lock is None:
+            lock = _task_locks[task_id] = threading.Lock()
+        return lock
 
 
 def _config(task_id: str) -> dict[str, Any]:
@@ -236,7 +255,8 @@ def stream_resume(task_id: str, decision: dict[str, Any]) -> Any:
 
     参数：task_id；decision —— 闸决策（空 dict 归一哨兵，同 ``resume``）。产出见 ``_run_stream``。
     """
-    yield from _run_stream(task_id, Command(resume=decision or {"__resume__": True}))
+    with _task_lock(task_id):  # 流式期间持锁：同会话第二个 resume 等本次流完（客户端断连→生成器关闭→释锁）
+        yield from _run_stream(task_id, Command(resume=decision or {"__resume__": True}))
 
 
 def resume(task_id: str, decision: dict[str, Any]) -> dict[str, Any]:
@@ -248,7 +268,8 @@ def resume(task_id: str, decision: dict[str, Any]) -> dict[str, Any]:
       重停死循环；全选填留空的合法「放弃」提交（如缺定额补录闸）会命中此坑，故在此归一化（哨兵不含业务
       字段，被下游 ``build_manual_basis`` 等按缺省/放弃处理）。
     """
-    result = _graph.invoke(Command(resume=decision or {"__resume__": True}), config=_config(task_id))
+    with _task_lock(task_id):  # 同会话并发 resume 串行化（后到请求等前一次跑完，防 checkpoint 交错）
+        result = _graph.invoke(Command(resume=decision or {"__resume__": True}), config=_config(task_id))
     return _format(task_id, result)
 
 
@@ -282,10 +303,11 @@ def rewind(task_id: str, to_node: str) -> dict[str, Any]:
     if to_node not in REWINDABLE_GATES:
         return _error(task_id, f"不可回退到 {to_node!r}（仅支持闸节点：{sorted(REWINDABLE_GATES)}）")
     config = _config(task_id)
-    target = next((s for s in _graph.get_state_history(config) if to_node in (s.next or ())), None)
-    if target is None:
-        return _error(task_id, f"历史中无 {to_node!r} 的前序检查点，无法回退（该闸可能尚未到达）")
-    result = _graph.invoke(None, config=target.config)
+    with _task_lock(task_id):  # 回退是写路径：查历史 + 重跑须与并发 resume 互斥（防回退点被同时推进作废）
+        target = next((s for s in _graph.get_state_history(config) if to_node in (s.next or ())), None)
+        if target is None:
+            return _error(task_id, f"历史中无 {to_node!r} 的前序检查点，无法回退（该闸可能尚未到达）")
+        result = _graph.invoke(None, config=target.config)
     return _format(task_id, result)
 
 

@@ -374,6 +374,7 @@ def orchestrate(
     *,
     has_project_context: bool | None = None,
     use_llm_fallback: bool | None = None,
+    prior_capability: str | None = None,
     cap_llm_url: str = LLM_URL,
     cap_model_id: str = LLM_MODEL_ID,
     dispatch_fn: Callable[[str, RouteDecision], dict] | None = None,
@@ -397,9 +398,11 @@ def orchestrate(
     _decompose = decompose_fn or decompose
     _synthesize = synthesize_fn or synthesize
 
-    # 顶层：意图混合路由（确定性强信号直配 / 低置信 32b 兜底补能力分类，红线闸仍确定性重推）。
+    # 顶层：意图混合路由（确定性强信号直配 / 低置信 32b 兜底补能力分类，红线闸仍确定性重推；
+    # prior_capability 供承接句会话粘性，见 prerouter EH-05 扩展）。
     decision = route_hybrid(query, has_project_context=has_project_context,
-                            use_llm_fallback=use_llm_fallback)
+                            use_llm_fallback=use_llm_fallback,
+                            prior_capability=prior_capability)
 
     # 域外出口（M1）：与造价无关 → 顶层直答能力范围，不进 norm 检索管道白跑、不联网兜底。
     if decision.capability == "out_of_domain":

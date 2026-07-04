@@ -89,6 +89,7 @@ def classify_intent(query: str,
 def route_hybrid(query: str, *,
                  has_project_context: bool | None = None,
                  use_llm_fallback: bool | None = None,
+                 prior_capability: str | None = None,
                  llm_url: str = ORCH_LLM_URL,
                  model_id: str = ORCH_LLM_MODEL_ID,
                  classify_fn=None) -> RouteDecision:
@@ -106,7 +107,8 @@ def route_hybrid(query: str, *,
            cap 为 None（fail-safe）或与原判相同 → 保持确定性决策不变。
     返回：``RouteDecision``（``route_source`` 标 deterministic / llm_fallback，供审计升级率）。
     """
-    decision = route(query, has_project_context=has_project_context)
+    decision = route(query, has_project_context=has_project_context,
+                     prior_capability=prior_capability)
 
     enabled = ROUTE_LLM_FALLBACK if use_llm_fallback is None else use_llm_fallback
     if decision.route_confidence != "low" or not enabled:
@@ -118,7 +120,8 @@ def route_hybrid(query: str, *,
         logger.info("意图兜底：低置信但未改判（cap=%s）→ 保持确定性 norm 兜底", cap)
         return decision
 
-    upgraded = route(query, has_project_context=has_project_context, capability_override=cap)
+    upgraded = route(query, has_project_context=has_project_context, capability_override=cap,
+                     prior_capability=prior_capability)
     logger.info("意图兜底升级：%s → %s（route_confidence 原 low）", decision.capability, cap)
     return upgraded
 

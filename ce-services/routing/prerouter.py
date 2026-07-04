@@ -101,6 +101,15 @@ GENERIC_NORM_KW: tuple[str, ...] = ("区别", "差异", "包含哪些", "构成"
 # 域外说法，故只由 LLM 兜底分类判出；编排器据此顶层直答能力范围，不进检索/取数管道白跑。
 VALID_CAPABILITIES: tuple[str, ...] = ("norm", "cost", "price", "compound", "out_of_domain")
 
+# ── 会话粘性（EH-05 扩展 · M1）：承接语词表——本句无任何强信号且含承接语时，沿用上一轮能力 ──
+# 只治「就按你说的组一下」「继续」这类指代承接句；新话题（换问构成/区别等）不含承接语、不粘。
+CONTINUATION_KW: tuple[str, ...] = (
+    "就按", "按你说的", "按刚才", "刚才那", "刚才的", "刚才说的", "那就", "继续", "接着",
+    "还是这个", "这个吧", "再来一个", "再算一个", "同上", "老样子", "跟上面一样", "跟刚才一样",
+)
+# 可粘能力：compound（一次性拆解）与 out_of_domain（域外不该延续）不粘。
+STICKY_CAPABILITIES: tuple[str, ...] = ("norm", "cost", "price")
+
 # ── 形态判定：构件 / 特征槽（cost 特征完整度 EH-04，确定性粗判，精判仍走 cost/clarify.py 的 LLM）──
 COMPONENT_KW: tuple[str, ...] = (
     "柱", "梁", "板", "墙", "基础", "楼梯", "砌块", "砖墙", "墙体", "过梁", "圈梁", "构造柱",
@@ -160,7 +169,8 @@ class RouteDecision:
         route_confidence —— "high"/"low"：确定性判定链是否由**强信号**拍板（意图混合路由）。
           low = 落到 norm 兜底且只靠泛词/纯默认、且无版本锁 → 交 LLM 兜底复核。**红线闸（EH-03
           出界 / caliber 口径）无论置信高低都确定性判、LLM 不碰**。
-        route_source —— "deterministic"/"llm_fallback"：capability 由谁拍板（审计升级率用）。
+        route_source —— "deterministic"/"llm_fallback"/"session_sticky"：capability 由谁拍板
+          （确定性词表 / LLM 兜底分类 / 承接句沿用上一轮，审计升级率用）。
         matched —— 命中信号（审计）。reasons —— 人类可读判定理由。
     """
 
@@ -214,7 +224,8 @@ def _has_feature_qualifier(text: str) -> bool:
 
 
 def route(query: str, *, has_project_context: bool | None = None,
-          capability_override: str | None = None) -> RouteDecision:
+          capability_override: str | None = None,
+          prior_capability: str | None = None) -> RouteDecision:
     """确定性前置路由：query（+ 可选「是否已挂项目上下文」覆盖）→ RouteDecision。
 
     参数：
@@ -224,6 +235,9 @@ def route(query: str, *, has_project_context: bool | None = None,
           （∈ VALID_CAPABILITIES）。给定即**跳过确定性能力分流**、以它为准，但**所有形态/红线闸
           （caliber / feature / EH-03 出界 / compose_full）照旧确定性重推**——LLM 只补能力分类、
           绝不碰安全闸（AGENT_TODO「红线两条路都确定性」）。非法值忽略、退回确定性分流。
+        prior_capability —— **会话粘性（EH-05 扩展）**：上一轮已定的能力落点。仅当本句
+          无任何强信号（纯默认落 norm）**且含承接语**（CONTINUATION_KW）时沿用（route_source
+          标 session_sticky）；形态/红线闸随新能力照常确定性重推，出界/特征/口径不粘。
     返回：RouteDecision。**本函数纯确定性、零 LLM**（override 由上层 route_hybrid 先算好再传入）。
     """
     text = query or ""
@@ -311,6 +325,18 @@ def route(query: str, *, has_project_context: bool | None = None,
         capability, source_type = "norm", "static"
         reasons.append(f"无组价/价格意图{'，规范信号 ' + str(norm_sig) if norm_sig else '（默认）'} → 规范问答")
 
+    # ── 会话粘性（EH-05 扩展 · M1）：承接句 + 上一轮能力 → 沿用 ──
+    # 条件（全部满足才粘）：① 无 LLM override；② 本句无强信号（纯默认落 norm 的路径）；
+    # ③ 含承接语；④ prior ∈ STICKY_CAPABILITIES。形态/红线闸随新能力在下文照常确定性重推
+    # （他省出界/缺特征/口径不因粘性豁免）；粘性置信记 high（能力已定，不再走 LLM 兜底）。
+    continuation_sig = _hits(text, CONTINUATION_KW)
+    if (capability_override is None and prior_capability in STICKY_CAPABILITIES
+            and capability == "norm" and not strong_signal and continuation_sig):
+        capability = prior_capability
+        source_type = "dynamic" if capability == "price" else "static"
+        route_source = "session_sticky"
+        reasons.append(f"承接语 {continuation_sig} + 上一轮能力 {prior_capability} → 会话粘性沿用（EH-05 扩展）")
+
     # ── 口径完整度（§4.0）：版本明确（2013/2024），或**显式点名了规范号**（如「按 gb50016」）——
     # 点名规范号=口径已明确表达，无需再反问版本；是否收录/可答由下游（检索零召回→FR-K07 兜底/拒答）裁定。
     _, version = family_version_of(text)
@@ -361,6 +387,8 @@ def route(query: str, *, has_project_context: bool | None = None,
     route_confidence = (
         "low" if (capability == "norm" and not strong_norm and not caliber_complete)
         else "high")
+    if route_source == "session_sticky":
+        route_confidence = "high"  # 粘性已定能力（含粘回 norm），无需再走 LLM 兜底
 
     return RouteDecision(
         capability=capability, source_type=source_type, needs_calc=needs_calc,
@@ -371,7 +399,7 @@ def route(query: str, *, has_project_context: bool | None = None,
         route_confidence=route_confidence, route_source=route_source,
         matched={
             "cost": cost_sig, "listing": listing_sig, "price": price_sig, "compound": compound_sig,
-            "compare": compare_hit, "multi_capability": multi_capability,
+            "continuation": continuation_sig, "compare": compare_hit, "multi_capability": multi_capability,
             "norm": norm_sig, "context": ctx_sig, "context_check": ctx_check_sig,
             "calc": calc_sig, "material": material_sig, "time": time_sig,
         },
@@ -510,8 +538,23 @@ def _selftest() -> int:
     failed += not ood_ok
     print(f"{'✓' if ood_ok else '✗'} override→out_of_domain src={d_ood.route_source} clarify={d_ood.clarify}（域外直答出口）")
 
+    # 会话粘性（EH-05 扩展）：承接句沿用上一轮能力；无承接语/无 prior/域外 prior 不粘
+    sticky_checks = (
+        (route("就按你说的组一下吧", prior_capability="cost"), "cost", "session_sticky"),
+        (route("继续", prior_capability="price"), "price", "session_sticky"),
+        (route("综合单价的构成是什么", prior_capability="cost"), "norm", "deterministic"),   # 新话题无承接语→不粘
+        (route("就按你说的组一下吧"), "norm", "deterministic"),                              # 无 prior→不粘
+        (route("就按你说的来", prior_capability="out_of_domain"), "norm", "deterministic"),  # 域外 prior→不粘
+    )
+    for d_s, exp_cap, exp_src in sticky_checks:
+        ok = d_s.capability == exp_cap and d_s.route_source == exp_src
+        passed += ok
+        failed += not ok
+        print(f"{'✓' if ok else '✗'} sticky cap={d_s.capability:<8} src={d_s.route_source:<15} "
+              f"(期望 {exp_cap}/{exp_src}) conf={d_s.route_confidence}")
+
     total = (len(_SELFTEST_CASES) + len(_SELFTEST_REGION_CASES)
-             + len(_SELFTEST_CONFIDENCE_CASES) + 2)
+             + len(_SELFTEST_CONFIDENCE_CASES) + 2 + len(sticky_checks))
     print(f"\n自测：{passed} 过 / {failed} 败 / 共 {total}")
     return 1 if failed else 0
 

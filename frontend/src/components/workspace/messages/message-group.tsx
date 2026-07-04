@@ -50,17 +50,23 @@ import { MarkdownContent } from "./markdown-content";
  * ② 直连 ``ce-task_start_cost_session`` → 结果 ``{task_id, marker}``。工具结果是结构化的：优先取
  * ``task_id``，兼容 ``marker`` 字段或整串里内嵌的 marker。非 HITL 结果（无 task_id）→ 返回 null。
  */
-function hitlTaskIdFromResult(result?: string): string | null {
+function hitlTaskIdFromResult(result?: string | Record<string, unknown>): string | null {
   if (!result) return null;
-  try {
-    const parsed = JSON.parse(result) as { task_id?: unknown; marker?: unknown };
-    if (typeof parsed.task_id === "string" && parsed.task_id) return parsed.task_id;
-    if (typeof parsed.marker === "string") {
-      return extractCostHitlMarker(parsed.marker)?.taskId ?? null;
+  // 工具结果运行时可能是字符串(JSON) 或已解析对象——两种都兼容（同 ce-tool-result 的 resultObj）。
+  let obj: Record<string, unknown> | undefined;
+  if (typeof result === "string") {
+    try {
+      obj = JSON.parse(result) as Record<string, unknown>;
+    } catch {
+      return extractCostHitlMarker(result)?.taskId ?? null;
     }
-  } catch {
-    return extractCostHitlMarker(result)?.taskId ?? null;
+  } else {
+    obj = result;
   }
+  const taskId = obj?.task_id;
+  if (typeof taskId === "string" && taskId) return taskId;
+  const marker = obj?.marker;
+  if (typeof marker === "string") return extractCostHitlMarker(marker)?.taskId ?? null;
   return null;
 }
 

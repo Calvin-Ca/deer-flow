@@ -2,8 +2,11 @@ import type { Message } from "@langchain/langgraph-sdk";
 import { expect, test } from "vitest";
 
 import {
+  extractContentFromMessage,
+  extractReasoningContentFromMessage,
   getAssistantTurnUsageMessages,
   getMessageGroups,
+  hasReasoning,
 } from "@/core/messages/utils";
 
 test("aggregates token usage messages once per assistant turn", () => {
@@ -96,4 +99,45 @@ test("hides internal todo reminder messages from message groups", () => {
   expect(
     groups.flatMap((group) => group.messages).map((message) => message.id),
   ).toEqual(["human-1", "ai-1"]);
+});
+
+test("closed <think> block: reasoning extracted, content is the answer", () => {
+  const message = {
+    id: "ai-1",
+    type: "ai",
+    content: "<think>weighing options</think>Final answer.",
+  } as Message;
+
+  expect(extractContentFromMessage(message)).toBe("Final answer.");
+  expect(extractReasoningContentFromMessage(message)).toBe("weighing options");
+  expect(hasReasoning(message)).toBe(true);
+});
+
+test("streaming: unclosed <think> is pulled out of content, not rendered inline", () => {
+  // While </think> has not arrived yet, the dangling <think> content must be
+  // treated as reasoning (empty answer content), so it renders in the collapsed
+  // reasoning widget instead of leaking into the answer body.
+  const message = {
+    id: "ai-1",
+    type: "ai",
+    content: "<think>still thinking, no close yet",
+  } as Message;
+
+  expect(extractContentFromMessage(message)).toBe("");
+  expect(extractReasoningContentFromMessage(message)).toBe(
+    "still thinking, no close yet",
+  );
+  expect(hasReasoning(message)).toBe(true);
+});
+
+test("plain answer without <think>: no reasoning", () => {
+  const message = {
+    id: "ai-1",
+    type: "ai",
+    content: "just an answer",
+  } as Message;
+
+  expect(extractContentFromMessage(message)).toBe("just an answer");
+  expect(extractReasoningContentFromMessage(message)).toBeNull();
+  expect(hasReasoning(message)).toBe(false);
 });

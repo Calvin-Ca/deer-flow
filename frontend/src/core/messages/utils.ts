@@ -187,18 +187,30 @@ export function extractTextFromMessage(message: Message) {
 }
 
 const THINK_TAG_RE = /<think>\s*([\s\S]*?)\s*<\/think>/g;
+// 流式期间 </think> 尚未到达时的**悬挂开标签**：<think> 之后到结尾整段当推理。
+// 否则未闭合的思考内容会漏进正文被当答案渲染（"一开始展示 think 过程/<think> 字样"的根因）。
+const OPEN_THINK_TAG_RE = /<think>\s*([\s\S]*)$/;
 
 function splitInlineReasoning(content: string) {
   const reasoningParts: string[] = [];
-  const cleaned = content
-    .replace(THINK_TAG_RE, (_, reasoning: string) => {
-      const normalized = reasoning.trim();
-      if (normalized) {
-        reasoningParts.push(normalized);
-      }
-      return "";
-    })
-    .trim();
+  let cleaned = content.replace(THINK_TAG_RE, (_, reasoning: string) => {
+    const normalized = reasoning.trim();
+    if (normalized) {
+      reasoningParts.push(normalized);
+    }
+    return "";
+  });
+
+  // 剥掉闭合块后若仍有悬挂的未闭合 <think>（流式进行中），从它到结尾整段剥成推理。
+  const open = OPEN_THINK_TAG_RE.exec(cleaned);
+  if (open) {
+    const normalized = open[1].trim();
+    if (normalized) {
+      reasoningParts.push(normalized);
+    }
+    cleaned = cleaned.slice(0, open.index);
+  }
+  cleaned = cleaned.trim();
 
   return {
     content: cleaned,

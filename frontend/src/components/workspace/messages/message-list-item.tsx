@@ -291,7 +291,8 @@ function MessageContent_({
   if (!isHuman && reasoningContent && !rawContent) {
     return (
       <AIElementMessageContent className={className}>
-        <Reasoning isStreaming={isLoading}>
+        {/* 借鉴 Claude web：思考默认折叠，仅留「Thinking…/Thought for Xs」一行，内容点开才看，不铺满消息流。 */}
+        <Reasoning isStreaming={isLoading} defaultOpen={false}>
           <ReasoningTrigger />
           <ReasoningContent>{reasoningContent}</ReasoningContent>
         </Reasoning>

@@ -83,6 +83,12 @@ NORM_KW: tuple[str, ...] = (
     "条文", "条款", "项目特征", "工作内容", "适用范围", "章节说明", "包含哪些", "构成",
     "区别", "差异", "怎么描述", "如何描述",
 )
+# 泛词 norm 信号（意图混合路由）：这些词**恰在 NORM_KW 里但语义含糊**——「A 和 B 的区别/构成/
+# 包含哪些」既可能是规范问答，也可能是被口语裹住的组价/价格诉求。落到 norm 且**只**命中这些泛词
+# （或纯默认、且无版本锁）→ 判**低置信**，交 LLM 兜底复核（不把「未命中/只命中泛词」硬吞成 norm）。
+GENERIC_NORM_KW: tuple[str, ...] = ("区别", "差异", "包含哪些", "构成")
+# 合法能力枚举（LLM 兜底分类的校验白名单；越界 → fail-safe 跌回确定性默认）。
+VALID_CAPABILITIES: tuple[str, ...] = ("norm", "cost", "price", "compound")
 
 # ── 形态判定：构件 / 特征槽（cost 特征完整度 EH-04，确定性粗判，精判仍走 cost/clarify.py 的 LLM）──
 COMPONENT_KW: tuple[str, ...] = (
@@ -140,6 +146,10 @@ class RouteDecision:
         clarify —— None / "feature"（EH-04 反问特征，仅 cost） / "caliber"（EH-05 反问口径，仅 norm）。
         out_of_scope_region —— 仅 cost/price（EH-03）：显式他省/他市口径的地名；命中则下游出
           「体面告知」模板、不做取数（组价/价格严格锁深圳，C-02 分侧）。
+        route_confidence —— "high"/"low"：确定性判定链是否由**强信号**拍板（意图混合路由）。
+          low = 落到 norm 兜底且只靠泛词/纯默认、且无版本锁 → 交 LLM 兜底复核。**红线闸（EH-03
+          出界 / caliber 口径）无论置信高低都确定性判、LLM 不碰**。
+        route_source —— "deterministic"/"llm_fallback"：capability 由谁拍板（审计升级率用）。
         matched —— 命中信号（审计）。reasons —— 人类可读判定理由。
     """
 
@@ -153,6 +163,8 @@ class RouteDecision:
     clarify: str | None
     out_of_scope_region: str | None = None
     compose_full: bool = False
+    route_confidence: str = "high"
+    route_source: str = "deterministic"
     matched: dict = field(default_factory=dict)
     reasons: list[str] = field(default_factory=list)
 
@@ -168,6 +180,8 @@ class RouteDecision:
             "clarify": self.clarify,
             "out_of_scope_region": self.out_of_scope_region,
             "compose_full": self.compose_full,
+            "route_confidence": self.route_confidence,
+            "route_source": self.route_source,
             "matched": self.matched,
             "reasons": self.reasons,
         }
@@ -188,13 +202,18 @@ def _has_feature_qualifier(text: str) -> bool:
     return bool(_hits(text, FEATURE_QUALIFIER_KW))
 
 
-def route(query: str, *, has_project_context: bool | None = None) -> RouteDecision:
+def route(query: str, *, has_project_context: bool | None = None,
+          capability_override: str | None = None) -> RouteDecision:
     """确定性前置路由：query（+ 可选「是否已挂项目上下文」覆盖）→ RouteDecision。
 
     参数：
         query —— 用户自然语言请求。
         has_project_context —— 调用方已知是否挂了 BOQ/算量（覆盖文本推断）；None 则只看文本。
-    返回：RouteDecision。
+        capability_override —— **意图混合路由专用**：LLM 兜底分类判出的 capability
+          （∈ VALID_CAPABILITIES）。给定即**跳过确定性能力分流**、以它为准，但**所有形态/红线闸
+          （caliber / feature / EH-03 出界 / compose_full）照旧确定性重推**——LLM 只补能力分类、
+          绝不碰安全闸（AGENT_TODO「红线两条路都确定性」）。非法值忽略、退回确定性分流。
+    返回：RouteDecision。**本函数纯确定性、零 LLM**（override 由上层 route_hybrid 先算好再传入）。
     """
     text = query or ""
     reasons: list[str] = []
@@ -236,7 +255,19 @@ def route(query: str, *, has_project_context: bool | None = None) -> RouteDecisi
     )
 
     # ── 能力分流（优先级：复合 > 价格 > 组价 > 上下文核对 > 规范兜底）──
-    if explicit_compound or multi_capability:
+    #   意图混合路由：capability_override 给定（LLM 兜底判的能力）→ 直接采信、跳过确定性分流；
+    #   源标 llm_fallback。非法值忽略、退回确定性。**强信号命中率（strong_signal）仍照确定性算**，
+    #   仅用于置信度审计。
+    strong_signal = bool(
+        cost_sig or price_strong or explicit_compound or multi_capability
+        or _EXPLICIT_GB_RE.search(text))
+    route_source = "deterministic"
+    if capability_override in VALID_CAPABILITIES:
+        capability = capability_override
+        source_type = "dynamic" if capability == "price" else "static"
+        route_source = "llm_fallback"
+        reasons.append(f"能力由 LLM 兜底分类判定：{capability}（确定性置信低 → 意图混合路由升级）")
+    elif explicit_compound or multi_capability:
         capability, source_type = "compound", "static"
         if explicit_compound:
             reasons.append(
@@ -299,12 +330,23 @@ def route(query: str, *, has_project_context: bool | None = None) -> RouteDecisi
     # ── 意图数量（EH-01）──
     intent_count = "compound" if capability == "compound" else "single"
 
+    # ── 置信度（意图混合路由）：判定链是否由强信号拍板 ──
+    #   low ⟺ 落到 norm 兜底 且 只命中泛词/纯默认（无非泛词 norm 实词）且 无版本锁（无 2013/2024、无显式GB）。
+    #   这类「未命中/只命中泛词」恰是关键词穷举疲劳 + 口语变体漏判的重灾区 → 交 LLM 兜底复核。
+    #   cost/price/compound 均由强信号驱动（strong_signal），一律 high、零延迟直配、金标可回归。
+    #   LLM 兜底改判后（route_source=llm_fallback）不再回炉，置信随新能力重算（多为 high）。
+    strong_norm = bool(set(norm_sig) - set(GENERIC_NORM_KW))
+    route_confidence = (
+        "low" if (capability == "norm" and not strong_norm and not caliber_complete)
+        else "high")
+
     return RouteDecision(
         capability=capability, source_type=source_type, needs_calc=needs_calc,
         needs_context=needs_context, intent_count=intent_count,
         feature_complete=feature_complete, caliber_complete=caliber_complete,
         clarify=clarify, out_of_scope_region=out_of_scope_region,
         compose_full=compose_full,
+        route_confidence=route_confidence, route_source=route_source,
         matched={
             "cost": cost_sig, "price": price_sig, "compound": compound_sig,
             "compare": compare_hit, "multi_capability": multi_capability,
@@ -362,6 +404,23 @@ _SELFTEST_REGION_CASES: tuple[tuple[str, str | None], ...] = (
 )
 
 
+# 置信度期望（意图混合路由）：high=强信号确定性直配，low=只泛词/纯默认 norm 兜底→交 LLM 复核。
+_SELFTEST_CONFIDENCE_CASES: tuple[tuple[str, str], ...] = (
+    # ── high：强信号（cost/price/compound/显式GB/强 norm 实词/版本锁）──
+    ("C30现浇混凝土矩形柱怎么组价？", "high"),                    # 组价动作词
+    ("深圳本月HRB400钢筋信息价是多少？", "high"),                 # 价格强信号
+    ("这两种方案哪种更省", "high"),                              # 复合
+    ("按 gb50500-2024 综合单价包含哪些费用？", "high"),           # 显式GB（即便含泛词「包含哪些」）
+    ("满堂脚手架工程量怎么计算？", "high"),                       # 强 norm 实词「工程量怎么」
+    ("房建计量规范 2013 和 2024 墙面抹灰有什么区别？", "high"),    # 版本锁（+「规范」实词）
+    # ── low：未命中/只命中泛词、无版本锁 → 落 norm 兜底、交 LLM 复核 ──
+    ("综合单价的构成是什么", "low"),                             # 只命中泛词「构成」
+    ("这两个有什么区别", "low"),                                 # 只命中泛词「区别」
+    ("帮我把这根柱子弄一下", "low"),                             # 口语变体、无任何关键词（纯默认）
+    ("独立基础和条形基础包含哪些", "low"),                       # 只命中泛词「包含哪些」，无版本
+)
+
+
 def _selftest() -> int:
     import sys
     try:
@@ -393,7 +452,26 @@ def _selftest() -> int:
             failed += 1
         print(f"{'✓' if ok else '✗'} region={str(d.out_of_scope_region):<5} (期望 {exp_region})  {query[:30]}")
 
-    total = len(_SELFTEST_CASES) + len(_SELFTEST_REGION_CASES)
+    # route_confidence（意图混合路由：高=强信号直配 / 低=交 LLM 兜底复核）
+    for query, exp_conf in _SELFTEST_CONFIDENCE_CASES:
+        d = route(query)
+        ok = d.route_confidence == exp_conf
+        if ok:
+            passed += 1
+        else:
+            failed += 1
+        print(f"{'✓' if ok else '✗'} conf={d.route_confidence:<4} (期望 {exp_conf}) cap={d.capability:<8} {query[:26]}")
+
+    # capability_override（LLM 兜底注入）：能力改判但红线闸仍确定性重推
+    d_ovr = route("帮我把这根柱子弄一下", capability_override="cost")
+    ovr_ok = (d_ovr.capability == "cost" and d_ovr.route_source == "llm_fallback"
+              and d_ovr.clarify == "feature")  # 缺特征→确定性重推出 feature 反问
+    passed += ovr_ok
+    failed += not ovr_ok
+    print(f"{'✓' if ovr_ok else '✗'} override→cost src={d_ovr.route_source} clarify={d_ovr.clarify}（红线闸确定性重推）")
+
+    total = (len(_SELFTEST_CASES) + len(_SELFTEST_REGION_CASES)
+             + len(_SELFTEST_CONFIDENCE_CASES) + 1)
     print(f"\n自测：{passed} 过 / {failed} 败 / 共 {total}")
     return 1 if failed else 0
 

@@ -45,6 +45,13 @@ KNOWLEDGE_URL = os.environ.get("BCRAG_KNOWLEDGE_URL", "http://localhost:8100")
 COST_DEFAULT_SPEC = os.environ.get("CE_COST_DEFAULT_SPEC", "2013")
 COST_DEFAULT_REGION = os.environ.get("CE_COST_DEFAULT_REGION", "深圳")
 
+# ── 意图混合路由（AGENT_TODO M1 路由线）：确定性低置信时用 32b 兜底补能力分类 ──
+# 确定性 prerouter 命中强信号 → 零延迟直配（多数流量、金标回归）；判 route_confidence="low"
+# （落 norm 兜底、只泛词/纯默认、无版本锁）→ 调 routing/intent_fallback.classify_intent（桶 B 32b，
+# 复用 ORCH_LLM_*）。**红线闸（EH-03 出界 / caliber 口径 / feature）两条路都确定性、LLM 不碰**；
+# LLM 不可达/越界 → fail-safe 跌回确定性。默认开；无 LLM 或要纯确定性 export CE_ROUTE_LLM_FALLBACK=0。
+ROUTE_LLM_FALLBACK = os.environ.get("CE_ROUTE_LLM_FALLBACK", "1").lower() not in ("0", "false", "no")
+
 # ── 规范问答联网兜底（§8 块2 / T9-4，PRD FR-K07）：仅 FR-K 开放，FR-P/FR-I 永不联网 ──
 # 三道闸在服务端确定性执行（norm/web_fallback.py），弱模型不碰查询口径/可信度筛查。
 # 默认开；无外网环境 export CE_NORM_WEB_FALLBACK=0 关闭（回落零召回直接拒答）。

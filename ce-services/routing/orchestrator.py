@@ -34,6 +34,7 @@ from common.guards import GUARD_C01, GUARD_C03, VERDICT_PASS, VERDICT_REJECT, Gu
 from common.llm import call_qwen3
 from norm import pipeline
 from norm.standard_router import family_version_of
+from routing.intent_fallback import route_hybrid
 from routing.prerouter import RouteDecision, route
 
 logger = logging.getLogger("ce-services.orchestrator")
@@ -352,17 +353,20 @@ def orchestrate(
     query: str,
     *,
     has_project_context: bool | None = None,
+    use_llm_fallback: bool | None = None,
     cap_llm_url: str = LLM_URL,
     cap_model_id: str = LLM_MODEL_ID,
     dispatch_fn: Callable[[str, RouteDecision], dict] | None = None,
     decompose_fn: Callable[[str], list[dict]] | None = None,
     synthesize_fn: Callable[[str, list[dict]], dict] | None = None,
 ) -> dict:
-    """复合编排：① 路由 → 单一直派 / 复合则拆解→逐子任务回①→派发→综合。
+    """复合编排：① 路由（意图混合：确定性 + 低置信 LLM 兜底）→ 单一直派 / 复合则拆解→逐子任务回①→派发→综合。
 
     参数：
         query —— 用户请求；has_project_context —— 是否挂 BOQ（透传 prerouter）。
-        cap_llm_url / cap_model_id —— 能力层（桶 A 8b）模型；拆解/综合用 32b（在默认 fn 内）。
+        use_llm_fallback —— 顶层路由是否启用 LLM 兜底（None 读 config CE_ROUTE_LLM_FALLBACK）；
+          仅作用于**顶层单句路由**（口语变体/泛词从 norm 兜底捞回），拆解后的子任务已自包含、仍走确定性。
+        cap_llm_url / cap_model_id —— 能力层（桶 A 8b）模型；拆解/综合/兜底分类用 32b（在默认 fn 内）。
         dispatch_fn / decompose_fn / synthesize_fn —— 可注入（单测用 stub）；缺省用真实现。
     返回：
         单一：``{mode:"single", route, result:<信封>}``；
@@ -373,7 +377,9 @@ def orchestrate(
     _decompose = decompose_fn or decompose
     _synthesize = synthesize_fn or synthesize
 
-    decision = route(query, has_project_context=has_project_context)
+    # 顶层：意图混合路由（确定性强信号直配 / 低置信 32b 兜底补能力分类，红线闸仍确定性重推）。
+    decision = route_hybrid(query, has_project_context=has_project_context,
+                            use_llm_fallback=use_llm_fallback)
 
     # 单一意图：无需拆解/综合，直接派发到能力层（编排器也作统一入口）。
     if decision.capability != "compound":

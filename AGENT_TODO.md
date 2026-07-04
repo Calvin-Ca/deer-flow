@@ -100,15 +100,21 @@
   **代价大一个量级**（动 `backend/` 上游 harness 核心 + 前端 interrupt 渲染）。**前置调研先行**（deer-flow 图是否
   支持节点内循环 interrupt，0.5–1 人日）。仅当「agent 必须在场」被确认为刚需才启动；**未排期**。
 
-## 意图混合路由（确定性 + LLM 兜底，归 benchmark M1 路由线，未排期）
+## 意图混合路由（确定性 + LLM 兜底，归 benchmark M1 路由线）
 
-- [ ] **prerouter 加 LLM 兜底分类**（治关键词穷举疲劳 + 口语变体漏判，不把红线交给弱模型）：确定性命中
-  **强信号**（COST/PRICE_STRONG/COMPOUND/显式GB/`_COMPARE_RE`）→ 直接走（多数流量、零延迟、金标可回归）；
-  未命中 / 只命中泛词（`区别/构成/包含哪些`）→ **32b 兜底分类器**（temp=0、enum JSON schema、校验 + fail-safe
-  跌回确定性默认）。**红线 guard（出界 EH-03 / 口径 C-02）两条路都确定性**，LLM 只补 capability+form 分类、
-  不碰安全闸、不覆盖。改动：`prerouter` 加「命中强信号 vs 兜底默认」置信信号 + 一个 LLM 兜底函数；
-  orchestrator/router 低置信时调兜底。测：确定性层金标（`routing_eval`）不动 + 兜底层建「难例/含糊」集，
-  量**升级率 + LLM 路由准确率 + 延迟**（对齐 FR-K ≤3s NFR）。量：中（后端 + 新 eval）。详见对话 2026-07-04 讨论。
+- [x] **prerouter 加 LLM 兜底分类**（治关键词穷举疲劳 + 口语变体漏判，不把红线交给弱模型）：确定性命中
+  **强信号**（COST/PRICE_STRONG/COMPOUND/显式GB/`_COMPARE_RE`/强 norm 实词/版本锁）→ 直接走（多数流量、
+  零延迟、金标可回归）；未命中 / 只命中泛词（`区别/构成/包含哪些`）且无版本锁 → **32b 兜底分类器**
+  （temp=0、enum JSON、校验 + fail-safe 跌回确定性默认）。**红线 guard（出界 EH-03 / 口径 caliber）两条路
+  都确定性**，LLM 只补 capability 分类、不碰安全闸（`route(capability_override=)` 确定性重推所有形态闸）。
+  **已落码**（2026-07-04）：① `prerouter` 加 `route_confidence`（high/low）+ `route_source` 信号 +
+  `capability_override` 参数（纯函数不引 LLM，金标 `prerouter_eval` 24/24 不动、自测 38/38）；
+  ② 新 `routing/intent_fallback.py`：`classify_intent`（32b fail-safe）+ `route_hybrid`（低置信才兜底，
+  自测 7/7）；③ `config.CE_ROUTE_LLM_FALLBACK`（默认开，env 可关）+ `orchestrator` 顶层用 `route_hybrid` +
+  `router /route` 加可选 `use_llm_fallback`（默认关保端点纯确定性）；④ 兜底难例集
+  `benchmark/routing_eval/intent_fallback_eval.jsonl`（20 例）+ `tools/intent_fallback_eval.py`
+  量升级门/直配正确率/兜底准确率/延迟（离线 20/20 门 + 6/6 直配全绿）。**待办**：`--llm` 真调 32b 出兜底
+  准确率 + P95 延迟（需服务器 LLM 起齐）；接真流量后回灌难例扩样本。
 
 ## 小尾巴（不阻塞主线，择机清）
 

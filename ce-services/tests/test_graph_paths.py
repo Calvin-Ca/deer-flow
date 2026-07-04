@@ -206,7 +206,7 @@ def test_quota_missing_partial_reasks_once():
         graph.invoke(initial, config)
         r2 = graph.invoke(Command(resume={"labor_cost": 10.0}), config)  # 半填
         g2 = gate(r2)
-        assert g2["node"] == "quota_missing" and "填齐" in g2["title"]  # partial 重问
+        assert g2["node"] == "quota_missing" and "补齐" in g2["title"]  # partial 重问（title 带「请补齐…或全空放弃」后缀）
         r3 = graph.invoke(Command(resume={"__resume__": True}), config)  # 空 dict→哨兵（同④）
         assert r3["status"] == "blocked"
 

@@ -39,10 +39,15 @@ services:
       - CE_NORM_WEB_FALLBACK=${CE_NORM_WEB_FALLBACK:-1}
       # 组价缺省国标版本（PRD C-05 默认深圳·2013；过渡期要完整组价体验可切 2024）
       - CE_COST_DEFAULT_SPEC=${CE_COST_DEFAULT_SPEC:-2013}
-      # 可选：桶B(32B) 升级 / 编码闸阈值 —— 不设则走 config.py 默认（8b、τ=0.75），按需放开
+      # 可选：桶B(32B) 升级 —— 不设则走 config.py 默认（8b），按需放开
       # - BCRAG_ORCH_LLM_URL=${ORCH_LLM_URL:-}
       # - BCRAG_ORCH_LLM_MODEL_ID=${ORCH_LLM_MODEL_ID:-}
-      # - CE_HITL_CONFIDENCE_TAU=${HITL_CONFIDENCE_TAU:-0.75}
+      # 编码闸 τ 双阈值（M4 数据定参 2026-07-05，eval_select n=10 分桶实测）：
+      #   校准排序能力已验证——错码全被压 0.00、≥0.14 样本 8/8 全对；τ_high 0.75→0.60
+      #   （[0.6,1] 桶 2/2 全对，分流 10%→20%），τ_low 0.60→0.30 保持双阈有序。
+      #   下一档候选 τ_high=0.25（[0.2,1] 4/4 全对）待金标扩 30+ 条复核后再放。
+      - CE_HITL_TAU_HIGH=${CE_HITL_TAU_HIGH:-0.60}
+      - CE_HITL_TAU_LOW=${CE_HITL_TAU_LOW:-0.30}
     volumes:
       # HITL 会话持久化：绑大盘（与 deps 数据卷同盘，避免 / 满 + 容器重建丢状态）
       - ${CE_DATA_ROOT:-/mnt/nvme/calvin/data/ce-code}/ce-services:/data

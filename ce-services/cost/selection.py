@@ -187,6 +187,10 @@ def select_code(
         "confidence": effective_conf,
         "llm_confidence": confidence,
         "external_confidence": external_conf,
+        # 校准原料外露（M4 调参归因）：0 分到底是 margin 清零（逆检索选对被冤）还是 abs 低
+        # （cosine 真不贴切），靠这两个数在 eval 里拆穿——不外露就只能猜。
+        "chosen_score": chosen_score,
+        "runner_up_score": runner_up_score,
         "reason": reason,
         "need_review": need_review,
         "alternatives": alternatives,

@@ -166,9 +166,11 @@ def run_eval(gold_path: Path, spec: str, top_k: int,
           f"知识服务={knowledge_url or '(config默认)'} · LLM={llm_url}\n")
 
     # 列宽固定的朴素表（ce-services 不引 rich，保持轻量）。
-    header = f"{'查询':<26}{'金标':<12}{'召回':<6}{'选码':<26}{'置信':<8}{'判定':<6}"
+    # cos/次优 = 选中候选与次优候选的 cosine（M4 归因列：置信 0 是 margin 清零还是 abs 低，一眼拆穿）。
+    header = (f"{'查询':<26}{'金标':<12}{'召回':<6}{'选码':<26}{'置信':<8}"
+              f"{'cos':<7}{'次优':<7}{'判定':<6}")
     print(header)
-    print("-" * 84)
+    print("-" * 98)
 
     records: list[dict] = []
     details: list[dict] = []
@@ -184,9 +186,13 @@ def run_eval(gold_path: Path, spec: str, top_k: int,
 
         verdict = _verdict(rec)
         picked = selection.get("code") or "—"
+        def _s(v: object) -> str:
+            return f"{v:.3f}" if isinstance(v, (int, float)) else "—"
         print(f"{c['query'][:24]:<26}{'/'.join(sorted(c['gold'])):<12}"
               f"{'✓' if rec['recalled'] else '✗':<6}{str(picked)[:24]:<26}"
-              f"{rec['confidence']:<8.2f}{verdict:<6}")
+              f"{rec['confidence']:<8.2f}"
+              f"{_s(selection.get('chosen_score')):<7}{_s(selection.get('runner_up_score')):<7}"
+              f"{verdict:<6}")
 
         details.append({"query": c["query"], "gold": sorted(c["gold"]),
                         "candidates_count": len(candidates), "selection": selection,

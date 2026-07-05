@@ -60,6 +60,18 @@ def test_build_rows_summary_with_rollup():
     assert "深圳·2024" in kv["口径声明"]
 
 
+def test_build_rows_unconfirmed_code_shape():
+    """未过闸形状（真会话半程导出实测缺口）：provenance 在 envelope 里也要读到，确认方式标「未确认」。"""
+    values = {"items": [{
+        "feature": "C30柱",
+        "code": {"value": "010502001", "locked": False,
+                 "envelope": {"provenance": {"source_ref": "GB50854-2013 附录E", "confidence": 0.8}}},
+    }]}
+    row = build_rows(values)["items"][1]
+    assert row[2] == "010502001" and row[11] == "GB50854-2013 附录E" and row[12] == 0.8
+    assert row[13] == "未确认"
+
+
 def test_build_rows_blocked_and_unfinished():
     blocked = build_rows({"items": [{"feature": "x"}],
                           "rollup": {"blocked_reason": "无法组价到总价（缺定额映射）"}})

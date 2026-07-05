@@ -28,9 +28,15 @@ def _fmt(v: Any) -> Any:
 
 
 def _item_row(idx: int, item: dict[str, Any]) -> list[Any]:
-    """单构件 → 明细行。缺口如实留空/标状态（missing_base / missing_quantity 等），不补数。"""
+    """单构件 → 明细行。缺口如实留空/标状态（missing_base / missing_quantity 等），不补数。
+
+    code 两种形状都认：过闸钉值后是 lock_value ``{value, provenance, by}``（provenance 顶层）；
+    未过闸是 ``{envelope, value, locked:False}``（provenance 在 envelope 里）——半程导出是常态
+    （评审中途拉表核对），未确认件也要能看到候选来源与置信。
+    """
     code = item.get("code") or {}
-    prov = code.get("provenance") or {}
+    prov = (code.get("provenance")
+            or (code.get("envelope") or {}).get("provenance") or {})
     up = item.get("unit_price") or {}
     breakdown = up.get("breakdown") or {}
     status = up.get("status") or ("ok" if up.get("total_price") is not None else "")
@@ -48,7 +54,9 @@ def _item_row(idx: int, item: dict[str, Any]) -> list[Any]:
         _fmt(status),
         _fmt(prov.get("source_ref") or prov.get("source_type")),
         _fmt(prov.get("confidence")),
-        "人工确认" if code.get("by") == "user" else ("自动采纳" if code.get("by") == "model" else ""),
+        ("人工确认" if code.get("by") == "user"
+         else "自动采纳" if code.get("by") == "model"
+         else "未确认" if code.get("value") else ""),
     ]
 
 

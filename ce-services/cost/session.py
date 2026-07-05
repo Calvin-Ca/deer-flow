@@ -278,6 +278,72 @@ def resume(task_id: str, decision: dict[str, Any]) -> dict[str, Any]:
     return _format(task_id, result)
 
 
+def batch_resume(task_id: str, decisions: list[dict[str, Any]],
+                 max_steps: int = 200) -> dict[str, Any]:
+    """批量决策续跑（M2 评审表后端地基）：一次提交多闸决策，服务端循环 resume 到「决策池耗尽/
+    未命中的闸/终态」为止——把「逐闸串行往返」压成一次调用。
+
+    参数：
+        task_id —— 会话标识；
+        decisions —— 决策池，每条 ``{node, item?, decision}``：node=闸节点名（interrupt payload
+          的 node 字段：list_coding / quota / quota_missing / price_item:N / quantity / feature /
+          rates / params / rollup）；item=构件序号（可省=不限件，对项目级闸 rates/params/rollup 无意义）；
+          decision=该闸的用户输入（与单闸 resume 同形）。
+        max_steps —— 步数上限（防异常死循环；30 件×每件~5 闸远低于 200）。
+    返回：``_format`` 响应 + ``batch {consumed, steps, stopped_reason}``：
+      - stopped_reason=done/blocked —— 跑到终态；
+      - no_match —— 停在决策池没有对应决策的闸（评审表语义：低置信件留人工，interrupt 照常返回）；
+      - repeat_gate —— 同一闸消耗决策后仍重停（决策被闸拒绝，如半填重问），停下防空转；
+      - max_steps —— 上限兜底。
+    匹配规则：node 精确等值 且（决策未给 item 或 item==当前 current_item）；命中即消耗（一条决策
+      只用一次——重停同闸不复用，交 repeat_gate 停下）。整个循环持会话锁（内部裸 invoke，不经
+      ``resume()``——threading.Lock 不可重入）。
+    """
+    pool = [dict(d) for d in (decisions or [])]
+    consumed: list[dict[str, Any]] = []
+    steps = 0
+    stopped = "no_match"
+    with _task_lock(task_id):
+        config = _config(task_id)
+        last_key: tuple[Any, Any] | None = None
+        while steps < max_steps:
+            snapshot = _graph.get_state(config)
+            gate = _pending_interrupt(snapshot)
+            if gate is None:  # 无挂起闸：已是终态（done/blocked）
+                stopped = (snapshot.values or {}).get("status", "done") if snapshot else "done"
+                break
+            node = gate.get("node") if isinstance(gate, dict) else None
+            current_item = (snapshot.values or {}).get("current_item") if snapshot else None
+            key = (node, current_item)
+            if key == last_key:  # 消耗了决策仍重停同闸（被闸拒绝，如人材机半填重问）→ 停下防空转
+                stopped = "repeat_gate"
+                break
+            idx = next((i for i, d in enumerate(pool)
+                        if d.get("node") == node
+                        and (d.get("item") is None or d.get("item") == current_item)), None)
+            if idx is None:  # 池里没有这闸的决策：留给人工（评审表的「低置信标黄」件）
+                stopped = "no_match"
+                break
+            entry = pool.pop(idx)
+            consumed.append({"node": node, "item": current_item})
+            last_key = key
+            decision = entry.get("decision") or {}
+            _graph.invoke(Command(resume=decision or {"__resume__": True}), config=config)
+            steps += 1
+        else:
+            stopped = "max_steps"
+
+        final = _graph.get_state(config)
+    values = final.values if final else {}
+    out = _format(task_id, {**values, "__interrupt__": None})
+    out["interrupt"] = _pending_interrupt(final)
+    if out["interrupt"] is not None:
+        out["status"] = "awaiting_input"
+    out["batch"] = {"consumed": consumed, "steps": steps, "stopped_reason": stopped,
+                    "remaining_decisions": len(pool)}
+    return out
+
+
 def _pending_interrupt(snapshot: Any) -> Any:
     """从图快照里提取**当前挂起的 interrupt 闸 payload**（供按 task_id 恢复渲染当前闸）。
 

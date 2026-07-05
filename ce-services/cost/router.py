@@ -302,6 +302,35 @@ def cost_session_state_endpoint(task_id: str) -> dict:
     return session.get_state(task_id)
 
 
+class BatchDecision(BaseModel):
+    """批量续跑的单条决策（(node, item) 寻址）。"""
+
+    node: str = Field(..., description="闸节点名（interrupt payload 的 node：list_coding/quota/price_item:N/quantity/rates/params/rollup…）")
+    item: int | None = Field(None, description="构件序号（省略=不限件；项目级闸无意义）")
+    decision: dict = Field(default_factory=dict, description="该闸的用户输入（与单闸 resume 同形）")
+
+
+class BatchResumeRequest(BaseModel):
+    """POST /cost/session/{id}/batch_resume 请求体。"""
+
+    decisions: list[BatchDecision] = Field(..., min_length=1, max_length=500,
+                                           description="决策池：命中即消耗；未命中的闸停下留人工")
+
+
+@router.post("/cost/session/{task_id}/batch_resume")
+def cost_session_batch_resume_endpoint(task_id: str, req: BatchResumeRequest) -> dict:
+    """批量决策续跑（M2 评审表后端）：一次提交多闸决策，服务端循环 resume 到池尽/未命中闸/终态。
+
+    评审表语义：高置信件的确认批量提交、低置信件不给决策自然停闸留人工。
+    返回：会话响应 + ``batch{consumed, steps, stopped_reason, remaining_decisions}``。
+    """
+    from cost import session
+    result = session.batch_resume(task_id, [d.model_dump() for d in req.decisions])
+    logger.info("/cost/session/%s/batch_resume steps=%d stopped=%s", task_id,
+                result["batch"]["steps"], result["batch"]["stopped_reason"])
+    return result
+
+
 @router.get("/cost/session/{task_id}/export")
 def cost_session_export_endpoint(task_id: str, fmt: str = "xlsx"):
     """导出会话组价成果为清单-定额-单价表（M2 §3.1 管线⑦，只读不推进图）。

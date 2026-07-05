@@ -300,6 +300,47 @@ def test_session_task_lock_identity():
     assert a1 is a2 and a1 is not b
 
 
+# ── ⑫ batch_resume 批量续跑（评审表后端）：决策池全命中 → 一次到 done ──
+def test_batch_resume_full_pool_to_done():
+    from cost import session
+
+    with patched(list_envs=[make_env(conf=0.5)]):  # 双件均低置信 → 各停 list_coding
+        res = session.start(features=[{"feature": "C30矩形柱甲", "quantity": 2.0},
+                                      {"feature": "C30矩形柱乙", "quantity": 1.0}],
+                            spec="2024", rates=dict(RATES))
+        task_id = res["task_id"]
+        assert res["status"] == "awaiting_input" and res["interrupt"]["node"] == "list_coding"
+        out = session.batch_resume(task_id, [
+            {"node": "list_coding", "item": 0, "decision": {"action": "approve"}},
+            {"node": "list_coding", "item": 1, "decision": {"action": "approve"}},
+            {"node": "params", "decision": dict(PARAMS)},
+            {"node": "rollup", "decision": {"action": "approve"}},
+        ])
+        assert out["batch"]["stopped_reason"] == "done", out["batch"]
+        assert out["status"] == "done" and out["interrupt"] is None
+        assert len(out["batch"]["consumed"]) == 4 and out["batch"]["remaining_decisions"] == 0
+        assert out["rollup"]["total"] > 0  # 双件合价 → 有总造价
+
+
+# ── ⑬ batch_resume 部分池：未给决策的闸停下留人工（评审表「低置信标黄」语义）──
+def test_batch_resume_partial_pool_stops_at_unmatched():
+    from cost import session
+
+    with patched(list_envs=[make_env(conf=0.5)]):
+        # 两件都预供 Q（否则第一件 approve 后先停 quantity 闸，测不到「停在第二件编码闸」）
+        res = session.start(features=[{"feature": "C30矩形柱甲", "quantity": 2.0},
+                                      {"feature": "C30矩形柱乙", "quantity": 1.0}],
+                            spec="2024", rates=dict(RATES))
+        out = session.batch_resume(res["task_id"], [
+            {"node": "list_coding", "item": 0, "decision": {"action": "approve"}},
+            # 刻意不给 item 1 的决策
+        ])
+        assert out["batch"]["stopped_reason"] == "no_match"
+        assert out["status"] == "awaiting_input"
+        assert out["interrupt"]["node"] == "list_coding"  # 停在第二件的编码闸
+        assert out["batch"]["consumed"] == [{"node": "list_coding", "item": 0}]
+
+
 if __name__ == "__main__":
     try:
         sys.stdout.reconfigure(encoding="utf-8")

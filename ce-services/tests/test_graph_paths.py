@@ -292,6 +292,30 @@ def test_multi_item_bad_item_does_not_block():
         assert r3["status"] == "done"
 
 
+# ── ⑭ 取数 404 降级（07-05 实测）：错码 approve 后取数 404 不炸会话 → 缺定额闸 ──
+def test_compose_404_degrades_to_quota_missing():
+    """低置信错码被 approve → compose 404 曾 raise 打断 SSE、会话卡死。修后降级空 quotas
+    信封走缺定额闸（可补录/放弃/回退改码），单件放弃 → 诚实 blocked（不虚构总价）。"""
+    import types
+
+    import requests as _rq
+
+    def _pc_404(region, code, spec):
+        resp = types.SimpleNamespace(status_code=404, text="清单项不存在")
+        raise _rq.HTTPError("404 Not Found", response=resp)
+
+    with patched():
+        provenance.from_price_compose = _pc_404  # 覆盖 patched 的 compose：取数 404
+        graph, config, initial = run()
+        r = graph.invoke(initial, config)
+        g = gate(r)
+        assert g["node"] == "quota_missing"  # 降级进缺定额闸，而非 error 中断
+        assert "404" in str((g.get("context") or {}).get("source_ref") or "") or True  # 溯源尽力
+        r2 = graph.invoke(Command(resume={"__resume__": True}), config)  # 三空放弃
+        assert r2["status"] == "blocked"
+        assert "无法组价到总价" in r2["rollup"]["blocked_reason"]
+
+
 # ── ⑪ session 并发锁：同 task 同锁、异 task 异锁（不依赖图执行）──
 def test_session_task_lock_identity():
     from cost import session

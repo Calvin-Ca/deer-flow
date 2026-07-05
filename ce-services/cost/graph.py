@@ -233,6 +233,27 @@ def compose_node(state: CostTaskState) -> dict[str, Any]:
                 "events": [{"step": "from_price_compose", "status": "未就绪",
                             "provenance": {"source_ref": f"spec={spec} 组价数据未就绪"}, "paused": False}],
             }
+        if status == 404:
+            # 选错码/该版本无此清单项（07-05 实测：低置信 0.14 错码被 approve 后取数 404 曾
+            # raise 打断整条 SSE、会话卡死在 compose）。选错码是用户常态操作，绝不炸会话——
+            # 降级为空 quotas 信封走缺定额闸：可补录基价 / 三空放弃 / rewind 回编码闸改码，
+            # 单件问题不拖死整单（与「库内无定额映射」同一条 HITL 出路）。
+            detail = (exc.response.text if exc.response is not None else str(exc))[:120]
+            item["quota"] = {"envelope": {
+                "step": "pick_quota", "status": provenance.STATUS_NO_SOURCE,
+                "result": {"quotas": []},
+                "provenance": {"source_type": "quota_lib",
+                               "source_ref": f"取数 404：编码 {code} 在 spec={spec} 无组价数据（{detail}）"},
+            }, "locked": False}
+            item["materials"] = []
+            return {
+                "items": _put_item(state, item),
+                "events": [{"step": "from_price_compose", "status": "no_source",
+                            "provenance": {"source_ref":
+                                           f"编码 {code} 在 spec={spec} 无组价数据（404，可能选码有误——"
+                                           "可在缺定额闸补录基价，或回退编码闸改码）"},
+                            "paused": False}],
+            }
         raise
 
     item["quota"] = {"envelope": bundle["quota_envelope"], "locked": False}

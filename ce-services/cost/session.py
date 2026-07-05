@@ -10,6 +10,7 @@
 """
 from __future__ import annotations
 
+import logging
 import sqlite3
 import threading
 import uuid
@@ -21,6 +22,8 @@ from langgraph.types import Command
 
 from common.config import HITL_CHECKPOINT_DB
 from cost.graph import build_graph
+
+logger = logging.getLogger("ce-services.cost.session")
 
 # 单例：SqliteSaver 持久化连接（check_same_thread=False —— uvicorn 多线程下复用同一连接）+ 编译图。
 _conn = sqlite3.connect(HITL_CHECKPOINT_DB, check_same_thread=False)
@@ -215,6 +218,9 @@ def _run_stream(task_id: str, graph_input: Any) -> Any:
                 for ev in update.get("events") or []:
                     yield {"type": "event", "event": ev}
     except (requests.RequestException, ValueError) as exc:
+        # 服务端必须留痕：此前只 yield 进 SSE，客户端断流后异常完全无痕（07-05 实测排障半小时
+        # 才定位到 compose 404——异常路径不出声是本项目已两踩的坑，见 message-content-blocks-trap）。
+        logger.warning("组价图流式执行异常 task=%s: %s", task_id, _exc_detail(exc))
         yield {"type": "error", "detail": _exc_detail(exc)}
         return
 

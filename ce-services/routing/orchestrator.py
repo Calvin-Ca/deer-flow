@@ -167,6 +167,61 @@ def _out_of_domain_envelope(query: str) -> dict[str, Any]:
             "answer": _CAPABILITY_STATEMENT}
 
 
+def _ignite_listing(query: str, decision: RouteDecision, *,
+                    extract_fn: Callable[[str], dict] | None = None,
+                    start_fn: Callable[..., dict] | None = None) -> dict[str, Any]:
+    """批量列清单点火（M2 §3.1 管线①→现有图）：抽构件 → 多构件 HITL 会话 → marker。
+
+    参数：query —— 原句（v0 把整条消息当抽取原文：用户把设计说明贴在消息里）；decision —— 路由判定；
+      extract_fn / start_fn —— 可注入（单测 stub，本地零 langgraph 可测）；缺省用真实现。
+    返回（三分支）：
+      - 抽到 ≥1 件 → ``session.start(features=[...])`` 批量点火，``{mode:"hitl", listing:{count, preview}}``
+        + marker（前端复用现有逐闸控件；评审表 UI 归 M2 后段）；抽到的工程量随件预供（quantity_gate 自动过）。
+      - 抽到 0 件 / 抽取失败 → ``need_input`` 引导贴设计说明或补构件特征（不硬拆、不空跑 compose）。
+      - 点火失败（服务/图不可达）→ 降级返回抽取结果本身（用户至少拿到构件清单草稿），status 标降级。
+    版本：沿 §4.0 口径——query 显式 2013/2024 优先，否则 None 交图 setup 归一默认。
+    """
+    from cost import listing as listing_mod
+    _extract = extract_fn or listing_mod.extract_components
+    env = _extract(query)
+    items = (env.get("result") or {}).get("items") or []
+
+    if env.get("status") != "ok" or not items:
+        return {"mode": "single", "route": decision.as_meta(),
+                "result": {"capability": "cost", "query": query, "status": "need_input",
+                           "extraction": env,
+                           "note": ("未能从描述中抽取出可计价构件。请把项目特征描述/设计说明原文贴出（含构件"
+                                    "名称、强度等级、材料规格），或按「构件+关键特征」逐条列出后重试。")}}
+
+    spec, spec_source = _spec_of(query)
+    features = [{k: it[k] for k in ("feature", "quantity") if k in it} for it in items]
+    if start_fn is None:
+        from cost import session  # 局部 import：隔离 langgraph 依赖，与 _ignite_hitl 一致
+        start_fn = session.start
+    try:
+        res = start_fn(features=features, spec=(spec if spec_source == "user" else None),
+                       region=COST_DEFAULT_REGION)
+    except (requests.RequestException, ValueError) as exc:
+        logger.warning("批量列清单点火失败 → 降级返回抽取草稿：%s", exc)
+        return {"mode": "single", "route": decision.as_meta(),
+                "result": {"capability": "cost", "query": query, "status": "degraded",
+                           "extraction": env,
+                           "note": f"已抽取 {len(items)} 个构件但组价会话启动失败（{exc}）；"
+                                   "以下为构件清单草稿，供人工核对后重试。"}}
+    task_id = res.get("task_id")
+    marker = "```cost-hitl\n" + json.dumps({"task_id": task_id}, ensure_ascii=False) + "\n```"
+    logger.info("orchestrate listing-ignite task=%s items=%d status=%s",
+                task_id, len(items), res.get("status"))
+    return {"mode": "hitl", "route": decision.as_meta(), "task_id": task_id,
+            "marker": marker, "status": res.get("status"),
+            "listing": {"count": len(items),
+                        "preview": [it["feature"] for it in items[:5]],
+                        "extraction_note": env.get("note")},
+            "note": (f"已从描述中抽取 {len(items)} 个构件并启动批量组价会话，页面已内嵌交互式组价控件。"
+                     "你只需用一句话、你自己的话告知用户已识别的构件数量、后续在控件里逐件确认即可，"
+                     "随后立即结束回合。严禁：罗列全部构件明细、转述闸内容、编造任何编码或数字。")}
+
+
 def _out_of_scope_envelope(cap: str, query: str, region: str) -> dict[str, Any]:
     """EH-03 跨地域体面告知（T9-5）：组价/价格显式要他省口径 → 不取数、说清范围 + 给出路（C-03）。
 
@@ -412,6 +467,10 @@ def orchestrate(
 
     # 单一意图：无需拆解/综合，直接派发到能力层（编排器也作统一入口）。
     if decision.capability != "compound":
+        # 批量列清单（M2）：listing 信号 + 非出界 → 抽构件批量点火（比 compose_full 更具体，先判）。
+        if (decision.capability == "cost" and decision.matched.get("listing")
+                and not decision.out_of_scope_region):
+            return _ignite_listing(query, decision)
         # Option B：完整组价形态（到总造价/逐步确认）+ 非出界 → 点火 HITL 会话（前门只点火）。
         #   出界他省优先体面告知（不点火）——交 dispatch_subtask 的 EH-03 拦截走一次性信封。
         if (decision.capability == "cost" and decision.compose_full
@@ -523,6 +582,30 @@ def _selftest() -> int:
         check("出界他省完整组价：不点火（体面告知）", o3.get("mode") == "single" and len(ignited) == 1)
     finally:
         globals()["_ignite_hitl"] = _orig_ignite
+
+    # ⑥ 批量列清单（M2）：listing 信号 → 抽构件 → 多件点火 / 0 件引导（打桩 _ignite_listing 验分支路由）
+    listed: list[str] = []
+
+    def _stub_listing(q: str, d: RouteDecision, **kw) -> dict:
+        listed.append(q)
+        return {"mode": "hitl", "task_id": "stub-listing", "route": d.as_meta(),
+                "listing": {"count": 3, "preview": []}}
+
+    _orig_listing = globals()["_ignite_listing"]
+    globals()["_ignite_listing"] = _stub_listing
+    try:
+        o_l1 = orchestrate("根据设计说明编制工程量清单：C30独立基础、C35矩形柱", dispatch_fn=stub_dispatch,
+                           decompose_fn=stub_decompose, synthesize_fn=stub_synth)
+        check("列清单：listing 信号 → 走批量点火分支", o_l1.get("mode") == "hitl"
+              and o_l1.get("task_id") == "stub-listing" and len(listed) == 1)
+        o_l2 = orchestrate("C30现浇矩形柱套什么清单码", dispatch_fn=stub_dispatch,
+                           decompose_fn=stub_decompose, synthesize_fn=stub_synth)
+        check("单件选码：不走 listing 分支", o_l2.get("mode") == "single" and len(listed) == 1)
+        o_l3 = orchestrate("按北京口径给这个项目列清单", dispatch_fn=stub_dispatch,
+                           decompose_fn=stub_decompose, synthesize_fn=stub_synth)
+        check("出界他省列清单：不点火（体面告知优先）", o_l3.get("mode") == "single" and len(listed) == 1)
+    finally:
+        globals()["_ignite_listing"] = _orig_listing
 
     # ⑤ 域外出口（M1）：路由判 out_of_domain → 顶层直答能力范围、零派发（打桩 route_hybrid 注入域外判定）
     dispatched.clear()

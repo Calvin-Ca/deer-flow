@@ -97,10 +97,12 @@ def _format(task_id: str, result: dict[str, Any]) -> dict[str, Any]:
 
 
 def _norm_feature(entry: str | dict[str, Any]) -> dict[str, Any] | None:
-    """把 features 元素归一为 item dict：纯字符串 → ``{feature}``；dict → 保留 feature + 可选两级汇总分组标签。
+    """把 features 元素归一为 item dict：纯字符串 → ``{feature}``；dict → 保留 feature + 分组标签 + 预供 Q。
 
-    参数：entry —— 字符串描述 或 ``{feature, single_work?, unit_work?}``。
-    返回：``{feature[, single_work, unit_work]}``；feature 为空 → None（由调用方过滤，不建空构件）。
+    参数：entry —— 字符串描述 或 ``{feature, single_work?, unit_work?, quantity?}``。
+    返回：``{feature[, single_work, unit_work, quantity]}``；feature 为空 → None（调用方过滤，不建空构件）。
+    quantity（M2 批量列清单）：抽取器从原文抽到的工程量随件预供 → quantity_gate 自动过；
+      非正数/非数值丢弃（不编量），照常停闸人工录入。
     """
     if isinstance(entry, str):
         return {"feature": entry} if entry else None
@@ -111,6 +113,9 @@ def _norm_feature(entry: str | dict[str, Any]) -> dict[str, Any] | None:
     for k in ("single_work", "unit_work"):
         if entry.get(k):
             item[k] = entry[k]
+    qty = entry.get("quantity")
+    if isinstance(qty, (int, float)) and qty > 0:
+        item["quantity"] = float(qty)
     return item
 
 

@@ -10,7 +10,9 @@ FROM python:3.12-slim
 # pip 源（默认清华，build 加速；可 --build-arg PIP_INDEX_URL=... 覆盖回官方）
 ARG PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
 
-# 运行时依赖（与 ce-services/pyproject.toml 对齐）：
+# 运行时依赖（⚠ 手工镜像 ce-services/pyproject.toml —— 那边加依赖这里必须跟，否则容器缺包
+#   而宿主 pytest 全绿（07-05 实锤：openpyxl 只进了 pyproject，导出 xlsx 在容器里 501）。
+#   TODO(契约单一源)：改为 COPY pyproject + uv sync 消灭手抄）：
 #   langgraph + checkpoint-sqlite → HITL 可中断图；mcp → :8101/mcp 的 ce-task façade。缺则 import 即崩。
 RUN pip install --no-cache-dir -i "$PIP_INDEX_URL" \
     "fastapi>=0.110" \
@@ -19,7 +21,8 @@ RUN pip install --no-cache-dir -i "$PIP_INDEX_URL" \
     "pydantic>=2.7" \
     "langgraph>=0.2.50" \
     "langgraph-checkpoint-sqlite>=2.0" \
-    "mcp>=1.2"
+    "mcp>=1.2" \
+    "openpyxl>=3.1"
 
 WORKDIR /app
 

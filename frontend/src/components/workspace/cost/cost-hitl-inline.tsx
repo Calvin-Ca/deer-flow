@@ -75,10 +75,14 @@ function DoneSummary({ snap }: { snap: Snapshot }) {
         })}
       </div>
 
-      <div className="text-muted-foreground space-y-0.5 border-t pt-1 text-xs">
-        <div>清单编码：<span className="font-mono">{displayValue(code)}</span></div>
-        <div>定额子目：<span className="font-mono">{displayValue(quota)}</span></div>
-      </div>
+      {snap.items.length === 1 && (
+        // 单件会话才显示这两行——多件时它只反映 items[0]（07-05 实测：3 件会话里显示
+        // 「编码 010502001 / 定额 —」误导为整单信息；多件的逐件明细看上方构件总览表）。
+        <div className="text-muted-foreground space-y-0.5 border-t pt-1 text-xs">
+          <div>清单编码：<span className="font-mono">{displayValue(code)}</span></div>
+          <div>定额子目：<span className="font-mono">{displayValue(quota)}</span></div>
+        </div>
+      )}
 
       {snap.overrides.length > 0 && (
         <div className="border-t pt-1 text-xs">

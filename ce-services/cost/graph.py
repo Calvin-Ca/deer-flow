@@ -119,7 +119,16 @@ def list_match_node(state: CostTaskState) -> dict[str, Any]:
     # clarify_rounds 存 item（多构件各自计澄清预算，互不挪用）。
     if env["status"] == provenance.STATUS_NEED_REVIEW and (item.get("clarify_rounds") or 0) < MAX_CLARIFY_ROUNDS:
         hints = [env["result"].get("name")] + [a.get("name") for a in env["provenance"].get("alternatives", [])]
-        item["missing_features"] = clarify.extract_missing_features(item.get("feature"), hints, LLM_URL, LLM_MODEL_ID)
+        extracted = clarify.extract_missing_features(item.get("feature"), hints, LLM_URL, LLM_MODEL_ID)
+        # 已补过的特征不再追问（07-05 实测：第二轮又问「断面尺寸」致 feature 拼出
+        # 「断面尺寸=10，断面尺寸=11」）——回环补答格式固定为「label=值」，据此代码判重过滤
+        # （可判定规则下沉代码，不指望抽取 LLM 自觉）。
+        feature_now = str(item.get("feature") or "")
+        item["missing_features"] = [
+            m for m in extracted
+            if f"{m.get('label') or m.get('key')}=" not in feature_now
+            and f"{m.get('key')}=" not in feature_now
+        ]
     else:
         item["missing_features"] = []
     return {"items": _put_item(state, item), "events": [provenance_event(env, paused=False)], "needs_rematch": False}

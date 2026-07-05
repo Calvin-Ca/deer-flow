@@ -292,6 +292,23 @@ def test_multi_item_bad_item_does_not_block():
         assert r3["status"] == "done"
 
 
+# ── ⑮ 澄清重复追问过滤（07-05 实测）：已补过的特征第二轮不再问 ──
+def test_clarify_no_repeat_question():
+    """实测坑：第二轮澄清又问「断面尺寸」致 feature 拼出「断面尺寸=10，断面尺寸=11」。
+    修后：第二轮抽取即使再报同一缺口，代码判 feature 已含「label=」即过滤 → 不再停澄清闸，
+    直接落编码确认闸。"""
+    envs = [make_env(code=None, conf=None, status="need_review")] * 3
+    same_gap = [{"key": "grade", "label": "强度等级", "why": "选码需要"}]
+    with patched(list_envs=envs, missing=[same_gap, same_gap]) as calls:
+        graph, config, initial = run()
+        r = graph.invoke(initial, config)
+        assert gate(r)["node"] == "feature"                       # 第一轮：正常反问
+        r2 = graph.invoke(Command(resume={"grade": "C30"}), config)
+        g2 = gate(r2)
+        assert g2["node"] == "list_coding", g2["node"]            # 第二轮：同缺口被过滤，不再反问
+        assert calls["missing"] == 2                              # 抽取跑了两轮（第二轮结果被代码滤掉）
+
+
 # ── ⑭ 取数 404 降级（07-05 实测）：错码 approve 后取数 404 不炸会话 → 缺定额闸 ──
 def test_compose_404_degrades_to_quota_missing():
     """低置信错码被 approve → compose 404 曾 raise 打断 SSE、会话卡死。修后降级空 quotas

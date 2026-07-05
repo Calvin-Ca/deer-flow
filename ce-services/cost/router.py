@@ -302,6 +302,39 @@ def cost_session_state_endpoint(task_id: str) -> dict:
     return session.get_state(task_id)
 
 
+@router.get("/cost/session/{task_id}/export")
+def cost_session_export_endpoint(task_id: str, fmt: str = "xlsx"):
+    """导出会话组价成果为清单-定额-单价表（M2 §3.1 管线⑦，只读不推进图）。
+
+    参数：task_id；fmt —— ``xlsx``（缺省）/ ``csv``。
+    返回：文件下载（Content-Disposition attachment）。逐行带 provenance（编码来源/置信/确认方式）、
+      汇总区透传 rollup 确定性结果，缺口如实标注不补数。会话无构件 → 404；xlsx 依赖未装 → 501
+      （提示用 csv 或服务器 ``uv add openpyxl``）。
+    """
+    from fastapi.responses import Response
+
+    from cost import export, session
+    if fmt not in ("xlsx", "csv"):
+        raise HTTPException(status_code=400, detail=f"不支持的导出格式 {fmt!r}（xlsx / csv）")
+    values = session.get_state(task_id).get("values") or {}
+    if not values.get("items"):
+        raise HTTPException(status_code=404, detail=f"会话 {task_id} 无构件数据，无可导出内容")
+    rows = export.build_rows(values)
+    if fmt == "csv":
+        body, media = export.to_csv_bytes(rows), "text/csv; charset=utf-8"
+    else:
+        try:
+            body = export.to_xlsx_bytes(rows)
+        except ImportError as exc:
+            raise HTTPException(status_code=501,
+                                detail=f"xlsx 依赖未安装（uv add openpyxl），可先用 fmt=csv：{exc}") from exc
+        media = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    filename = f"cost-{task_id[:8]}.{fmt}"
+    logger.info("/cost/session/%s/export fmt=%s items=%d", task_id, fmt, len(values.get("items") or []))
+    return Response(content=body, media_type=media,
+                    headers={"Content-Disposition": f'attachment; filename="{filename}"'})
+
+
 class BoqRow(BaseModel):
     """一条 BOQ 清单行（FR-C 核对输入）。除 code 外均可选——给什么核什么。"""
 

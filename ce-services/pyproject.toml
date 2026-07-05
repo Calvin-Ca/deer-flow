@@ -18,6 +18,9 @@ dependencies = [
     # 包成 MCP 工具供 deer-flow agent 直接调，工具名/入参/结果结构化进前端 toolCall 流。
     # 服务器侧以 `uv add mcp` 落锁（本地不提交 uv.lock）。
     "mcp>=1.2",
+    # 组价成果导出 xlsx（M2 §3.1 管线⑦，cost/export.py 延迟 import——CSV 路径不吃此依赖）。
+    # 服务器侧以 `uv add openpyxl` 落锁（本地不提交 uv.lock）。
+    "openpyxl>=3.1",
 ]
 
 [dependency-groups]

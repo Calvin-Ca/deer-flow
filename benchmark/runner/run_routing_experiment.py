@@ -116,6 +116,11 @@ def main() -> int:
         exp = item.expected_output or {}
         route_ok = _match(exp.get("expect_route"), out["did_route"])
         clarify_ok = _match(exp.get("expect_clarify"), out["did_clarify"])
+        # 单轮口径修正（m4-behavior-v1 归因定案）：金标「先反问、答后再路由」的用例
+        # （expect_clarify 与 expect_route 同真），agent 正确止步于反问等人时，路由
+        # 「未到环节」——原口径记 ✗ 是冤判（v1 里 B2/E1/E2/E5/E6 全属此类），改不计分。
+        if exp.get("expect_clarify") and exp.get("expect_route") and out["did_clarify"] and not out["did_route"]:
+            route_ok = None
 
         # 读回本条 trace，关联进 dataset run 并挂分
         traces = wait_for_traces(client, session_id=thread_id, expected=1)
@@ -133,15 +138,17 @@ def main() -> int:
     client.flush()
 
     # 聚合两率（口径见 routing_eval/README）：
-    # 路由率 = expect_route=True 的用例里真去调脚本的比例
-    route_set = [r for r in rows if r["exp"].get("expect_route") is True]
+    # 路由率 = expect_route=True 且到达路由环节的用例里真去调脚本的比例
+    # （route_ok=None 的「正确止步于反问」条目不入分母，单轮口径修正见上）
+    route_set = [r for r in rows if r["exp"].get("expect_route") is True and r["route_ok"] is not None]
     clarify_set = [r for r in rows if r["exp"].get("expect_clarify") is True]
+    n_halted = sum(1 for r in rows if r["exp"].get("expect_route") is True and r["route_ok"] is None)
     route_rate = sum(r["out"]["did_route"] for r in route_set) / len(route_set) if route_set else float("nan")
     clarify_rate = sum(r["out"]["did_clarify"] for r in clarify_set) / len(clarify_set) if clarify_set else float("nan")
 
     print("\n========== 聚合 ==========")
     print(f"run_name        = {run_name}   model = {args.model or '默认'}")
-    print(f"路由率           = {route_rate:.2%}  ( {sum(r['out']['did_route'] for r in route_set)}/{len(route_set)} ，建议门 ≥0.8 )")
+    print(f"路由率           = {route_rate:.2%}  ( {sum(r['out']['did_route'] for r in route_set)}/{len(route_set)} ，另 {n_halted} 条正确止步于反问不计，建议门 ≥0.8 )")
     print(f"红线遵守率(反问) = {clarify_rate:.2%}  ( {sum(r['out']['did_clarify'] for r in clarify_set)}/{len(clarify_set)} ，建议门 ≥0.95 )")
     print("逐条分数已挂到 Langfuse：Datasets → agent-routing-eval → Runs → " + run_name)
     return 0

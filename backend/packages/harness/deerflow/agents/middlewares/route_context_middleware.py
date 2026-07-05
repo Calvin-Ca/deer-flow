@@ -145,6 +145,8 @@ class RouteContextMiddleware(AgentMiddleware):
                 "请按 capability 与形态字段选择动作，不要自行重判能力归属；"
                 "out_of_scope_region 非空＝他省口径出界，必须体面告知、不得调取数工具；"
                 "clarify=feature 时先 ask_clarification 补构件特征（只问特征，不问版本）；"
+                "clarify=caliber 时（规范问答缺口径）也必须先 ask_clarification 问「哪个地区、哪个清单规范版本」"
+                "再取数——规范侧口径反问与组价侧「版本缺省不问」是两条规则，不要用后者压掉前者；"
                 "capability=out_of_domain＝与造价无关：只说明你的能力范围（规范问答/构件组价/深圳信息价查询），"
                 "不要回答问题本身，严禁编造域外内容（天气/新闻/代码等）。",
                 json.dumps(compact, ensure_ascii=False),

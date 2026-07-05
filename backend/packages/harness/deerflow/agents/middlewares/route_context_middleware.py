@@ -30,7 +30,7 @@ import uuid
 from typing import override
 
 from langchain.agents.middleware import AgentMiddleware
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langgraph.runtime import Runtime
 
 logger = logging.getLogger(__name__)
@@ -46,13 +46,17 @@ _DECISION_KEYS = (
     "feature_complete", "caliber_complete", "needs_context",
     "route_confidence", "route_source",
 )
+# 哑火收编的「像在提问」启发（m4-behavior-v2 归因定案，2026-07-06）：判定要求反问而模型
+# 只回纯文本时，文本命中任一标记才收编成 ask_clarification——不命中说明模型给的是陈述句
+# 「答案」，硬包成问题更糟，只出声告警（哑火可观测，不静默）。
+_QUESTION_MARKERS = ("？", "?", "请提供", "请问", "请先", "请补充", "请告知", "需要您", "需要你")
 
 
-def _extract_prior_capability(messages: list) -> str | None:
-    """从历史里最近一条路由 reminder 解析上一轮能力（供 /route 会话粘性）；无/解析失败 → None。
+def _extract_latest_decision(messages: list) -> dict | None:
+    """逆序找最近一条路由 reminder，解析其正文里那行 compact JSON 判定；无/解析失败 → None。
 
-    当轮 reminder 尚未注入，故逆序扫到的第一条 route reminder 即上一轮的判定；其正文里有
-    一行 compact JSON（``_build_reminder`` 产出），取其中 capability 字段。任何异常按无处理。
+    调用时机决定语义：``before_agent`` 注入前调用取到的是**上一轮**判定（会话粘性用）；
+    ``after_model`` 时当轮 reminder 已注入，取到的是**当轮**判定（哑火收编用）。
     """
     for message in reversed(messages):
         if isinstance(message, HumanMessage) and message.additional_kwargs.get(_ROUTE_REMINDER_KEY):
@@ -61,15 +65,21 @@ def _extract_prior_capability(messages: list) -> str | None:
                 line = line.strip()
                 if line.startswith("{"):
                     try:
-                        cap = json.loads(line).get("capability")
+                        decision = json.loads(line)
                     except json.JSONDecodeError:
                         return None
-                    return cap if isinstance(cap, str) else None
+                    return decision if isinstance(decision, dict) else None
             return None
     return None
 
 
-def _message_text(message: HumanMessage) -> str:
+def _extract_prior_capability(messages: list) -> str | None:
+    """从历史里最近一条路由 reminder 解析上一轮能力（供 /route 会话粘性）；无/解析失败 → None。"""
+    cap = (_extract_latest_decision(messages) or {}).get("capability")
+    return cap if isinstance(cap, str) else None
+
+
+def _message_text(message) -> str:
     """提取消息纯文本：str 原样；块列表（前端多模态形态 ``[{"type":"text",...}]``）拼接全部 text 块。
 
     首版只认 ``isinstance(content, str)``，前端消息实为块列表 → 每条都静默早退、中间件形同虚设
@@ -147,6 +157,9 @@ class RouteContextMiddleware(AgentMiddleware):
                 "clarify=feature 时先 ask_clarification 补构件特征（只问特征，不问版本）；"
                 "clarify=caliber 时（规范问答缺口径）也必须先 ask_clarification 问「哪个地区、哪个清单规范版本」"
                 "再取数——规范侧口径反问与组价侧「版本缺省不问」是两条规则，不要用后者压掉前者；"
+                "凡需向用户提问或索要材料（构件特征、口径、设计说明/图纸原文均同理），"
+                "一律必须通过 ask_clarification 工具发起，禁止在普通回复文本里反问——"
+                "纯文本反问不会中断流程、用户答复接不回审查闸，视同未反问；"
                 "capability=out_of_domain＝与造价无关：只说明你的能力范围（规范问答/构件组价/深圳信息价查询），"
                 "不要回答问题本身，严禁编造域外内容（天气/新闻/代码等）。",
                 json.dumps(compact, ensure_ascii=False),
@@ -196,6 +209,58 @@ class RouteContextMiddleware(AgentMiddleware):
         )
         return {"messages": [reminder_msg, user_msg]}
 
+    # ── 哑火收编（after_model）──────────────────────────────────────────────
+    def _coerce_silent_clarify(self, state) -> dict | None:
+        """判定要求反问、模型却纯文本应答时，把文本收编成 ask_clarification 工具调用。
+
+        背景（m4-behavior-v2 归因，2026-07-06）：E2/E3/E4 三条「列清单」用例 /route 判定
+        完全一致（cost + clarify=feature），8B 对 E4 老实调 ask_clarification、对 E2/E3
+        （查询里出现「这个项目」「设计说明」）漂移成纯文本索要材料——同指令不同服从，
+        prompt 治不动，按「弱模型不驱动流程」归代码。纯文本反问不进 HITL 闸（不
+        interrupt、用户答复接不回状态机），收编后由链尾 ClarificationMiddleware 的
+        wrap_tool_call 拦截 interrupt（工具执行时拦截，与 after_model 钩子顺序无关）。
+
+        只在「本轮判定 clarify∈{feature,caliber} + 自 reminder 起零工具活动 + 文本像在
+        提问」三条件齐时收编；文本不像提问（陈述句「答案」）不硬转，只告警出声。
+        """
+        messages = list(state.get("messages", []))
+        if not messages or not isinstance(messages[-1], AIMessage):
+            return None
+        last = messages[-1]
+        if last.tool_calls:
+            return None
+        # 本轮 reminder 定位；没注入（/route 挂了 fail-open）则不干预
+        idx = next((i for i in reversed(range(len(messages)))
+                    if isinstance(messages[i], HumanMessage)
+                    and messages[i].additional_kwargs.get(_ROUTE_REMINDER_KEY)), None)
+        if idx is None:
+            return None
+        decision = _extract_latest_decision(messages)
+        if not decision or decision.get("clarify") not in ("feature", "caliber"):
+            return None
+        # 本轮已有工具活动 → 这段文本是干完活的正经答复，不是哑火
+        for m in messages[idx + 1:-1]:
+            if isinstance(m, ToolMessage) or (isinstance(m, AIMessage) and m.tool_calls):
+                return None
+        text = _message_text(last).strip()
+        if not text:
+            return None
+        if not any(marker in text for marker in _QUESTION_MARKERS):
+            logger.warning("RouteContextMiddleware: clarify=%s 但模型未反问也未调工具（哑火，文本非疑问不收编）: %.80s",
+                           decision.get("clarify"), text)
+            return None
+        logger.warning("RouteContextMiddleware: 纯文本反问收编为 ask_clarification（clarify=%s）: %.80s",
+                       decision.get("clarify"), text)
+        tool_call = {
+            "name": "ask_clarification",
+            "args": {"question": text, "clarification_type": "missing_info"},
+            "id": f"route-clarify-{uuid.uuid4().hex[:8]}",
+            "type": "tool_call",
+        }
+        # 同 id 原位替换（add_messages reducer）：正文清空，问题文本由 ClarificationMiddleware
+        # 的 ToolMessage 呈现，避免同一段话渲染两遍
+        return {"messages": [AIMessage(content="", tool_calls=[tool_call], id=last.id)]}
+
     @override
     def before_agent(self, state, runtime: Runtime) -> dict | None:
         return self._inject(state)
@@ -203,3 +268,11 @@ class RouteContextMiddleware(AgentMiddleware):
     @override
     async def abefore_agent(self, state, runtime: Runtime) -> dict | None:
         return self._inject(state)
+
+    @override
+    def after_model(self, state, runtime: Runtime) -> dict | None:
+        return self._coerce_silent_clarify(state)
+
+    @override
+    async def aafter_model(self, state, runtime: Runtime) -> dict | None:
+        return self._coerce_silent_clarify(state)

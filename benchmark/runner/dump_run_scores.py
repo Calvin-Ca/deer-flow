@@ -21,6 +21,25 @@ from _lf import require_langfuse  # noqa: E402
 DATASET_NAME = "agent-routing-eval"
 
 
+def _answer_snippet(output: object, limit: int = 60) -> str:
+    """从 trace 顶层 output 里挤出一段可读答复文本（归因用，够看清说了什么就行）。
+
+    output 形态不定（str / 末消息 dict / 消息列表 / 整个 state dict），逐层试探取 content；
+    全失败退回 str(output)。压空白截断到 limit。
+    """
+    obj = output
+    if isinstance(obj, dict):
+        msgs = obj.get("messages")
+        if isinstance(msgs, list) and msgs:
+            obj = msgs[-1]
+        if isinstance(obj, dict):
+            obj = obj.get("content", obj)
+    if isinstance(obj, list):  # blocks 形态：拼 text 块
+        obj = " ".join(str(b.get("text", "")) if isinstance(b, dict) else str(b) for b in obj)
+    text = " ".join(str(obj or "").split())
+    return text[:limit] + ("…" if len(text) > limit else "")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="拉回行为回归 run 的逐条分数矩阵")
     parser.add_argument("--run-name", required=True)
@@ -54,6 +73,12 @@ def main() -> int:
                 c = getattr(s, "comment", None)
                 if c and getattr(s, "value", 1) == 0:
                     comments.append(f"{name}: {c[:90]}")
+        # 挂零分的条目补答复摘要——「route ✓ 但没问」类失败光看工具列表裁决不了（B2/E2/E3），
+        # 得看 agent 到底说了什么（纯文本反问？直接作答？材料索要？）
+        if any(v == 0 for v in scores.values()):
+            snippet = _answer_snippet(getattr(full, "output", None)) if slist else ""
+            if snippet:
+                comments.append(f"答复: {snippet}")
         # 金标 id 靠 metadata（upload 时把原 id 放哪要看实际字段）——两处都试
         gold_id = (item.metadata or {}).get("id") or (item.metadata or {}).get("case_id") or item.id[:8]
         rows.append({"id": gold_id, "route": scores.get("route_correct"),

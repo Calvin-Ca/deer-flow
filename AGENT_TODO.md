@@ -40,16 +40,28 @@
 
 ## 2. 两条收尾线（下次开工从这里接手；服务器无后台任务在挂，跑批已结束）
 
-### ① 行为回归 v2 —— 差 3+3 条归因
+### ① 行为回归 v2 —— 逐条矩阵已拉，归因定案（2026-07-06），治理已落码待 v3 验证
 
-v1 逐条矩阵定案三簇：单轮口径冤判（B2/E1/E2/E5/E6，agent 正确止步于反问被记 route ✗）、
-prompt 红线越界压制规范侧口径反问（A1/A2/A7 漏问）、E4「清单列项」哑火（不问不调纯文本打发）。
-三修已落（commit `9db05b58`，[backend]）：prompt 红线限定 cost 侧 + reminder 补 clarify=caliber + runner 单轮口径修正。
-
-**v2 结果**：路由率 86.36%（19/22，另 7 条正确止步于反问不计）；反问率 70%（7/10，门 ≥0.95 未过）。
-**待办（唯一动作）**：拉 v2 逐条矩阵定位剩余「3 条该问没问 + 3 条该调没调」是谁——
-`cd /mnt/nvme/calvin/code/deer-flow && set -a && . ./.env && set +a && uv run --project backend python benchmark/runner/dump_run_scores.py --run-name m4-behavior-v2`
-读法：A1/A2/A7 若仍 ✗ → prompt 治不动，按通则③把 caliber 反问下沉编排层代码；E4 式哑火（工具=[]）是重点治理形态。
+**v2 矩阵**：route 24/27=88.89%、clarify 30/34=88.24%。**A1/A2/A7 全部转绿——prompt 治得动 caliber
+反问，不必下沉**。剩余失败三簇归因定案：
+- **E2/E3 哑火（工具=[]）**：本地实证 /route 对 E2/E3/E4 判定**完全一致**（cost+clarify=feature），
+  8B 对同一指令服从随查询词形漂移（「这个项目」「设计说明」把模型带进纯文本索要材料轨、E4 裸关键词
+  老实调工具）→ **prompt 治不动实锤，按通则③下沉编排层**：`RouteContextMiddleware` 新增 after_model
+  哑火收编——判定要求反问 + 本轮零工具活动 + 文本像在提问 → 确定性转 `ask_clarification` 工具调用
+  （链尾 ClarificationMiddleware wrap_tool_call 必拦截 interrupt）；非疑问陈述句不硬转、告警出声。
+  reminder 同步加红线「反问一律走 ask_clarification 工具，禁止纯文本反问」。单测 13 条新增
+  `backend/tests/test_route_context_middleware.py`。
+- **A9 结构性冤判（该调没调 ×1 + 反向过问）**：runner 每条独立 thread 冷启动，EH-05 前提「A1 已确认
+  口径」不存在，agent 反问反而正确——金标 `expect_*` 改挂 null（自动分不计），以前端连续同会话人工判读
+  为准（本就在 §4 小尾巴）。
+- **B2 该问没问（route ✓ clarify ✗）**：光看工具列表裁决不了（可能是前门 orchestrate 接管了特征反问
+  ——那是口径盲区非漏问）；`dump_run_scores.py` 已加「答复摘要」列，v3 跑完看它说了什么再定。
+**待办（服务器，按序单行）**：
+- [ ] 跑 backend 单测：`cd /mnt/nvme/calvin/code/deer-flow/backend && PYTHONPATH=. uv run pytest tests/test_route_context_middleware.py -v`
+- [ ] 重传路由金标（A9 改判）：`cd /mnt/nvme/calvin/code/deer-flow && set -a && . ./.env && set +a && uv run --project backend python benchmark/runner/upload_datasets.py --only routing`
+- [ ] 重起 gateway 使中间件生效后跑 v3：`uv run --project backend python benchmark/runner/run_routing_experiment.py --run-name m4-behavior-v3`
+- [ ] 拉 v3 矩阵：`uv run --project backend python benchmark/runner/dump_run_scores.py --run-name m4-behavior-v3`——
+  预期 E2/E3 收编转绿、A9 挂 —；B2 看答复摘要裁决（orchestrate 前门反问=改金标口径，真漏问=再治）。
 （用户口径：benchmark 优化可后置，不阻塞主线。）
 
 ### ② 清单套定额对照表补全 —— 跑批已收官（2026-07-06），剩前端验收

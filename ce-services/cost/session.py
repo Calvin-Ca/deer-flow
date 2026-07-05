@@ -131,18 +131,21 @@ def start(
     rates: dict[str, Any] | None = None,
     quantity: float | None = None,
     features: list[str | dict[str, Any]] | None = None,
+    critic: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """起一个组价 HITL 会话，跑到首个闸或 done（支持单/多构件）。
 
     参数：feature —— 单构件描述；features —— 多构件列表（给定则按外层循环逐件办，优先于 feature；
       元素可为纯描述字符串，或 ``{feature, single_work?, unit_work?}`` 带两级汇总分组）；
       spec —— 国标版本（缺则 setup 闸采集）；region/period/price_source/rates —— setup 口径；
-      quantity —— 可选工程量 Q（仅单构件时预供 items[0]；多构件各件经 quantity_gate 录入）。
+      quantity —— 可选工程量 Q（仅单构件时预供 items[0]；多构件各件经 quantity_gate 录入）；
+      critic —— Critic 复核信封（M3：批量点火时对草表的质疑，随身进 state 供评审表标注）。
     返回：会话响应（含 task_id；首个 interrupt 通常是编码确认闸，或 spec 缺失时的 setup 录入闸）。
     """
     task_id = uuid.uuid4().hex
     initial = _initial_state(task_id, feature, region, rates, quantity, features,
-                             spec=spec, period=period, price_source=price_source)
+                             spec=spec, period=period, price_source=price_source,
+                             critic=critic)
     result = _graph.invoke(initial, config=_config(task_id))
     return _format(task_id, result)
 
@@ -158,6 +161,7 @@ def _initial_state(
     spec: str | None = None,
     period: str | None = None,
     price_source: str | None = None,
+    critic: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """构造图初始状态（start 与 stream_start 共用）——多构件归一 + Q 预供 + setup 口径。
 
@@ -184,6 +188,8 @@ def _initial_state(
         initial["price_source"] = price_source
     if rates:
         initial["rates"] = rates
+    if critic:
+        initial["critic"] = critic
     return initial
 
 

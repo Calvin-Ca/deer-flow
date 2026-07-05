@@ -41,6 +41,8 @@ class CostTaskState(TypedDict, total=False):
         overrides —— 用户覆盖轨迹（§5.4）。
         audit_log —— 审计时间线（哪步谁改了什么）。
         events —— 逐节点 provenance 事件（前端依据卡数据源，无论是否暂停每节点都发）。
+        critic —— Critic 对抗复核信封（M3 管线④：批量列清单点火时对抽取草表的质疑清单，
+          随身携带供前端评审表标注；图节点不消费。status=need_review＝复核未执行≠绿灯）。
         status —— running / awaiting_input / done / blocked。
     """
 
@@ -59,6 +61,7 @@ class CostTaskState(TypedDict, total=False):
     overrides: Annotated[list[dict[str, Any]], operator.add]
     audit_log: Annotated[list[dict[str, Any]], operator.add]
     events: Annotated[list[dict[str, Any]], operator.add]
+    critic: dict[str, Any] | None
     status: str
 
 

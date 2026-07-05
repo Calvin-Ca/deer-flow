@@ -27,6 +27,8 @@ interface Snapshot {
   items: Array<Record<string, unknown>>;
   /** Index of the item currently being processed (multi-item batch sessions). */
   currentItem: number;
+  /** Critic 复核信封（M3：批量会话的草表质疑，need_review=复核未运行≠绿灯）。 */
+  critic: Record<string, unknown> | null;
   overrides: Array<Record<string, unknown>>;
   auditCount: number;
   events: CostEvent[];
@@ -115,6 +117,7 @@ export function CostHitlInline({ taskId }: { taskId: string }) {
       rollup: asRecord(v.rollup),
       items: (v.items as Array<Record<string, unknown>>) ?? [],
       currentItem: typeof v.current_item === "number" ? v.current_item : 0,
+      critic: asRecord(v.critic),
       overrides: (v.overrides as Array<Record<string, unknown>>) ?? [],
       auditCount: Array.isArray(v.audit_log) ? v.audit_log.length : 0,
       events: (v.events as CostEvent[]) ?? [],
@@ -208,6 +211,7 @@ export function CostHitlInline({ taskId }: { taskId: string }) {
             items={snap.items}
             currentItem={snap.currentItem}
             sessionStatus={status}
+            critic={snap.critic}
           />
         )}
 

@@ -121,9 +121,18 @@ def test_extract_over_limit_noted():
     assert "分批" in env["note"]
 
 
-# ── 编排接线（stub extract + stub session.start，本地零 langgraph）──
+# ── 编排接线（stub extract + stub critic + stub session.start，本地零 langgraph）──
 
 _DECISION = route("根据设计说明列清单：" + _TEXT)
+
+_CRITIC_STUB_ENV = {"step": "critic_review", "status": "ok",
+                    "result": {"findings": [{"type": "weak_feature", "item_index": 1,
+                                             "detail": "缺截面尺寸", "source_text": "x"}]},
+                    "provenance": {}}
+
+
+def _stub_critic(text: str, items: list) -> dict:
+    return dict(_CRITIC_STUB_ENV)
 
 
 def test_ignite_listing_multi_item():
@@ -136,20 +145,23 @@ def test_ignite_listing_multi_item():
 
     out = _ignite_listing("q", _DECISION,
                           extract_fn=lambda t: extract_components(_TEXT, llm_fn=_stub_ok),
-                          start_fn=stub_start)
+                          start_fn=stub_start, critic_fn=_stub_critic)
     assert out["mode"] == "hitl" and out["task_id"] == "t-listing"
     assert "cost-hitl" in out["marker"]
     assert out["listing"]["count"] == 2 and len(out["listing"]["preview"]) == 2
+    assert out["listing"]["critic"] == {"status": "ok", "findings": 1}  # 复核摘要外露
     feats = started["features"]
     assert feats[0] == {"feature": "C30现浇钢筋混凝土独立基础", "quantity": 120.0}  # Q 随件透传
     assert feats[1] == {"feature": "C35现浇矩形柱600×600 HRB400钢筋"}
     assert started["region"]  # 口径透传
+    assert started["critic"]["result"]["findings"]  # 质疑信封随身进会话 state（M3 接线）
 
 
 def test_ignite_listing_zero_items_guides():
     out = _ignite_listing("帮我列一下清单", _DECISION,
                           extract_fn=lambda t: extract_components("", llm_fn=_stub_ok),
-                          start_fn=lambda **kw: (_ for _ in ()).throw(AssertionError("不应点火")))
+                          start_fn=lambda **kw: (_ for _ in ()).throw(AssertionError("不应点火")),
+                          critic_fn=lambda t, i: (_ for _ in ()).throw(AssertionError("0 件不应复核")))
     assert out["mode"] == "single" and out["result"]["status"] == "need_input"
     assert "设计说明" in out["result"]["note"]
 
@@ -159,9 +171,24 @@ def test_ignite_listing_start_failure_degrades():
         raise ValueError("graph down")
     out = _ignite_listing("q", _DECISION,
                           extract_fn=lambda t: extract_components(_TEXT, llm_fn=_stub_ok),
-                          start_fn=bad_start)
+                          start_fn=bad_start, critic_fn=_stub_critic)
     assert out["result"]["status"] == "degraded"
     assert out["result"]["extraction"]["result"]["items"]  # 草稿仍在，不丢用户成果
+
+
+def test_ignite_listing_critic_failure_does_not_block():
+    """Critic 降级（need_review 信封）不阻塞点火——复核未执行照样起会话，信封随身供前端灰标。"""
+    started: dict = {}
+    nr_env = {"step": "critic_review", "status": "need_review",
+              "result": {"findings": []}, "note": "复核未执行（LLM 不可用）"}
+    out = _ignite_listing("q", _DECISION,
+                          extract_fn=lambda t: extract_components(_TEXT, llm_fn=_stub_ok),
+                          start_fn=lambda **kw: (started.update(kw) or
+                                                 {"task_id": "t", "status": "awaiting_input"}),
+                          critic_fn=lambda t, i: nr_env)
+    assert out["mode"] == "hitl"
+    assert out["listing"]["critic"]["status"] == "need_review"
+    assert started["critic"]["status"] == "need_review"  # 未执行状态也随身带上（≠绿灯）
 
 
 if __name__ == "__main__":

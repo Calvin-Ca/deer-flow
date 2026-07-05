@@ -169,7 +169,8 @@ def _out_of_domain_envelope(query: str) -> dict[str, Any]:
 
 def _ignite_listing(query: str, decision: RouteDecision, *,
                     extract_fn: Callable[[str], dict] | None = None,
-                    start_fn: Callable[..., dict] | None = None) -> dict[str, Any]:
+                    start_fn: Callable[..., dict] | None = None,
+                    critic_fn: Callable[[str, list], dict] | None = None) -> dict[str, Any]:
     """批量列清单点火（M2 §3.1 管线①→现有图）：抽构件 → 多构件 HITL 会话 → marker。
 
     参数：query —— 原句（v0 把整条消息当抽取原文：用户把设计说明贴在消息里）；decision —— 路由判定；
@@ -193,6 +194,13 @@ def _ignite_listing(query: str, decision: RouteDecision, *,
                            "note": ("未能从描述中抽取出可计价构件。请把项目特征描述/设计说明原文贴出（含构件"
                                     "名称、强度等级、材料规格），或按「构件+关键特征」逐条列出后重试。")}}
 
+    # Critic 对抗复核（M3 管线④）：对草表提质疑，随身进会话 state 供评审表标注。
+    # 信封化降级（review_extraction 自身不抛）——Critic 挂了＝status=need_review 照样带上，
+    # 前端据此显示「复核未运行」而非绿灯；绝不阻塞点火主链路。
+    if critic_fn is None:
+        from cost.critic import review_extraction as critic_fn  # 局部 import，与本文件风格一致
+    critic_env = critic_fn(query, items)
+
     spec, spec_source = _spec_of(query)
     features = [{k: it[k] for k in ("feature", "quantity") if k in it} for it in items]
     if start_fn is None:
@@ -200,7 +208,7 @@ def _ignite_listing(query: str, decision: RouteDecision, *,
         start_fn = session.start
     try:
         res = start_fn(features=features, spec=(spec if spec_source == "user" else None),
-                       region=COST_DEFAULT_REGION)
+                       region=COST_DEFAULT_REGION, critic=critic_env)
     except (requests.RequestException, ValueError) as exc:
         logger.warning("批量列清单点火失败 → 降级返回抽取草稿：%s", exc)
         return {"mode": "single", "route": decision.as_meta(),
@@ -216,7 +224,10 @@ def _ignite_listing(query: str, decision: RouteDecision, *,
             "marker": marker, "status": res.get("status"),
             "listing": {"count": len(items),
                         "preview": [it["feature"] for it in items[:5]],
-                        "extraction_note": env.get("note")},
+                        "extraction_note": env.get("note"),
+                        "critic": {"status": critic_env.get("status"),
+                                   "findings": len((critic_env.get("result") or {})
+                                                   .get("findings") or [])}},
             "note": (f"已从描述中抽取 {len(items)} 个构件并启动批量组价会话，页面已内嵌交互式组价控件。"
                      "你只需用一句话、你自己的话告知用户已识别的构件数量、后续在控件里逐件确认即可，"
                      "随后立即结束回合。严禁：罗列全部构件明细、转述闸内容、编造任何编码或数字。")}

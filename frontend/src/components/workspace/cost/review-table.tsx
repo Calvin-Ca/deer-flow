@@ -78,26 +78,66 @@ function buildRow(
   };
 }
 
+/** Critic findings split by target: per-item map + global (missing_item etc.). */
+function splitFindings(critic: Record<string, unknown> | null | undefined): {
+  byItem: Map<number, string[]>;
+  global: string[];
+  notRun: boolean;
+} {
+  const byItem = new Map<number, string[]>();
+  const global: string[] = [];
+  const status = critic?.status;
+  const notRun = status === "need_review"; // 复核未执行 ≠ 绿灯（M3 降级语义）
+  const findings = asRecord(critic?.result)?.findings;
+  if (Array.isArray(findings)) {
+    for (const f of findings) {
+      const rec = asRecord(f);
+      if (!rec) continue;
+      const detail = typeof rec.detail === "string" ? rec.detail : "";
+      if (!detail) continue;
+      const idx = rec.item_index;
+      if (typeof idx === "number") {
+        const list = byItem.get(idx) ?? [];
+        list.push(detail);
+        byItem.set(idx, list);
+      } else {
+        global.push(detail);
+      }
+    }
+  }
+  return { byItem, global, notRun };
+}
+
 /** Whole-session item overview; rendered only for multi-item (batch) sessions. */
 export function ReviewTable({
   items,
   currentItem,
   sessionStatus,
+  critic,
 }: {
   items: Array<Record<string, unknown>>;
   currentItem: number;
   sessionStatus: string;
+  critic?: Record<string, unknown> | null;
 }) {
   if (items.length <= 1) return null;
   const rows = items.map((it, i) => buildRow(it, i, currentItem, sessionStatus));
   const done = rows.filter((r) => r.state === "confirmed" || r.state === "auto").length;
+  const { byItem, global, notRun } = splitFindings(critic);
 
   return (
     <div className="rounded-md border">
       <div className="text-muted-foreground flex items-center justify-between border-b px-2 py-1 text-[11px]">
         <span>构件总览（{items.length} 件）</span>
-        <span>
-          已定码 {done} / {items.length}
+        <span className="flex items-center gap-2">
+          {notRun && (
+            <Badge variant="outline" className="text-[10px]">
+              复核未运行
+            </Badge>
+          )}
+          <span>
+            已定码 {done} / {items.length}
+          </span>
         </span>
       </div>
       <table className="w-full text-xs">
@@ -109,30 +149,53 @@ export function ReviewTable({
             <th className="px-2 py-1 font-normal">置信</th>
             <th className="px-2 py-1 font-normal">工程量</th>
             <th className="px-2 py-1 font-normal">状态</th>
+            <th className="px-2 py-1 font-normal">质疑</th>
           </tr>
         </thead>
         <tbody>
-          {rows.map((r, i) => (
-            <tr
-              key={i}
-              className={r.state === "current" ? "bg-primary/5 border-b" : "border-b"}
-            >
-              <td className="text-muted-foreground px-2 py-1">{i + 1}</td>
-              <td className="max-w-[200px] truncate px-2 py-1" title={r.feature}>
-                {r.feature}
-              </td>
-              <td className="px-2 py-1 font-mono">{r.code}</td>
-              <td className="px-2 py-1 font-mono">{r.confidence}</td>
-              <td className="px-2 py-1 font-mono">{r.quantity}</td>
-              <td className="px-2 py-1">
-                <Badge variant={STATE_BADGE[r.state]} className="text-[10px]">
-                  {STATE_LABEL[r.state]}
-                </Badge>
-              </td>
-            </tr>
-          ))}
+          {rows.map((r, i) => {
+            const doubts = byItem.get(i) ?? [];
+            return (
+              <tr
+                key={i}
+                className={r.state === "current" ? "bg-primary/5 border-b" : "border-b"}
+              >
+                <td className="text-muted-foreground px-2 py-1">{i + 1}</td>
+                <td className="max-w-[200px] truncate px-2 py-1" title={r.feature}>
+                  {r.feature}
+                </td>
+                <td className="px-2 py-1 font-mono">{r.code}</td>
+                <td className="px-2 py-1 font-mono">{r.confidence}</td>
+                <td className="px-2 py-1 font-mono">{r.quantity}</td>
+                <td className="px-2 py-1">
+                  <Badge variant={STATE_BADGE[r.state]} className="text-[10px]">
+                    {STATE_LABEL[r.state]}
+                  </Badge>
+                </td>
+                <td className="px-2 py-1">
+                  {doubts.length > 0 ? (
+                    <span
+                      className="cursor-help text-amber-600"
+                      title={doubts.join("\n")}
+                    >
+                      ⚠ {doubts.length}
+                    </span>
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  )}
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
+      {global.length > 0 && (
+        <div className="border-t px-2 py-1 text-[11px] text-amber-600">
+          {global.map((g, i) => (
+            <div key={i}>⚠ {g}</div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

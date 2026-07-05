@@ -5,8 +5,11 @@
 ``{id, text, draft_items, expected_findings[{type, must_include, item_index?}]}``。
 判中：某 expected 命中 ⟺ 存在 finding 同 type、且 detail+source_text 合并文本含全部
 must_include 词、且 item_index 相符（金标给了才比）。
-指标：**质疑查全率 ≥80%** 且 **负向样本零误报**（expected 为空的行产出任何质疑都算 false_positive
-——Critic 硬凑质疑比漏质疑更伤信任）才过。
+负向断言两层（Critic 误报比漏报更伤信任）：
+  - 负向样本：expected 为空的行产出任何质疑 → false_positive；
+  - 行级 forbidden ``[{type?, contains}]``：命中的质疑 → false_positive（07-05 首跑实测：
+    32b 把已在草表的砌块墙判成漏项——正向样本的错误质疑曾是盲区，与 listing 金标同款教训）。
+指标：**质疑查全率 ≥80% 且 false_positive 合计 = 0** 才过。
 
 运行：
   离线（金标格式校验）：cd ce-services && uv run python -m tools.critic_eval
@@ -34,7 +37,22 @@ def _load() -> list[dict]:
         for e in r.get("expected_findings", []):
             assert e.get("type") in FINDING_TYPES and e.get("must_include"), \
                 f"金标 expected 格式错: {r['id']}"
+        for rule in r.get("forbidden") or []:
+            assert rule.get("contains"), f"金标 forbidden 格式错: {r['id']}"
     return rows
+
+
+def _forbidden_hits(row: dict, findings: list[dict]) -> list[str]:
+    """行级 forbidden：type 匹配（缺省不限）且 detail+source 含全部 contains 词 → 违规描述列表。"""
+    out: list[str] = []
+    for rule in row.get("forbidden") or []:
+        for f in findings:
+            if rule.get("type") and f.get("type") != rule["type"]:
+                continue
+            blob = f"{f.get('detail', '')} {f.get('source_text', '')}"
+            if all(kw in blob for kw in rule["contains"]):
+                out.append(f"[{f.get('type')}] {f.get('detail', '')[:40]}")
+    return out
 
 
 def _hit(expected: dict, findings: list[dict]) -> bool:
@@ -77,9 +95,13 @@ def main() -> int:
         row_hits = [e for e in expected if _hit(e, findings)]
         miss = [f"{e['type']}:{','.join(e['must_include'])}" for e in expected if e not in row_hits]
         fp = len(findings) if not expected else 0  # 负向样本产出任何质疑=误报
+        forb = _forbidden_hits(r, findings)        # 正向样本的已知错误质疑模式（假漏项等）
+        fp += len(forb)
         hits += len(row_hits)
         false_pos += fp
         flag = "✓" if not miss and not fp else "✗"
+        if forb:
+            print(f"  ✗ forbidden 命中: {'; '.join(forb)}")
         print(f"{flag} {r['id']}: 命中 {len(row_hits)}/{len(expected)}"
               f"{'  漏: ' + ';'.join(miss) if miss else ''}"
               f"{'  误报: ' + str(fp) if fp else ''}  产出 {len(findings)} 条"

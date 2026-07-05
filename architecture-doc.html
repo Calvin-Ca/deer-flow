@@ -244,7 +244,7 @@
 <table>
   <tr><th style="width:150px">机制</th><th>设计要点</th><th>状态</th></tr>
   <tr><td><b>意图路由</b></td><td>两级混合：确定性 prerouter（关键词/信号，强信号零延迟直配，金标可回归）→ 低置信才升 32b 兜底分类（temp=0、enum、代码校验、fail-safe 跌回）。LLM 只出能力标签；出界/口径/特征/形态四个红线闸两条路都确定性重推。<b>补</b>：<s>out_of_domain 第五标签＋顶层直答</s>✅、<s>「列清单/列项」词条＋金标</s>✅（2026-07-04 落地，47+8+12 自测、30/30 金标全绿；32b 兜底服务器实测 <b>17/17=100%</b>、P95 639ms，提示词反例锚点修复口语误判后收口）；余 prior_capability 会话粘性入参。</td><td class="good">已建，余一项</td></tr>
-  <tr><td><b>第零跳收权</b></td><td>RouteContextMiddleware（deer-flow 中间件，照抄 DynamicContextMiddleware 模式）：每轮消息先调 /route，RouteDecision 以 system-reminder 注入；模型从「自由分诊」降为「按判定执行」；:8101 不可达则不注入（fail-open）。路由单一源留在 ce-services，harness 只做消费者。</td><td class="warn">规划</td></tr>
+  <tr><td><b>第零跳收权</b></td><td>RouteContextMiddleware（deer-flow 中间件，照抄 DynamicContextMiddleware 模式）：每轮消息先调 /route，RouteDecision 以 system-reminder 注入；模型从「自由分诊」降为「按判定执行」；:8101 不可达则不注入（fail-open）。路由单一源留在 ce-services，harness 只做消费者。<b>已灰度实证（07-05）</b>：天气句 cap=out_of_domain/llm_fallback→8B 不再编造预报、正确声明能力范围；列清单句注入前后行为质变（空跑 compose→先 ask_clarification 问特征）；组价句 deterministic 直配+如实透传 501。踩坑修复：前端消息 content 为块列表致首版静默早退——fail-open 路径必须出声（可观测性教训）。</td><td class="good">已灰度</td></tr>
   <tr><td><b>HITL 门控</b></td><td>门控不逐步 gate：τ 双阈值三段式（≥τ_high 直配 / 中段人工确认 / &lt;τ_low 提示补描述）＋多候选/缺价/缺政策数才停；末尾 review 恒停。compute/gate 双拆——interrupt resume 从节点头重跑，昂贵 LLM 调用放上游有 checkpoint 的 compute 节点。用户决策 lock_value 钉死，下游确定性重算不重跑 LLM。</td><td class="good">已建</td></tr>
   <tr><td><b>Provenance</b></td><td>来源是字段不是散文：每个数字带 {source_type, source_ref, confidence, alternatives}；前端只从结构化字段渲染，不解析模型自然语言。audit_log + overrides 支撑交付对账。待知识层补文件+行号级 source_ref。</td><td class="good">已建，粒度待补</td></tr>
   <tr><td><b>模型分桶</b></td><td>桶 A Qwen3-8B（延迟敏感：生成/澄清/皮肤）；桶 B 32B（真推理：选码消歧/拆解综合/意图兜底）；URL+model 成对回落防半错配。置信校准：8b 自报置信无区分度 → cosine 客观分校准、只拉低不抬高。未来强模型可入桶 C 供 agent 原语用。</td><td class="good">已建</td></tr>
@@ -271,7 +271,7 @@
 <table>
   <tr><td>1</td><td><b>列清单批量落点不存在</b>——路由层已修复（07-04：六句实测句正确落 cost＋特征反问，词表+柔性正则+金标 E1~E6）；但批量能力入口（设计说明→多构件）仍缺，归 M2</td></tr>
   <tr><td>2</td><td><b>Agent 原语零个建成</b>——三个虚线框（生成/规划/核对）待接电</td></tr>
-  <tr><td>3</td><td>第零跳未收权——lead_agent 分诊无金标无审计</td></tr>
+  <tr><td>3</td><td><s>第零跳未收权</s>——已收权（07-05 灰度实证）：RouteContextMiddleware 注入生效，8B 从自由分诊降为按判定执行（域外拒答/先澄清后调用两个行为质变样本）</td></tr>
   <tr><td>4</td><td>契约三处手抄；marker 寄生模型正文；session 并发隐患</td></tr>
   <tr><td>5</td><td>benchmark 未完全 CI 化（tools 自测未收编 pytest；τ/校准待真实分布调参）</td></tr>
   <tr><td>6</td><td><s>域外问题无出口</s>——已修复（07-04）：out_of_domain 第五标签＋编排器顶层直答能力范围，不再吞进 norm 检索管道（金标 F14~F16；兜底准确率待服务器 --llm 实测）</td></tr>

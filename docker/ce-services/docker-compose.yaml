@@ -42,10 +42,13 @@ services:
       # 可选：桶B(32B) 升级 —— 不设则走 config.py 默认（8b），按需放开
       # - BCRAG_ORCH_LLM_URL=${ORCH_LLM_URL:-}
       # - BCRAG_ORCH_LLM_MODEL_ID=${ORCH_LLM_MODEL_ID:-}
-      # 编码闸 τ 双阈值（M4 数据定参 2026-07-05，eval_select n=10 分桶实测）：
+      # 编码闸 τ 双阈值（M4 数据定参 2026-07-05，eval_select n=10 分桶+归因实测）：
       #   校准排序能力已验证——错码全被压 0.00、≥0.14 样本 8/8 全对；τ_high 0.75→0.60
       #   （[0.6,1] 桶 2/2 全对，分流 10%→20%），τ_low 0.60→0.30 保持双阈有序。
-      #   下一档候选 τ_high=0.25（[0.2,1] 4/4 全对）待金标扩 30+ 条复核后再放。
+      #   归因（cos/次优列）：9/10 条 effective 由 margin 主导、abs 形同虚设；三条「逆检索
+      #   选对」被 margin 清零（冤案）但两条错码也靠同机制钉死在 0——软化负 margin 无分流
+      #   收益且会让错码浮到 ~0.35、毁掉将来 τ 下探空间 → **公式与三参保持不动（有据的不动）**。
+      #   分流唯一安全杠杆＝τ 下探：下一档 τ_high=0.25（[0.2,1] 4/4 全对）待金标扩 30+ 条复核。
       - CE_HITL_TAU_HIGH=${CE_HITL_TAU_HIGH:-0.60}
       - CE_HITL_TAU_LOW=${CE_HITL_TAU_LOW:-0.30}
     volumes:

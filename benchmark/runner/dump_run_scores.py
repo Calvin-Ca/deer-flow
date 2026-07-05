@@ -39,11 +39,14 @@ def main() -> int:
         trace = traces[0]
         scores: dict[str, float] = {}
         comments: list[str] = []
-        # trace.scores 在 v4 API 里可能是关联对象；稳妥走 score 列表接口按 trace 过滤
+        # trace 详情接口自带 scores（GET /api/public/traces/{id}）——比猜 score 列表 API 名稳；
+        # 首版用 score_v_2.get 猜名失败被 except 静默吞、全表空（又一例「兜底不出声」）。
         try:
-            slist = client.api.score_v_2.get(trace_id=trace.id, limit=20).data
-        except Exception:  # noqa: BLE001 —— 老版本 API 兜底
-            slist = getattr(trace, "scores", None) or []
+            full = client.api.trace.get(trace.id)
+            slist = getattr(full, "scores", None) or []
+        except Exception as exc:  # noqa: BLE001
+            slist = []
+            comments.append(f"(拉分失败: {exc})")
         for s in slist:
             name = getattr(s, "name", None)
             if name in ("route_correct", "clarify_correct"):

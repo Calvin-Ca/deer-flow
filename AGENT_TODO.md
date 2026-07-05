@@ -56,12 +56,26 @@
   为准（本就在 §4 小尾巴）。
 - **B2 该问没问（route ✓ clarify ✗）**：光看工具列表裁决不了（可能是前门 orchestrate 接管了特征反问
   ——那是口径盲区非漏问）；`dump_run_scores.py` 已加「答复摘要」列，v3 跑完看它说了什么再定。
-**待办（服务器，按序单行）**：
-- [ ] 跑 backend 单测：`cd /mnt/nvme/calvin/code/deer-flow/backend && PYTHONPATH=. uv run pytest tests/test_route_context_middleware.py -v`
-- [ ] 重传路由金标（A9 改判）：`cd /mnt/nvme/calvin/code/deer-flow && set -a && . ./.env && set +a && uv run --project backend python benchmark/runner/upload_datasets.py --only routing`
-- [ ] 重起 gateway 使中间件生效后跑 v3：`uv run --project backend python benchmark/runner/run_routing_experiment.py --run-name m4-behavior-v3`
-- [ ] 拉 v3 矩阵：`uv run --project backend python benchmark/runner/dump_run_scores.py --run-name m4-behavior-v3`——
-  预期 E2/E3 收编转绿、A9 挂 —；B2 看答复摘要裁决（orchestrate 前门反问=改金标口径，真漏问=再治）。
+**v3 半程定案（2026-07-06 当晚）**：run 在第 13 条崩了（Langfuse items 新建在前，只跑了
+E7/G1-G3/E1-E6/D1/C3 这 12 条，A1–C2 没跑到；崩因没留下——runner 原无单条兜底，一条异常杀全轮）。
+半程收获与三修：
+- ✅ E1/E2/E4/E5 反问全绿（v2 哑火重灾区 E2 转绿），G1-G3/E7/D1 保持绿——收编方向有效。
+- **E6 冤案双修**：① 模型 `<think>` 推理块漏进 content，思维链里的「？」误触发收编、整段思维链被当
+  question 呈给用户 → 收编前先剥 `<think>…</think>`（含流截断未闭合形态），剥空则不收编；② 收编产生的
+  反问只以 ToolMessage 流出、runner 只数 ai tool_calls 看不见（记「工具=[]」）→ runner 补数
+  `type=tool` 工具结果名。单测扩到 16 条。
+- **runner 补单条 try/except**：跑挂出声跳过不挂分，一条崩不再废整轮（v3 就是这样丢了 22 条），
+  下轮崩因直接可见。
+- **E3 新形态待口径**：agent 调了 orchestrate（route ✓），listing 0 件引导返回后纯文本收尾——
+  「已有工具活动不收编」按设计不介入。是改金标（编排层已接管引导）还是要求引导也走
+  ask_clarification，看 v3b 全量矩阵再定。
+**待办（服务器，按序单行；无需重起 gateway，runner 嵌入式 git pull 即新代码）**：
+- [ ] 单测：`cd /mnt/nvme/calvin/code/deer-flow/backend && PYTHONPATH=. uv run pytest tests/test_route_context_middleware.py -v`（16 条）
+- [ ] 重传路由金标（A9 改判；已传过可跳）：`cd /mnt/nvme/calvin/code/deer-flow && set -a && . ./.env && set +a && uv run --project backend python benchmark/runner/upload_datasets.py --only routing`
+- [ ] 全量重跑：`uv run --project backend python benchmark/runner/run_routing_experiment.py --run-name m4-behavior-v3b`
+- [ ] 拉矩阵：`uv run --project backend python benchmark/runner/dump_run_scores.py --run-name m4-behavior-v3b`——
+  读法：E2/E3/E6 收编+观测双修后应绿、A9 挂 —、A1–C2 首次带修复跑；B2 看答复摘要裁决
+  （orchestrate 前门反问=改金标口径，真漏问=再治）；哪条「跑挂了」直接看崩因行。
 （用户口径：benchmark 优化可后置，不阻塞主线。）
 
 ### ② 清单套定额对照表补全 —— 跑批已收官（2026-07-06），剩前端验收

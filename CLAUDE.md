@@ -43,7 +43,29 @@
 - 数据文件 `ce-code/data/`：**入 git 同步** `parsed/`（MinerU 输出）、`structured/`（chunk 树 / bill_spec.jsonl 等结构化产物）——派生数据走 git 在 Mac/服务器间同步（2026-06-16 起）；**仍不进 git** `raw/`（PDF 原件，版权敏感）、`vector_store/`（BM25 + Milvus 索引，大体积二进制、可重新生成）、`eval_set/`（仅余评测 xlsx 原件）。**评测金标集已迁项目根 `benchmark/`**（`routing_eval/` 路由评测 + `retrieval_eval/` 清单匹配/条文召回金标，随 git 同步）
 - **作为开发者，禁止用「前端调大模型对话生成」的方式新建 skill 或 agent**（即 `/workspace/agents/new` 的 bootstrap 流程、`/workspace/chats/new?mode=skill` 的 skill-creator 流程）：① 产物落 `.deer-flow/users/{user}/agents/` 与 `skills/custom/`，均**不随 git 同步**、按机器隔离，与 Mac↔服务器 git 工作流不一致；② **这些前端自助创建功能未来会被删除**。开发态的 skill 一律**手写进 `skills/public/{name}/SKILL.md`（随 git 同步）**，agent 定义同理走代码/git 纳管，不依赖前端生成
 
-### 2.3 服务器环境
+### 2.3 服务器验证两态：dev 调试态 / Docker 生产态（2026-07-06 定）
+
+- **日常改码验证一律用 dev 调试态，不重建 Docker**：backend 用 VS Code debugpy 起 uvicorn :8001，
+  launch.json **必须带 `"envFile": "${workspaceFolder}/.env"`**——`CE_ROUTE_CONTEXT_URL` 等灰度开关在
+  `.env` 里，缺了路由注入/哑火收编中间件整个不注册（agent.py 未设=不启用），验了等于白验；frontend
+  `pnpm exec next dev --turbo --port 2026`（next.config 的 dev rewrites 直连 :8001 无需 nginx，内网直访
+  172.19.3.136:2026 已放行）。改后端 F5 重启调试（秒级），改前端热更新。**debugpy 下禁加 `--reload`**
+  （fork 子进程断点脱靶）。
+- 起 dev 前先停 Docker harness 层腾 :2026：`sudo ./scripts/deploy.sh down`（ce-services/ce-code/精排/监控
+  容器**不动**，dev 后端还要调它们）。账号/线程数据共用 `backend/.deer-flow` 两态无缝；前端命令带
+  `BETTER_AUTH_SECRET=$(cat ../backend/.deer-flow/.better-auth-secret)` 保登录态。
+- **两态唯一要来回翻的配置**：`config.yaml` 的 vLLM base_url（Docker 态 `host.docker.internal:8099` ↔
+  dev 态 `localhost:8099`）；后端连不上 8099 先查这里。
+- **benchmark runner 与两态无关**：走 DeerFlowClient 嵌入式、进程内加载源码，`git pull` 即新代码，
+  不需要起 gateway。
+- **dev 态验不了的四边界**（批次收尾必须过一次生产态）：① 前端类型错误——next dev（Turbopack）不跑
+  tsc，动过 `.ts/.tsx` 回生产前先 `pnpm typecheck`；② 多 worker 行为（生产 `--workers 4`，dev 单进程）；
+  ③ Dockerfile/compose/nginx/容器网络类改动；④ `uv add` 新依赖须重建镜像才进容器。
+- **切回生产态**（每批次一次，不逐次改逐次建）：sed 翻回 host.docker.internal → `sudo ./scripts/deploy.sh`；
+  动过后端源码须防 COPY 层缓存坑：`build --no-cache gateway` + `up -d --force-recreate gateway`（详见
+  `docker/README.md` §5）；动 harness/ce-services 容器一律 `sudo`（rootless 会建出影子容器）。
+
+### 2.4 服务器环境
 
 - 服务器ip：172.19.3.136
 - 服务器路径：`/mnt/nvme/calvin/code/deer-flow/`（home: `/home/caic`）

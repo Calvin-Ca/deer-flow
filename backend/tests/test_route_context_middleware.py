@@ -143,6 +143,40 @@ def test_no_coerce_on_empty_text():
     assert mw.after_model(state, _fake_runtime()) is None
 
 
+# ---------------------------------------------------------------------------
+# <think> 推理块剥离（v3 E6 冤案：思维链里的「？」误触发收编、整段被当 question）
+# ---------------------------------------------------------------------------
+
+
+def test_think_block_stripped_from_question():
+    mw = _make_middleware()
+    text = "<think>用户没给特征，要不要问呢？先问吧。</think>请提供构件的混凝土等级？"
+    state = {"messages": [_reminder("feature"), _user(), AIMessage(content=text, id="ai-1")]}
+
+    result = mw.after_model(state, _fake_runtime())
+
+    assert result is not None
+    question = result["messages"][0].tool_calls[0]["args"]["question"]
+    assert question == "请提供构件的混凝土等级？"
+    assert "<think>" not in question
+
+
+def test_no_coerce_when_content_is_think_only():
+    """正文全是推理块（含问号）→ 剥完为空，不收编不硬造问题。"""
+    mw = _make_middleware()
+    state = {"messages": [_reminder("feature"), _user(),
+                          AIMessage(content="<think>该问什么？嗯，先分析一下路由决策。</think>", id="ai-1")]}
+    assert mw.after_model(state, _fake_runtime()) is None
+
+
+def test_no_coerce_on_unclosed_think_block():
+    """未闭合 <think>（流截断）→ 自 <think> 起全按推理剥掉。"""
+    mw = _make_middleware()
+    state = {"messages": [_reminder("feature"), _user(),
+                          AIMessage(content="<think>好的，用户说“这个工程开个清单”，需要处理这个请求？", id="ai-1")]}
+    assert mw.after_model(state, _fake_runtime()) is None
+
+
 def test_no_coerce_when_last_message_is_not_ai():
     mw = _make_middleware()
     state = {"messages": [_reminder("feature"), _user()]}

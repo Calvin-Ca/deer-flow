@@ -75,6 +75,11 @@ def _drive_agent(query: str, model_name: str | None, thread_id: str) -> dict:
                     tool_names.append(name)
             if isinstance(d.get("content"), str):
                 answer_parts.append(d["content"])
+        elif d.get("type") == "tool" and d.get("name"):
+            # 工具结果也计名（m4-behavior-v3 归因，2026-07-06）：哑火收编（after_model 把纯文本
+            # 反问转 ask_clarification）不经模型流式 tool_calls 出来，只有 ClarificationMiddleware
+            # 的 ToolMessage 可观测——只数 ai tool_calls 会把收编成功误判成「工具=[]」（E6 冤案）。
+            tool_names.append(d["name"])
 
     return {
         "answer": "".join(answer_parts)[:500],
@@ -111,7 +116,11 @@ def main() -> int:
     for i, item in enumerate(dataset.items):
         query = (item.input or {}).get("query", "")
         thread_id = f"exp-{run_name}-{item.id}"
-        out = _drive_agent(query, args.model, thread_id)
+        try:
+            out = _drive_agent(query, args.model, thread_id)
+        except Exception as exc:  # noqa: BLE001 —— 单条崩不拖垮整轮（v3 实测一条异常废了后续 22 条）
+            print(f"[{i + 1}/{len(dataset.items)}] {item.id} 跑挂了，跳过（不挂分）：{type(exc).__name__}: {exc}")
+            continue
 
         exp = item.expected_output or {}
         route_ok = _match(exp.get("expect_route"), out["did_route"])

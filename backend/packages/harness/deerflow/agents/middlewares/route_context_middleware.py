@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import urllib.request
 import uuid
 from typing import override
@@ -50,6 +51,10 @@ _DECISION_KEYS = (
 # 只回纯文本时，文本命中任一标记才收编成 ask_clarification——不命中说明模型给的是陈述句
 # 「答案」，硬包成问题更糟，只出声告警（哑火可观测，不静默）。
 _QUESTION_MARKERS = ("？", "?", "请提供", "请问", "请先", "请补充", "请告知", "需要您", "需要你")
+# Qwen3 推理块（v3 实测 E6：<think>…漏进 content，思维链里的「？」触发误收编、整段思维链
+# 被当 question 呈给用户）——标记检查与 question 文本都必须先剥掉它；未闭合（流截断）时
+# 从 <think> 起全是推理，一并剥到结尾。
+_THINK_RE = re.compile(r"<think>.*?(?:</think>|$)", re.DOTALL)
 
 
 def _extract_latest_decision(messages: list) -> dict | None:
@@ -242,8 +247,9 @@ class RouteContextMiddleware(AgentMiddleware):
         for m in messages[idx + 1:-1]:
             if isinstance(m, ToolMessage) or (isinstance(m, AIMessage) and m.tool_calls):
                 return None
-        text = _message_text(last).strip()
-        if not text:
+        text = _THINK_RE.sub("", _message_text(last)).strip()
+        if not text:  # 剥完 <think> 空了 = 全是推理没正文，无可收编（出声归 quantity-drop 同类）
+            logger.warning("RouteContextMiddleware: clarify=%s 但模型正文只有 <think> 推理块，无可收编", decision.get("clarify"))
             return None
         if not any(marker in text for marker in _QUESTION_MARKERS):
             logger.warning("RouteContextMiddleware: clarify=%s 但模型未反问也未调工具（哑火，文本非疑问不收编）: %.80s",

@@ -1,0 +1,61 @@
+name: CE Services Tests
+
+# M4 金标 CI 化（第一层）：ce-services 全部 stub 级测试（路由/契约/图路径/抽取/复核/导出/
+# 度量仪）零 LLM 零服务，GitHub 免费 runner 即可跑——任何 PR 破线即红。
+# 第二层（--llm 真评测：选码/抽取/复核金标）依赖内网 32b vLLM，跑不进公网 CI，
+# 由服务器侧 tools/*_eval.py --llm 手动/定时执行（见各工具文件头）。
+
+on:
+  push:
+    branches: [ 'main' ]
+    paths:
+      - 'ce-services/**'
+      - 'benchmark/**'
+      - '.github/workflows/ce-services-tests.yml'
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - 'ce-services/**'
+      - 'benchmark/**'
+
+concurrency:
+  group: ce-services-tests-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  ce-services-tests:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Install dependencies
+        working-directory: ce-services
+        run: uv sync
+
+      - name: Run tests (stub-level, no LLM / no services)
+        working-directory: ce-services
+        run: uv run pytest tests/ -q
+
+      - name: Gold-set format checks (offline mode)
+        working-directory: ce-services
+        run: |
+          uv run python -m tools.listing_eval
+          uv run python -m tools.critic_eval
+          uv run python -m tools.compare_eval
+          uv run python -m tools.prerouter_eval
+          uv run python -m tools.intent_fallback_eval

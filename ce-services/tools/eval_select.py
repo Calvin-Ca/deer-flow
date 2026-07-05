@@ -104,6 +104,28 @@ def aggregate(records: list[dict]) -> dict:
             "n_recalled": n_recalled, "n_dangerous": n_dangerous}
 
 
+# 置信分桶边界（M4 τ 调参度量仪）：0.75 界=当前 τ_high，最后一桶即「自动过区」——
+# 其准确率就是 G2 门指标（≥95% 才配自动放行）。调 τ 的读法：把 τ 设在某界上 ⟺
+# 该界以上各桶合并准确率须 ≥95%，同时看落入自动过区的样本占比（分流率）。
+BUCKET_EDGES = (0.0, 0.2, 0.4, 0.6, 0.75, 1.01)
+
+
+def confidence_buckets(records: list[dict]) -> list[dict]:
+    """按校准后置信分桶统计 (n, 命中数, 准确率)——τ 调参的直接依据（纯函数可单测）。
+
+    参数：records —— classify_case 输出列表（confidence=校准后 effective）。
+    返回：``[{lo, hi, n, n_correct, acc}]``（acc 无样本→None），桶界见 BUCKET_EDGES。
+    """
+    out = []
+    for lo, hi in zip(BUCKET_EDGES, BUCKET_EDGES[1:]):
+        bucket = [r for r in records if lo <= r["confidence"] < hi]
+        n_correct = sum(1 for r in bucket if r["correct"])
+        out.append({"lo": lo, "hi": min(hi, 1.0), "n": len(bucket),
+                    "n_correct": n_correct,
+                    "acc": (n_correct / len(bucket)) if bucket else None})
+    return out
+
+
 def _load_gold(path: Path) -> list[dict]:
     """读 match_gold.jsonl（跳过空行）；每条规范化出 ``gold`` 为 set[str]。"""
     cases = []
@@ -172,7 +194,7 @@ def run_eval(gold_path: Path, spec: str, top_k: int,
                                                "auto_accept", "dangerous")}})
 
     m = aggregate(records)
-    _print_summary(m, top_k)
+    _print_summary(m, top_k, records)
     return m, details
 
 
@@ -187,7 +209,7 @@ def select_safe(query: str, candidates: list[dict], llm_url: str, model_id: str)
                 "need_review": True, "alternatives": [], "_error": True}
 
 
-def _print_summary(m: dict, top_k: int) -> None:
+def _print_summary(m: dict, top_k: int, records: list[dict] | None = None) -> None:
     """打印汇总指标 + PRD §6 红线对照。"""
     def pct(x: float | None) -> str:
         return "—" if x is None else f"{x:.0%}"
@@ -205,6 +227,16 @@ def _print_summary(m: dict, top_k: int) -> None:
     print(f"  高置信错码（危险·绕过 HITL）={danger_tag}")
     print("\n红线：Top-1 ≥ 85%（PRD §6 业务层）。端到端未达多因 Recall 缺口——看「候选内 Top-1」"
           "定位是召回问题还是选码问题；「高置信错码」必须为 0（HITL 安全）。")
+
+    if records:
+        print("\n置信分桶（校准后 effective · M4 τ 调参度量仪）")
+        print(f"  {'桶':<14}{'n':>4}{'命中':>6}{'准确率':>8}")
+        for b in confidence_buckets(records):
+            acc = "—" if b["acc"] is None else f"{b['acc']:.0%}"
+            tau_mark = "  ← 当前自动过区（τ_high=0.75）" if b["lo"] == 0.75 else ""
+            print(f"  [{b['lo']:.2f},{b['hi']:.2f}){b['n']:>4}{b['n_correct']:>6}{acc:>8}{tau_mark}")
+        print("  读法：τ 设在某界 ⟺ 该界以上桶合并准确率须 ≥95%（G2 门），同时看落桶占比＝自动分流率。"
+              "实测停闸全停（0.144/0.00/0.208/0.451 全＜τ）＝校准过严，据此表回调 FLOOR/CEIL/MARGIN。")
 
 
 def _cli() -> None:

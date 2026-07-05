@@ -39,8 +39,10 @@ DATASET_NAME = "agent-routing-eval"
 # tool_call 首片里就到齐，不像 args 会分片）。口径见 routing_eval/README：路由 = 调
 # 脚本/工具，bash/read_file 自己瞎折腾不算。首轮实跑确认真实工具名为 qa.py / cost.py
 # （脚本式工具）与 ce-cost_* （:8100 MCP 工具）；新增工具时往这两处加。
+# M4 行为回归对齐（2026-07-05）：主路已迁 ce-task_orchestrate 前门（MCP），ce-task 前缀
+# 必须计入——否则 orchestrate 调用全被判「未路由」、路由率虚假归零。
 ROUTE_TOOL_NAMES = {"qa.py", "cost.py"}
-ROUTE_TOOL_PREFIXES = ("ce-cost",)
+ROUTE_TOOL_PREFIXES = ("ce-cost", "ce-task")
 CLARIFY_TOOL = "ask_clarification"
 
 

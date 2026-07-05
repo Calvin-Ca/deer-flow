@@ -36,6 +36,10 @@ def main() -> int:
         pass
 
     rows = [json.loads(ln) for ln in _EVAL.read_text(encoding="utf-8").splitlines() if ln.strip()]
+    # out_of_domain 组（G*）整条跳过：确定性单层对域外的**正确**行为就是 norm 低置信
+    # （域外判定在 32b 兜底层，由 intent_fallback_eval F14~16 盖；agent 级行为由
+    # benchmark/runner 的 routing experiment 盖）——本评测只管确定性层，不误判它。
+    rows = [r for r in rows if r.get("group") != "out_of_domain"]
     passed = failed = 0
     for r in rows:
         d = route(r["query"])

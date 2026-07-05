@@ -28,3 +28,7 @@
 {"id": "E4", "agent": "cost-agent", "group": "listing", "query": "清单列项", "expect_route": true, "expect_clarify": true, "gold": "2013", "note": "关键词「清单列项」→ cost"}
 {"id": "E5", "agent": "cost-agent", "group": "listing", "query": "帮我把这几个构件列项", "expect_route": true, "expect_clarify": true, "gold": "2013", "note": "「列项」伴随「构件」才计（裸「列项」二义，见 A9 反例：能同时列项吗=norm）"}
 {"id": "E6", "agent": "cost-agent", "group": "listing", "query": "这个工程开个清单", "expect_route": true, "expect_clarify": true, "gold": "2013", "note": "柔性正则「开个清单」→ cost"}
+{"id": "G1", "agent": "out-of-domain", "group": "out_of_domain", "query": "今天天气怎么样", "expect_route": false, "expect_clarify": false, "gold": null, "note": "M4 行为回归·域外闲聊：期望 8B 不调任何路由工具、直接说明能力范围（M1 out_of_domain 出口 + RouteContextMiddleware 注入判定的端到端行为验证；灰度实测曾编造天气预报→修复后正确拒答）"}
+{"id": "G2", "agent": "out-of-domain", "group": "out_of_domain", "query": "帮我写个Python爬虫", "expect_route": false, "expect_clarify": false, "gold": null, "note": "M4 行为回归·域外代码请求：不调路由工具、不写代码（造价助手身份边界）"}
+{"id": "G3", "agent": "out-of-domain", "group": "out_of_domain", "query": "你好，你是谁", "expect_route": false, "expect_clarify": false, "gold": null, "note": "M4 行为回归·问候：直接自我介绍（能力范围声明），不调工具不反问"}
+{"id": "E7", "agent": "cost-agent", "group": "listing", "query": "根据设计说明列清单，按2024版国标：本工程基础采用C30现浇钢筋混凝土独立基础，混凝土用量约120m³。框架柱为C35现浇钢筋混凝土矩形柱，截面600×600mm。外墙采用MU10标准砖240厚实心砖墙，M5水泥砂浆砌筑。", "expect_route": true, "expect_clarify": false, "gold": "2024", "note": "M4 行为回归·批量列清单点火：期望调 ce-task_orchestrate（listing 分支抽件+批量起会话），特征齐全不反问——M2 主打场景的 agent 级行为断言"}

@@ -16,6 +16,8 @@
 
 import type { Message } from "@langchain/langgraph-sdk";
 
+import { extractTextFromMessage } from "@/core/messages/utils";
+
 const COST_HITL_BLOCK = /```cost-hitl\s*\r?\n([\s\S]*?)```/;
 
 export interface CostHitlMarker {
@@ -72,12 +74,14 @@ export function hitlTaskIdFromResult(
 export function extractHitlTaskIdFromMessages(messages: Message[]): string | null {
   const resultByToolCallId = new Map<string, string>();
   for (const message of messages) {
-    if (
-      message.type === "tool" &&
-      message.tool_call_id &&
-      typeof message.content === "string"
-    ) {
-      resultByToolCallId.set(message.tool_call_id, message.content);
+    if (message.type !== "tool" || !message.tool_call_id) continue;
+    // MCP 工具结果的 content 常是 blocks 数组（[{type:"text",…}]）而非纯字符串——与
+    // findToolCallResult 同用 extractTextFromMessage 兼容两种形状。此前 typeof === "string"
+    // 严判令 blocks 形态下 task_id 永远提不出、控件从不渲染（07-05 实测：三次 listing 点火
+    // 服务端全成功、前端零控件；与 RouteContextMiddleware 踩的是同一类 content 形状坑）。
+    const content = extractTextFromMessage(message);
+    if (content) {
+      resultByToolCallId.set(message.tool_call_id, content);
     }
   }
   let taskId: string | null = null;

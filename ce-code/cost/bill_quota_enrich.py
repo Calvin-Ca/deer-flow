@@ -46,29 +46,67 @@ _JUDGE_SYSTEM = """\
 """
 
 
-def bigrams(s: str) -> set[str]:
-    """字符 2-gram 集（去空格数字；短串整串兜底）——粗筛打分基元。"""
-    s = re.sub(r"[\s\d]", "", s or "")
-    return {s[i:i + 2] for i in range(len(s) - 1)} if len(s) >= 2 else ({s} if s else set())
+def grams12(s: str) -> set[str]:
+    """字符 1-gram + 2-gram 集（去空格数字/标点）——粗筛打分基元。
 
-
-def rough_score(bill_name: str, quota_name: str) -> float:
-    """粗筛分：清单名 2-gram 被定额名覆盖的比例（清单侧覆盖率）。
-
-    「独立基础」⊂「非泵送现浇混凝土 独立基础 混凝土」→ 1.0（前缀式定额名的克星——
-    名称匹配对不上是因为拿首段比对，覆盖率不看位置）。
+    首批 0105 章实测（第二圈）：纯 2-gram 被「钢筋混凝土」类通用词串绑架——
+    「钢筋混凝土柱」把「凿桩头 钢筋混凝土桩」顶到 0.8、真解「非泵送现浇混凝土 矩形柱」
+    只得 0.4 挤出候选。构件判别信息常在**单字**（柱/梁/板/墙），故混入 1-gram，
+    配合 IDF 让判别字压过通用串。
     """
-    bg = bigrams(bill_name)
+    s = re.sub(r"[\s\d/()（）.、-]", "", s or "")
+    out = set(s)
+    out |= {s[i:i + 2] for i in range(len(s) - 1)}
+    return out
+
+
+def build_idf(quota_names: list[str]) -> dict[str, float]:
+    """按定额池计算每个 gram 的 IDF（log((N+1)/(df+1))+1）——通用串（混凝/凝土/钢筋…）
+    在池内 df 极高 → 权重趋近下限；判别字（柱/梁/斜/筏…）df 低 → 主导打分。"""
+    import math
+
+    df: dict[str, int] = {}
+    for name in quota_names:
+        for g in grams12(name):
+            df[g] = df.get(g, 0) + 1
+    n = max(1, len(quota_names))
+    return {g: math.log((n + 1) / (c + 1)) + 1.0 for g, c in df.items()}
+
+
+def rough_score(bill_name: str, quota_name: str, idf: dict[str, float] | None = None) -> float:
+    """粗筛分：清单名 grams 被定额名覆盖的 **IDF 加权**比例 × **尾字本体规则**。
+
+    尾字规则（第二圈心算证伪 IDF 单独可用后加）：IDF 只懂频率、不懂「钢筋混凝土是材料
+    修饰、柱才是构件本体」——查询里钢筋族 grams 的权重和仍压过单字「柱」。中文构件名
+    硬规律：**本体在尾部**（钢筋混凝土·柱 / 实心·楼板）。候选不含查询尾字 → 打三折：
+    「凿桩头 钢筋混凝土桩」无「柱」被压下去，「矩形柱」翻正；尾字非构件字（筒芯的
+    「芯」）时全体等比缩放不改排序，无害。
+
+    idf=None 退化为无权重覆盖率（兼容旧行为/单测）。「独立基础」⊂「非泵送现浇混凝土
+    独立基础 混凝土」→ 1.0（前缀式定额名的克星——覆盖率不看位置）。
+    """
+    bg = grams12(bill_name)
     if not bg:
         return 0.0
-    return len(bg & bigrams(quota_name)) / len(bg)
+    qg = grams12(quota_name)
+    if idf is None:
+        score = len(bg & qg) / len(bg)
+    else:
+        total = sum(idf.get(g, 1.0) for g in bg)
+        hit = sum(idf.get(g, 1.0) for g in bg & qg)
+        score = hit / total if total else 0.0
+    clean = re.sub(r"[\s\d/()（）.、-]", "", bill_name or "")
+    if clean and clean[-1] not in (quota_name or ""):
+        score *= 0.3
+    return score
 
 
-def shortlist(bill_name: str, quotas: list[dict[str, Any]], top_k: int = 15) -> list[dict[str, Any]]:
-    """全量定额粗筛 top-K（1257 条量级全量打分零压力）；同分定额名短者优先（更通用的排前）。"""
-    scored = sorted(quotas, key=lambda q: (-rough_score(bill_name, q.get("name") or ""),
+def shortlist(bill_name: str, quotas: list[dict[str, Any]], top_k: int = 15,
+              idf: dict[str, float] | None = None) -> list[dict[str, Any]]:
+    """全量定额粗筛 top-K（1257 条量级全量打分零压力）；同分定额名短者优先。"""
+    scored = sorted(quotas, key=lambda q: (-rough_score(bill_name, q.get("name") or "", idf),
                                            len(q.get("name") or "")))
-    return [q for q in scored[:top_k] if rough_score(bill_name, q.get("name") or "") > 0]
+    return [q for q in scored[:top_k] if rough_score(bill_name, q.get("name") or "", idf) > 0]
 
 
 def _judge_user(bill: dict[str, Any], candidates: list[dict[str, Any]]) -> str:
@@ -183,10 +221,11 @@ def _cli() -> None:
     print(f"未映射清单码 {len(bills)} 个 · 定额池 {len(quotas)} 条 · top_k={args.top_k} "
           f"· LLM={args.llm_url} ({args.model}) · {'WRITE' if args.write else 'DRY-RUN'}\n")
 
+    idf = build_idf([q.get("name") or "" for q in quotas])  # 池级 IDF：通用串降权、判别字主导
     all_records: list[dict[str, Any]] = []
     n_empty = n_err = n_dropped = 0
     for i, bill in enumerate(bills, 1):
-        cands = shortlist(bill["name"], quotas, args.top_k)
+        cands = shortlist(bill["name"], quotas, args.top_k, idf=idf)
         if not cands:
             n_empty += 1
             print(f"[{i}/{len(bills)}] {bill['code']} {bill['name']}: 粗筛零候选（库内无近似定额）")

@@ -69,6 +69,26 @@ def _extract_prior_capability(messages: list) -> str | None:
     return None
 
 
+def _message_text(message: HumanMessage) -> str:
+    """提取消息纯文本：str 原样；块列表（前端多模态形态 ``[{"type":"text",...}]``）拼接全部 text 块。
+
+    首版只认 ``isinstance(content, str)``，前端消息实为块列表 → 每条都静默早退、中间件形同虚设
+    （灰度首日踩坑）。与 DynamicContextMiddleware 对 content 的宽容处理对齐。
+    """
+    content = message.content
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts: list[str] = []
+        for block in content:
+            if isinstance(block, str):
+                parts.append(block)
+            elif isinstance(block, dict) and block.get("type") == "text":
+                parts.append(str(block.get("text") or ""))
+        return "\n".join(p for p in parts if p)
+    return ""
+
+
 def _is_real_user_message(message: object) -> bool:
     """Return whether *message* is a genuine user turn (not an injected reminder/summary)."""
     return (
@@ -124,7 +144,9 @@ class RouteContextMiddleware(AgentMiddleware):
                 "以下是服务端确定性意图路由对本轮用户消息的判定（结构化、可审计）。"
                 "请按 capability 与形态字段选择动作，不要自行重判能力归属；"
                 "out_of_scope_region 非空＝他省口径出界，必须体面告知、不得调取数工具；"
-                "clarify=feature 时先 ask_clarification 补构件特征（只问特征，不问版本）。",
+                "clarify=feature 时先 ask_clarification 补构件特征（只问特征，不问版本）；"
+                "capability=out_of_domain＝与造价无关：只说明你的能力范围（规范问答/构件组价/深圳信息价查询），"
+                "不要回答问题本身，严禁编造域外内容（天气/新闻/代码等）。",
                 json.dumps(compact, ensure_ascii=False),
                 "</route_decision>",
                 "</system-reminder>",
@@ -136,14 +158,20 @@ class RouteContextMiddleware(AgentMiddleware):
         messages = list(state.get("messages", []))
         idx = next((i for i in reversed(range(len(messages))) if _is_real_user_message(messages[i])), None)
         if idx is None:
+            logger.debug("RouteContextMiddleware: no real user message found, skip")
             return None
         target = messages[idx]
         if target.additional_kwargs.get(_ROUTE_INJECTED_KEY):
-            return None  # 本回合已注入（resume 重入），不重复调 /route
-        if not isinstance(target.content, str) or not target.content.strip():
-            return None  # 多模态/空消息：路由无从判，跳过（fail-open）
+            logger.debug("RouteContextMiddleware: current turn already injected, skip")
+            return None
+        text = _message_text(target).strip()
+        if not text:
+            # 纯图片/未知形态：路由无从判，跳过（fail-open）——但要出声，别再静默失联
+            logger.info("RouteContextMiddleware: no extractable text in user message (content type=%s), skip",
+                        type(target.content).__name__)
+            return None
 
-        decision = self._fetch_decision(target.content, _extract_prior_capability(messages))
+        decision = self._fetch_decision(text, _extract_prior_capability(messages))
         if decision is None:
             return None
 

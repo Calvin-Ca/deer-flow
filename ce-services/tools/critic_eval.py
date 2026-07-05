@@ -100,12 +100,12 @@ def main() -> int:
         hits += len(row_hits)
         false_pos += fp
         flag = "✓" if not miss and not fp else "✗"
-        if forb:
-            print(f"  ✗ forbidden 命中: {'; '.join(forb)}")
         print(f"{flag} {r['id']}: 命中 {len(row_hits)}/{len(expected)}"
               f"{'  漏: ' + ';'.join(miss) if miss else ''}"
               f"{'  误报: ' + str(fp) if fp else ''}  产出 {len(findings)} 条"
               f"  status={env['status']}  {int(times[-1])}ms")
+        if forb:
+            print(f"    ✗ forbidden 命中: {'; '.join(forb)}")
         for f in findings:
             print(f"    · [{f['type']}]{'#' + str(f['item_index']) if 'item_index' in f else ''} "
                   f"{f['detail'][:60]}")

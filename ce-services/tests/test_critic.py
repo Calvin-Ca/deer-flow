@@ -67,6 +67,25 @@ def test_out_of_range_index_kept_without_pointer():
     assert len(fs) == 1 and "item_index" not in fs[0]  # 质疑保留、指向剥离
 
 
+def test_false_missing_item_dropped_by_code():
+    """假漏项代码判（07-05 实测：prompt 铁律治不住）：构件已在草表却被判漏项 → 作废；
+    真漏项（原文独有内容）不受误杀。"""
+    text = "外墙MU10砖墙350m²。内隔墙为加气混凝土砌块墙200厚。屋面SBS改性沥青防水卷材两道。"
+    items = [{"feature": "MU10砖墙"}, {"feature": "加气混凝土砌块墙200厚"}]
+
+    def stub(s, u):
+        return {"findings": [
+            {"type": "missing_item", "detail": "假漏项：砌块墙其实在草表",
+             "source_text": "内隔墙为加气混凝土砌块墙200厚"},
+            {"type": "missing_item", "detail": "真漏项：屋面防水",
+             "source_text": "屋面SBS改性沥青防水卷材两道"},
+        ]}
+    env = review_extraction(text, items, llm_fn=stub)
+    fs = env["result"]["findings"]
+    assert len(fs) == 1 and "屋面" in fs[0]["source_text"]  # 假漏项砍、真漏项留
+    assert "作废" in env["note"]
+
+
 def test_empty_input_and_llm_failure_need_review():
     env1 = review_extraction("", _ITEMS, llm_fn=lambda s, u: {"findings": []})
     assert env1["status"] == "need_review" and "未执行" in env1["note"]

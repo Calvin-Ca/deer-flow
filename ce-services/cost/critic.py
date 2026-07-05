@@ -74,6 +74,34 @@ def _critic_user(text: str, items: list[dict[str, Any]]) -> str:
             + "\n\n对抗式复核，只返回合法 JSON。\n\n/no_think")
 
 
+def _ngrams(s: str, n: int = 4) -> set[str]:
+    """字符 4-gram 集（短串整串兜底）——中文免分词的重叠度基元。"""
+    return {s[i:i + n] for i in range(len(s) - n + 1)} if len(s) >= n else ({s} if s else set())
+
+
+def _is_false_missing(source_text: str, items: list[dict[str, Any]]) -> bool:
+    """假漏项判定（代码侧第三重保险）：missing_item 的原文摘录若与草表某件 feature 高度重合，
+    说明该构件已在草表——判漏项即假漏项，作废。
+
+    07-05 实测：prompt 铁律（「提漏项前逐条核对草表」）治不住 32b 的假漏项——「对照清单查重」
+    是代码比 LLM 可靠的活，不该指望提示词。判法：feature 的 4-gram 被 source_text 覆盖 ≥70%
+    即视为同一构件（阈值防「现浇钢筋混凝土」类通用词串误杀真漏项——金标 C1 真漏项护着回归）。
+    """
+    src_grams = _ngrams(source_text)
+    for it in items:
+        feat = str(it.get("feature") or "")
+        if not feat:
+            continue
+        if len(feat) < 4:
+            if feat in source_text:
+                return True
+            continue
+        feat_grams = _ngrams(feat)
+        if feat_grams and len(feat_grams & src_grams) / len(feat_grams) >= 0.7:
+            return True
+    return False
+
+
 def _envelope(status: str, findings: list[dict[str, Any]], note: str | None = None) -> dict[str, Any]:
     env: dict[str, Any] = {
         "step": "critic_review", "status": status,
@@ -128,6 +156,10 @@ def review_extraction(
         source = str(entry.get("source_text") or "").strip()
         # 三重校验：类型白名单 / 溯源子串 / 件索引范围（LLM 不得造类别、造引文、指向不存在的件）
         if ftype not in FINDING_TYPES or not detail or not source or source not in sent:
+            dropped += 1
+            continue
+        # 第四重（仅 missing_item）：假漏项代码判——构件已在草表却被判漏项，作废（prompt 治不住）
+        if ftype == "missing_item" and _is_false_missing(source, items):
             dropped += 1
             continue
         finding: dict[str, Any] = {"type": ftype, "detail": detail, "source_text": source}

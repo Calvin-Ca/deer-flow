@@ -82,6 +82,19 @@ def test_extract_cross_wired_quantity_dropped():
     assert all("quantity" not in it for it in env["result"]["items"])
 
 
+def test_extract_substring_quantity_trap():
+    """子串陷阱（第三圈实测坑）：Q=1 而摘录含「120m³」——"1" 是 "120" 的子串，
+    子串匹配放行、token 精确匹配必须砍；Q=120 恰等于 token 则合法保留。"""
+    def stub(s, u):
+        return {"items": [
+            {"feature": "有梁板", "source_text": "混凝土量120m³", "quantity": 1},    # 子串陷阱 → 砍
+            {"feature": "基础", "source_text": "混凝土量120m³", "quantity": 120},    # token 精确 → 留
+        ]}
+    env = extract_components(_TEXT, llm_fn=stub)
+    assert "quantity" not in env["result"]["items"][0]
+    assert env["result"]["items"][1]["quantity"] == 120.0
+
+
 def test_extract_empty_input():
     env = extract_components("  ", llm_fn=_stub_ok)
     assert env["status"] == "need_review" and env["result"]["items"] == []

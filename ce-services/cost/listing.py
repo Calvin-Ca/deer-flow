@@ -24,10 +24,15 @@ from typing import Any, Callable
 
 import requests
 
+import re
+
 from common.config import ORCH_LLM_MODEL_ID, ORCH_LLM_URL
 from common.llm import call_qwen3
 
 logger = logging.getLogger("ce-services.cost.listing")
+
+# source_text 里的独立数字 token（整数/小数）——量校验用精确匹配，防子串漏洞
+_NUM_RE = re.compile(r"\d+(?:\.\d+)?")
 
 # 抽取上限：防超长说明爆量（>30 件的真实项目应分批；截断时如实标注，不静默丢）。
 MAX_ITEMS = 30
@@ -129,9 +134,11 @@ def extract_components(
             continue
         item: dict[str, Any] = {"feature": feature, "source_text": source}
         qty = entry.get("quantity")
-        # 不编量双保险：非正数/非数值作废；且量的数字串必须出现在 source_text（挡编量与串量——
-        # 首跑实测 32b 会把砖墙的 350 串给砌块墙、给无量的过梁编 Q=1，代码侧必须能砍）。
-        if isinstance(qty, (int, float)) and qty > 0 and f"{qty:g}" in source:
+        # 不编量双保险：非正数/非数值作废；且量必须**恰好等于** source_text 里的某个独立数字 token
+        # （挡编量与串量——实测 32b 会把砖墙的 350 串给砌块墙、给无量构件编 Q=1；
+        #   子串匹配有漏洞："1" in "板厚120mm" 为真，Q=1 能钻过，故用 token 精确匹配）。
+        if (isinstance(qty, (int, float)) and qty > 0
+                and f"{qty:g}" in _NUM_RE.findall(source)):
             item["quantity"] = float(qty)
             if entry.get("unit"):
                 item["unit"] = str(entry["unit"])

@@ -199,6 +199,8 @@ def _cli() -> None:
     p.add_argument("--limit", type=int, default=0, help="只处理前 N 个未映射码（0=全量）")
     p.add_argument("--code-prefix", default="", help="只处理该前缀的清单码（如 0105=混凝土章，定向试跑）")
     p.add_argument("--timeout", type=int, default=180, help="单次 LLM 超时秒（32b 机负载高时放大）")
+    p.add_argument("--workers", type=int, default=4,
+                   help="LLM 判定并发数（全量实测串行 75s/码≈7.7h，4 并发提速 2~3x）")
     p.add_argument("--write", action="store_true", help="落库（缺省 dry-run 只出报告）")
     args = p.parse_args()
 
@@ -222,43 +224,73 @@ def _cli() -> None:
           f"· LLM={args.llm_url} ({args.model}) · {'WRITE' if args.write else 'DRY-RUN'}\n")
 
     idf = build_idf([q.get("name") or "" for q in quotas])  # 池级 IDF：通用串降权、判别字主导
-    all_records: list[dict[str, Any]] = []
-    n_empty = n_err = n_dropped = 0
-    for i, bill in enumerate(bills, 1):
+
+    def _process(bill: dict[str, Any]) -> dict[str, Any]:
+        """单码全流程（粗筛→LLM→校验），供线程池并发；不碰共享状态，结果回主线程聚合。"""
         cands = shortlist(bill["name"], quotas, args.top_k, idf=idf)
         if not cands:
-            n_empty += 1
-            print(f"[{i}/{len(bills)}] {bill['code']} {bill['name']}: 粗筛零候选（库内无近似定额）")
-            continue
+            return {"bill": bill, "kind": "no_cand"}
         try:
             raw = call_llm(_JUDGE_SYSTEM, _judge_user(bill, cands), args.llm_url, args.model,
                            timeout=args.timeout)
         except Exception as exc:  # noqa: BLE001 —— 单码失败不拖垮整批，出声跳过
-            n_err += 1
-            print(f"[{i}/{len(bills)}] {bill['code']} {bill['name']}: LLM 失败跳过（{exc}）")
-            continue
+            return {"bill": bill, "kind": "err", "exc": str(exc)}
         records, dropped = judge_mappings(bill, cands, raw)
-        n_dropped += dropped
-        if not records:
-            n_empty += 1
-            top3 = "；".join((q.get("name") or "")[:24] for q in cands[:3])
-            print(f"[{i}/{len(bills)}] {bill['code']} {bill['name']}: 判定无适用（诚实空）"
-                  f"{f'，作废 {dropped}' if dropped else ''}  粗筛前3：{top3}")
-            continue
-        all_records.extend(records)
-        tag = " ".join(f"{r['quota_code']}({r['confidence']})" for r in records)
-        print(f"[{i}/{len(bills)}] {bill['code']} {bill['name']}: +{len(records)} → {tag}"
-              f"{f'，作废 {dropped}' if dropped else ''}")
+        return {"bill": bill, "kind": "ok" if records else "empty",
+                "records": records, "dropped": dropped,
+                "top3": "；".join((q.get("name") or "")[:24] for q in cands[:3])}
+
+    def _flush(buf: list[dict[str, Any]]) -> int:
+        """增量落库（每批 flush）——7 小时级长跑批中途断电/断连不再全盘白跑。"""
+        if not (args.write and buf):
+            return 0
+        with psycopg.connect(cost_query.resolve_dsn()) as wconn:
+            n = load_pg.load_bill_quota_map(wconn, buf)
+            wconn.commit()
+        return n
+
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    all_records: list[dict[str, Any]] = []
+    pending: list[dict[str, Any]] = []   # 未落库缓冲（每 25 码 flush 一次）
+    n_empty = n_err = n_dropped = n_written = done = 0
+    with ThreadPoolExecutor(max_workers=max(1, args.workers)) as ex:
+        futures = [ex.submit(_process, b) for b in bills]
+        for fut in as_completed(futures):
+            out = fut.result()
+            bill = out["bill"]
+            done += 1
+            if out["kind"] == "no_cand":
+                n_empty += 1
+                print(f"[{done}/{len(bills)}] {bill['code']} {bill['name']}: 粗筛零候选（库内无近似定额）")
+            elif out["kind"] == "err":
+                n_err += 1
+                print(f"[{done}/{len(bills)}] {bill['code']} {bill['name']}: LLM 失败跳过（{out['exc']}）")
+            elif out["kind"] == "empty":
+                n_empty += 1
+                n_dropped += out["dropped"]
+                print(f"[{done}/{len(bills)}] {bill['code']} {bill['name']}: 判定无适用（诚实空）"
+                      f"{f'，作废 {out['dropped']}' if out['dropped'] else ''}  粗筛前3：{out['top3']}")
+            else:
+                n_dropped += out["dropped"]
+                all_records.extend(out["records"])
+                pending.extend(out["records"])
+                tag = " ".join(f"{r['quota_code']}({r['confidence']})" for r in out["records"])
+                print(f"[{done}/{len(bills)}] {bill['code']} {bill['name']}: +{len(out['records'])} → {tag}"
+                      f"{f'，作废 {out['dropped']}' if out['dropped'] else ''}")
+            if len(pending) >= 25:
+                n_written += _flush(pending)
+                pending.clear()
+    n_written += _flush(pending)
+    pending.clear()
 
     lo = [r for r in all_records if (r["confidence"] or 0) < 0.7]
     print(f"\n报告：配上 {len({r['bill_code'] for r in all_records})} 码 / 共 {len(all_records)} 条边"
           f"；诚实空 {n_empty}；LLM 失败 {n_err}；红线作废 {n_dropped}"
           f"；低置信(<0.7)边 {len(lo)} 条（入库后由 quota_gate 人工确认兜底）")
-    if args.write and all_records:
-        with psycopg.connect(cost_query.resolve_dsn()) as conn:
-            n = load_pg.load_bill_quota_map(conn, all_records)
-            conn.commit()
-        print(f"已落库 {n} 条（source=semantic_llm，可按 source 整批回滚）")
+    if args.write:
+        print(f"已增量落库 {n_written} 条（source=semantic_llm，可按 source 整批回滚；"
+              "每 25 码一批 flush，长跑批中断也只丢最后一批）")
     elif all_records:
         print("（dry-run 未落库；确认报告后加 --write 重跑）")
 

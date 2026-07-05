@@ -16,6 +16,7 @@ import { displayValue } from "@/core/cost/format";
 import type { CostDecision, CostEvent, CostInterrupt } from "@/core/cost/types";
 
 import { ConfirmGate, HierarchyTree, InputGate, ReviewGate, ROLLUP_LABELS } from "./gates";
+import { ReviewTable } from "./review-table";
 import { CostStepTimeline } from "./step-timeline";
 
 /** Normalized snapshot the widget renders from (works for both state + resume shapes). */
@@ -24,6 +25,8 @@ interface Snapshot {
   gate: CostInterrupt | null;
   rollup: Record<string, unknown> | null;
   items: Array<Record<string, unknown>>;
+  /** Index of the item currently being processed (multi-item batch sessions). */
+  currentItem: number;
   overrides: Array<Record<string, unknown>>;
   auditCount: number;
   events: CostEvent[];
@@ -103,29 +106,30 @@ export function CostHitlInline({ taskId }: { taskId: string }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const loadState = useCallback(async () => {
+    const s = await getSessionState(taskId);
+    const v = s.values ?? {};
+    setSnap({
+      status: s.status,
+      gate: s.interrupt,
+      rollup: asRecord(v.rollup),
+      items: (v.items as Array<Record<string, unknown>>) ?? [],
+      currentItem: typeof v.current_item === "number" ? v.current_item : 0,
+      overrides: (v.overrides as Array<Record<string, unknown>>) ?? [],
+      auditCount: Array.isArray(v.audit_log) ? v.audit_log.length : 0,
+      events: (v.events as CostEvent[]) ?? [],
+    });
+  }, [taskId]);
+
   useEffect(() => {
     let cancelled = false;
-    getSessionState(taskId)
-      .then((s) => {
-        if (cancelled) return;
-        const v = s.values ?? {};
-        setSnap({
-          status: s.status,
-          gate: s.interrupt,
-          rollup: asRecord(v.rollup),
-          items: (v.items as Array<Record<string, unknown>>) ?? [],
-          overrides: (v.overrides as Array<Record<string, unknown>>) ?? [],
-          auditCount: Array.isArray(v.audit_log) ? v.audit_log.length : 0,
-          events: (v.events as CostEvent[]) ?? [],
-        });
-      })
-      .catch((e: unknown) => {
-        if (!cancelled) setError(e instanceof Error ? e.message : "加载会话失败");
-      });
+    loadState().catch((e: unknown) => {
+      if (!cancelled) setError(e instanceof Error ? e.message : "加载会话失败");
+    });
     return () => {
       cancelled = true;
     };
-  }, [taskId]);
+  }, [loadState]);
 
   const decide = useCallback(
     async (decision: CostDecision) => {
@@ -143,6 +147,9 @@ export function CostHitlInline({ taskId }: { taskId: string }) {
             setSnap((prev) =>
               prev ? { ...prev, gate: msg.gate, status: "awaiting_input" } : prev,
             );
+            // 多构件会话：停闸后刷持久化态，让构件总览表跟上进度（current_item/已钉码）。
+            // 失败不致命——表格下轮再追；闸卡片已由上面的 msg.gate 立即渲染。
+            void loadState().catch(() => undefined);
           } else if (msg.type === "done") {
             const doneRollup = asRecord(msg.rollup);
             setSnap((prev) =>
@@ -174,7 +181,7 @@ export function CostHitlInline({ taskId }: { taskId: string }) {
         setBusy(false);
       }
     },
-    [taskId],
+    [taskId, loadState],
   );
 
   const status = snap?.status ?? "loading";
@@ -195,6 +202,14 @@ export function CostHitlInline({ taskId }: { taskId: string }) {
         {error && <div className="text-destructive text-xs">{error}</div>}
 
         {snap && snap.events.length > 0 && <CostStepTimeline events={snap.events} />}
+
+        {snap && (
+          <ReviewTable
+            items={snap.items}
+            currentItem={snap.currentItem}
+            sessionStatus={status}
+          />
+        )}
 
         {gate?.gate_type === "confirm" && (
           <ConfirmGate interrupt={gate} busy={busy} onDecide={decide} />

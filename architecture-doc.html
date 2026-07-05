@@ -321,12 +321,20 @@
   <div class="m-head"><span class="m-num">M3</span><span class="m-title">Agent 原语深化 —— 从抽取式升级为受约束 agentic loop</span><span class="m-dur">2–3 周</span></div>
   <div class="m-body">
     <ul>
-      <li>清单生成 Agent v1：迭代式（分段读→检索验证→自查遗漏→补抽），对比 v0 的召回增益</li>
-      <li>组合套定额规划 Agent：一项多定额组合提案（先确认知识层是否已返回组合候选，再定建能力还是接线）</li>
-      <li>Critic Agent：对草表做对抗式复核（漏项/错套/组合合理性），质疑进评审表</li>
-      <li>多 agent 编排 demo：③ 组价 fan-out（planner-worker-critic 全形态），与单 agent / 确定性版同 benchmark 对比</li>
+      <li>🟢 <s>清单生成 v1（refine_missing 增量补抽原语，自查/定向两模式）</s>——已建但<b>实测不入主链</b>（见对比实验）</li>
+      <li>⏸ 组合套定额规划 Agent——侦查判缓行：bill_quota_map 是「变体选择」语义、组合成员语义数据层不存在，
+        且映射覆盖仅 11.2%；先补数据（映射富化＝数据线 P0）</li>
+      <li>🟢 <s>Critic Agent v0＋编排接线</s>（三圈淬火：假漏项 prompt 治不住→4-gram 代码判；质疑随身进 state、
+        评审表质疑列；生产验证「抽丢型归 Critic / 源缺型归澄清闸」分工正确性）</li>
+      <li>🟢 <s>多 agent 对比实验（07-05 实测收官）</s>：P1 单次 / P2 自查 / P3 对抗复核，7 金标（含 3 难例）同指标</li>
     </ul>
-    <div class="gatebox"><b>验收：</b>每个 agent 过入籍审查（信封＋金标＋降级）；三方案对比表落盘（准确率 / token 成本 / 延迟）——这张表同时是面试的核心叙事材料。</div>
+    <div class="gatebox"><b>验收已达，且结论为「证伪」（07-05 实测）：</b>三方案总召回同为 96%、难例 92%、违规 0
+      ——自查与对抗复核<b>零增益、双倍调用</b>（P1 7 调 25.6s / P2 14 调 26.5s / P3 14 调 31.3s）。
+      细究：构件识别实为 25/25 满分（难例隐蔽构件全中），唯一 miss 是 L5 条形基础的 <b>Q=210 未带上（量归属）</b>
+      ——refine 管道不治此病，增益该投量抽取而非加 agent。定位落定：<b>32b 单次抽取已是封闭任务天花板，
+      Critic 价值在人审辅助（评审表质疑列）而非自动修正回路</b>——每单省 1~2 次 LLM 调用。
+      这是「编排自治程度须匹配任务开放性」的一手实证：封闭任务加自治层＝纯开销。
+      新靶子记档：quantity_doubt 的「原文有量草表没带」形态（Critic 金标 C4）；量字段被校验砍时静默（可观测性）。</div>
   </div>
 </div>
 

@@ -79,21 +79,32 @@ def _judge_user(bill: dict[str, Any], candidates: list[dict[str, Any]]) -> str:
             "判定直接适用的定额子目（可为空），只返回合法 JSON。\n\n/no_think")
 
 
-def call_llm(system: str, user: str, llm_url: str, model: str, timeout: int = 60) -> dict[str, Any]:
-    """标准库版 vLLM chat 调用（ce-code 不引 requests 依赖；response_format 强制 JSON）。"""
+def call_llm(system: str, user: str, llm_url: str, model: str, timeout: int = 180,
+             retries: int = 1) -> dict[str, Any]:
+    """标准库版 vLLM chat 调用（ce-code 不引 requests 依赖；response_format 强制 JSON）。
+
+    timeout 默认 180s + 失败重试 1 次——首批实测 32b 机 60s 超时率 6/16（负载/排队），
+    离线跑批宁慢勿丢。
+    """
     body = json.dumps({
         "model": model,
         "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
         "temperature": 0.0, "max_tokens": 2048,
         "response_format": {"type": "json_object"},
     }).encode("utf-8")
-    req = urllib.request.Request(f"{llm_url.rstrip('/')}/v1/chat/completions", data=body,
-                                 headers={"Content-Type": "application/json"}, method="POST")
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        data = json.loads(resp.read().decode("utf-8"))
-    content = data["choices"][0]["message"]["content"]
-    content = re.sub(r"^```(?:json)?\s*|\s*```$", "", content.strip())  # 去 markdown 壳
-    return json.loads(content)
+    last_exc: Exception | None = None
+    for _ in range(retries + 1):
+        try:
+            req = urllib.request.Request(f"{llm_url.rstrip('/')}/v1/chat/completions", data=body,
+                                         headers={"Content-Type": "application/json"}, method="POST")
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+            content = data["choices"][0]["message"]["content"]
+            content = re.sub(r"^```(?:json)?\s*|\s*```$", "", content.strip())  # 去 markdown 壳
+            return json.loads(content)
+        except Exception as exc:  # noqa: BLE001 —— 重试后仍失败才上抛
+            last_exc = exc
+    raise last_exc  # type: ignore[misc]
 
 
 def judge_mappings(bill: dict[str, Any], candidates: list[dict[str, Any]],
@@ -148,6 +159,8 @@ def _cli() -> None:
     p.add_argument("--model", default="qwen3-8b")
     p.add_argument("--top-k", type=int, default=15)
     p.add_argument("--limit", type=int, default=0, help="只处理前 N 个未映射码（0=全量）")
+    p.add_argument("--code-prefix", default="", help="只处理该前缀的清单码（如 0105=混凝土章，定向试跑）")
+    p.add_argument("--timeout", type=int, default=180, help="单次 LLM 超时秒（32b 机负载高时放大）")
     p.add_argument("--write", action="store_true", help="落库（缺省 dry-run 只出报告）")
     args = p.parse_args()
 
@@ -163,6 +176,8 @@ def _cli() -> None:
                     [args.region])
         quotas = cur.fetchall()
 
+    if args.code_prefix:
+        bills = [b for b in bills if str(b["code"]).startswith(args.code_prefix)]
     if args.limit:
         bills = bills[: args.limit]
     print(f"未映射清单码 {len(bills)} 个 · 定额池 {len(quotas)} 条 · top_k={args.top_k} "
@@ -177,7 +192,8 @@ def _cli() -> None:
             print(f"[{i}/{len(bills)}] {bill['code']} {bill['name']}: 粗筛零候选（库内无近似定额）")
             continue
         try:
-            raw = call_llm(_JUDGE_SYSTEM, _judge_user(bill, cands), args.llm_url, args.model)
+            raw = call_llm(_JUDGE_SYSTEM, _judge_user(bill, cands), args.llm_url, args.model,
+                           timeout=args.timeout)
         except Exception as exc:  # noqa: BLE001 —— 单码失败不拖垮整批，出声跳过
             n_err += 1
             print(f"[{i}/{len(bills)}] {bill['code']} {bill['name']}: LLM 失败跳过（{exc}）")
@@ -186,8 +202,9 @@ def _cli() -> None:
         n_dropped += dropped
         if not records:
             n_empty += 1
+            top3 = "；".join((q.get("name") or "")[:24] for q in cands[:3])
             print(f"[{i}/{len(bills)}] {bill['code']} {bill['name']}: 判定无适用（诚实空）"
-                  f"{f'，作废 {dropped}' if dropped else ''}")
+                  f"{f'，作废 {dropped}' if dropped else ''}  粗筛前3：{top3}")
             continue
         all_records.extend(records)
         tag = " ".join(f"{r['quota_code']}({r['confidence']})" for r in records)

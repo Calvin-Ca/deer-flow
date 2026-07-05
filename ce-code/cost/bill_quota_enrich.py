@@ -198,6 +198,8 @@ def _cli() -> None:
     p.add_argument("--top-k", type=int, default=15)
     p.add_argument("--limit", type=int, default=0, help="只处理前 N 个未映射码（0=全量）")
     p.add_argument("--code-prefix", default="", help="只处理该前缀的清单码（如 0105=混凝土章，定向试跑）")
+    p.add_argument("--codes", default="",
+                   help="只处理这些清单码（逗号分隔，精确定向重跑 LLM 失败码——整轮重跑会把诚实空浪费重判）")
     p.add_argument("--timeout", type=int, default=180, help="单次 LLM 超时秒（32b 机负载高时放大）")
     p.add_argument("--workers", type=int, default=4,
                    help="LLM 判定并发数（全量实测串行 75s/码≈7.7h，4 并发提速 2~3x）")
@@ -218,6 +220,13 @@ def _cli() -> None:
 
     if args.code_prefix:
         bills = [b for b in bills if str(b["code"]).startswith(args.code_prefix)]
+    if args.codes:
+        want = {c.strip() for c in args.codes.split(",") if c.strip()}
+        bills = [b for b in bills if str(b["code"]) in want]
+        missing = want - {str(b["code"]) for b in bills}
+        if missing:  # 指定码不在未映射集合：已配上边（无需重跑）或码不存在——出声，别静默漏
+            print(f"提示：{len(missing)} 个指定码不在待处理集合（已有映射或码不存在）："
+                  f"{'、'.join(sorted(missing))}")
     if args.limit:
         bills = bills[: args.limit]
     print(f"未映射清单码 {len(bills)} 个 · 定额池 {len(quotas)} 条 · top_k={args.top_k} "

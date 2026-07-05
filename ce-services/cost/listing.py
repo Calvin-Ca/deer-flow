@@ -44,7 +44,12 @@ _EXTRACT_SYSTEM = """\
 拼进一句描述，能脱离原文单独用于清单选码。
 3. 每条带 source_text：**逐字摘录**原文中支撑该条目的片段（用于溯源校验，禁止改写）。
 4. 同一构件不重复抽；纯说明性文字（工期/责任/验收条款）不是构件，不抽。
-5. 原文含工程量数字（如「120m³」「350m²」）时填 quantity（纯数字）与 unit；没有则省略，**不得编造数量**。
+5. quantity 只在**原文数字明确属于该构件**时填写，并把含该数字的原文片段一并摘进 source_text；\
+数字属于哪个构件拿不准时**宁可不填**——错量比缺量有害。没有则省略字段，**不得编造数量**。
+6. 砌筑砂浆/混凝土强度/钢筋牌号/防水做法等是构件的**特征不是构件**，必须并入所属构件的 feature，\
+**绝不单独成条**（「M5水泥砂浆砌筑」不是构件，是砖墙的特征，应写进砖墙条目）。
+7. 钢筋制作安装可单列为独立计价条目，但 feature 必须带部位与语境\
+（如「柱内HRB400钢筋制作安装」，不得只写「HRB400钢筋」）。
 
 只返回合法 JSON，不输出任何 JSON 以外的文字：
 {"items": [{"feature": "自包含构件描述", "source_text": "原文逐字摘录", "quantity": 120, "unit": "m3"}]}\
@@ -116,7 +121,9 @@ def extract_components(
             continue
         item: dict[str, Any] = {"feature": feature, "source_text": source}
         qty = entry.get("quantity")
-        if isinstance(qty, (int, float)) and qty > 0:  # 不编量：非正数/非数值作废字段
+        # 不编量双保险：非正数/非数值作废；且量的数字串必须出现在 source_text（挡编量与串量——
+        # 首跑实测 32b 会把砖墙的 350 串给砌块墙、给无量的过梁编 Q=1，代码侧必须能砍）。
+        if isinstance(qty, (int, float)) and qty > 0 and f"{qty:g}" in source:
             item["quantity"] = float(qty)
             if entry.get("unit"):
                 item["unit"] = str(entry["unit"])

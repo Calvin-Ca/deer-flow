@@ -30,7 +30,8 @@ _TEXT = ("基础工程：C30现浇钢筋混凝土独立基础，混凝土量120m
 
 def _stub_ok(system: str, user: str) -> dict:
     return {"items": [
-        {"feature": "C30现浇钢筋混凝土独立基础", "source_text": "C30现浇钢筋混凝土独立基础",
+        # source_text 摘录含量句「120m³」——新校验要求量的数字串出现在摘录里（不编量双保险）
+        {"feature": "C30现浇钢筋混凝土独立基础", "source_text": "C30现浇钢筋混凝土独立基础，混凝土量120m³",
          "quantity": 120, "unit": "m3"},
         {"feature": "C35现浇矩形柱600×600 HRB400钢筋", "source_text": "C35现浇矩形柱600×600"},
     ]}
@@ -63,6 +64,22 @@ def test_extract_fake_quantity_dropped():
                           {"feature": "柱", "source_text": "矩形柱", "quantity": "很多"}]}
     env = extract_components(_TEXT, llm_fn=stub)
     assert all("quantity" not in it for it in env["result"]["items"])  # 不编量
+
+
+def test_extract_cross_wired_quantity_dropped():
+    """串量/编量作废（首跑实测坑）：量的数字串不在 source_text 摘录里 → 字段砍掉、条目保留。
+
+    对应真实案例：32b 把砖墙的 350 串给砌块墙、给原文无量的过梁编 Q=1——摘录里没有该数字，
+    代码侧即可挡（不依赖 prompt 自觉）。
+    """
+    def stub(s, u):
+        return {"items": [
+            {"feature": "加气砌块墙", "source_text": "矩形柱", "quantity": 350},   # 串量：350 不在摘录
+            {"feature": "C25过梁", "source_text": "独立基础", "quantity": 1},      # 编量：1 不在摘录
+        ]}
+    env = extract_components(_TEXT, llm_fn=stub)
+    assert env["status"] == "ok" and len(env["result"]["items"]) == 2
+    assert all("quantity" not in it for it in env["result"]["items"])
 
 
 def test_extract_empty_input():

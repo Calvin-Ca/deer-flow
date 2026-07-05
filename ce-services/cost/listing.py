@@ -156,3 +156,97 @@ def extract_components(
     if len(raw_items) > MAX_ITEMS:
         note = ((note + "；") if note else "") + f"超出单批上限 {MAX_ITEMS} 件，其余未处理（请分批）"
     return _envelope("ok", items, note=note, truncated=truncated)
+
+
+# ── v1 增量补抽原语（M3 多 agent 对比实验：P2 自查 / P3 Critic 定向修正共用）──
+
+_REFINE_SYSTEM = """\
+你是建设工程造价的构件**补抽器**。给定原文、已抽取的草表、以及（可能有的）复核质疑，\
+只做一件事：找出**草表里没有、原文里有**的可计价构件，补成新增条目。
+
+铁律（与首轮抽取同规）：
+1. 只补原文明确出现的构件；feature 自包含；source_text 逐字摘录原文。
+2. **绝不重复草表已有的构件**（含名称变体）；没有可补的就返回空列表——不要硬凑。
+3. 不修改、不删除已有条目——你只产增量。
+4. quantity 只在数字明确属于该构件且量句已摘进 source_text 时填，否则省略。
+
+只返回合法 JSON：{"items": [{"feature": "...", "source_text": "...", "quantity": 120, "unit": "m3"}]}\
+"""
+
+
+def _refine_user(text: str, items: list[dict[str, Any]], hints: list[str] | None) -> str:
+    rows = [f"[{i}] {it.get('feature')}" for i, it in enumerate(items)]
+    hint_block = ""
+    if hints:
+        hint_block = "\n复核质疑（重点核对这些线索）：\n" + "\n".join(f"- {h}" for h in hints)
+    return (f"原文：\n{text}\n\n已抽取草表：\n" + "\n".join(rows) + hint_block
+            + "\n\n对照原文找出草表遗漏的可计价构件（没有则 items 为空），只返回合法 JSON。\n\n/no_think")
+
+
+def refine_missing(
+    text: str,
+    base_items: list[dict[str, Any]],
+    hints: list[str] | None = None,
+    llm_url: str = ORCH_LLM_URL,
+    model_id: str = ORCH_LLM_MODEL_ID,
+    llm_fn: Callable[[str, str], dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """增量补抽（v1 原语）：对照原文找草表漏项 → 校验后合并 → 新信封。
+
+    参数：text —— 原文；base_items —— 首轮草表；hints —— 定向线索（P3 传 Critic 的
+      missing_item 质疑文本；P2 自查不传）；llm_fn —— 可注入。
+    返回：信封 ``result.items`` = base + 通过校验的新增件；``result.added`` = 新增数。
+      新增件三重校验：溯源子串 / 量数字在摘录 token 中（同首轮）/ **4-gram 判重**（与既有件
+      重叠 ≥70% 视为重复丢弃——补抽器绝不许靠复读已有件刷增量）。失败降级：LLM 挂 →
+      原表原样返回（added=0 + note），补抽失败绝不损失首轮成果。
+    """
+    from cost.critic import _ngrams  # 同包私有复用（4-gram 判重与 critic 假漏项判同源，防漂移）
+
+    text = (text or "").strip()
+    sent = text[:MAX_TEXT_CHARS]
+    base = [dict(it) for it in (base_items or [])]
+
+    _call = llm_fn or (lambda s, u: call_qwen3(s, u, llm_url, model_id, temperature=0.0))
+    try:
+        raw = _call(_REFINE_SYSTEM, _refine_user(sent, base, hints))
+    except (requests.RequestException, json.JSONDecodeError, ValueError) as exc:
+        logger.warning("补抽 LLM 不可靠 → 保留首轮成果：%s", exc)
+        env = _envelope("ok", base, note=f"补抽未执行（LLM 不可用）：{exc}")
+        env["result"]["added"] = 0
+        return env
+
+    raw_items = raw.get("items") if isinstance(raw, dict) else None
+    added = dropped = 0
+    if isinstance(raw_items, list):
+        for entry in raw_items[:MAX_ITEMS]:
+            if not isinstance(entry, dict):
+                dropped += 1
+                continue
+            feature = str(entry.get("feature") or "").strip()
+            source = str(entry.get("source_text") or "").strip()
+            if not feature or not source or source not in sent:
+                dropped += 1
+                continue
+            # 4-gram 判重：与既有件（含本轮已收的新增件）高重叠 = 复读，丢弃
+            fg = _ngrams(feature)
+            if fg and any(
+                len(fg & _ngrams(str(b.get("feature") or ""))) / len(fg) >= 0.7 for b in base
+            ):
+                dropped += 1
+                continue
+            item: dict[str, Any] = {"feature": feature, "source_text": source}
+            qty = entry.get("quantity")
+            if (isinstance(qty, (int, float)) and qty > 0
+                    and f"{qty:g}" in _NUM_RE.findall(source)):
+                item["quantity"] = float(qty)
+                if entry.get("unit"):
+                    item["unit"] = str(entry["unit"])
+            base.append(item)
+            added += 1
+
+    note = None
+    if dropped:
+        note = f"{dropped} 条补抽结果未过校验/判重已作废"
+    env = _envelope("ok", base, note=note)
+    env["result"]["added"] = added
+    return env

@@ -20,7 +20,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from cost.listing import MAX_ITEMS, extract_components  # noqa: E402
+from cost.listing import MAX_ITEMS, extract_components, refine_missing  # noqa: E402
 from routing.orchestrator import _ignite_listing  # noqa: E402
 from routing.prerouter import route  # noqa: E402
 
@@ -119,6 +119,43 @@ def test_extract_over_limit_noted():
     env = extract_components(_TEXT, llm_fn=stub)
     assert len(env["result"]["items"]) == MAX_ITEMS
     assert "分批" in env["note"]
+
+
+# ── v1 增量补抽原语（M3 对比实验 P2/P3 共用）──
+
+def test_refine_adds_validated_items():
+    base = [{"feature": "C30现浇钢筋混凝土独立基础", "source_text": "x"}]
+
+    def stub(s, u):
+        return {"items": [
+            {"feature": "C35现浇矩形柱", "source_text": "C35现浇矩形柱600×600"},          # 真漏项 → 收
+            {"feature": "C30现浇钢筋混凝土独立基础加强", "source_text": "C30现浇钢筋混凝土独立基础"},  # 复读既有件 → 判重丢
+            {"feature": "幻觉件", "source_text": "地下连续墙"},                            # 溯源失败 → 丢
+        ]}
+    env = refine_missing(_TEXT, base, llm_fn=stub)
+    items = env["result"]["items"]
+    assert env["result"]["added"] == 1 and len(items) == 2
+    assert items[1]["feature"] == "C35现浇矩形柱"
+    assert "作废" in env["note"]  # 判重/溯源丢弃出声
+
+
+def test_refine_llm_failure_keeps_base():
+    base = [{"feature": "基础", "source_text": "x"}, {"feature": "柱", "source_text": "y"}]
+
+    def boom(s, u):
+        raise ValueError("bad json")
+    env = refine_missing(_TEXT, base, llm_fn=boom)
+    assert env["result"]["items"] == base and env["result"]["added"] == 0
+    assert "未执行" in env["note"]  # 补抽失败绝不损失首轮成果
+
+
+def test_refine_quantity_rule_applies():
+    def stub(s, u):
+        return {"items": [{"feature": "独立基础垫层", "source_text": "混凝土量120m³",
+                           "quantity": 5}]}  # 5 不在摘录 token → 字段砍、条目留
+    env = refine_missing(_TEXT, [{"feature": "别的件", "source_text": "x"}], llm_fn=stub)
+    added_item = env["result"]["items"][-1]
+    assert "quantity" not in added_item and env["result"]["added"] == 1
 
 
 # ── 编排接线（stub extract + stub critic + stub session.start，本地零 langgraph）──

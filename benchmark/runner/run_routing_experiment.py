@@ -51,6 +51,16 @@ def _is_route_tool(name: str) -> bool:
     return name in ROUTE_TOOL_NAMES or any(name.startswith(p) for p in ROUTE_TOOL_PREFIXES)
 
 
+def _is_fetch_tool(name: str) -> bool:
+    """「真取数」工具（路由工具去掉 ce-task 前门）——expect_route=False 的违规口径。
+
+    v3b B11 归因定案（2026-07-06）：出界/域外请求交给 ce-task_orchestrate、由编排层确定性
+    出界闸体面拒绝，比模型自答更稳（弱模型不驱动流程），计为合规；只有直调取数工具
+    （ce-cost_* / qa.py / cost.py，有拿他省数据杜撰的风险）才算违规。
+    """
+    return _is_route_tool(name) and not name.startswith("ce-task")
+
+
 def _drive_agent(query: str, model_name: str | None, thread_id: str) -> dict:
     """把一条 query 喂给默认 lead agent，收集其工具调用与最终回复（主线程同步）。
 
@@ -81,11 +91,13 @@ def _drive_agent(query: str, model_name: str | None, thread_id: str) -> dict:
             # 的 ToolMessage 可观测——只数 ai tool_calls 会把收编成功误判成「工具=[]」（E6 冤案）。
             tool_names.append(d["name"])
 
+    tool_names = list(dict.fromkeys(tool_names))  # 去重保序（tool_call 与其结果各计一次的重影）
     return {
         "answer": "".join(answer_parts)[:500],
         "tool_names": tool_names,
         "did_clarify": CLARIFY_TOOL in tool_names,
         "did_route": any(_is_route_tool(n) for n in tool_names),
+        "did_fetch": any(_is_fetch_tool(n) for n in tool_names),
     }
 
 
@@ -123,7 +135,9 @@ def main() -> int:
             continue
 
         exp = item.expected_output or {}
-        route_ok = _match(exp.get("expect_route"), out["did_route"])
+        # expect_route=False（出界/域外）的违规口径按「真取数」判：前门 orchestrate 合规（见 _is_fetch_tool）
+        actual_route = out["did_route"] if exp.get("expect_route") else out["did_fetch"]
+        route_ok = _match(exp.get("expect_route"), actual_route)
         clarify_ok = _match(exp.get("expect_clarify"), out["did_clarify"])
         # 单轮口径修正（m4-behavior-v1 归因定案）：金标「先反问、答后再路由」的用例
         # （expect_clarify 与 expect_route 同真），agent 正确止步于反问等人时，路由
@@ -137,7 +151,7 @@ def main() -> int:
         if trace_id:
             client.api.dataset_run_items.create(run_name=run_name, dataset_item_id=item.id, trace_id=trace_id)
             if route_ok is not None:
-                client.create_score(name="route_correct", value=1.0 if route_ok else 0.0, trace_id=trace_id, data_type="NUMERIC", comment=f"期望调脚本={bool(exp.get('expect_route'))} 实际={out['did_route']} 工具={out['tool_names']}")
+                client.create_score(name="route_correct", value=1.0 if route_ok else 0.0, trace_id=trace_id, data_type="NUMERIC", comment=f"期望调脚本={bool(exp.get('expect_route'))} 实际={actual_route} 工具={out['tool_names']}")
             if clarify_ok is not None:
                 client.create_score(name="clarify_correct", value=1.0 if clarify_ok else 0.0, trace_id=trace_id, data_type="NUMERIC", comment=f"期望反问={bool(exp.get('expect_clarify'))} 实际={out['did_clarify']}")
 

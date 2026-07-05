@@ -162,9 +162,11 @@ class RouteContextMiddleware(AgentMiddleware):
                 "clarify=feature 时先 ask_clarification 补构件特征（只问特征，不问版本）；"
                 "clarify=caliber 时（规范问答缺口径）也必须先 ask_clarification 问「哪个地区、哪个清单规范版本」"
                 "再取数——规范侧口径反问与组价侧「版本缺省不问」是两条规则，不要用后者压掉前者；"
-                "凡需向用户提问或索要材料（构件特征、口径、设计说明/图纸原文均同理），"
-                "一律必须通过 ask_clarification 工具发起，禁止在普通回复文本里反问——"
+                "需要反问时（仅限上述 clarify 非空的情形），一律必须通过 ask_clarification 工具发起"
+                "（构件特征、口径、设计说明/图纸原文均同理），禁止在普通回复文本里反问——"
                 "纯文本反问不会中断流程、用户答复接不回审查闸，视同未反问；"
+                "反之 clarify=null（或缺省）＝判定信息已足够：禁止反问，直接按 capability 调工具执行，"
+                "库内查不到就如实说无（need_review/no_source），不许用反问拖延或替代如实拒答；"
                 "capability=out_of_domain＝与造价无关：只说明你的能力范围（规范问答/构件组价/深圳信息价查询），"
                 "不要回答问题本身，严禁编造域外内容（天气/新闻/代码等）。",
                 json.dumps(compact, ensure_ascii=False),

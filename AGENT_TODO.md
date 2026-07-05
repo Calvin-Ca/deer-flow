@@ -40,7 +40,34 @@
 
 ## 2. 两条收尾线（下次开工从这里接手；服务器无后台任务在挂，跑批已结束）
 
-### ① 行为回归 v2 —— 逐条矩阵已拉，归因定案（2026-07-06），治理已落码待 v3 验证
+### ① 行为回归 —— v3b 全量定案（2026-07-06 深夜）：v2 三大簇全出清，新形态三修落码待 v4
+
+**v3b 矩阵**：route 21/24=87.50%（未挂分 10：A9 + 9 条正确止步于反问）、clarify 30/33=90.91%。
+**v2 三大顽疾全部治愈**：E2/E3/E6 哑火出清（收编+观测双修生效）、B2 转绿（先问特征再止步）、A9 按定案挂 —。
+剩余 3+3 全是新形态，逐条归因（/route 判定本地实证）+ 三修已落码：
+- **A4/B8 反向过问（不该问却问）**：判定均 clarify=null（A4 版本齐 caliber_complete=true、B8 特征齐
+  feature_complete=true），模型自作主张反问——上轮「反问必须走工具」红线把 ask_clarification 提得太显眼、
+  缺对向约束 → reminder 双修：工具红线限定「clarify 非空」情形 + 补「clarify=null＝禁止反问，直接执行，
+  查不到如实说无，不许用反问拖延」。
+- **B11 前门口径定案（合规改判）**：模型把出界请求交 ce-task_orchestrate、由编排层确定性出界闸拒绝并正确
+  转述话术——比模型自答更稳（弱模型不驱动流程）。runner `expect_route=False` 违规口径改为只计直调取数工具
+  （`_is_fetch_tool`：ce-cost_*/qa.py/cost.py，才有杜撰他省数据风险），前门放行；金标 B11 note 写回；
+  工具列表去重（call+result 重影）。
+- **E5 引导后哑火（唯一余留，不阻塞）**：clarify=feature，orchestrate listing 抽 0 件、引导文本返回后模型
+  纯文本收尾——「有工具活动不收编」按设计不介入（E3 的 v3 形态漂移）。**A4/B8 修好后 clarify 32/33=97%
+  已过 ≥0.95 门**。治本挂 follow-up：ce-services 0 件引导返回带结构化 need_input 标记 → 中间件识别后对
+  该形态放行收编（勿用「工具后仍收编」的宽松版，会干扰组价 HITL 会话话术）。
+**待办（服务器，按序单行）**：
+- [ ] 重传金标（B11 note）：`cd /mnt/nvme/calvin/code/deer-flow && set -a && . ./.env && set +a && uv run --project backend python benchmark/runner/upload_datasets.py --only routing`
+- [ ] 跑 v4：`uv run --project backend python benchmark/runner/run_routing_experiment.py --run-name m4-behavior-v4`
+- [ ] 拉矩阵：`uv run --project backend python benchmark/runner/dump_run_scores.py --run-name m4-behavior-v4`——
+  预期 A4/B8 不再过问、B11 按新口径转绿、clarify ≥0.95 过门；E5 若仍红属已知余留不阻塞。
+（用户口径：benchmark 优化可后置，不阻塞主线。）
+
+<details>
+<summary>v2/v3 归因过程存档（定案已并入上文，展开看推理链）</summary>
+
+### 行为回归 v2 —— 逐条矩阵已拉，归因定案（2026-07-06），治理已落码待 v3 验证
 
 **v2 矩阵**：route 24/27=88.89%、clarify 30/34=88.24%。**A1/A2/A7 全部转绿——prompt 治得动 caliber
 反问，不必下沉**。剩余失败三簇归因定案：
@@ -76,7 +103,8 @@ E7/G1-G3/E1-E6/D1/C3 这 12 条，A1–C2 没跑到；崩因没留下——runne
 - [ ] 拉矩阵：`uv run --project backend python benchmark/runner/dump_run_scores.py --run-name m4-behavior-v3b`——
   读法：E2/E3/E6 收编+观测双修后应绿、A9 挂 —、A1–C2 首次带修复跑；B2 看答复摘要裁决
   （orchestrate 前门反问=改金标口径，真漏问=再治）；哪条「跑挂了」直接看崩因行。
-（用户口径：benchmark 优化可后置，不阻塞主线。）
+
+</details>
 
 ### ② 清单套定额对照表补全 —— 跑批已收官（2026-07-06），剩前端验收
 

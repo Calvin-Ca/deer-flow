@@ -13,9 +13,9 @@ def test_match_emits_bill_spec_version():
     assert rows[0]["source"] == "auto_name_exact"
 
 
-def test_compose_capable_excludes_2013():
-    # 只有「有兼容定额、supports_compose」的版本可建映射；2013（定额未就绪）应被排除
+def test_compose_capable_includes_2013():
+    # 定额与清单国标版本解耦，2013 清单同样套现行 SJG 定额 → 应纳入可组价集合
     caps = _compose_capable_versions()
     assert "GB/T 50854-2024" in caps
     assert "GB/T 50856-2024" in caps
-    assert "GB/T 50854-2013" not in caps
+    assert "GB/T 50854-2013" in caps

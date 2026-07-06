@@ -90,9 +90,10 @@ def match(bills: list[dict], quotas: list[dict]) -> list[dict]:
 def _compose_capable_versions() -> set[str]:
     """从 SPEC_REGISTRY 取「有兼容定额、可组价」的清单 spec_version 集合。
 
-    定额（SJG）口径与现行清单配套，跨版本套用会口径错位（见 notebooks 口径讨论 + BACKLOG）。
-    故只为 supports_compose 的版本生成清单→定额映射；2013（定额未就绪）暂不生成，避免造
-    「2013 清单 → 2024 SJG 定额」的错耦合行。Phase 2 翻 2013 supports_compose=True 后自动纳入。
+    定额/信息价/费率是深圳现行地方标准，与清单国标版本（2013/2024）解耦——实务中不论用哪版
+    清单列项，组价一律套「现行」SJG 定额，不存在「配套 2013 清单的那本定额」。故凡 supports_compose
+    的版本（含 2013）都纳入生成。需警惕的不是跨版本套定额（那是正常业务），而是 2013 与 2024
+    「同码不同义」的清单码（如 011702006）——映射按 9 位码建，语义漂移的码要靠人工消歧。
     返回：可组价的 spec_version 字符串集合。
     """
     import config

@@ -69,7 +69,7 @@ def test_resolve_spec_known():
     assert config.resolve_spec("2024")["bill_collection"] == "cost_bill_spec_kb"
     assert config.resolve_spec("2013")["bill_collection"] == "cost_bill_spec_kb_2013"
     assert config.resolve_spec("2024")["supports_compose"] is True
-    assert config.resolve_spec("2013")["supports_compose"] is False
+    assert config.resolve_spec("2013")["supports_compose"] is True
     assert config.resolve_spec(" 2024 ")["bill_collection"] == "cost_bill_spec_kb"  # 去空白
     assert config.resolve_spec("2024")["bill_doc_ids"] == ["GB-50854", "GB-50856"]
     assert config.resolve_spec("2013")["bill_doc_ids"] == ["GB-50854-2013"]

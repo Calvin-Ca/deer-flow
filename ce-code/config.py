@@ -59,7 +59,7 @@ SPEC_REGISTRY: dict[str, dict] = {
         "bill_collection": "cost_bill_spec_kb_2013",
         "bill_doc_ids": ["GB-50854-2013"],
         "bill_spec_versions": ["GB/T 50854-2013"],
-        "supports_compose": False,  # 2013 组价数据（定额/价格/清单→定额映射）未就绪，见 notebooks/BACKLOG Phase 2
+        "supports_compose": True,   # 定额/信息价/费率是深圳现行地方标准、与清单国标版本解耦，2013 清单同样套现行 SJG，组价可出数；仅「同码不同义」码需人工消歧（见上）
     },
 }
 

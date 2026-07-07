@@ -367,6 +367,10 @@ channels:
   # 频道统一回连本机 Gateway（非 Docker 部署用 localhost 即可）
   langgraph_url: http://localhost:8001/api
   gateway_url: http://localhost:8001
+  wecom:
+    enabled: true
+    bot_id: $WECOM_BOT_ID
+    bot_secret: $WECOM_BOT_SECRET
   wechat:
     enabled: true
     # 首次没有 bot_token，用扫码绑定个人微信机器人；

@@ -73,17 +73,26 @@
     → `quota_missing` 重问一次"三项一起填或全空放弃"）。本地新增 5 用例全过（#1 三分因 + #2 补齐续算/仍空放弃）。
     余 3 项低优先（下方待办）：#3 空 decision 哨兵全局化对 setup 闸的影响 / #4 `should_pause_quota` 死代码 /
     #5 补录 basis 无「单位」致工程量卡单位栏空白。
-- [ ] **补常见现浇构件本体定额映射**（归 ce-code，**数据填充、你来补**）：`010502006 钢筋混凝土柱 / 010502011 梁 /
-  010401 砌体墙` 等 → SJG 子目写进 `bill_quota_map`。**根因非重跑匹配器**：清单名「钢筋混凝土柱」与定额名
-  「非泵送现浇混凝土 矩形柱」(`010002-34`)/「矩形柱 木模板」(`010006-15`) 字面不重叠，名称匹配桥不过去，需**领域
-  策划的种子映射**（真实子目已在 `ce-code/data/structured/cost/SZ-SJG171/quota_item.jsonl`：矩形柱浇筑=010002-34、
-  矩形梁浇筑=010002-38、异型/圆形柱=010002-35/36…）。缺映射时上面的机制已能诚实兜住（不算假总价），故此条从
-  **阻塞**降为**数据完善**：补一条即端到端出真总价一条。
+- [x] **补常见现浇构件本体定额映射**（✅ 2026-07-06，清单套定额补全跑批收官——`ce-code/cost/bill_quota_enrich.py`
+  LLM 按意配边，2024 房建覆盖率 11.2%→26.9%（127/472 码），`010502006 矩形柱`/独立基础等本体码已配上 SJG
+  本体定额边、四靶人眼抽验全对；详见 `ce-code/TODO.md` C 节）。**剩验收**：前端 2024 口径全链走到真总价
+  （根 `AGENT_TODO.md` §2②），通了此条彻底关账。
+  <details><summary>原条目存档（根因分析，已解决）</summary>
+
+  归 ce-code，数据填充：`010502006 钢筋混凝土柱 / 010502011 梁 / 010401 砌体墙` 等 → SJG 子目写进
+  `bill_quota_map`。根因非重跑匹配器：清单名「钢筋混凝土柱」与定额名「非泵送现浇混凝土 矩形柱」(`010002-34`)/
+  「矩形柱 木模板」(`010006-15`) 字面不重叠，名称匹配桥不过去，需领域策划的种子映射（真实子目已在
+  `ce-code/data/structured/cost/SZ-SJG171/quota_item.jsonl`：矩形柱浇筑=010002-34、矩形梁浇筑=010002-38、
+  异型/圆形柱=010002-35/36…）。缺映射时上面的机制已能诚实兜住（不算假总价）。
+  </details>
 
 ### P1 · 服务常驻 + 依赖（不做，「能用但动不动挂」）
-- [ ] **四进程常驻化**：`:8001` gateway / `:8100` 知识 / `:8101` 任务 / frontend。用 tmux 或 systemd，**别用 nohup**
-  （Exit 125 静默失败坑）。最好一个启动脚本按序拉起 + `curl /health` 自检。
-- [ ] **前端跑生产模式**（非 `pnpm dev`）：`pnpm build && pnpm start`（或 standalone）。
+- [x] **四进程常驻化**（✅ 已被 Docker 生产态覆盖，2026-07-06 对账）：harness（nginx/gateway/frontend）走
+  `sudo ./scripts/deploy.sh`，ce-code/:8100 + ce-services/:8101 + 精排 + 监控各自 compose，均 `restart:
+  unless-stopped`（拓扑权威 `docker/README.md`）。⚠️ 试用前须**切回生产态**：日常 dev 调试态（debugpy :8001 +
+  next dev :2026，CLAUDE.md §2.3）占着 :2026，且本批次动过后端源码——重建须 `build --no-cache gateway` +
+  `up -d --force-recreate gateway`、config.yaml sed 翻回 host.docker.internal。
+- [x] **前端跑生产模式**（✅ 同上，Docker frontend 容器即 next 生产 build；dev 态仅限开发验证）。
 - [ ] **依赖服务确认在跑**：PG `ce_cost` :5433、Milvus :19530、embed :8097、vLLM Qwen3-8B :8099、agent 基座
   qwen-plus（DashScope key 有效）。任一挂 → 对应能力 500。
 - [ ] **向量索引已建**（不进 git，需服务器上在）：清单库 `cost_bill_*` + 规范库 `building_code_gb_*`，重启后仍在。

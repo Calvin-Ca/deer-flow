@@ -16,6 +16,7 @@ import {
   ConversationScrollButton,
 } from "@/components/ai-elements/conversation";
 import { Button } from "@/components/ui/button";
+import { extractHitlTaskIdFromMessages } from "@/core/cost/marker";
 import { useI18n } from "@/core/i18n/hooks";
 import {
   buildTokenDebugSteps,
@@ -32,7 +33,6 @@ import {
   hasPresentFiles,
   hasReasoning,
 } from "@/core/messages/utils";
-import { extractHitlTaskIdFromMessages } from "@/core/cost/marker";
 import { useRehypeSplitWordsIntoSpans } from "@/core/rehype";
 import type { Subtask } from "@/core/tasks";
 import { useUpdateSubtask } from "@/core/tasks/context";
@@ -42,9 +42,8 @@ import { cn } from "@/lib/utils";
 
 import { ArtifactFileList } from "../artifacts/artifact-file-list";
 import { CopyButton } from "../copy-button";
-import { StreamingIndicator } from "../streaming-indicator";
-
 import { CostHitlInline } from "../cost/cost-hitl-inline";
+import { StreamingIndicator } from "../streaming-indicator";
 
 import { MarkdownContent } from "./markdown-content";
 import { MessageGroup } from "./message-group";

@@ -24,6 +24,26 @@ def test_build_self_update_section_empty_for_default_agent():
     assert prompt_module._build_self_update_section(None) == ""
 
 
+def test_apply_prompt_template_uses_magent_as_default_identity(monkeypatch):
+    config = SimpleNamespace(
+        sandbox=SimpleNamespace(mounts=[]),
+        skills=SimpleNamespace(container_path="/mnt/skills"),
+        lead_agent=SimpleNamespace(system_prompt_path=None),
+    )
+    monkeypatch.setattr("deerflow.config.get_app_config", lambda: config)
+    monkeypatch.setattr(prompt_module, "_get_enabled_skills", lambda: [])
+    monkeypatch.setattr(prompt_module, "get_deferred_tools_prompt_section", lambda **kwargs: "")
+    monkeypatch.setattr(prompt_module, "_build_acp_section", lambda **kwargs: "")
+    monkeypatch.setattr(prompt_module, "get_agent_soul", lambda agent_name=None: "")
+
+    prompt = prompt_module.apply_prompt_template()
+
+    assert "你是MAgent，一个专注于**建筑成本估算**的智能助手" in prompt
+    assert "核心能力只包括两类：① 规范知识问答；② 智能组价" in prompt
+    assert "价格查询" not in prompt
+    assert "DeerFlow 2.0" not in prompt
+
+
 def test_build_self_update_section_present_for_custom_agent():
     section = prompt_module._build_self_update_section("my-agent")
 

@@ -363,7 +363,7 @@ task(description="Oracle Cloud analysis", prompt="...", subagent_type="general-p
 
 SYSTEM_PROMPT_TEMPLATE = """
 <role>
-你是{agent_name}，一个面向**建筑**领域的智能助手。核心能力有两类：① 建筑规范条文问答；② 智能组价（构件描述 → 选 9 位清单编码 → 取定额工料机含量与信息价），以及"既问规则又要价""哪种做法更省"等复合诉求。
+你是{agent_name}，一个专注于**建筑成本估算**的智能助手。核心能力只包括两类：① 规范知识问答；② 智能组价（构件描述 → 选 9 位清单编码 → 取定额工料机含量与信息价），以及"既问规则又要价""哪种做法更省"等复合诉求。
 这些能力统一由**确定性编排前门工具 `ce-task_orchestrate`** 承接——它在服务端做确定性意图路由 + 复合拆解 + 校验闸；
 你负责理解并点火、然后**忠实转述前门返回的结构化结果**，不自己判该谁管、不自己拆、不自己补数据。
 </role>
@@ -731,7 +731,7 @@ def apply_prompt_template(
     # as a <system-reminder> in the first HumanMessage, keeping this prompt
     # identical across users and sessions for maximum prefix-cache reuse.
     return _resolve_system_prompt_template(app_config).format(
-        agent_name=agent_name or "DeerFlow 2.0",
+        agent_name=agent_name or "MAgent",
         soul=get_agent_soul(agent_name),
         self_update_section=_build_self_update_section(agent_name),
         skills_section=skills_section,

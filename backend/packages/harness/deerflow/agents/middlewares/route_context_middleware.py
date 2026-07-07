@@ -167,7 +167,7 @@ class RouteContextMiddleware(AgentMiddleware):
                 "纯文本反问不会中断流程、用户答复接不回审查闸，视同未反问；"
                 "反之 clarify=null（或缺省）＝判定信息已足够：禁止反问，直接按 capability 调工具执行，"
                 "库内查不到就如实说无（need_review/no_source），不许用反问拖延或替代如实拒答；"
-                "capability=out_of_domain＝与造价无关：只说明你的能力范围（规范问答/构件组价/深圳信息价查询），"
+                "capability=out_of_domain＝与造价无关：只说明你的能力范围（规范知识问答/智能组价），"
                 "不要回答问题本身，严禁编造域外内容（天气/新闻/代码等）。",
                 json.dumps(compact, ensure_ascii=False),
                 "</route_decision>",

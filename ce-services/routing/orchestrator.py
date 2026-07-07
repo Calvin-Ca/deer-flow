@@ -149,10 +149,9 @@ def _ignite_hitl(query: str, decision: RouteDecision) -> dict[str, Any]:
 
 # 域外直答文案（M1 域外出口）：路由判 out_of_domain → 顶层说明能力范围，不进检索/取数管道白跑。
 _CAPABILITY_STATEMENT = (
-    "我是深圳房建造价助手，可以帮您：\n"
-    "① **规范问答**——计量/计价规则、条文解释（GB 50500 / GB 50854 / GB 50856，2013/2024 双版）；\n"
-    "② **构件组价**——描述构件（如「C30现浇矩形柱」）→ 清单编码 → 定额与工料机价，支持完整组价到总造价（逐闸确认）；\n"
-    "③ **深圳信息价查询**——材料/设备当期价与价差。\n"
+    "我是 MAgent，一个专注于建筑成本估算的智能助手，可以帮您：\n"
+    "① **规范知识问答**——计量/计价规则、条文解释（GB 50500 / GB 50854 / GB 50856，2013/2024 双版）；\n"
+    "② **智能组价**——描述构件（如「C30现浇矩形柱」）→ 清单编码 → 定额与工料机价，支持完整组价到总造价（逐闸确认）。\n"
     "您这个问题看起来不在上述范围内，我无法提供专业解答。"
     "若确与造价相关而被我误判，请换个说法（点明构件、规范或材料名）再试。"
 )
@@ -628,7 +627,10 @@ def _selftest() -> int:
         check("域外：mode=single 直答能力范围、不派发",
               o_ood["mode"] == "single"
               and o_ood["result"]["capability"] == "out_of_domain"
-              and "范围" in o_ood["result"]["answer"] and len(dispatched) == 0)
+              and "规范知识问答" in o_ood["result"]["answer"]
+              and "智能组价" in o_ood["result"]["answer"]
+              and "深圳信息价查询" not in o_ood["result"]["answer"]
+              and len(dispatched) == 0)
     finally:
         globals()["route_hybrid"] = _orig_rh
 

@@ -19,6 +19,7 @@ from app.channels.message_bus import InboundMessage, InboundMessageType, Message
 from app.channels.store import ChannelStore
 from app.gateway.csrf_middleware import CSRF_COOKIE_NAME, CSRF_HEADER_NAME, generate_csrf_token
 from app.gateway.internal_auth import create_internal_auth_headers
+from deerflow.runtime.text import strip_inline_thinking
 from deerflow.runtime.user_context import get_effective_user_id
 
 logger = logging.getLogger(__name__)
@@ -38,13 +39,13 @@ STREAM_UPDATE_MIN_INTERVAL_SECONDS = 0.35
 THREAD_BUSY_MESSAGE = "This conversation is already processing another request. Please wait for it to finish and try again."
 
 CHANNEL_CAPABILITIES = {
-    "dingtalk": {"supports_streaming": False},
-    "discord": {"supports_streaming": False},
-    "feishu": {"supports_streaming": True},
-    "slack": {"supports_streaming": False},
-    "telegram": {"supports_streaming": False},
-    "wechat": {"supports_streaming": False},
-    "wecom": {"supports_streaming": True},
+    "dingtalk": {"supports_streaming": False, "supports_native_reasoning": False},
+    "discord": {"supports_streaming": False, "supports_native_reasoning": False},
+    "feishu": {"supports_streaming": True, "supports_native_reasoning": False},
+    "slack": {"supports_streaming": False, "supports_native_reasoning": False},
+    "telegram": {"supports_streaming": False, "supports_native_reasoning": False},
+    "wechat": {"supports_streaming": False, "supports_native_reasoning": False},
+    "wecom": {"supports_streaming": True, "supports_native_reasoning": True},
 }
 
 InboundFileReader = Callable[[dict[str, Any], httpx.AsyncClient], Awaitable[bytes | None]]
@@ -568,6 +569,22 @@ class ChannelManager:
                 return channel.supports_streaming
         return CHANNEL_CAPABILITIES.get(channel_name, {}).get("supports_streaming", False)
 
+    @staticmethod
+    def _channel_supports_native_reasoning(channel_name: str) -> bool:
+        from .service import get_channel_service
+
+        service = get_channel_service()
+        if service:
+            channel = service.get_channel(channel_name)
+            if channel is not None:
+                return channel.supports_native_reasoning
+        return CHANNEL_CAPABILITIES.get(channel_name, {}).get("supports_native_reasoning", False)
+
+    def _format_channel_text(self, channel_name: str, text: str) -> str:
+        if self._channel_supports_native_reasoning(channel_name):
+            return text
+        return strip_inline_thinking(text)
+
     def _resolve_session_layer(self, msg: InboundMessage) -> tuple[dict[str, Any], dict[str, Any]]:
         channel_layer = _as_dict(self._channel_sessions.get(msg.channel_name))
         users_layer = _as_dict(channel_layer.get("users"))
@@ -789,7 +806,7 @@ class ChannelManager:
             else:
                 raise
 
-        response_text = _extract_response_text(result)
+        response_text = self._format_channel_text(msg.channel_name, _extract_response_text(result))
         artifacts = _extract_artifacts(result)
 
         logger.info(
@@ -865,6 +882,10 @@ class ChannelManager:
                 if not latest_text or latest_text == last_published_text:
                     continue
 
+                outbound_text = self._format_channel_text(msg.channel_name, latest_text)
+                if not outbound_text or outbound_text == last_published_text:
+                    continue
+
                 now = time.monotonic()
                 if last_published_text and now - last_publish_at < STREAM_UPDATE_MIN_INTERVAL_SECONDS:
                     continue
@@ -874,13 +895,13 @@ class ChannelManager:
                         channel_name=msg.channel_name,
                         chat_id=msg.chat_id,
                         thread_id=thread_id,
-                        text=latest_text,
+                        text=outbound_text,
                         is_final=False,
                         thread_ts=msg.thread_ts,
                         metadata=_slim_metadata(msg.metadata),
                     )
                 )
-                last_published_text = latest_text
+                last_published_text = outbound_text
                 last_publish_at = now
         except Exception as exc:
             stream_error = exc
@@ -890,7 +911,7 @@ class ChannelManager:
                 logger.exception("[Manager] streaming error: thread_id=%s", thread_id)
         finally:
             result = last_values if last_values is not None else {"messages": [{"type": "ai", "content": latest_text}]}
-            response_text = _extract_response_text(result)
+            response_text = self._format_channel_text(msg.channel_name, _extract_response_text(result))
             artifacts = _extract_artifacts(result)
             response_text, attachments = _prepare_artifact_delivery(thread_id, response_text, artifacts)
 
@@ -903,7 +924,7 @@ class ChannelManager:
                     else:
                         response_text = "An error occurred while processing your request. Please try again."
                 else:
-                    response_text = latest_text or "(No response from agent)"
+                    response_text = self._format_channel_text(msg.channel_name, latest_text) or "(No response from agent)"
 
             logger.info(
                 "[Manager] streaming response completed: thread_id=%s, response_len=%d, artifacts=%d, error=%s",

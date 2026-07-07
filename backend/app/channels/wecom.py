@@ -33,6 +33,10 @@ class WeComChannel(Channel):
     def supports_streaming(self) -> bool:
         return True
 
+    @property
+    def supports_native_reasoning(self) -> bool:
+        return True
+
     def _clear_ws_context(self, thread_ts: str | None) -> None:
         if not thread_ts:
             return

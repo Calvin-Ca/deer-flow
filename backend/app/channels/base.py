@@ -35,6 +35,10 @@ class Channel(ABC):
     def supports_streaming(self) -> bool:
         return False
 
+    @property
+    def supports_native_reasoning(self) -> bool:
+        return False
+
     # -- lifecycle ---------------------------------------------------------
 
     @abstractmethod

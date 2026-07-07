@@ -282,6 +282,17 @@ class TestExtractResponseText:
         result = {"messages": [{"type": "ai", "content": "hello"}]}
         assert _extract_response_text(result) == "hello"
 
+    def test_extracts_raw_inline_think_blocks(self):
+        from app.channels.manager import _extract_response_text
+
+        result = {"messages": [{"type": "ai", "content": "<think>internal reasoning</think>\n\n您好！有什么问题需要帮助吗？"}]}
+        assert _extract_response_text(result) == "<think>internal reasoning</think>\n\n您好！有什么问题需要帮助吗？"
+
+    def test_extracts_raw_unclosed_streaming_think_block(self):
+        from app.channels.manager import _extract_text_content
+
+        assert _extract_text_content("<think>internal reasoning") == "<think>internal reasoning"
+
     def test_list_content_blocks(self):
         from app.channels.manager import _extract_response_text
 
@@ -414,6 +425,20 @@ def _make_async_iterator(items):
 
 
 class TestChannelManager:
+    def test_format_channel_text_strips_think_for_plain_text_channels(self):
+        from app.channels.manager import ChannelManager
+
+        manager = ChannelManager(bus=MessageBus(), store=ChannelStore(path=Path(tempfile.mkdtemp()) / "store.json"))
+
+        assert manager._format_channel_text("wechat", "<think>hidden</think>\nvisible") == "visible"
+
+    def test_format_channel_text_preserves_think_for_wecom_native_reasoning(self):
+        from app.channels.manager import ChannelManager
+
+        manager = ChannelManager(bus=MessageBus(), store=ChannelStore(path=Path(tempfile.mkdtemp()) / "store.json"))
+
+        assert manager._format_channel_text("wecom", "<think>hidden</think>\nvisible") == "<think>hidden</think>\nvisible"
+
     def test_get_client_includes_csrf_header_and_cookie(self):
         from app.channels.manager import ChannelManager
 
@@ -576,6 +601,39 @@ class TestChannelManager:
 
             assert len(outbound_received) == 1
             assert outbound_received[0].text == "Hello from agent!"
+
+        _run(go())
+
+    def test_handle_chat_strips_think_for_wechat_outbound(self):
+        from app.channels.manager import ChannelManager
+
+        async def go():
+            bus = MessageBus()
+            store = ChannelStore(path=Path(tempfile.mkdtemp()) / "store.json")
+            manager = ChannelManager(bus=bus, store=store)
+            outbound_received = []
+
+            async def capture_outbound(msg):
+                outbound_received.append(msg)
+
+            bus.subscribe_outbound(capture_outbound)
+            mock_client = _make_mock_langgraph_client(
+                run_result={
+                    "messages": [
+                        {"type": "human", "content": "hello"},
+                        {"type": "ai", "content": "<think>hidden</think>\n您好！"},
+                    ]
+                }
+            )
+            manager._client = mock_client
+
+            await manager.start()
+            inbound = InboundMessage(channel_name="wechat", chat_id="chat1", user_id="user1", text="hello")
+            await bus.publish_inbound(inbound)
+            await _wait_for(lambda: len(outbound_received) >= 1)
+            await manager.stop()
+
+            assert outbound_received[0].text == "您好！"
 
         _run(go())
 
@@ -996,6 +1054,68 @@ class TestChannelManager:
             assert [msg.text for msg in outbound_received] == ["Hello", "Hello world", "Hello world"]
             assert [msg.is_final for msg in outbound_received] == [False, False, True]
             assert all(msg.thread_ts == "om-source-1" for msg in outbound_received)
+
+        _run(go())
+
+    def test_handle_wecom_streaming_preserves_think_for_native_reasoning(self, monkeypatch):
+        from app.channels.manager import ChannelManager
+
+        monkeypatch.setattr("app.channels.manager.STREAM_UPDATE_MIN_INTERVAL_SECONDS", 0.0)
+
+        async def go():
+            bus = MessageBus()
+            store = ChannelStore(path=Path(tempfile.mkdtemp()) / "store.json")
+            manager = ChannelManager(bus=bus, store=store)
+
+            outbound_received = []
+
+            async def capture_outbound(msg):
+                outbound_received.append(msg)
+
+            bus.subscribe_outbound(capture_outbound)
+
+            stream_events = [
+                _make_stream_part(
+                    "messages-tuple",
+                    [
+                        {"id": "ai-1", "content": "<think>hidden</think>\nvisible", "type": "AIMessageChunk"},
+                        {"langgraph_node": "agent"},
+                    ],
+                ),
+                _make_stream_part(
+                    "values",
+                    {
+                        "messages": [
+                            {"type": "human", "content": "hi"},
+                            {"type": "ai", "content": "<think>hidden</think>\nvisible"},
+                        ],
+                        "artifacts": [],
+                    },
+                ),
+            ]
+
+            mock_client = _make_mock_langgraph_client()
+            mock_client.runs.stream = MagicMock(return_value=_make_async_iterator(stream_events))
+            manager._client = mock_client
+
+            await manager.start()
+
+            inbound = InboundMessage(
+                channel_name="wecom",
+                chat_id="chat1",
+                user_id="user1",
+                text="hi",
+                thread_ts="msg-1",
+            )
+            await bus.publish_inbound(inbound)
+            await _wait_for(lambda: len(outbound_received) >= 2)
+            await manager.stop()
+
+            assert [msg.text for msg in outbound_received] == [
+                "<think>hidden</think>\nvisible",
+                "<think>hidden</think>\nvisible",
+            ]
+            assert [msg.is_final for msg in outbound_received] == [False, True]
 
         _run(go())
 

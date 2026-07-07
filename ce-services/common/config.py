@@ -2,7 +2,7 @@
 
 任务层不依赖 ce-code/retrieval，因此不复用 ``retrieval.config.DEFAULTS``；
 这里只保留任务服务真正需要的三项：调 vLLM 的 LLM_URL/MODEL，以及知识服务地址。
-embedding / Milvus 等检索依赖归知识服务（:8100）所有，任务层一概不碰。
+embedding / Milvus 等检索依赖归知识服务所有，任务层一概不碰。
 """
 from __future__ import annotations
 
@@ -32,8 +32,15 @@ ORCH_LLM_MODEL_ID = os.environ.get(
 SELECT_LLM_URL = os.environ.get("BCRAG_SELECT_LLM_URL", ORCH_LLM_URL)
 SELECT_LLM_MODEL_ID = os.environ.get("BCRAG_SELECT_LLM_MODEL_ID", ORCH_LLM_MODEL_ID)
 
-# ce-code 知识服务（裸检索原语 /search /expand /clause）
-KNOWLEDGE_URL = os.environ.get("BCRAG_KNOWLEDGE_URL", "http://localhost:8100")
+# ce-code 新拆分入口：
+#   RAG_URL —— 条文/候选/证据检索（ce-rag，默认 :8100）
+#   DB_URL  —— 结构化真值取数（ce-db，默认 :8102）
+# 兼容：若未单独配置 BCRAG_RAG_URL / BCRAG_DB_URL，则回退历史单入口 BCRAG_KNOWLEDGE_URL。
+_LEGACY_KNOWLEDGE_URL = os.environ.get("BCRAG_KNOWLEDGE_URL")
+RAG_URL = os.environ.get("BCRAG_RAG_URL", _LEGACY_KNOWLEDGE_URL or "http://localhost:8100")
+DB_URL = os.environ.get("BCRAG_DB_URL", _LEGACY_KNOWLEDGE_URL or "http://localhost:8102")
+# 兼容别名：旧代码/脚本仍可能引用 KNOWLEDGE_URL，把它钉到 RAG 入口。
+KNOWLEDGE_URL = RAG_URL
 
 # ── 口径默认（§8 块1 / T9-1，PRD §4.0/C-05）：组价/价格缺省口径 = 深圳·2013 ──
 # PRD 钉死唯一默认作答口径为深圳·2013（2024 为试行版、非默认）；缺版本**不反问**，直接归一

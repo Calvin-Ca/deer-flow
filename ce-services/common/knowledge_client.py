@@ -1,7 +1,7 @@
 """知识服务 HTTP 客户端 —— 任务层够到规范条文检索原语的唯一通道。
 
-任务层 Norm-QA（造价规范问答）不 ``import retrieval`` 在进程内检索，而是打 ce-code 知识服务
-（:8100）的检索原语 ``/search`` ``/expand`` ``/clause/{standard}/{path}``。好处：retrieval +
+任务层 Norm-QA（造价规范问答）不 ``import retrieval`` 在进程内检索，而是打 ce-code RAG 服务
+（默认 :8100）的检索原语 ``/search/clause`` ``/expand/clauses`` ``/clause/{standard}/{path}``。好处：retrieval +
 rerank 模型只在知识服务加载一份、索引预热只一处；任务层保持轻量、可独立部署。
 
 与造价取数客户端 ``common.cost_client``（/bill/match /price/compose /quota）并列——同一知识服务
@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import requests
 
-from common.config import KNOWLEDGE_URL
+from common.config import RAG_URL
 
 
 def search(
@@ -25,14 +25,14 @@ def search(
     base_url: str | None = None,
     timeout: int = 300,
 ) -> dict:
-    """打知识服务 /search，返回完整响应 dict（含 ``clauses`` 与 ``meta``）。
+    """打 RAG 服务 /search/clause，返回完整响应 dict（含 ``evidence`` 与 ``meta``）。
 
     调用方按需取 ``resp["clauses"]``；HTTP 错误（如未知规范 400 / 索引未就绪 503）
     通过 ``requests.HTTPError`` 上抛，由任务服务转译为对应状态码。
     """
-    base = (base_url or KNOWLEDGE_URL).rstrip("/")
+    base = (base_url or RAG_URL).rstrip("/")
     resp = requests.post(
-        f"{base}/search",
+        f"{base}/search/clause",
         json={
             "query": query,
             "standard": standard,
@@ -51,10 +51,10 @@ def expand(
     base_url: str | None = None,
     timeout: int = 60,
 ) -> dict:
-    """打知识服务 /expand，对种子条款做一跳引用图扩展。"""
-    base = (base_url or KNOWLEDGE_URL).rstrip("/")
+    """打 RAG 服务 /expand/clauses，对种子条款做一跳引用图扩展。"""
+    base = (base_url or RAG_URL).rstrip("/")
     resp = requests.post(
-        f"{base}/expand",
+        f"{base}/expand/clauses",
         json={"node_paths": node_paths, "standard": standard},
         timeout=timeout,
     )
@@ -68,8 +68,8 @@ def get_clause(
     base_url: str | None = None,
     timeout: int = 60,
 ) -> dict:
-    """打知识服务 /clause/{standard}/{path}，按条款号直取单条款。"""
-    base = (base_url or KNOWLEDGE_URL).rstrip("/")
+    """打 RAG 服务 /clause/{standard}/{path}，按条款号直取单条款。"""
+    base = (base_url or RAG_URL).rstrip("/")
     resp = requests.get(f"{base}/clause/{standard}/{node_path}", timeout=timeout)
     resp.raise_for_status()
     return resp.json()

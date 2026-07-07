@@ -38,11 +38,23 @@
       "env": {},
       "description": "PostgreSQL database access"
     },
-    "ce-cost": {
+    "ce-rag": {
       "enabled": true,
       "type": "http",
       "url": "http://host.docker.internal:8100/mcp",
-      "description": "深圳房建组价取数原语：bill_match / quota_lookup / price_compose（按国标版本 spec 隔离 2013/2024）"
+      "description": "深圳房建 RAG 原语：search_clause / expand_clause_refs / get_clause / match_bill_item / search_aux_table / search_price_rule / retrieve_evidence"
+    },
+    "ce-db": {
+      "enabled": true,
+      "type": "http",
+      "url": "http://host.docker.internal:8102/mcp",
+      "description": "深圳房建结构化真值原语：bill_get / bill_list / quota_get / quota_list / price_query / price_compose / fee_rate_lookup / price_composition_get / aux_table_get / aux_table_list / resource_lookup"
+    },
+    "ce-cost": {
+      "enabled": false,
+      "type": "http",
+      "url": "http://host.docker.internal:8100/mcp",
+      "description": "兼容层：历史复合 MCP（已由 ce-rag / ce-db 拆分替代）"
     },
     "ce-task": {
       "enabled": true,

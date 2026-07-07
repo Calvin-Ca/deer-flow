@@ -2,8 +2,8 @@
 """任务层 —— 任务服务统一入口（常驻 HTTP，端口 8101）。
 
 聚焦深圳房建组价，两条主线共进程：**Norm-QA**（造价规范问答）+ **CostAgent**（构件 → 选码 →
-组价取数）。均为知识服务 :8100 的纯 HTTP 客户端——Norm-QA 打 /search 取规范条文，CostAgent 打
-/bill/match 选码 + /price/compose 组价取数。防火 RAG 消费方 qa/compliance 已退役。
+组价取数）。均为 ce-code 知识层的纯 HTTP 客户端——Norm-QA 打 ce-rag（默认 :8100）取规范条文，
+CostAgent 打 ce-rag 召回清单候选 + ce-db（默认 :8102）取结构化真值。防火 RAG 消费方 qa/compliance 已退役。
 
 端点：
   GET  /health        健康检查（含知识服务 / LLM 地址）
@@ -42,7 +42,7 @@ from contextlib import asynccontextmanager  # noqa: E402
 from fastapi import FastAPI  # noqa: E402
 from fastapi.routing import APIRoute  # noqa: E402
 
-from common.config import KNOWLEDGE_URL, LLM_URL  # noqa: E402
+from common.config import DB_URL, KNOWLEDGE_URL, LLM_URL, RAG_URL  # noqa: E402
 from common.mcp_server import mcp as task_mcp  # noqa: E402
 from cost.router import router as cost_router  # noqa: E402
 from norm.router import router as norm_router  # noqa: E402
@@ -74,7 +74,7 @@ for _router in APP_ROUTERS:
 def health() -> dict:
     """健康检查 + 路由清单。
 
-    返回：``{status, service, knowledge_url, llm_url, routes}``——routes 从 ``APP_ROUTERS`` 各
+    返回：``{status, service, rag_url, db_url, knowledge_url, llm_url, routes}``——routes 从 ``APP_ROUTERS`` 各
       router 的 ``routes`` **动态生成**（含真实 path 参数名如 ``{task_id}``），新增端点自动出现、
       不再手维护漏列（如曾漏 rewind）。
     """
@@ -85,6 +85,8 @@ def health() -> dict:
     return {
         "status": "ok",
         "service": "tasks",
+        "rag_url": RAG_URL,
+        "db_url": DB_URL,
         "knowledge_url": KNOWLEDGE_URL,
         "llm_url": LLM_URL,
         "routes": routes,

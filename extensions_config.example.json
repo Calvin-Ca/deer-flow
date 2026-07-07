@@ -27,6 +27,18 @@
       ],
       "env": {},
       "description": "PostgreSQL database access"
+    },
+    "ce-rag": {
+      "enabled": false,
+      "type": "http",
+      "url": "http://localhost:8100/mcp",
+      "description": "Example ce-rag MCP server for evidence retrieval and candidate recall"
+    },
+    "ce-db": {
+      "enabled": false,
+      "type": "http",
+      "url": "http://localhost:8102/mcp",
+      "description": "Example ce-db MCP server for readonly structured data access"
     }
   },
   "skills": {}

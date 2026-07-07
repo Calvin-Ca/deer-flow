@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS bill_spec (
   chapter         TEXT,                       -- 所属分部（祖先链根）
   provenance      JSONB,                      -- 溯源 {node_path, caption, page}
   -- 治理字段 ──
-  doc_id          TEXT NOT NULL DEFAULT 'GB-50854',  -- 收录文档标识（GB-50854 / GB-50500）
+  doc_id          TEXT NOT NULL DEFAULT 'GB-50854',  -- 收录文档标识（GB-50854 / GB-50856 等计量规范；50500 计价规范无清单项目录，不进本表）
   spec_version    TEXT NOT NULL,              -- 规范版本（canonical，如 GB/T 50854-2024）
   region          TEXT NOT NULL DEFAULT '全国', -- 适用地区（国标 = 全国）
   effective_priority SMALLINT NOT NULL DEFAULT 1,  -- 口径优先级（越小越优先）

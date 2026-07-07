@@ -6,6 +6,7 @@ retrieval`、不连 Milvus / PG，只打知识服务原语，再叠加路由 / �
 
 > 需求/设计见 `PRD.md` 与仓库根 `AGENT_PRD.md`/`AGENT_DEV.md`（四层骨架 §9、口径收窄+联网兜底 §8）；
 > HITL 设计见 `HITL_DESIGN.md`；进度见 `TODO.md`。
+> 服务器运行级联调步骤见 `RUNTIME_E2E_RUNBOOK.md`。
 
 ## 拓扑（四层骨架，AGENT_DEV §9）
 

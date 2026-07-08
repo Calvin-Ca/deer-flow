@@ -2,7 +2,7 @@
 
 知识层（`../ce-code`，默认 `:8100` + `:8102`）的**任务服务**。任务层是知识服务的**纯 HTTP 客户端**——不 `import
 retrieval`、不连 Milvus / PG，只打知识服务原语，再叠加路由 / 编排 / 生成 / 选码 / 校验闸逻辑。
-共进程 :8101（REST + MCP `/mcp`）。
+共进程 :8101（REST + 内部任务实现）。当前不把 :8101 作为 agent 可见 MCP 工具入口。
 
 > 需求/设计见 `PRD.md` 与仓库根 `AGENT_PRD.md`；服务间契约见 `INTERFACE_CONTRACTS.md`；
 > HITL 设计见 `HITL_DESIGN.md`。
@@ -17,7 +17,7 @@ ce-code DB  服务 :8102 (service.db_api：/bill /quota /price/query /price/comp
                         PG 真值唯一 owner；MCP「ce-db」)
         ▲ HTTP（knowledge_client / cost_client）
         │
-ce-services 任务服务 :8101（MCP「ce-task」= orchestrate_tool 前门 + norm_qa_tool + cost_compose_tool）
+ce-services 任务服务 :8101（REST：/route /norm/qa /cost/compose /cost/session/*；MCP 前门停用）
   ① 前置路由 routing/prerouter    确定性能力分流+形态判定（零 LLM）＋EH-03 跨地域出界检测
   ② 能力层   norm/（检索+带引用生成，零召回→FR-K07 联网兜底三道闸→仍无则拒答给出路）
              cost/（选码+组价取数 compose · HITL 13步图 · /cost/check 清单核对 FR-C v1）

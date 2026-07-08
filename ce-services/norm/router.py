@@ -1,7 +1,7 @@
 """Norm-QA 路由 —— ``POST /norm/qa``：造价规范条文检索 + 带引用生成。
 
 编排内核在 ``norm.pipeline.answer_query``（resolve_standard→检索→零召回/生成→校验闸→meta），
-本层只做 HTTP 编排 + 异常→状态码映射。内核与 ``ce-task_norm_qa`` MCP 工具、复合编排器共用同一实现。
+本层只做 HTTP 编排 + 异常→状态码映射。内核与复合编排器共用同一实现；旧任务层 MCP façade 不再作为主入口挂载。
 """
 from __future__ import annotations
 

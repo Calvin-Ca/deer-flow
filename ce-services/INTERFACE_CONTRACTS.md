@@ -1,6 +1,6 @@
-# ce-rag / ce-db / ce-task Interface Contracts
+# ce-rag / ce-db / Task Service Interface Contracts
 
-This document defines the service boundary and data semantics between `ce-rag`, `ce-db`, and `ce-task`.
+This document defines the service boundary and data semantics between `ce-rag`, `ce-db`, and the application task service.
 It is not a public API manual or an OpenAPI replacement. Its purpose is to prevent the task layer and agents
 from confusing semantic candidates, evidence, and structured truth.
 
@@ -41,9 +41,10 @@ It is not responsible for:
 - semantic retrieval over regulation clauses;
 - natural-language explanation or final answer generation.
 
-### ce-task
+### Task service (:8101 REST, not agent-visible MCP)
 
-`ce-task` provides routing, orchestration, candidate decision, and HITL entry points.
+The task service provides routing, orchestration, candidate decision, and HITL entry points over REST/application APIs.
+It is not currently exposed as an agent-visible MCP tool, because the former task-layer MCP mixed too many responsibilities.
 
 It is responsible for:
 
@@ -58,7 +59,7 @@ It must not:
 
 - treat `ce-rag` bill-match results as final bill truth;
 - let an LLM fabricate missing prices, quotas, or fee rates;
-- continue to `cost_price_compose_envelope_tool` when code selection returns `need_review`;
+- continue to pricing when code selection returns `need_review`;
 - use `retrieve_evidence` as a shortcut for business workflows that have a dedicated endpoint.
 
 ## 2. Truth Levels
@@ -119,7 +120,7 @@ Response semantics:
 Contract:
 
 - Candidate `code` values are suggestions only.
-- A candidate must pass `ce-task` selection or HITL review before it is used as the selected bill code.
+- A candidate must pass candidate selection or HITL review before it is used as the selected bill code.
 - Candidate score is a retrieval signal, not a confidence guarantee.
 - Structural penalties such as `type_penalty` and `prefab_penalty` are ranking diagnostics, not final truth.
 
@@ -138,8 +139,8 @@ Contract:
 
 - This endpoint returns evidence or candidates according to the selected corpus.
 - It is not the primary entry point for complete business workflows.
-- For cost composition, callers should use `ce-task /cost/compose` or the equivalent MCP tool (`cost_compose_tool`).
-- For known-key pricing, callers should use `ce-db` directly or through `ce-task` tools such as `quota_lookup_tool` and `price_lookup_tool`.
+- For one-shot cost composition, application callers should use the task service REST endpoint `/cost/compose`.
+- For known-key pricing, callers should use `ce-db` directly.
 
 ## 4. ce-db Contracts
 
@@ -189,7 +190,7 @@ Contract:
 - Zero matches should be returned as a normal empty result, not fabricated.
 - Dynamic price data is independent of the bill spec unless an endpoint explicitly says otherwise.
 
-## 5. ce-task Contracts
+## 5. Task Service REST Contracts (Not MCP Tools)
 
 ### `POST /route`
 
@@ -231,7 +232,7 @@ Purpose: one-shot cost composition from construction description.
 Expected chain:
 
 1. Call `ce-rag /search/bill-match` for semantic candidates.
-2. Run `ce-task` candidate selection within the returned candidate set.
+2. Run candidate selection within the returned candidate set.
 3. If selected code is missing or `need_review`, stop and return review state.
 4. Call `ce-db /price/compose/{region}/{code}` only after code selection.
 5. Return selection, code, price data or explicit missing-data state, and guard metadata.
@@ -269,9 +270,9 @@ Contract:
 
 - `ce-rag /search/bill-match` returns `semantic_candidate`; it must not be treated as `ground_truth`.
 - `ce-db` is the source for structured bill, quota, fee, and price truth.
-- `ce-task` must not continue to pricing when code selection is absent or marked `need_review`.
+- The workflow/selection layer must not continue to pricing when code selection is absent or marked `need_review`.
 - Missing prices, quotas, rates, or resources must not be filled by an LLM.
-- `retrieve_evidence` is an evidence facade, not a replacement for `cost_compose_tool`, `price_query`, or `cost_price_compose_envelope_tool`.
+- `retrieve_evidence` is an evidence facade, not a replacement for the application compose workflow or `ce-db` price endpoints.
 - Cross-version or cross-standard evidence must be filtered or downgraded by guardrails before final presentation.
 
 ## 8. Current Contract Coverage
@@ -280,7 +281,7 @@ This first version covers the currently validated runtime chain:
 
 - `ce-rag`: `/search/clause`, `/search/bill-match`, `/retrieve/evidence`
 - `ce-db`: `/bill/{code}`, `/price/compose/{region}/{code}`, `/price/query`
-- `ce-task`: `/route`, `/norm/qa`, `/cost/compose`, `/orchestrate` (MCP tools: `orchestrate_tool`, `norm_qa_tool`, `cost_compose_tool`)
+- Task service REST: `/route`, `/norm/qa`, `/cost/compose`, `/orchestrate`, `/cost/session/*` (not agent-visible MCP tools)
 
 Future updates should add contract details for quota lookup, fee-rate lookup, auxiliary table lookup, price composition lookup,
-resource lookup, HITL session flows, and MCP `tools/call` request/response examples.
+resource lookup, HITL session flows, and MCP `tools/call` request/response examples for the remaining `ce-rag` / `ce-db` tools.

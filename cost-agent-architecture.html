@@ -576,7 +576,6 @@
             <h3>全局 MCP 工具池</h3>
             <p>工具在系统全局注册，不归某个智能体私有。</p>
             <div class="chip-row">
-              <span class="chip">ce-task</span>
               <span class="chip">ce-rag</span>
               <span class="chip">ce-db</span>
             </div>
@@ -732,7 +731,8 @@
               <h4>norm-qa skill</h4>
               <p>只允许规范问答和澄清工具。</p>
               <div class="chip-row">
-                <span class="chip">ce-task_norm_qa_tool</span>
+                <span class="chip">ce-rag_search_clause</span>
+                <span class="chip">ce-rag_get_clause</span>
                 <span class="chip">ask_clarification</span>
               </div>
             </div>
@@ -740,7 +740,7 @@
               <h4>bill-match skill</h4>
               <p>只允许清单匹配工具和必要澄清。</p>
               <div class="chip-row">
-                <span class="chip">ce-task_cost_match_bill_item_tool</span>
+                <span class="chip">ce-rag_match_bill_item</span>
                 <span class="chip">ask_clarification</span>
               </div>
             </div>
@@ -748,8 +748,8 @@
               <h4>quota-match skill</h4>
               <p>只允许定额查询和定额候选选择工具。</p>
               <div class="chip-row">
-                <span class="chip">ce-task_quota_lookup_tool</span>
-                <span class="chip">ce-task_cost_select_quota_tool</span>
+                <span class="chip">ce-db_quota_get</span>
+                <span class="chip">ce-db_quota_list</span>
               </div>
             </div>
           </div>
@@ -765,33 +765,34 @@
               <h4>MCP Servers</h4>
               <p>由 <code>extensions_config.json</code> 全局启用。</p>
               <div class="chip-row">
-                <span class="chip">ce-task</span>
                 <span class="chip">ce-rag</span>
                 <span class="chip">ce-db</span>
               </div>
             </div>
             <div class="tool-cluster">
-              <h4>Task Tools</h4>
-              <p>面向智能体的业务级工具。</p>
+              <h4>Retrieval Tools</h4>
+              <p>面向智能体的语义检索和证据召回原语。</p>
               <div class="chip-row">
-                <span class="chip">norm_qa</span>
-                <span class="chip">cost_compose</span>
-                <span class="chip">price_lookup</span>
-                <span class="chip">quota_lookup</span>
+                <span class="chip">search_clause</span>
+                <span class="chip">get_clause</span>
+                <span class="chip">match_bill_item</span>
+                <span class="chip">retrieve_evidence</span>
               </div>
             </div>
             <div class="tool-cluster">
-              <h4>Specialist Tools</h4>
-              <p>供子智能体或 workflow 内部使用。</p>
+              <h4>Structured Data Tools</h4>
+              <p>已知 key 后查询结构化真值和价格数据。</p>
               <div class="chip-row">
-                <span class="chip">bill_match</span>
-                <span class="chip">select_quota</span>
-                <span class="chip">price_compose_envelope</span>
+                <span class="chip">bill_get</span>
+                <span class="chip">quota_get</span>
+                <span class="chip">price_query</span>
+                <span class="chip">price_compose</span>
+                <span class="chip">fee_rate_lookup</span>
               </div>
             </div>
             <div class="tool-cluster">
               <h4>Compute Tools</h4>
-              <p>确定性计算工具，输入必须显式完整。</p>
+              <p>确定性计算能力，主要由 workflow / 服务端内部调用。</p>
               <div class="chip-row">
                 <span class="chip">compute_unit_price</span>
                 <span class="chip">rollup</span>
@@ -839,21 +840,21 @@
             <td><code>norm_qa_agent</code></td>
             <td><code>config.yaml</code> / <code>subagents.custom_agents</code></td>
             <td><code>norm-qa</code></td>
-            <td><code>norm-qa/SKILL.md</code> 的 <code>allowed-tools</code> 允许 <code>ask_clarification</code> 和 <code>ce-task_norm_qa_tool</code>。</td>
+            <td><code>norm-qa/SKILL.md</code> 的 <code>allowed-tools</code> 允许 <code>ask_clarification</code>、<code>ce-rag_search_clause</code>、<code>ce-rag_get_clause</code>。</td>
             <td>只做规范知识问答。</td>
           </tr>
           <tr>
             <td><code>bill_match_agent</code></td>
             <td><code>config.yaml</code> / <code>subagents.custom_agents</code></td>
             <td><code>bill-match</code></td>
-            <td><code>bill-match/SKILL.md</code> 的 <code>allowed-tools</code> 允许 <code>ask_clarification</code> 和 <code>ce-task_cost_match_bill_item_tool</code>。</td>
+            <td><code>bill-match/SKILL.md</code> 的 <code>allowed-tools</code> 允许 <code>ask_clarification</code> 和 <code>ce-rag_match_bill_item</code>。</td>
             <td>只做候选内清单码选择。</td>
           </tr>
           <tr>
             <td><code>quota_agent</code></td>
             <td><code>config.yaml</code> / <code>subagents.custom_agents</code></td>
             <td><code>quota-match</code></td>
-            <td><code>quota-match/SKILL.md</code> 的 <code>allowed-tools</code> 允许 <code>ce-task_quota_lookup_tool</code> 和 <code>ce-task_cost_select_quota_tool</code>。</td>
+            <td><code>quota-match/SKILL.md</code> 的 <code>allowed-tools</code> 允许 <code>ce-db_quota_get</code> 和 <code>ce-db_quota_list</code>。</td>
             <td>只做定额查询和候选选择。</td>
           </tr>
           <tr>
@@ -878,23 +879,23 @@
         <tbody>
           <tr>
             <td>规范问答</td>
-            <td><code>ce-task_norm_qa_tool</code></td>
+            <td><code>ce-rag_search_clause</code>, <code>ce-rag_get_clause</code>, <code>ce-rag_expand_clause_refs</code></td>
             <td>暴露给 <code>norm_qa_agent</code>，必要时也可暴露给 <code>lead_agent</code>。</td>
           </tr>
           <tr>
             <td>清单匹配</td>
-            <td><code>ce-task_cost_match_bill_item_tool</code></td>
+            <td><code>ce-rag_match_bill_item</code></td>
             <td>暴露给 <code>bill_match_agent</code>，通常不直接暴露给 <code>lead_agent</code>。</td>
           </tr>
           <tr>
             <td>定额匹配</td>
-            <td><code>ce-task_quota_lookup_tool</code>, <code>ce-task_cost_select_quota_tool</code></td>
+            <td><code>ce-db_quota_get</code>, <code>ce-db_quota_list</code></td>
             <td>暴露给 <code>quota_agent</code>；workflow 可在服务端内部使用等价函数。</td>
           </tr>
           <tr>
             <td>询价与计算</td>
-            <td><code>price_lookup</code>, <code>compute_unit_price</code>, <code>rollup</code>, <code>rollup_hierarchy</code></td>
-            <td>主要给 workflow 内部使用；只有 skill 明确需要时才暴露给智能体。</td>
+            <td><code>ce-db_price_query</code>, <code>ce-db_price_compose</code>, 内部计算函数</td>
+            <td>询价可按 skill 暴露给智能体；计算主要给 workflow 内部使用。</td>
           </tr>
           <tr>
             <td>完整组价 Session</td>

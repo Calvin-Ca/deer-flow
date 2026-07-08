@@ -314,7 +314,7 @@ function ToolCall({
     );
 
   if (isCeTool(name)) {
-    // 造价领域 MCP 工具（ce-task_* / ce-rag_* / ce-db_*）：领域结果渲染收在 ce-tool-result，
+    // 造价领域 MCP 工具（ce-rag_* / ce-db_*）：领域结果渲染收在 ce-tool-result，
     // 不把造价业务字段塞进本通用组件（见该文件）。
     return <CeToolResult name={name} args={args} result={result} />;
   } else if (name === "web_search") {

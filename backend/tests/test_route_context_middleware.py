@@ -111,7 +111,7 @@ def test_no_coerce_without_reminder():
 def test_no_coerce_when_model_already_called_tools():
     mw = _make_middleware()
     last = AIMessage(content="", id="ai-1",
-                     tool_calls=[{"name": "ce-task_orchestrate_tool", "args": {}, "id": "tc-1", "type": "tool_call"}])
+                     tool_calls=[{"name": "ce-rag_search_clause", "args": {}, "id": "tc-1", "type": "tool_call"}])
     state = {"messages": [_reminder("feature"), _user(), last]}
     assert mw.after_model(state, _fake_runtime()) is None
 

@@ -1,28 +1,28 @@
-# ce-rag / ce-db / ce-task 服务器运行级联调手册
+# ce-rag / ce-db / Task Service 服务器运行级联调手册
 
 适用范围：
 - `ce-code/service/rag_api.py` -> `:8100` -> `ce-rag`
 - `ce-code/service/db_api.py` -> `:8102` -> `ce-db`
-- `ce-services/main.py` -> `:8101` -> `ce-task`
+- `ce-services/main.py` -> `:8101` -> REST 任务服务（不作为 agent 可见 MCP 工具）
 
 目标：
 - 先确认 3 个进程本身可启动。
 - 再确认 `ce-rag` / `ce-db` 的 REST 原语可用。
-- 再确认 3 个 `/mcp` 端点能被 MCP 客户端发现工具。
-- 最后确认任务层链路已经切到 `ce-rag` + `ce-db`。
+- 再确认 `ce-rag` / `ce-db` 的 `/mcp` 端点能被 MCP 客户端发现工具。
+- 最后确认任务层 REST 链路已经切到 `ce-rag` + `ce-db`。
 
 ## 1. 环境前提
 
 - 服务器已拉到包含提交 `d8c4a9f0` 及之后文档更新的代码。
 - `ce-code` 与 `ce-services` 都已执行过 `uv sync`。
 - PostgreSQL / Milvus / rerank / LLM 等底层依赖已按服务器现状可用。
-- 若 gateway/前端要一起验，`extensions_config.json` 必须已包含 `ce-rag` / `ce-db` / `ce-task`。
+- 若 gateway/前端要一起验，`extensions_config.json` 必须启用 `ce-rag` / `ce-db`，不要配置旧任务层大工具。
 
 建议先看当前配置：
 
 ```bash
 git rev-parse HEAD
-grep -n '"ce-rag"\|"ce-db"\|"ce-task"' extensions_config.json
+grep -n '"ce-rag"\|"ce-db"' extensions_config.json
 ```
 
 ## 2. 启动顺序
@@ -200,26 +200,9 @@ curl -s http://127.0.0.1:8102/mcp \
   }' | jq
 ```
 
-`ce-task`：
-
-```bash
-curl -s http://127.0.0.1:8101/mcp \
-  -H 'Content-Type: application/json' \
-  -H 'Accept: application/json, text/event-stream' \
-  -d '{
-    "jsonrpc":"2.0",
-    "id":"init-task",
-    "method":"initialize",
-    "params":{
-      "protocolVersion":"2025-03-26",
-      "capabilities":{},
-      "clientInfo":{"name":"curl","version":"0.0.0"}
-    }
-  }' | jq
-```
-
 期望重点：
-- `serverInfo.name` 分别是 `ce-rag` / `ce-db` / `ce-task`。
+- `serverInfo.name` 分别是 `ce-rag` / `ce-db`。
+- `:8101` 只验 REST `/health`、`/route`、`/norm/qa`、`/cost/compose`、`/cost/session/*`，不再验 agent 可见 MCP 工具。
 
 ### 5.2 tools/list
 
@@ -273,48 +256,26 @@ curl -s http://127.0.0.1:8102/mcp \
 - `aux_table_list`
 - `resource_lookup`
 
-`ce-task`：
-
-```bash
-curl -s http://127.0.0.1:8101/mcp \
-  -H 'Content-Type: application/json' \
-  -H 'Accept: application/json, text/event-stream' \
-  -d '{
-    "jsonrpc":"2.0",
-    "id":"tools-task",
-    "method":"tools/list",
-    "params":{}
-  }' | jq
-```
-
-期望至少看到这些工具名：
-- `orchestrate_tool`
-- `norm_qa_tool`
-- `cost_compose_tool`
-- `quota_lookup_tool`
-- `price_lookup_tool`
-- `start_cost_session_tool`
-
 ## 6. gateway / agent 联调
 
 如果还要验证 DeerFlow 侧是否真的接入新 MCP，按下面顺序做：
 
-1. 确认 `extensions_config.json` 中 `ce-rag` / `ce-db` / `ce-task` 为 enabled。
+1. 确认 `extensions_config.json` 中 `ce-rag` / `ce-db` 为 enabled，且没有旧任务层大工具。
 2. 重启 gateway。
 3. 若 gateway 有 MCP 缓存，执行一次 `touch extensions_config.json` 后再重启。
-4. 观察 gateway 日志，确认已加载 3 个 server 的工具。
+4. 观察 gateway 日志，确认已加载 2 个 server 的工具。
 
 建议的对话验证用例：
 
 1. `现浇混凝土矩形柱按什么计量，按 gb50854-2024 回答`
-   期望：`ce-task_norm_qa_tool` 或 `ce-task_orchestrate_tool` -> `ce-rag search_clause`
+   期望：`norm-qa` / `ce-rag_search_clause`
 2. `C30现浇钢筋混凝土矩形柱，按 2024 在深圳组价`
-   期望：`ce-task_cost_compose_tool` 或 `ce-task_orchestrate_tool` -> `ce-rag match_bill_item` -> `ce-db price_compose`
+   期望：`cost-agent` / `ce-rag_match_bill_item` -> `ce-db_price_compose`
 3. `深圳钢筋信息价是多少`
-   期望：`ce-task_price_lookup_tool` 或 `ce-task_orchestrate_tool` -> `ce-db price_query`
+   期望：`ce-db_price_query`
 
 判定标准：
-- 前端或日志里应出现 `ce-rag_*` / `ce-db_*` / `ce-task_*`。
+- 前端或日志里应出现 `ce-rag_*` / `ce-db_*`。
 - 不应依赖旧兼容工具作为主链路。
 
 ## 7. 常见失败点
@@ -325,9 +286,9 @@ curl -s http://127.0.0.1:8101/mcp \
    - 大概率是 `ce-services/common/config.py` 没更新到新版本，或环境变量覆盖了预期值。
 - `ce-rag` 正常但 `ce-db` 全部 500
   - 优先查 PG 连接、只读账号、相关结构化表是否齐全。
-- `ce-task cost_compose_tool` 能选码但不能取价
-  - 先单独打 `:8102/price/compose/...`，确认是 `ce-db` 问题还是任务层问题。
-- gateway 对话里没有出现 `ce-rag_*` / `ce-db_*` / `ce-task_*`
+- `cost-agent` 能选码但不能取价
+  - 先单独打 `:8102/price/compose/...`，确认是 `ce-db` 问题还是任务层 REST 链路问题。
+- gateway 对话里没有出现 `ce-rag_*` / `ce-db_*`
   - 大概率是 gateway 没重启、配置缓存没刷新，或者 agent allow-list 未包含新工具名。
 
 ## 8. 建议回传结果
@@ -335,7 +296,7 @@ curl -s http://127.0.0.1:8101/mcp \
 服务器联调完成后，建议把下面结果贴回：
 
 - 三个 `/health` 的摘要。
-- `ce-rag / ce-db / ce-task` 三个 `initialize` 返回里的 `serverInfo.name`。
+- `ce-rag / ce-db` 两个 `initialize` 返回里的 `serverInfo.name`。
 - `tools/list` 各自工具数。
 - 一条 `norm/qa` 成功样例。
 - 一条 `cost/compose` 成功样例。

@@ -4,7 +4,7 @@
 本文件只**涉及**：目录结构、流水线命令、起服务。算量不在本层。
 
 > - 需求/设计（领域铁律、schema、多表征、检索/造价设计、端点规格）见 `PRD.md`
-> - **服务接口契约**（`ce-rag` / `ce-db` / `ce-task` 边界、候选/真值/证据语义）见 `../ce-services/INTERFACE_CONTRACTS.md`
+> - **服务接口契约**（`ce-rag` / `ce-db` / 任务服务边界、候选/真值/证据语义）见 `../ce-services/INTERFACE_CONTRACTS.md`
 > - **运行联调步骤**见 `../ce-services/RUNTIME_E2E_RUNBOOK.md`
 > - 项目级共享上下文（设备分工、git 约定、服务器环境）见仓库根 `CLAUDE.md`
 > - **任务层（生成/合规编排）在 `../ce-services/`**，是本服务的纯 HTTP 客户端，文档见 `../ce-services/README.md`

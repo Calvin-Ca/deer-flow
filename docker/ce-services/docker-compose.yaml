@@ -11,7 +11,7 @@
 #   docker compose -f docker/ce-services/docker-compose.yaml logs -f
 #
 # 架构：
-#   knowledge(:8100) ← tasks(:8101)  [CostAgent 选码/组价 + HITL 图 + Norm-QA + 前门路由 + ce-task MCP]
+#   knowledge(:8100) ← tasks(:8101)  [CostAgent 选码/组价 + HITL 图 + Norm-QA + 前门路由]
 #   network_mode: host —— 两服务均直接访问宿主机的 Milvus:19530 / embed:8097 / vLLM:8099
 
 include:

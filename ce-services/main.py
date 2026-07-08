@@ -37,31 +37,16 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 
-from contextlib import asynccontextmanager  # noqa: E402
-
 from fastapi import FastAPI  # noqa: E402
 from fastapi.routing import APIRoute  # noqa: E402
 
 from common.config import DB_URL, KNOWLEDGE_URL, LLM_URL, RAG_URL  # noqa: E402
-from common.mcp_server import mcp as task_mcp  # noqa: E402
 from cost.router import router as cost_router  # noqa: E402
 from norm.router import router as norm_router  # noqa: E402
 from routing.router import router as routing_router  # noqa: E402
 
 
-@asynccontextmanager
-async def _lifespan(_: FastAPI):
-    """启动期手动跑任务层 MCP 的 StreamableHTTP session manager。
-
-    Starlette 不会自动执行 ``app.mount`` 子应用的 lifespan，故 MCP session manager 必须由父
-    应用 lifespan 显式启动（否则挂在 /mcp 的 streamable-HTTP 端点不可用）。见 common.mcp_server。
-    """
-    async with task_mcp.session_manager.run():
-        yield
-
-
-app = FastAPI(title="CE Task Services · Norm-QA + CostAgent", version="4.0.0",
-              lifespan=_lifespan)
+app = FastAPI(title="CE Task Services · Norm-QA + CostAgent", version="4.0.0")
 # 注册与 /health 清单共用同一份 router 列表（单一事实源）：新增 router 只改这里，清单自动跟上。
 # 不从 app.routes 反推——fastapi≥0.139 include_router 改懒挂载（app.routes 里是 _IncludedRouter
 # 包装、不摊平也不暴露内部 routes），isinstance(APIRoute) 清单会归零；APIRouter.routes 是历代稳定 API。
@@ -91,13 +76,6 @@ def health() -> dict:
         "llm_url": LLM_URL,
         "routes": routes,
     }
-
-
-# ── 任务层能力 MCP façade（streamable-HTTP，url=/mcp）──────────────────────────
-# 必须在 /health + 两个 router 之后挂载：FastAPI 按注册顺序匹配，本服务自有端点先注册先匹配；
-# MCP 子应用内部路由就是 /mcp（mcp_server 的 streamable_http_path 默认值），故挂在根 "/"，
-# 最终对外即 :8101/mcp。注册：extensions_config.json mcpServers 加 ce-task（type:http）。
-app.mount("/", task_mcp.streamable_http_app())
 
 
 if __name__ == "__main__":

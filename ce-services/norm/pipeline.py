@@ -1,13 +1,12 @@
-"""Norm-QA 编排内核 —— 规范问答的单一实现（被 /norm/qa 端点、ce-task_norm_qa MCP 工具、
-复合编排器 T-A4 共用）。
+"""Norm-QA 编排内核 —— 规范问答的单一实现（被 /norm/qa 端点和复合编排器 T-A4 共用）。
 
 链路：``resolve_standard``（T-A2 规范选择确定化）→ ``knowledge_client.search``（:8100 检索）→
 零召回则 **先 ``web_fallback``（FR-K07 联网兜底三道闸，仅本 norm 链路）**、仍无可信命中才
 ``guards.reject_no_recall``（C-03 拒答给出路）/ 否则 ``generation.answer``（Qwen3 带引用）→
 ``guards.audit_answer``（C-01/C-02 校验闸）→ 组装 meta。
 
-抽出动机：此前 ``norm/router.py`` 与 ``common/mcp_server.py`` 各持一份**近乎一致**的实现，T-A4 还需
-第三个调用点（编排器派发 norm 子任务）——三处复制必漂移，故收敛到本模块单一事实源。调用方只需
+抽出动机：此前 ``norm/router.py`` 与任务层工具 façade 各持一份**近乎一致**的实现，T-A4 还需
+第三个调用点（编排器派发 norm 子任务）——多处复制必漂移，故收敛到本模块单一事实源。调用方只需
 包一层「异常 → 自己的错误类型」映射（端点→HTTPException、MCP→ToolError）。
 """
 from __future__ import annotations

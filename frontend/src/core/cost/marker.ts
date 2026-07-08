@@ -43,11 +43,7 @@ export function extractCostLaunchPayload(content: string): CostHitlMarker | null
   }
 }
 
-/**
- * 从造价 MCP 工具结果里抠出组价会话 task_id（结果可能是 JSON 字符串或已解析对象）。
- * 覆盖两条点火路径：① 前门 ``ce-task_orchestrate_tool`` → ``{mode:"hitl", task_id}``；
- * ② 直连 ``ce-task_start_cost_session_tool`` → ``{task_id, status, interrupt, ui_hint}``。非 HITL 结果 → null。
- */
+/** 从结构化结果里抠出组价会话 task_id（结果可能是 JSON 字符串或已解析对象）。 */
 export function hitlTaskIdFromLaunchResult(
   result?: string | Record<string, unknown> | null,
 ): string | null {
@@ -74,35 +70,15 @@ export function hitlTaskIdFromLaunchResult(
   return null;
 }
 
-/**
- * 扫描一个回合的消息，取出被点火的组价 HITL 会话 task_id（优先结构化的 ce-task 工具**结果**，
- * 不依赖弱模型把启动信息贴进正文）。返回最后一个命中的 task_id，无则 null。用于把组价控件渲染到
- * 回合**末尾**（agent 文字之后），而非钉在工具调用处（中间过程块）导致方位错乱。
- */
+/** 扫描一个回合的消息，取出 legacy cost-hitl marker；当前 session 点火不再来自 MCP 工具结果。 */
 export function extractLaunchTaskIdFromMessages(messages: Message[]): string | null {
-  const resultByToolCallId = new Map<string, string>();
-  for (const message of messages) {
-    if (message.type !== "tool" || !message.tool_call_id) continue;
-    // MCP 工具结果的 content 常是 blocks 数组（[{type:"text",…}]）而非纯字符串——与
-    // findToolCallResult 同用 extractTextFromMessage 兼容两种形状。此前 typeof === "string"
-    // 严判令 blocks 形态下 task_id 永远提不出、控件从不渲染（07-05 实测：三次 listing 点火
-    // 服务端全成功、前端零控件；与 RouteContextMiddleware 踩的是同一类 content 形状坑）。
-    const content = extractTextFromMessage(message);
-    if (content) {
-      resultByToolCallId.set(message.tool_call_id, content);
-    }
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    const message = messages[i];
+    if (!message) continue;
+    const marker = extractCostLaunchPayload(extractTextFromMessage(message));
+    if (marker) return marker.taskId;
   }
-  let taskId: string | null = null;
-  for (const message of messages) {
-    if (message.type !== "ai" || !message.tool_calls) continue;
-    for (const toolCall of message.tool_calls) {
-      if (!toolCall.name?.startsWith("ce-task_")) continue;
-      const result = toolCall.id ? resultByToolCallId.get(toolCall.id) : undefined;
-      const id = hitlTaskIdFromLaunchResult(result);
-      if (id) taskId = id;
-    }
-  }
-  return taskId;
+  return null;
 }
 
 // Backward-compatible aliases kept for existing imports.

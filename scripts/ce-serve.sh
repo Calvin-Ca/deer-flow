@@ -5,7 +5,7 @@
 # 服务与启动顺序（有依赖先后）：
 #   ① :8100 ce-rag    ce-code       uv run python -m service.rag_api
 #   ② :8102 ce-db     ce-code       uv run python -m service.db_api
-#   ③ :8101 ce-task   ce-services    uv run python main.py
+#   ③ :8101 tasks     ce-services    uv run python main.py
 #   ④ :8001 gateway   backend        make gateway（uvicorn，无 --reload，单进程）
 #   ⑤ :3000 前端      frontend       pnpm start（生产模式，需先 pnpm build）
 #
@@ -88,5 +88,5 @@ start_win frontend 'cd frontend && exec pnpm start'
 wait_health frontend http://localhost:3000 90 || { echo "前端未就绪（是否忘了 pnpm build？用 --build 重跑），终止"; exit 1; }
 
 echo
-echo "✅ 服务全部就绪：ce-rag :8100 / ce-db :8102 / ce-task :8101 / gateway :8001 / 前端 :3000"
+echo "✅ 服务全部就绪：ce-rag :8100 / ce-db :8102 / tasks :8101 / gateway :8001 / 前端 :3000"
 echo "   看日志：tmux attach -t $SESSION   停全部：scripts/ce-serve.sh --stop"

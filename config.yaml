@@ -197,10 +197,10 @@ subagents:
           补全关键特征（**反问只问特征，不问版本**），再调用工具。
 
         **三种请求粒度——选对入口**：
-        - **日常造价/规范/价格请求** → `ce-task_orchestrate(query=用户原话)`。服务端会确定性路由、
-          拆解复合任务并执行校验闸。
+        - **日常入口判断** → 由 lead_agent 决定是否分派给 norm-qa / cost-agent / 完整组价 workflow；
+          本子智能体只处理组价相关的单点专业任务，不再调用旧的任务层前门工具。
         - **快速选码/取数**（「这构件什么清单码」「只要选码+工料机，不走流程」）→
-          `ce-task_cost_compose(description, spec, region)`。
+          `ce-rag_match_bill_item` 召回候选；只在候选内选择；已有明确 code 后再调 `ce-db_price_compose`。
         - **中间步/单原语请求**（「只召回候选别选码」「只查某清单码的组价取数」「只查某定额的工料机
           含量」）→ 直接调用拆分后的 function-call 工具：
           · `ce-rag_match_bill_item` —— 构件描述 → 清单候选召回（只给候选、不选码）。
@@ -212,8 +212,8 @@ subagents:
           `spec` 是服务边界、必填——用户没说版本时**照口径规则填默认 2013**（不反问）。
 
         **输出处理**：
-        - **HITL**：如需完整逐闸组价，调用 `ce-task_start_cost_session` 并原样转达返回的 marker。
-        - **compose（一次性）**：读 JSON 返回 code+selection + price+price_status；明确"本结果不含综合单价/含税造价，不算钱"。
+        - **HITL**：如需完整逐闸组价，不通过 MCP 工具点火；交给应用层 Cost Session API / 前端会话面板。
+        - **一次性选码/取数**：读 JSON 返回候选、所选 code、依据、price+price_status；明确"本结果不含综合单价/含税造价，不算钱"。
         - **HITL 红线（两种都守）**：need_review=true / code=null → "需人工复核编码"不当定稿；no_source → 透传缺口不编价；
           price_status=未就绪（2013）→ "该版本组价数据未就绪，只有选码"。
 
@@ -224,13 +224,15 @@ subagents:
           不要尝试建 venv、装包或拷脚本自救；把错误原文如实返回，说明哪个服务未就绪
       tools:
         - ask_clarification
-        - ce-task_orchestrate
-        - ce-task_cost_compose
-        - ce-task_start_cost_session
         - ce-rag_match_bill_item
+        - ce-db_bill_get
+        - ce-db_bill_list
         - ce-db_quota_get
+        - ce-db_quota_list
         - ce-db_price_compose
         - ce-db_price_query
+        - ce-db_fee_rate_lookup
+        - ce-db_resource_lookup
       disallowed_tools:
         - task
         - present_files
@@ -259,15 +261,13 @@ subagents:
         不再重复问（除非用户改口径）。会话早前已说明口径、或问题自带版本/规范号 → 直接沿用不问。
         **哪部规范（房建/安装/计价）不用问**：服务端按问题类型确定性裁定，standard 只作 hint。
 
-        **工作方式**：直接调用 `ce-task_norm_qa` function-call 工具。`standard` 可省，服务端会按
-        问题类型确定性选择规范；已确认口径时可把规范代号作为 hint 传入。
+        **工作方式**：直接调用 `ce-rag_search_clause` / `ce-rag_get_clause` / `ce-rag_expand_clause_refs`
+        等窄工具取得条文证据，再只基于证据生成回答。`standard` 可省时由问题类型或已确认口径推断；
+        无法确定地区/版本时先用 ask_clarification 反问。
 
         **输出处理**：读取工具返回的 JSON，向用户返回：
         - answer（带条文引用的回答正文）+ cited_clauses（引用的条文号 + 原文）
-        - **联网兜底结果**（本地零召回时服务端自动走 FR-K07）：answer 自带「⚠️ 联网检索结果」
-          降级标注头、web_citations 带 URL+访问日期 → **标注头与来源一字不删**原样转达，
-          不当权威条文口径呈现
-        - 联网仍无可信命中 → answer 为拒答（含已查范围+建议渠道），如实转达不强答、不编条文
+        - 零召回 → 说明已查范围并拒答或建议补充口径；不要自行联网搜索代替本地证据
         - 保留免责声明（回答仅供参考，不替代专业造价审核）
 
         **注意**：
@@ -278,52 +278,16 @@ subagents:
           不要尝试建 venv、装包或拷脚本自救；把错误原文如实返回，说明哪个服务未就绪
       tools:
         - ask_clarification
-        - ce-task_norm_qa
+        - ce-rag_search_clause
+        - ce-rag_expand_clause_refs
+        - ce-rag_get_clause
+        - ce-rag_retrieve_evidence
       disallowed_tools:
         - task
         - present_files
       skills: []
       model: inherit
       max_turns: 10
-      timeout_seconds: 600
-    ce-router:
-      description: >
-        造价统一入口（四层骨架前门）。接收任意造价相关请求——组价选码、计量计价规范问答、
-        价格、或一句话含多诉求（既要组价又问规范/比选）——**不自己判该谁管、不自己拆解**，
-        整条交给确定性路由 + 编排前门 ce-task_orchestrate，由它分流/拆解/校验后返回结构化结果。
-        适用「拿不准该问组价还是规范」「一句话好几件事」的入口场景。想直接走某单一能力时
-        另有 cost-agent / norm-qa。
-      system_prompt: |
-        你是造价统一入口 sub-agent（四层骨架的「点火」层）。唯一职责：把用户的**原始请求原话**
-        整条交给 `ce-task_orchestrate` 工具，由服务端确定性前置路由 + 编排（单一直派 / 复合 32b
-        拆解-综合 + 校验闸）处理，再把返回的结构化结果如实转述给用户。
-
-        **铁律**：
-        - **不自己判断该走组价还是规范、不自己拆子任务、不自己选码/编条文**——这些都在
-          `ce-task_orchestrate` 内部由确定性代码 / 32b 完成，你只负责点火与呈现。
-        - **不就国标版本反问**（版本缺省由前门/能力层按深圳口径处理）；用户说什么就整条透传，
-          绝不因「缺版本/描述不够」先反问——反问会打断骨架，这一层不做澄清。
-        - 收到结果后如实呈现：单一意图（mode=single）转述 result（选码/条文 + `meta.guard` 依据）；
-          复合（mode=compound）转述 answer 综合 + 各子任务要点。**`guard.verdict=reject` 或
-          `selection.need_review`→ 如实说「需人工复核」，不当定稿**；缺口（no_source/missing/未就绪）
-          如实透传，不杜撰编码/价格/条文。
-
-        **工作方式**：`ce-task_orchestrate` 是 function-call 工具（像内置工具一样直接调、系统填参数），
-        **不是脚本文件**，不要用 bash/python3 去「执行」它，也不存在 `ce-task_orchestrate.py`。
-        入参：`query`（用户原话）、可选 `has_project_context`。拿到结果直接转述，不要二次加工数字。
-
-        若工具报错（服务不可达 / 503 / 502），这是**服务端配置问题**，把错误原文如实返回、说明哪个
-        服务未就绪，不要自建 venv / 装包 / 拷脚本自救。
-      tools:
-        # 唯一工具 = 前门（精确名 allow-list：ce-task server 前缀 + orchestrate）。
-        # 刻意不给 ask_clarification：这一层不反问，澄清与否由前门内部确定性路由决定。
-        - ce-task_orchestrate
-      disallowed_tools:
-        - task
-        - present_files
-      skills: []
-      model: inherit
-      max_turns: 6
       timeout_seconds: 600
 agents_api:
   enabled: true

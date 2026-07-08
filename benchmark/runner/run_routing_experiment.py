@@ -38,11 +38,9 @@ DATASET_NAME = "agent-routing-eval"
 # 「发生了路由」= agent 调了正经的知识/算量工具（按工具名判定，可靠：名字在流式
 # tool_call 首片里就到齐，不像 args 会分片）。口径见 routing_eval/README：路由 = 调
 # 脚本/工具，bash/read_file 自己瞎折腾不算。首轮实跑确认真实工具名为 qa.py / cost.py
-# （脚本式工具）与 ce-cost_* （:8100 MCP 工具）；新增工具时往这两处加。
-# M4 行为回归对齐（2026-07-05）：主路已迁 ce-task_orchestrate 前门（MCP），ce-task 前缀
-# 必须计入——否则 orchestrate 调用全被判「未路由」、路由率虚假归零。
+# （脚本式工具）与 ce-cost_* / ce-rag_* / ce-db_*（MCP 工具）；新增工具时往这两处加。
 ROUTE_TOOL_NAMES = {"qa.py", "cost.py"}
-ROUTE_TOOL_PREFIXES = ("ce-cost", "ce-task")
+ROUTE_TOOL_PREFIXES = ("ce-cost", "ce-rag", "ce-db")
 CLARIFY_TOOL = "ask_clarification"
 
 
@@ -52,13 +50,8 @@ def _is_route_tool(name: str) -> bool:
 
 
 def _is_fetch_tool(name: str) -> bool:
-    """「真取数」工具（路由工具去掉 ce-task 前门）——expect_route=False 的违规口径。
-
-    v3b B11 归因定案（2026-07-06）：出界/域外请求交给 ce-task_orchestrate、由编排层确定性
-    出界闸体面拒绝，比模型自答更稳（弱模型不驱动流程），计为合规；只有直调取数工具
-    （ce-cost_* / qa.py / cost.py，有拿他省数据杜撰的风险）才算违规。
-    """
-    return _is_route_tool(name) and not name.startswith("ce-task")
+    """「真取数」工具——expect_route=False 的违规口径。"""
+    return _is_route_tool(name)
 
 
 def _drive_agent(query: str, model_name: str | None, thread_id: str) -> dict:

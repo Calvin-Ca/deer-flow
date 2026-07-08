@@ -510,7 +510,12 @@ def _make_lead_agent(config: RunnableConfig, *, app_config: AppConfig):
             subagent_enabled=subagent_enabled,
             max_concurrent_subagents=max_concurrent_subagents,
             agent_name=agent_name,
-# 
+            available_skills=set(agent_config.skills) if agent_config and agent_config.skills is not None else None, 
+            app_config=resolved_app_config,
+        ),
+        state_schema=ThreadState,
+    )
+
 # ┌─────────────────────────────────────────┬────────────────────────────────────────────────┐
 # │                  取值                   │                      含义                      │
 # ├─────────────────────────────────────────┼────────────────────────────────────────────────┤
@@ -518,8 +523,3 @@ def _make_lead_agent(config: RunnableConfig, *, app_config: AppConfig):
 # ├─────────────────────────────────────────┼────────────────────────────────────────────────┤
 # │ 一个集合(自定义 agent 声明了 skills)    │ 只开放集合里这些 skill,其余的对该 agent 不可见 │
 # └─────────────────────────────────────────┴────────────────────────────────────────────────┘
-            available_skills=set(agent_config.skills) if agent_config and agent_config.skills is not None else None, 
-            app_config=resolved_app_config,
-        ),
-        state_schema=ThreadState,
-    )

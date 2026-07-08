@@ -4,7 +4,7 @@
 > 各步骤在前端逐步显示。本文是分阶段落地方案，对齐现有代码与红线，供 Mac↔服务器对照。
 >
 > 相关文档：编排/分层原则 `HITL_DESIGN.md`、任务层需求 `PRD.md`、算钱原语 `cost/pricing.py`、图 `cost/graph.py`。
-> 主线挂点见根 `AGENT_TODO.md`「M4 · 组价步骤可视化」。
+> 组价步骤可视化设计记录；当前服务边界以 `INTERFACE_CONTRACTS.md` 为准。
 
 ---
 
@@ -153,7 +153,7 @@
 
 ### 7.2 B1（坏）vs B2（好）—— 关键区分
 
-- **B1**：LLM 每闸进环（读闸→转述→收决策→resume）。🔴 撞 HITL_DESIGN §10 / AGENT_DEV §9 line 279
+- **B1**：LLM 每闸进环（读闸→转述→收决策→resume）。🔴 撞 HITL 设计的逐闸确定性边界
   弱模型转述事故。**不做。**
 - **B2**：deer-flow agent 图里加**一个确定性节点**，用 langgraph **节点内多次 `interrupt()`** 托管闸循环。
   resume 一个被 interrupt 的节点是**从中断点继续该节点、不回 LLM 节点**，故闸1→闸2 之间 **LLM 不被重调**。
@@ -228,7 +228,7 @@
 | **3 步骤可视化** | 卡片 + 时间线 + 两级层级树，只从结构化 `events` 渲染 | ✅ 已实现（阶段0/1/2） | 显示由"图 emit events"决定，与"是否 MCP"无关 |
 | **4 训练模型套定额** | 落成图内**一个 compute 节点外呼**（同 `bill_match`/`price_compose`），**置信门控**（复用混合路由）：高置信自动过、低置信升人闸；算一次写进 session 持久化，gate 只确认 | 🔒 模型未训；**接口已预留** | 贵+非确定性副作用必须留图内 compute 节点、不进重放区；它减少人闸→削弱全 B2 的 ROI |
 | **5 红线守卫** | 套定额模型只在真实候选内选、`消耗量/费率`走确定性库查表；费率/税率必须人录入；缺价 `no_source`、选不出码 `need_review` 如实透传；自动过的闸必留依据卡；**改已完成组价的参数不在对话里重算**（导回卡片重开闸/重起会话） | ✅ 本次补齐 | `HITL_DESIGN §1.2/§10`；类型 B 杜撰重算护栏见 cost-agent skill 红线 7 |
-| **6 MCP 粒度** | 维持不拆：ce-cost 取数原语 + ce-task（orchestrate/norm_qa/cost_compose/start_cost_session）。HITL 逐闸**不暴露成 MCP** | ✅ 已实现 | 拆 HITL 步骤=逼弱模型当编排器（红线）+ 无状态失配 + 一致性倒退 |
+| **6 MCP 粒度** | 维持不拆：ce-rag/ce-db 取数原语 + ce-task（orchestrate/norm_qa/cost_compose/start_cost_session）。HITL 逐闸**不暴露成 MCP** | ✅ 已实现 | 拆 HITL 步骤=逼弱模型当编排器（红线）+ 无状态失配 + 一致性倒退 |
 
 ### 8.2 本次落地内容（已实现，代码级）
 

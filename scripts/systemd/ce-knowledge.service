@@ -1,4 +1,4 @@
-# CE 知识服务 :8100（裸机 uv，纯 CPU；精排走 Docker :8095）——开机自启
+# CE RAG 服务 :8100（裸机 uv，纯 CPU；精排走 Docker :8095）——开机自启
 #
 # 安装（服务器，sudo）：
 #   sudo cp scripts/systemd/ce-knowledge.service /etc/systemd/system/
@@ -7,7 +7,7 @@
 #
 # 注：ExecStart 用登录 shell 取 uv（PATH 里）。若 uv 不在登录 PATH，改成绝对路径（which uv 看）。
 [Unit]
-Description=CE Knowledge Service (:8100, bare-metal uv, CPU)
+Description=CE RAG Service (:8100, bare-metal uv, CPU)
 After=network-online.target docker.service
 Wants=network-online.target
 
@@ -16,7 +16,7 @@ Type=simple
 User=caic
 WorkingDirectory=/mnt/nvme/calvin/code/deer-flow/ce-code
 Environment=CE_RERANK_URL=http://localhost:8095
-ExecStart=/bin/bash -lc 'exec uv run python -m service.knowledge_api'
+ExecStart=/bin/bash -lc 'exec uv run python -m service.rag_api'
 Restart=on-failure
 RestartSec=5
 

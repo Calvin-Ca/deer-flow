@@ -1,6 +1,6 @@
 """前置路由（T-A1）—— 确定性能力分流 + 形态判定，把路由从弱模型手里夺回。
 
-> 对应 AGENT_DEV §9.1 ① 前置路由、§9.5 T-A1；AGENT_PRD §4.1 四维分流 / §4.2 请求形态 /
+> 对应 PRD §4.1 四维分流 / §4.2 请求形态 /
 > §4.3 粗分流决策表（唯一权威路由表）/ §4.0 口径归一 / EH-01/04/05。
 
 **为什么放服务端、不交给 LLM**：同 §8.3/T-A2 原则。能力分流（这问题该谁答）与形态判定（要不要
@@ -234,7 +234,7 @@ def route(query: str, *, has_project_context: bool | None = None,
         capability_override —— **意图混合路由专用**：LLM 兜底分类判出的 capability
           （∈ VALID_CAPABILITIES）。给定即**跳过确定性能力分流**、以它为准，但**所有形态/红线闸
           （caliber / feature / EH-03 出界 / compose_full）照旧确定性重推**——LLM 只补能力分类、
-          绝不碰安全闸（AGENT_TODO「红线两条路都确定性」）。非法值忽略、退回确定性分流。
+          绝不碰安全闸。非法值忽略、退回确定性分流。
         prior_capability —— **会话粘性（EH-05 扩展）**：上一轮已定的能力落点。仅当本句
           无任何强信号（纯默认落 norm）**且含承接语**（CONTINUATION_KW）时沿用（route_source
           标 session_sticky）；形态/红线闸随新能力照常确定性重推，出界/特征/口径不粘。

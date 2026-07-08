@@ -21,7 +21,7 @@ dependencies = [
     # ===== 检索/合规 HTTP 服务（skill 通过 HTTP 调用，沙箱内零依赖）=====
     "fastapi>=0.110",        # retrieval/server.py
     "uvicorn>=0.29",         # ASGI server
-    "mcp>=1.27",             # 组价取数原语 MCP façade（FastMCP streamable-HTTP，service/mcp_server.py）
+    "mcp>=1.27",             # ce-rag / ce-db MCP façade（FastMCP streamable-HTTP）
     # 辅助
     "click>=8.1",            # CLI 参数解析
     "rich>=13.7",            # 终端日志/表格输出

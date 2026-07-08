@@ -22,7 +22,7 @@ RUN pip install --no-cache-dir -i "$PIP_INDEX_URL" \
 WORKDIR /app
 
 # 仅精排服务所需：config.py（读 RERANK_MODEL/DEVICE）+ service 包（rerank_api）。
-# service/__init__.py 只有 __all__、不触发子模块导入，故不会拉进 knowledge_api 的重依赖。
+# service/__init__.py 只有 __all__、不触发子模块导入，故不会拉进业务 API 的重依赖。
 COPY ce-code/config.py             config.py
 COPY ce-code/service/__init__.py   service/__init__.py
 COPY ce-code/service/rerank_api.py service/rerank_api.py

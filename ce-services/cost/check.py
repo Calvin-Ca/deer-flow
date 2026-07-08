@@ -122,7 +122,7 @@ def check_boq(rows: list[dict[str, Any]], spec: str | None = None,
 
     参数：rows —— BOQ 行列表（每行 ``{code, name?, unit?, quantity?, unit_price?, amount?}``）；
       spec —— 国标版本（缺省默认深圳·2013，§4.0 不反问）；region —— 地区（声明用）；
-      bill_get_fn —— 可注入（默认打知识服务 ``/bill/get``）。
+      bill_get_fn —— 可注入（默认打 ce-db ``/bill/{code}``）。
     返回：``{spec, region, total, rows_with_issues, issues:[{row_index, code, checks, bill}],
       unsupported, meta:{caliber, guard}}``——issues 只含有发现的行；unsupported 如实列 v1 不做的面；
       guard: C-01 溯源（发现均引 bill_spec 库内规范行）、报告型 verdict=pass（核对报告本身不拒答）。

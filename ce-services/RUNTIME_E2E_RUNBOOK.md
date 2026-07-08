@@ -9,20 +9,20 @@
 - 先确认 3 个进程本身可启动。
 - 再确认 `ce-rag` / `ce-db` 的 REST 原语可用。
 - 再确认 3 个 `/mcp` 端点能被 MCP 客户端发现工具。
-- 最后确认任务层链路已经切到 `ce-rag` + `ce-db`，不是还走旧 `ce-cost` 单入口。
+- 最后确认任务层链路已经切到 `ce-rag` + `ce-db`。
 
 ## 1. 环境前提
 
 - 服务器已拉到包含提交 `d8c4a9f0` 及之后文档更新的代码。
 - `ce-code` 与 `ce-services` 都已执行过 `uv sync`。
 - PostgreSQL / Milvus / rerank / LLM 等底层依赖已按服务器现状可用。
-- 若 gateway/前端要一起验，`extensions_config.json` 必须已包含 `ce-rag` / `ce-db` / `ce-task`，且 `ce-cost` 为 disabled。
+- 若 gateway/前端要一起验，`extensions_config.json` 必须已包含 `ce-rag` / `ce-db` / `ce-task`。
 
 建议先看当前配置：
 
 ```bash
 git rev-parse HEAD
-grep -n '"ce-rag"\|"ce-db"\|"ce-task"\|"ce-cost"' extensions_config.json
+grep -n '"ce-rag"\|"ce-db"\|"ce-task"' extensions_config.json
 ```
 
 ## 2. 启动顺序
@@ -113,7 +113,7 @@ curl -s "http://127.0.0.1:8102/bill/$CODE?spec=2024" | jq
 
 期望重点：
 - 直接命中一条清单真值。
-- 这里是 `/bill/{code}`，不是旧路径 `/bill/get/{code}`。
+- 这里是 `/bill/{code}`。
 
 ### 4.4 ce-db 组价取数
 
@@ -125,7 +125,7 @@ curl -s "http://127.0.0.1:8102/price/compose/%E6%B7%B1%E5%9C%B3/$CODE?spec=2024"
 期望重点：
 - 若 2024 组价数据已就绪，应返回定额与工料机明细。
 - 若出现业务上的 `no_source`，这是允许的，表示缺价透传，不是系统故障。
-- 若你故意改成旧路径 `/bill/get/{code}` 还能通，说明服务器可能还跑着旧入口，不符合本次拆分目标。
+- 若错误路径也能通，说明服务器可能还跑着旧入口，不符合本次拆分目标。
 
 ### 4.5 ce-services 任务层直测
 
@@ -299,7 +299,7 @@ curl -s http://127.0.0.1:8101/mcp \
 
 如果还要验证 DeerFlow 侧是否真的接入新 MCP，按下面顺序做：
 
-1. 确认 `extensions_config.json` 中 `ce-rag` / `ce-db` / `ce-task` 为 enabled，`ce-cost` 为 disabled。
+1. 确认 `extensions_config.json` 中 `ce-rag` / `ce-db` / `ce-task` 为 enabled。
 2. 重启 gateway。
 3. 若 gateway 有 MCP 缓存，执行一次 `touch extensions_config.json` 后再重启。
 4. 观察 gateway 日志，确认已加载 3 个 server 的工具。
@@ -315,7 +315,7 @@ curl -s http://127.0.0.1:8101/mcp \
 
 判定标准：
 - 前端或日志里应出现 `ce-rag_*` / `ce-db_*` / `ce-task_*`。
-- 不应再依赖 `ce-cost_*` 作为主链路。
+- 不应依赖旧兼容工具作为主链路。
 
 ## 7. 常见失败点
 
@@ -327,8 +327,8 @@ curl -s http://127.0.0.1:8101/mcp \
   - 优先查 PG 连接、只读账号、相关结构化表是否齐全。
 - `ce-task cost_compose` 能选码但不能取价
   - 先单独打 `:8102/price/compose/...`，确认是 `ce-db` 问题还是任务层问题。
-- gateway 对话里还出现 `ce-cost_*`
-  - 大概率是 gateway 没重启、配置缓存没刷新，或者 agent allow-list 还保留旧工具名。
+- gateway 对话里没有出现 `ce-rag_*` / `ce-db_*` / `ce-task_*`
+  - 大概率是 gateway 没重启、配置缓存没刷新，或者 agent allow-list 未包含新工具名。
 
 ## 8. 建议回传结果
 

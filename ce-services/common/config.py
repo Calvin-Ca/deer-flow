@@ -13,7 +13,7 @@ from pathlib import Path
 LLM_URL = os.environ.get("BCRAG_LLM_URL", "http://localhost:8099")
 LLM_MODEL_ID = os.environ.get("BCRAG_LLM_MODEL_ID", "qwen3-8b")
 
-# ── 桶 B（Qwen3-32B vLLM）：真·推理 + 选码消歧（AGENT_DEV §9.3 模型分层，T-A5 接线）──
+# ── 桶 B（Qwen3-32B vLLM）：真·推理 + 选码消歧 ──
 # 用于：① 复合拆解/综合（routing/orchestrator）；② 选码候选消歧（cost/selection.select_code）——
 #   「8b 最不可靠、选错最贵、非 2s 直配路径，可承受 32b 延迟」（§9.3）。取价/生成/直配/澄清仍走 8b。
 # 部署：32b 在另一台服务器（config.yaml 记 172.19.2.2:8001/v1，model=/models/Qwen3-32B-AWQ），
@@ -46,13 +46,13 @@ KNOWLEDGE_URL = RAG_URL
 # PRD 钉死唯一默认作答口径为深圳·2013（2024 为试行版、非默认）；缺版本**不反问**，直接归一
 # 到默认口径并在输出带口径声明（meta.caliber）。
 # ⚠️ 数据前置：2013 组价数据（定额/价格/映射）未就绪（supports_compose=False）——默认 2013 时
-# /price/compose 会如实 501「数据未就绪」+ 给出路（宁缺毋造，不静默换版本）；/bill/match 可用
+# /price/compose 会如实 501「数据未就绪」+ 给出路（宁缺毋造，不静默换版本）；/search/bill-match 可用
 # （2013 清单向量库已建）。2013 数据入库后本默认无需改代码即完全可用；过渡期若要体验完整组价，
 # export CE_COST_DEFAULT_SPEC=2024 一行切换。
 COST_DEFAULT_SPEC = os.environ.get("CE_COST_DEFAULT_SPEC", "2013")
 COST_DEFAULT_REGION = os.environ.get("CE_COST_DEFAULT_REGION", "深圳")
 
-# ── 意图混合路由（AGENT_TODO M1 路由线）：确定性低置信时用 32b 兜底补能力分类 ──
+# ── 意图混合路由：确定性低置信时用 32b 兜底补能力分类 ──
 # 确定性 prerouter 命中强信号 → 零延迟直配（多数流量、金标回归）；判 route_confidence="low"
 # （落 norm 兜底、只泛词/纯默认、无版本锁）→ 调 routing/intent_fallback.classify_intent（桶 B 32b，
 # 复用 ORCH_LLM_*）。**红线闸（EH-03 出界 / caliber 口径 / feature）两条路都确定性、LLM 不碰**；

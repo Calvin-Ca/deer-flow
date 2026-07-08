@@ -1,5 +1,5 @@
 /**
- * 造价领域 MCP 工具的中间过程渲染（ce-task_* / ce-cost_* / ce-rag_* / ce-db_*）。
+ * 造价领域 MCP 工具的中间过程渲染（ce-task_* / ce-rag_* / ce-db_*）。
  *
  * 背景：deer-flow 原生 toolCall 流的泛型分支只画一行 label、不渲染工具结果（见 message-group.tsx
  * 的 `else` 分支）。把 norm_qa / cost_compose 等任务层能力做成 MCP 工具后，工具名/入参/结果天然
@@ -28,7 +28,6 @@ import {
 export function isCeTool(name: string): boolean {
   return (
     name.startsWith("ce-task_") ||
-    name.startsWith("ce-cost_") ||
     name.startsWith("ce-rag_") ||
     name.startsWith("ce-db_")
   );

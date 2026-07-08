@@ -30,7 +30,7 @@ def bill_match(
     base_url: str | None = None,
     timeout: int = 120,
 ) -> dict:
-    """打 RAG /search/bill-match：构件描述 → 清单候选召回（dense 向量 + 结构约束重排）。
+    """打 ce-rag /search/bill-match：构件描述 → 清单候选召回（dense 向量 + 结构约束重排）。
 
     参数：query —— 构件/做法自然语言描述；spec —— **国标版本（必填）**：2013 / 2024，按版本路由清单库；
       top_k —— 候选数；structural —— 结构约束重排（默认开）；rerank —— cross-encoder 精排（默认关）。
@@ -57,7 +57,7 @@ def price_compose(
     base_url: str | None = None,
     timeout: int = 120,
 ) -> dict:
-    """打 DB /price/compose/{region}/{code}：清单 → 适用定额 → 工料机含量 + 信息价单价（含小计）。
+    """打 ce-db /price/compose/{region}/{code}：清单 → 适用定额 → 工料机含量 + 信息价单价（含小计）。
 
     参数：region —— 地区（如「深圳」）；code —— 清单编码（9 位）；spec —— **国标版本（必填）**：2013 / 2024
       （按版本隔离 bill_spec 取数）；on_date —— 计价期（可选，缺省每资源取最新可用信息价期）。

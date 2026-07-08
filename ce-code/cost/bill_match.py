@@ -1,4 +1,4 @@
-"""构件→清单候选召回 —— /bill/match 取数原语（dense 向量检索）。
+"""构件→清单候选召回 —— /search/bill-match 取数原语（dense 向量检索）。
 
 输入构件/做法的自然语言描述，嵌入后在 ``bill_spec_kb`` Milvus collection 做 COSINE 检索，返回
 top_k 清单项候选 + 出处。**知识层只负责召回候选**；在候选内决策选码（LLM）归任务层 CostAgent

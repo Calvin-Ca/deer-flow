@@ -1,4 +1,4 @@
-# 知识服务（:8100）—— 单独启动，或被 docker/ce-services/docker-compose.yaml include
+# ce-rag 服务（:8100）—— 单独启动，或被 docker/ce-services/docker-compose.yaml include
 #
 # ⚠️ 本服务现为**纯 CPU**：唯一的本地 GPU 消费者（cross-encoder 精排）已拆到 docker/ce-rerank
 #    （:8098）。检索时经 CE_RERANK_URL HTTP 调它；rerank 服务不起 → 静默 fallback RRF（召回不变、精排失效）。
@@ -8,23 +8,19 @@
 #   cp docker/ce-code/.env.example docker/ce-code/.env
 #   docker compose -f docker/ce-code/docker-compose.yaml up -d
 #
-# ⚠️ 注：本目录 Dockerfile 尚为重构前旧版（COPY core/ 已不存在、CMD retrieval.server 已改名、缺 psycopg/mcp），
-#    build 不出当前代码——待单独修（见 ce-code TODO）。修后基底应从 pytorch-cuda 换 python:slim（本服务已纯 CPU）。
-
 services:
-  knowledge:
+  ce-rag:
     build:
       context: ../..                      # 项目根（COPY ce-code/ 的基准）
       dockerfile: docker/ce-code/Dockerfile
     image: rag-knowledge:latest
     container_name: rag-knowledge
-    network_mode: host                    # 直接复用宿主机网络，访问 Milvus/embed/vLLM/PG/rerank
+    network_mode: host                    # 直接复用宿主机网络，访问 Milvus/embed/PG/rerank
     restart: unless-stopped
     environment:
       # 精排服务地址（已拆出，见 docker/ce-rerank）；不起 rerank 则检索降级 RRF
       - CE_RERANK_URL=${CE_RERANK_URL:-http://localhost:8095}
-      # 造价库 PG 连接串（host-net 打宿主 :5433 的 ce-postgres；密码在 .env、不入 git）。
-      # 不设则回落无密码 DSN → PG 依赖端点（/price/compose /price/query /bill/get）fe_sendauth 报 503。
+      # 造价库 PG 连接串（aux_table / price_rule 投影检索会读取 PG；密码在 .env、不入 git）。
       - CE_PG_DSN=${CE_PG_DSN:-postgresql://cost@localhost:5433/ce_cost}
     volumes:
       - ${DATA_DIR}:/app/data:ro

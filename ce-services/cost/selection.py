@@ -2,7 +2,7 @@
 
 知识层只**召回候选**（Recall@10≈60%，正解多已进 top-k）；选 Top-1 归任务层（PRD §6）。本模块把
 「构件描述 + 候选清单项」交 LLM 选出最匹配的一项，产 ``{code, confidence, reason, need_review,
-alternatives}``。**默认走桶 B 32b**（AGENT_DEV §9.3：选码消歧 8b 最不可靠、选错最贵，非 2s 直配
+alternatives}``。**默认走桶 B 32b**（选码消歧 8b 最不可靠、选错最贵，非 2s 直配
 路径可承受 32b 延迟；未部署 32b 时 config 成对回落 8b）；``llm_url``/``model_id`` 仍可显式覆盖
 （benchmark 对比 8b/32b 即用此）。
 
@@ -59,7 +59,7 @@ def build_user_message(description: str, candidates: list[dict]) -> str:
 
     参数：
         description —— 构件/做法自然语言描述。
-        candidates —— 知识层 /bill/match 候选：``[{code, name, unit, feature, chapter, score, ...}]``。
+        candidates —— ce-rag /search/bill-match 候选：``[{code, name, unit, feature, chapter, score, ...}]``。
     返回：
         拼好的 user message（候选编号列出 code/名称/单位/特征/章节；末尾附 /no_think 禁 thinking）。
     """
@@ -114,7 +114,7 @@ def select_code(
     """LLM 在候选内选清单编码 + 确定性红线兜底。
 
     参数：
-        description —— 构件/做法描述；candidates —— /bill/match 候选列表；
+        description —— 构件/做法描述；candidates —— /search/bill-match 候选列表；
         llm_url / model_id —— vLLM 配置，缺省桶 B 32b（§9.3）；benchmark 可显式覆盖比 8b/32b。
     返回：
         ``{code, confidence, llm_confidence, external_confidence, reason, need_review, alternatives}``：

@@ -4,11 +4,11 @@
 retrieval`、不连 Milvus / PG，只打知识服务原语，再叠加路由 / 编排 / 生成 / 选码 / 校验闸逻辑。
 共进程 :8101（REST + MCP `/mcp`）。
 
-> 需求/设计见 `PRD.md` 与仓库根 `AGENT_PRD.md`/`AGENT_DEV.md`（四层骨架 §9、口径收窄+联网兜底 §8）；
-> HITL 设计见 `HITL_DESIGN.md`；进度见 `TODO.md`。
+> 需求/设计见 `PRD.md` 与仓库根 `AGENT_PRD.md`；服务间契约见 `INTERFACE_CONTRACTS.md`；
+> HITL 设计见 `HITL_DESIGN.md`。
 > 服务器运行级联调步骤见 `RUNTIME_E2E_RUNBOOK.md`。
 
-## 拓扑（四层骨架，AGENT_DEV §9）
+## 拓扑（四层骨架）
 
 ```
 ce-code RAG 服务 :8100 (service.rag_api：条文检索 /search/clause /expand/clauses /clause

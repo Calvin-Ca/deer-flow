@@ -1,12 +1,11 @@
 # ce-code（知识层）
 
-**深圳房建组价知识库**（清单 / 定额 / 价格 / 费率 + 取数原语）。本文件只**涉及**：目录结构、流水线命令、起服务。
-（规范条文检索 RAG 已于 2026-06-18 重构移除，日后按需重建；算量不在本层。）
+**深圳房建组价知识库 + 造价规范 RAG 知识层**（清单 / 定额 / 价格 / 费率 + 规范条文检索 + 候选召回）。
+本文件只**涉及**：目录结构、流水线命令、起服务。算量不在本层。
 
 > - 需求/设计（领域铁律、schema、多表征、检索/造价设计、端点规格）见 `PRD.md`
-> - 依赖服务与环境（Embedding/VLM/Milvus/版本约束/GPU）见 `DEV.md`
-> - 进度与评测指标见 `TODO.md`
-> - **MCP 分拆设计**（`ce-rag` / `ce-db`、文件迁移清单、Tool API 列表）见 `MCP_SPLIT_PLAN.md`
+> - **服务接口契约**（`ce-rag` / `ce-db` / `ce-task` 边界、候选/真值/证据语义）见 `../ce-services/INTERFACE_CONTRACTS.md`
+> - **运行联调步骤**见 `../ce-services/RUNTIME_E2E_RUNBOOK.md`
 > - 项目级共享上下文（设备分工、git 约定、服务器环境）见仓库根 `CLAUDE.md`
 > - **任务层（生成/合规编排）在 `../ce-services/`**，是本服务的纯 HTTP 客户端，文档见 `../ce-services/README.md`
 
@@ -63,10 +62,7 @@ ce-code/
 │   ├── rag_api.py                  #   :8100 新入口：ce-rag REST + /mcp
 │   ├── db_api.py                   #   :8102 新入口：ce-db REST + /mcp
 │   ├── rag_mcp_server.py           #   ce-rag MCP façade
-│   ├── db_mcp_server.py            #   ce-db MCP façade
-│   ├── knowledge_api.py            #   旧复合入口（兼容层）：cost_router + /search /expand /clause
-│   ├── cost_api.py                 #   旧结构化 router（/bill/match /price/compose /quota，spec 必填）
-│   └── mcp_server.py               #   旧复合 MCP（ce-cost，兼容层）
+│   └── db_mcp_server.py            #   ce-db MCP façade
 └── tools/
     ├── eval_bill.py                #   清单召回评测（Top-1/Top-3/Recall@k/MRR，按编码精确判命中）
     └── build_match_gold.py         #   真实结算 xlsx → 清单匹配 gold（脱敏 + 覆盖过滤）
@@ -74,7 +70,7 @@ ce-code/
 
 > **运行模型**：ce-code 不安装为包（`packages=[]`），**从 ce-code 根运行**，绝对 import 无 sys.path hack。
 > 摄取 `python -m ingest.parser mineru …` / `python -m ingest.splitter toc …`；造价抽取 `python -m cost.<模块>`；
-> 服务 `python -m service.rag_api` / `python -m service.db_api`（旧兼容入口仍可 `python -m service.knowledge_api`）；评测 `python -m tools.eval_bill`。
+> 服务 `python -m service.rag_api` / `python -m service.db_api`；评测 `python -m tools.eval_bill`。
 > **范围**：ce-code = **深圳房建组价知识库**（清单/定额/价格/费率 + 取数原语）**+ 造价规范条文检索**
 > （Norm-QA，2026-06-22 起从 git 历史恢复 hybrid 引擎，语料为 GB 50500/50854/50856 计量计价规范）。
 > 防火规范 RAG 仍停做。算量不在本层。
@@ -161,35 +157,30 @@ uv run python -m ingest.splitter toc --input "data/parsed/<basename>/auto/<basen
 
 ---
 
-## HTTP 服务脚本（知识服务 :8100，统一入口）
-
-`service.knowledge_api` 为 :8100 统一入口——挂载组价取数（cost_router：/bill/match /price/compose
-/quota + **/price/query** 当期信息价查询（FR-I，名称模糊+期号，动态数据无关 spec）+ **/bill/get/{code}**
-清单编码精确查询（FR-C 核对原语，spec 必填））+ 规范条文检索（/search /expand /clause，供 Norm-QA）。
-MCP façade `ce-cost` 四原语：bill_match / quota_lookup / price_compose / price_query。
-仅起组价测试可单跑 `service.cost_api`。
-
-2026-07 新拆分入口：
+## HTTP 服务脚本（ce-rag :8100 / ce-db :8102）
 
 - `service.rag_api`（默认 `:8100`）—— `ce-rag`：条文检索 / bill_match / 半结构化投影检索
 - `service.db_api`（默认 `:8102`）—— `ce-db`：结构化真值取数（bill/quota/price/fee_rate/aux_table）
-- 详细 Tool API 与文件迁移方案见 `MCP_SPLIT_PLAN.md`
 
 ```bash
-# 统一知识服务（组价取数 + 规范条文检索，:8100）—— 从 ce-code 根，模块式
-cd /mnt/nvme/calvin/code/deer-flow/ce-code && uv run python -m service.knowledge_api
-curl http://localhost:8100/health   # ready_standards 列出已建索引的规范
+# ce-rag（检索 + 候选召回 + MCP）—— 从 ce-code 根，模块式
+cd /mnt/nvme/calvin/code/deer-flow/ce-code && uv run python -m service.rag_api
+curl http://localhost:8100/health
+
+# ce-db（结构化真值 + 价格/定额/费率 + MCP）
+cd /mnt/nvme/calvin/code/deer-flow/ce-code && uv run python -m service.db_api
+curl http://localhost:8102/health
 ```
 
 组价取数须带**国标版本** `spec`（2013/2024，必填）：
 ```bash
-curl -s -X POST http://localhost:8100/bill/match -H 'Content-Type: application/json' -d '{"query":"C30现浇矩形柱","spec":"2024","top_k":5}'
-curl -s "http://localhost:8100/price/compose/%E6%B7%B1%E5%9C%B3/010401002?spec=2024"
+curl -s -X POST http://localhost:8100/search/bill-match -H 'Content-Type: application/json' -d '{"description":"C30现浇矩形柱","spec":"2024","top_k":5}'
+curl -s "http://localhost:8102/price/compose/%E6%B7%B1%E5%9C%B3/010401002?spec=2024"
 ```
 
 规范条文检索（Norm-QA，须带 `standard` 代号，见 `config.STANDARD_ALIASES`）：
 ```bash
-curl -s -X POST http://localhost:8100/search -H 'Content-Type: application/json' -d '{"query":"满堂脚手架工程量怎么计算","standard":"gb50854-2024","top_k":10}'
+curl -s -X POST http://localhost:8100/search/clause -H 'Content-Type: application/json' -d '{"query":"满堂脚手架工程量怎么计算","standard":"gb50854-2024","top_k":10}'
 ```
 
 端到端：组价编排（构件→选码→组价）由 CostAgent、规范问答由 Norm-QA——均在任务层 `../ce-services/`
@@ -288,7 +279,7 @@ CE_PG_DSN='postgresql://cost:<密码>@localhost:5433/ce_cost' uv run python -m c
 2013 与 2024 两套清单计量国标**同 9 位码不同义**（见 `notebooks/experiments.md` E6–E9），混用会串库。隔离三层：
 - **关系库**：`bill_spec` 复合主键 `(code, spec_version)`，2013（`GB/T 50854-2013`）与 2024（`GB/T 50854-2024`/`GB/T 50856-2024`）同码共存不覆盖。
 - **向量库**：每版本独立 collection —— `cost_bill_spec_kb`(2024) / `cost_bill_spec_kb_2013`(2013)。
-- **路由**：`config.SPEC_REGISTRY` + `resolve_spec(spec)` 把版本号（`"2013"`/`"2024"`）映射到 collection + `bill_spec_versions` 过滤集 + `supports_compose` 标志。`/bill/match`（请求体 `spec` 必填）、`/price/compose`（query `spec` 必填）按版本路由；**spec 无默认，缺省/未知 → 400**（逼调用方显式选版本）。`supports_compose=False`（当前 2013，组价定额/价格/映射数据未就绪）→ `/price/compose` 返回 501，仅 `/bill/match` 可用。
+- **路由**：`config.SPEC_REGISTRY` + `resolve_spec(spec)` 把版本号（`"2013"`/`"2024"`）映射到 collection + `bill_spec_versions` 过滤集 + `supports_compose` 标志。`/search/bill-match`（请求体 `spec` 必填）、`/price/compose`（query `spec` 必填）按版本路由；**spec 无默认，缺省/未知 → 400**（逼调用方显式选版本）。`supports_compose=False`（当前 2013，组价定额/价格/映射数据未就绪）→ `/price/compose` 返回 501，仅 `/search/bill-match` 可用。
 
 任务层 CostAgent 调用前须向用户确认所用国标版本（2013/2024）再透传 `spec`（`ce-services/common/cost_client.py` 的 `bill_match`/`price_compose` 已加 `spec` 必填参数）。
 

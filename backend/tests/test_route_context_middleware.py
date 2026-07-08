@@ -122,7 +122,7 @@ def test_no_coerce_after_tool_activity_this_turn():
     state = {"messages": [
         _reminder("feature"), _user(),
         AIMessage(content="", id="ai-1",
-                  tool_calls=[{"name": "ce-cost_bill_match", "args": {}, "id": "tc-1", "type": "tool_call"}]),
+                  tool_calls=[{"name": "ce-rag_match_bill_item", "args": {}, "id": "tc-1", "type": "tool_call"}]),
         ToolMessage(content="候选清单码…", tool_call_id="tc-1", id="tm-1"),
         AIMessage(content="请从以下候选里确认？", id="ai-2"),
     ]}

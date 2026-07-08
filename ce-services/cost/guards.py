@@ -1,11 +1,11 @@
-"""cost 侧校验闸（③ 层，AGENT_DEV §9.2 ③「cost 侧对齐同一 GuardReport 契约」/ §9.5 T-A3）。
+"""cost 侧校验闸（③ 层，对齐同一 GuardReport 契约）。
 
 norm 侧把 C-01/02/03 收成 ``norm/guards.py``；cost 侧此前只有 provenance 信封逐字段透传
 （need_review / no_source / missing_base / 501），**没有一个统一的结构化裁决**。本模块把 cost 组价
 结果（``orchestration.compose`` 产物）过一遍确定性校验闸（无 LLM），产出**与 norm 同形的
 ``common.guards.GuardReport``** → 进 ``meta.guard``，前端/审计据同一契约读「口径纯净/溯源完整/裁决」。
 
-cost 侧三红线映射（对齐 AGENT_PRD C-01/02/03）：
+cost 侧三红线映射（对齐 PRD C-01/02/03）：
   - **C-03 无命中不幻觉**：选不出码（``code=None`` / ``need_review``）→ ``verdict=reject``、``tier=none``
     （转人工，不杜撰编码/价格）；选到码但价格未就绪/无定额映射 → 价格缺口如实透传（``provenance_complete=False``，
     不 reject——选码本身有价值）。

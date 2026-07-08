@@ -404,7 +404,7 @@ def cost_check_endpoint(req: CostCheckRequest) -> dict:
         detail = exc.response.text if exc.response is not None else str(exc)
         raise HTTPException(status_code=code, detail=f"知识服务返回错误: {detail}") from exc
     except requests.RequestException as exc:
-        raise HTTPException(status_code=503, detail=f"知识服务不可达（:8100 /bill/get）: {exc}") from exc
+        raise HTTPException(status_code=503, detail=f"ce-db 不可达（:8102 /bill/{{code}}）: {exc}") from exc
     logger.info("/cost/check spec=%s rows=%d issues=%d",
                 result.get("spec"), result.get("total"), result.get("rows_with_issues"))
     return result

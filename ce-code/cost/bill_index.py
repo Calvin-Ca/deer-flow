@@ -1,4 +1,4 @@
-"""造价清单向量库 bill_spec_kb —— 从 PG bill_spec 建 Milvus collection，供 /bill/match 构件→清单候选召回。
+"""造价清单向量库 bill_spec_kb —— 从 PG bill_spec 建 Milvus collection，供 /search/bill-match 构件→清单候选召回。
 
 **源是 PG ``ce_cost.bill_spec``**（非 chunks.json；造价取数一律走 PG），把每条清单项嵌成向量入 Milvus。
 **嵌入复用规范轨**（bge-large-zh-v1.5 @ ``embed_url``, dim 1024）与 ``index.vector_index.embed_texts``——

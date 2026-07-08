@@ -2,7 +2,7 @@
 
 > 适用范围：`工程造价完整流程.md` 描述的「项目特征 → 总造价」13 步全流程。
 > 本文是**编排层（ce-services）设计文档**，定义为什么要可中断编排、怎么分层、数据契约长什么样。
-> 计算原语归 `ce-cost`，编排图归 `ce-services`，本文是两者的接口约定。
+> 候选召回归 `ce-rag`，结构化取数归 `ce-db`，编排图归 `ce-services`，本文是 HITL 编排接口约定。
 
 ---
 
@@ -33,7 +33,7 @@
 
 | 层 | 职责 | 归属 |
 |---|---|---|
-| **计算原语** | 选码 / 套定额 / 标准化 / 查价 / 算费，确定性、返回结构化依据 | `ce-cost`（MCP/可调函数） |
+| **取数原语** | 候选召回 / 套定额 / 标准化 / 查价 / 算费，确定性、返回结构化依据 | `ce-rag` + `ce-db`（MCP/HTTP 原语） |
 | **编排图** | 步骤状态机、闸门、状态持久化、provenance 事件、可恢复 | `ce-services`（langgraph） |
 | **会话门面** | 意图路由 + setup 澄清，**不当逐步编排器** | `lead_agent` |
 | **展示/交互** | 依据卡 + 确认/录入控件，从结构化 payload 渲染 | 前端 |
@@ -115,7 +115,7 @@
 
 ### 5.1 原语返回（通用 provenance 信封）
 
-所有 `ce-cost` 原语统一返回该结构，**来源是字段不是散文**：
+所有取数原语统一返回该结构，**来源是字段不是散文**：
 
 ```json
 {
@@ -254,7 +254,7 @@
 ## 9. 落地路径（建议顺序）
 
 1. **🟢 定原语契约**（本地就位 2026-06-28）：§5.1 provenance 信封落 `ce-services/cost/provenance.py`——
-   **决策改为「原地包一层」**（不新建 `ce-cost/` 目录、不搬代码），适配器 `list_match`/`from_price_compose`
+   **决策改为「原地包一层」**（不新建独立兼容服务、不搬代码），适配器 `list_match`/`from_price_compose`
    裹现有 `bill_match`/`select_code`/`price_compose`。信息价文件名+行号级 `source_ref` 知识层暂未返回，
    best-effort + `TODO(knowledge-layer)` 标注（去标记是本步后续）。
 2. **⬜ 打通信息价那一步**（HITL × provenance 交汇最密）：来源闸已在 setup 采集（`price_source`）、缺价逐项闸

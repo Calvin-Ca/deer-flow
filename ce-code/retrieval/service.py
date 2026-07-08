@@ -1,7 +1,7 @@
 """检索服务 —— 对外统一检索入口（RetrievalQuery → KnowledgeContext），传输无关。
 
 收口检索原语的「业务编排」（不含 HTTP）：规范代号 → store 解析 → 混合检索 / 引用扩展 / 单条
-直取，产 IR（KnowledgeContext / RetrievedChunk）。HTTP 层（service/knowledge_api）只做 IR↔JSON
+直取，产 IR（KnowledgeContext / RetrievedChunk）。HTTP 层只做 IR↔JSON
 翻译 + 异常→状态码映射；CLI（tools/）亦复用本类。
 
 异常约定（由调用方映射）：未知规范代号 → ValueError（HTTP 400）；store 未就绪 →

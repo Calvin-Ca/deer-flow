@@ -1,7 +1,5 @@
 """意图混合路由（确定性 + LLM 兜底）—— 只在确定性**低置信**时兜底补一次能力分类。
 
-> 对应 AGENT_TODO「意图混合路由（确定性 + LLM 兜底，归 benchmark M1 路由线）」。
-
 **为什么要 LLM 兜底**：``routing/prerouter`` 是关键词/信号确定性路由——多数流量零延迟、金标可回归，
 但两处天然会漏：① **关键词穷举疲劳**（同义变体列不尽）；② **口语变体漏判**（「帮我把这根柱子弄一下」
 无任何组价动作词）。这些恰是 prerouter 判 ``route_confidence="low"`` 的场景（落 norm 兜底、只命中泛词/
@@ -12,7 +10,7 @@
   - **低置信**（``route_confidence="low"``）→ 调 **32b 兜底分类器**（temp=0、enum JSON、校验），把
     可能被口语裹住的 cost/price/compound 从 norm 兜底里捞回来。
 
-**红线不交给弱模型**（AGENT_TODO 硬约束）：LLM **只补 capability 分类**，**绝不碰安全闸**——
+**红线不交给弱模型**：LLM **只补 capability 分类**，**绝不碰安全闸**——
 EH-03 跨地域出界、口径 caliber、特征 feature、compose_full 形态，全部在 ``route(capability_override=...)``
 里**确定性重推**。LLM 判错顶多是能力分类偏一点（可被下游 guard/取数零命中兜住），碰不到「按错口径
 给数据」这类不可逆红线。

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""意图混合路由·兜底层评测（AGENT_TODO M1 路由线：确定性 + LLM 兜底）。
+"""意图混合路由·兜底层评测（确定性 + LLM 兜底）。
 
 评三件事（金标 ``benchmark/routing_eval/intent_fallback_eval.jsonl``，难例/含糊/口语变体集）：
   1. **升级门（确定性，离线）**：每条 ``route().route_confidence`` 是否等于金标 ``expect_confidence``

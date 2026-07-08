@@ -1,10 +1,10 @@
-"""清单匹配评测 —— 给 `/bill/match`（构件→清单候选）上护栏，量化排序质量。
+"""清单匹配评测 —— 给 `/search/bill-match`（构件→清单候选）上护栏，量化排序质量。
 
 读金标 `match_gold.jsonl`（每行 ``{query, gold:[code...], note?}``）→ 对每条跑
 ``cost.bill_match.search_bill`` 取候选 → 按**编码精确相等**判命中（清单 9 位码唯一，无规范轨的
 「包含关系」），算 **Top-1 / Top-3 / Recall@k / MRR / 平均金标秩**（PRD §6 排序敏感口径）。
 
-PRD §6 红线：Top-1 ≥ 85% / Top-3 ≥ 95%。未达即 `/bill/match` 仅「跑通」、需上 sparse/rerank/KG。
+PRD §6 红线：Top-1 ≥ 85% / Top-3 ≥ 95%。未达即 `/search/bill-match` 仅「跑通」、需上 sparse/rerank/KG。
 
 使用（服务器，从 ce-code 根，需 Milvus + 嵌入服务在跑）：
   uv run python -m tools.eval_bill                                  # 默认 gold + top_k=10

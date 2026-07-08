@@ -1,6 +1,6 @@
-"""校验闸共享契约（③ 层，AGENT_DEV §9.1）—— 跨能力（norm / cost）统一的 ``GuardReport``。
+"""校验闸共享契约（③ 层）—— 跨能力（norm / cost）统一的 ``GuardReport``。
 
-> 对应 §9.2 ③「cost 侧对齐同一 GuardReport 契约」、§9.5 T-A3；AGENT_PRD C-01 溯源 / C-02 口径纯净 /
+> 对应 PRD C-01 溯源 / C-02 口径纯净 /
 > C-03 空结果不幻觉。
 
 **为什么抽到 common**：校验闸最初生于 norm 侧（``norm/guards.py``），但 C-01/02/03 是**全能力红线**，

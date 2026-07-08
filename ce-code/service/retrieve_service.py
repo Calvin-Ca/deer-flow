@@ -1,7 +1,7 @@
-"""对外检索编排 —— 在 RetrievalService 之上加可观测性（承旧 server._run_search / _log_clauses）。
+"""对外检索编排 —— 在 RetrievalService 之上加可观测性。
 
 职责：请求级编排 + 日志/计时/request_id，产**对外响应 dict**（字段名逐字保持旧契约）。检索数值
-逻辑全在检索层（retrieval.RetrievalService），本层不碰；HTTP 层（knowledge_api）只调本层方法 +
+逻辑全在检索层（retrieval.RetrievalService），本层不碰；HTTP 层只调本层方法 +
 做异常→状态码映射。CLI（tools/）亦可复用。
 """
 from __future__ import annotations
@@ -56,7 +56,7 @@ class KnowledgeRetrieveService:
         }
 
     def get_clause(self, standard: str, node_path: str) -> dict:
-        """单条直取 → (store 名, 行 dict 或 None) 经 knowledge_api 映射（None → 404）。"""
+        """单条直取 → (store 名, 行 dict 或 None) 经 HTTP 层映射（None → 404）。"""
         store_name, clause = self.svc.get_clause(standard, node_path)
         return {"standard": store_name, "node_path": node_path, "clause": clause}
 

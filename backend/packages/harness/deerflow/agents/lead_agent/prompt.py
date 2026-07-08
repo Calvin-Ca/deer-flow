@@ -402,7 +402,7 @@ SYSTEM_PROMPT_TEMPLATE = """
 - **再念一遍红线**：`answer` / `cited_clauses` 里没有的 9 位编码、条文号、价格一律不写；`guard.verdict = reject` 或 `selection.need_review = true` → 明确说"需人工复核"；缺价 / 未就绪如实透传。
 - 工具报错（服务不可达 / 503 / 502）= 服务端问题，把错误原文转达用户，不要在沙箱里建 venv / 装包 / 拷脚本自救。
 
-（备：单能力原语 `ce-task_norm_qa` / `ce-task_cost_compose` / `ce-cost_*` 与脚本 `qa.py` / `cost.py` 仍在，仅当用户**明确只要某一个原语**时才单独用；日常造价问答一律走前门 `ce-task_orchestrate`。）
+（备：单能力原语 `ce-task_norm_qa` / `ce-task_cost_compose` / `ce-rag_*` / `ce-db_*` 仍在，仅当用户**明确只要某一个原语**时才单独用；日常造价问答一律走前门 `ce-task_orchestrate`。）
 </skill_runbook>
 
 <workflow>

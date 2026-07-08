@@ -1,6 +1,6 @@
 """cost/query.py —— 造价关系库（PG）只读取数访问层。
 
-服务层（``service.cost_api``）与 CLI/测试共享的数据访问原语：给定 region + 编码，
+服务层（``service.db_api``）与 CLI/测试共享的数据访问原语：给定 region + 编码，
 从 ``ce_cost`` 库取「定额子目 + 工料机含量」等组价取数结果。与写入侧 ``load_pg.py``
 分离（本文件只读、不建表不 upsert）。
 

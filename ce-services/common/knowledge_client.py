@@ -4,8 +4,8 @@
 （默认 :8100）的检索原语 ``/search/clause`` ``/expand/clauses`` ``/clause/{standard}/{path}``。好处：retrieval +
 rerank 模型只在知识服务加载一份、索引预热只一处；任务层保持轻量、可独立部署。
 
-与造价取数客户端 ``common.cost_client``（/bill/match /price/compose /quota）并列——同一知识服务
-（:8100）的两类原语：本模块取规范条文（Norm-QA），cost_client 取组价数据（CostAgent）。
+与造价取数客户端 ``common.cost_client`` 并列：本模块取 ce-rag 规范条文（Norm-QA），
+cost_client 分别调用 ce-rag 候选召回与 ce-db 结构化取数（CostAgent）。
 
 ``standard`` 参数取 ``config.STANDARD_ALIASES`` 的代号（造价规范如 ``gb50854-2024`` /
 ``gb50500-2013``，按国标版本隔离），Norm-QA 调用须显式传，不依赖默认。

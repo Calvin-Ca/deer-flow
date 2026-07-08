@@ -63,6 +63,12 @@ class CostTaskState(TypedDict, total=False):
     events: Annotated[list[dict[str, Any]], operator.add]
     critic: dict[str, Any] | None
     status: str
+    # ── 4 步版 HITL 统一机制通道（hitl.py）──
+    pending_human_task: dict[str, Any] | None  # 当前挂起的 HumanTask（hitl 节点写、apply 节点消费清空）
+    hitl_result: dict[str, Any] | None         # 人的 HumanResponse（resume 注入，apply 节点消费清空）
+    resolved_tasks: list[str]                  # 已完成的 project 级 task_type（会话粘性，一次管全单）
+    final_approved: bool | None                # 终审结果（None=未审 / True/False）
+    escalations: Annotated[list[dict[str, Any]], operator.add]  # escalate 改派轨迹
 
 
 def _now() -> str:

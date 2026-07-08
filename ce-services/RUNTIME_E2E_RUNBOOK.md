@@ -288,12 +288,12 @@ curl -s http://127.0.0.1:8101/mcp \
 ```
 
 期望至少看到这些工具名：
-- `orchestrate`
-- `norm_qa`
-- `cost_compose`
-- `quota_lookup`
-- `price_lookup`
-- `start_cost_session`
+- `orchestrate_tool`
+- `norm_qa_tool`
+- `cost_compose_tool`
+- `quota_lookup_tool`
+- `price_lookup_tool`
+- `start_cost_session_tool`
 
 ## 6. gateway / agent 联调
 
@@ -307,11 +307,11 @@ curl -s http://127.0.0.1:8101/mcp \
 建议的对话验证用例：
 
 1. `现浇混凝土矩形柱按什么计量，按 gb50854-2024 回答`
-   期望：`ce-task_norm_qa` 或 `ce-task_orchestrate` -> `ce-rag search_clause`
+   期望：`ce-task_norm_qa_tool` 或 `ce-task_orchestrate_tool` -> `ce-rag search_clause`
 2. `C30现浇钢筋混凝土矩形柱，按 2024 在深圳组价`
-   期望：`ce-task_cost_compose` 或 `ce-task_orchestrate` -> `ce-rag match_bill_item` -> `ce-db price_compose`
+   期望：`ce-task_cost_compose_tool` 或 `ce-task_orchestrate_tool` -> `ce-rag match_bill_item` -> `ce-db price_compose`
 3. `深圳钢筋信息价是多少`
-   期望：`ce-task_price_lookup` 或 `ce-task_orchestrate` -> `ce-db price_query`
+   期望：`ce-task_price_lookup_tool` 或 `ce-task_orchestrate_tool` -> `ce-db price_query`
 
 判定标准：
 - 前端或日志里应出现 `ce-rag_*` / `ce-db_*` / `ce-task_*`。
@@ -322,10 +322,10 @@ curl -s http://127.0.0.1:8101/mcp \
 - `:8101` 正常启动但 `/mcp` 404
   - 大概率是没走新 `main.py`，或 `mcp` 依赖未装，或进程未重启。
 - `:8101/health` 还指向旧 `knowledge_url`
-  - 大概率是 `ce-services/common/config.py` 没更新到新版本，或环境变量覆盖了预期值。
+   - 大概率是 `ce-services/common/config.py` 没更新到新版本，或环境变量覆盖了预期值。
 - `ce-rag` 正常但 `ce-db` 全部 500
   - 优先查 PG 连接、只读账号、相关结构化表是否齐全。
-- `ce-task cost_compose` 能选码但不能取价
+- `ce-task cost_compose_tool` 能选码但不能取价
   - 先单独打 `:8102/price/compose/...`，确认是 `ce-db` 问题还是任务层问题。
 - gateway 对话里没有出现 `ce-rag_*` / `ce-db_*` / `ce-task_*`
   - 大概率是 gateway 没重启、配置缓存没刷新，或者 agent allow-list 未包含新工具名。

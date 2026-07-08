@@ -184,7 +184,8 @@ def test_ignite_listing_multi_item():
                           extract_fn=lambda t: extract_components(_TEXT, llm_fn=_stub_ok),
                           start_fn=stub_start, critic_fn=_stub_critic)
     assert out["mode"] == "hitl" and out["task_id"] == "t-listing"
-    assert "cost-hitl" in out["marker"]
+    assert out["interrupt"] is None
+    assert out["ui_hint"]["kind"] == "inline_session"
     assert out["listing"]["count"] == 2 and len(out["listing"]["preview"]) == 2
     assert out["listing"]["critic"] == {"status": "ok", "findings": 1}  # 复核摘要外露
     feats = started["features"]

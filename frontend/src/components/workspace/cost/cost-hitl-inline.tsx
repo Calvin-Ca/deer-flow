@@ -101,11 +101,12 @@ function DoneSummary({ snap }: { snap: Snapshot }) {
 }
 
 /**
- * Inline cost-HITL widget rendered inside a chat message (triggered by the
- * ``cost-hitl`` marker). Bound to an existing session ``taskId``, it loads the
- * current gate via ``/ce-cost/session/{id}/state`` and drives resume directly —
- * gate decisions are structured clicks, never round-tripped through the LLM.
- * After done it shows a reviewable summary (rebuilt from persisted state on reload).
+ * Inline cost-HITL widget rendered inside a chat message (triggered by a
+ * structured launch result with ``task_id`` / ``interrupt``). Bound to an
+ * existing session ``taskId``, it loads the current gate via
+ * ``/ce-cost/session/{id}/state`` and drives resume directly — gate decisions
+ * are structured clicks, never round-tripped through the LLM. After done it
+ * shows a reviewable summary (rebuilt from persisted state on reload).
  */
 export function CostHitlInline({ taskId }: { taskId: string }) {
   const [snap, setSnap] = useState<Snapshot | null>(null);

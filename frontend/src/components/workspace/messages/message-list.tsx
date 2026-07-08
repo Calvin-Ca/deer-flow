@@ -16,7 +16,7 @@ import {
   ConversationScrollButton,
 } from "@/components/ai-elements/conversation";
 import { Button } from "@/components/ui/button";
-import { extractHitlTaskIdFromMessages } from "@/core/cost/marker";
+import { extractLaunchTaskIdFromMessages } from "@/core/cost/marker";
 import { useI18n } from "@/core/i18n/hooks";
 import {
   buildTokenDebugSteps,
@@ -210,7 +210,7 @@ export function MessageList({
         const turnMessages = groupedMessages
           .slice(turnStart, i + 1)
           .flatMap((g) => g.messages);
-        const taskId = extractHitlTaskIdFromMessages(turnMessages);
+        const taskId = extractLaunchTaskIdFromMessages(turnMessages);
         if (taskId) map.set(i, taskId);
         turnStart = -1;
       }

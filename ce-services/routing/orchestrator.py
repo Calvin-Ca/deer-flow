@@ -112,13 +112,13 @@ def _spec_of(query: str) -> tuple[str, str]:
 
 
 def _ignite_hitl(query: str, decision: RouteDecision) -> dict[str, Any]:
-    """完整组价形态（Option B）：**点火**一个可中断 HITL 组价会话，返回 task_id + cost-hitl marker。
+    """完整组价形态（Option B）：**点火**一个可中断 HITL 组价会话，返回结构化会话信封。
 
-    前门只点火、不编排（HITL_DESIGN §10）：起会话跑到首个闸，前端据 marker/task_id 内嵌渲染交互式
-    组价控件，用户在控件里逐闸办到总造价——全程不经弱模型。版本：query 显式 2013/2024 优先，否则
-    传 None 让图 setup 归一到默认深圳·2013（留口径声明事件）。点火失败（服务/LLM 不可达）→ 降级为
+    前门只点火、不编排（HITL_DESIGN §10）：起会话跑到首个闸，前端根据 ``task_id`` 读取会话状态并渲染
+    交互式组价控件，用户在控件里逐闸办到总造价——全程不经弱模型。版本：query 显式 2013/2024 优先，
+    否则传 None 让图 setup 归一到默认深圳·2013（留口径声明事件）。点火失败（服务/LLM 不可达）→ 降级为
     一次性 compose（不致命，用户至少拿到选码），status 标降级。
-    返回：``{mode:"hitl", route, task_id, marker, status, first_gate}``。
+    返回：``{mode:"hitl", route, task_id, status, interrupt, ui_hint}``。
     """
     from cost import session  # 局部 import：隔离 langgraph 依赖，与 dispatch_subtask 一致
     spec, spec_source = _spec_of(query)
@@ -133,18 +133,24 @@ def _ignite_hitl(query: str, decision: RouteDecision) -> dict[str, Any]:
                 "result": {"capability": "cost", "query": query, "status": "ok",
                            "result": fallback, "note": f"HITL 点火失败降级一次性选码：{exc}"}}
     task_id = res.get("task_id")
-    marker = "```cost-hitl\n" + json.dumps({"task_id": task_id}, ensure_ascii=False) + "\n```"
     logger.info("orchestrate hitl-ignite task=%s status=%s", task_id, res.get("status"))
-    # **刻意不返回 first_gate**：前端内嵌控件自己 getSessionState 拿闸，无需它；返回给弱模型 lead 反而
-    # 被它读去用文字转述首闸（编「1/13、请选择 1确认2覆盖3补充」等，与卡片真按钮重复且误导）。只留 note
-    # 明示「只回一句就停、勿转述闸」——素材少了、弱模型没得发挥（红线不靠自觉：能不给的素材就不给）。
-    return {"mode": "hitl", "route": decision.as_meta(), "task_id": task_id,
-            "marker": marker, "status": res.get("status"),
-            # note 给弱模型：描述意图、**不给照抄话术**（给带引号的固定句 → 弱模型易吐两遍）、**不提上/下方向**
-            # （卡片位置由前端定，方向词易说反自相矛盾）。逐闸交互全在控件里、不经它。
-            "note": ("HITL 组价会话已成功启动，页面已内嵌交互式组价控件。你只需用**一句话、你自己的话**"
-                     "简短告知用户会话已开始、后续在页面的组价控件里逐步完成即可，随后立即结束回合。"
-                     "严禁：转述闸/编码/条文内容、罗列操作选项、重复语句、编造任何编码或数字。")}
+    interrupt = res.get("interrupt")
+    return {
+        "mode": "hitl",
+        "route": decision.as_meta(),
+        "task_id": task_id,
+        "status": res.get("status"),
+        "interrupt": interrupt,
+        "ui_hint": {
+            "kind": "inline_session",
+            "start_path": "/ce-cost/session/start",
+            "state_path": f"/ce-cost/session/{task_id}/state",
+            "resume_path": f"/ce-cost/session/{task_id}/resume",
+        },
+        "note": ("HITL 组价会话已启动，页面会显示交互式组价控件。"
+                 "你只需用一句话告知用户会话已开始，后续直接在页面控件里逐步完成即可。"
+                 "不要转述闸、编码、条文或任何数字。"),
+    }
 
 
 # 域外直答文案（M1 域外出口）：路由判 out_of_domain → 顶层说明能力范围，不进检索/取数管道白跑。
@@ -170,13 +176,13 @@ def _ignite_listing(query: str, decision: RouteDecision, *,
                     extract_fn: Callable[[str], dict] | None = None,
                     start_fn: Callable[..., dict] | None = None,
                     critic_fn: Callable[[str, list], dict] | None = None) -> dict[str, Any]:
-    """批量列清单点火（M2 §3.1 管线①→现有图）：抽构件 → 多构件 HITL 会话 → marker。
+    """批量列清单点火（M2 §3.1 管线①→现有图）：抽构件 → 多构件 HITL 会话 → 结构化会话信封。
 
     参数：query —— 原句（v0 把整条消息当抽取原文：用户把设计说明贴在消息里）；decision —— 路由判定；
       extract_fn / start_fn —— 可注入（单测 stub，本地零 langgraph 可测）；缺省用真实现。
     返回（三分支）：
-      - 抽到 ≥1 件 → ``session.start(features=[...])`` 批量点火，``{mode:"hitl", listing:{count, preview}}``
-        + marker（前端复用现有逐闸控件；评审表 UI 归 M2 后段）；抽到的工程量随件预供（quantity_gate 自动过）。
+      - 抽到 ≥1 件 → ``session.start(features=[...])`` 批量点火，``{mode:"hitl", listing:{count, preview},
+        task_id, interrupt, ui_hint}``；前端复用现有逐闸控件；抽到的工程量随件预供（quantity_gate 自动过）。
       - 抽到 0 件 / 抽取失败 → ``need_input`` 引导贴设计说明或补构件特征（不硬拆、不空跑 compose）。
       - 点火失败（服务/图不可达）→ 降级返回抽取结果本身（用户至少拿到构件清单草稿），status 标降级。
     版本：沿 §4.0 口径——query 显式 2013/2024 优先，否则 None 交图 setup 归一默认。
@@ -216,20 +222,30 @@ def _ignite_listing(query: str, decision: RouteDecision, *,
                            "note": f"已抽取 {len(items)} 个构件但组价会话启动失败（{exc}）；"
                                    "以下为构件清单草稿，供人工核对后重试。"}}
     task_id = res.get("task_id")
-    marker = "```cost-hitl\n" + json.dumps({"task_id": task_id}, ensure_ascii=False) + "\n```"
     logger.info("orchestrate listing-ignite task=%s items=%d status=%s",
                 task_id, len(items), res.get("status"))
-    return {"mode": "hitl", "route": decision.as_meta(), "task_id": task_id,
-            "marker": marker, "status": res.get("status"),
-            "listing": {"count": len(items),
-                        "preview": [it["feature"] for it in items[:5]],
-                        "extraction_note": env.get("note"),
-                        "critic": {"status": critic_env.get("status"),
-                                   "findings": len((critic_env.get("result") or {})
-                                                   .get("findings") or [])}},
-            "note": (f"已从描述中抽取 {len(items)} 个构件并启动批量组价会话，页面已内嵌交互式组价控件。"
-                     "你只需用一句话、你自己的话告知用户已识别的构件数量、后续在控件里逐件确认即可，"
-                     "随后立即结束回合。严禁：罗列全部构件明细、转述闸内容、编造任何编码或数字。")}
+    return {
+        "mode": "hitl",
+        "route": decision.as_meta(),
+        "task_id": task_id,
+        "status": res.get("status"),
+        "interrupt": res.get("interrupt"),
+        "ui_hint": {
+            "kind": "inline_session",
+            "start_path": "/ce-cost/session/start",
+            "state_path": f"/ce-cost/session/{task_id}/state",
+            "resume_path": f"/ce-cost/session/{task_id}/resume",
+        },
+        "listing": {"count": len(items),
+                    "preview": [it["feature"] for it in items[:5]],
+                    "extraction_note": env.get("note"),
+                    "critic": {"status": critic_env.get("status"),
+                               "findings": len((critic_env.get("result") or {})
+                                               .get("findings") or [])}},
+        "note": (f"已从描述中抽取 {len(items)} 个构件并启动批量组价会话，页面已内嵌交互式组价控件。"
+                 "你只需用一句话、你自己的话告知用户已识别的构件数量、后续在控件里逐件确认即可，"
+                 "随后立即结束回合。严禁：罗列全部构件明细、转述闸内容、编造任何编码或数字。"),
+    }
 
 
 def _out_of_scope_envelope(cap: str, query: str, region: str) -> dict[str, Any]:

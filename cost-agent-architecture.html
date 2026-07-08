@@ -1,0 +1,917 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>造价智能体系统数据流架构图</title>
+  <style>
+    :root {
+      --bg: #f5f7fa;
+      --panel: #ffffff;
+      --ink: #111827;
+      --muted: #667085;
+      --line: #cbd5e1;
+      --line-dark: #94a3b8;
+      --blue: #1d4ed8;
+      --teal: #0f766e;
+      --violet: #6d28d9;
+      --amber: #b45309;
+      --rose: #be123c;
+      --slate: #334155;
+      --blue-soft: #e8f0ff;
+      --teal-soft: #e6f6f3;
+      --violet-soft: #f0eaff;
+      --amber-soft: #fff4dc;
+      --rose-soft: #ffe9ee;
+      --slate-soft: #eef2f7;
+      --shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+        "Microsoft YaHei", sans-serif;
+      line-height: 1.5;
+    }
+
+    main {
+      max-width: 1500px;
+      margin: 0 auto;
+      padding: 28px;
+    }
+
+    h1, h2, h3, p {
+      margin: 0;
+    }
+
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+        "Liberation Mono", monospace;
+      font-size: 12px;
+      background: #f1f5f9;
+      border: 1px solid #e2e8f0;
+      border-radius: 4px;
+      padding: 1px 4px;
+      word-break: break-word;
+    }
+
+    .header {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 24px;
+      align-items: end;
+      padding-bottom: 18px;
+      margin-bottom: 22px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .header h1 {
+      font-size: 32px;
+      line-height: 1.16;
+      letter-spacing: 0;
+      margin-bottom: 8px;
+    }
+
+    .header p {
+      max-width: 1040px;
+      color: var(--muted);
+      font-size: 15px;
+    }
+
+    .legend {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(128px, 1fr));
+      gap: 8px 14px;
+      color: var(--muted);
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    .legend span {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+    }
+
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 2px;
+      display: inline-block;
+    }
+
+    .bg-blue { background: var(--blue); }
+    .bg-teal { background: var(--teal); }
+    .bg-violet { background: var(--violet); }
+    .bg-amber { background: var(--amber); }
+    .bg-rose { background: var(--rose); }
+    .bg-slate { background: var(--slate); }
+
+    .blue { color: var(--blue); }
+    .teal { color: var(--teal); }
+    .violet { color: var(--violet); }
+    .amber { color: var(--amber); }
+    .rose { color: var(--rose); }
+    .slate { color: var(--slate); }
+
+    .section {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.76);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      margin-bottom: 18px;
+    }
+
+    .section-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      padding: 13px 16px;
+      border-bottom: 1px solid var(--line);
+      background: #f8fafc;
+    }
+
+    .section-head h2 {
+      font-size: 15px;
+      line-height: 1.3;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .section-head p {
+      color: var(--muted);
+      font-size: 13px;
+      text-align: right;
+    }
+
+    .node {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      padding: 13px;
+      min-height: 94px;
+      position: relative;
+    }
+
+    .node h3,
+    .node h4 {
+      font-size: 15px;
+      line-height: 1.25;
+      margin-bottom: 6px;
+    }
+
+    .node p,
+    .node li {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .node ul {
+      margin: 8px 0 0;
+      padding-left: 17px;
+    }
+
+    .soft-blue {
+      background: linear-gradient(180deg, var(--blue-soft), #fff 78%);
+      border-color: #b9c9f3;
+    }
+
+    .soft-teal {
+      background: linear-gradient(180deg, var(--teal-soft), #fff 78%);
+      border-color: #adddd5;
+    }
+
+    .soft-violet {
+      background: linear-gradient(180deg, var(--violet-soft), #fff 78%);
+      border-color: #d4c3ff;
+    }
+
+    .soft-amber {
+      background: linear-gradient(180deg, var(--amber-soft), #fff 78%);
+      border-color: #efcf91;
+    }
+
+    .soft-rose {
+      background: linear-gradient(180deg, var(--rose-soft), #fff 78%);
+      border-color: #f0b5c1;
+    }
+
+    .soft-slate {
+      background: linear-gradient(180deg, var(--slate-soft), #fff 78%);
+      border-color: #c6d1de;
+    }
+
+    .chip-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 9px;
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      min-height: 23px;
+      padding: 2px 7px;
+      border: 1px solid #d7dee8;
+      border-radius: 5px;
+      background: #f8fafc;
+      color: #344054;
+      font-size: 12px;
+      font-weight: 650;
+      white-space: nowrap;
+    }
+
+    .flow {
+      padding: 16px;
+    }
+
+    .flow-row {
+      display: grid;
+      grid-template-columns: 1.05fr 52px 1.15fr 52px 1.15fr 52px 1.15fr;
+      gap: 0;
+      align-items: stretch;
+      margin-bottom: 12px;
+    }
+
+    .flow-row.wide {
+      grid-template-columns: 1fr 52px 1fr 52px 1fr 52px 1fr 52px 1fr;
+    }
+
+    .flow-row:last-child {
+      margin-bottom: 0;
+    }
+
+    .arrow {
+      display: grid;
+      place-items: center;
+      color: var(--line-dark);
+      font-size: 28px;
+      font-weight: 800;
+      min-height: 94px;
+    }
+
+    .arrow-label {
+      display: block;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+      text-align: center;
+      margin-top: 2px;
+      line-height: 1.2;
+    }
+
+    .branch-label {
+      margin: 18px 0 10px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--slate);
+      font-weight: 800;
+      font-size: 14px;
+      letter-spacing: 0.02em;
+    }
+
+    .branch-label::before {
+      content: "";
+      width: 34px;
+      border-top: 2px solid var(--line-dark);
+    }
+
+    .branch-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .stack {
+      padding: 16px;
+    }
+
+    .band {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #ffffff;
+      overflow: hidden;
+      margin-bottom: 12px;
+    }
+
+    .band:last-child {
+      margin-bottom: 0;
+    }
+
+    .band-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      padding: 10px 14px;
+      background: #f8fafc;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .band-title h3 {
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .band-title p {
+      color: var(--muted);
+      font-size: 13px;
+      text-align: right;
+    }
+
+    .band-body {
+      display: grid;
+      gap: 12px;
+      padding: 14px;
+    }
+
+    .cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .cols-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+
+    .mcp-band .band-body {
+      grid-template-columns: 1.2fr 1fr 1fr 1fr 1fr;
+    }
+
+    .tool-cluster {
+      border: 1px solid #efcf91;
+      border-radius: 8px;
+      background: linear-gradient(180deg, #fff8e8, #fff 82%);
+      padding: 13px;
+      min-height: 126px;
+    }
+
+    .tool-cluster h4 {
+      font-size: 15px;
+      margin-bottom: 7px;
+    }
+
+    .tool-cluster p {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .mapping {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      gap: 18px;
+      margin-top: 18px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: var(--shadow);
+      font-size: 13px;
+    }
+
+    caption {
+      text-align: left;
+      font-size: 16px;
+      font-weight: 800;
+      padding: 14px 16px;
+      background: #f8fafc;
+      border-bottom: 1px solid var(--line);
+    }
+
+    th,
+    td {
+      text-align: left;
+      vertical-align: top;
+      padding: 10px 11px;
+      border-bottom: 1px solid #e7ecf2;
+    }
+
+    th {
+      background: #fcfcfd;
+      color: #344054;
+      font-weight: 800;
+    }
+
+    tr:last-child td {
+      border-bottom: 0;
+    }
+
+    .callout {
+      margin-top: 18px;
+      background: #ffffff;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      box-shadow: var(--shadow);
+      padding: 16px;
+    }
+
+    .callout h2 {
+      font-size: 17px;
+      margin-bottom: 8px;
+    }
+
+    .callout p {
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    @media (max-width: 1260px) {
+      main {
+        padding: 20px;
+      }
+
+      .header,
+      .mapping {
+        grid-template-columns: 1fr;
+      }
+
+      .flow-row,
+      .flow-row.wide {
+        grid-template-columns: 1fr;
+      }
+
+      .arrow {
+        min-height: 34px;
+        transform: rotate(90deg);
+      }
+
+      .branch-grid,
+      .band-body,
+      .mcp-band .band-body,
+      .cols-5,
+      .cols-4,
+      .cols-3,
+      .cols-2 {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
+    @media (max-width: 720px) {
+      .branch-grid,
+      .band-body,
+      .mcp-band .band-body,
+      .cols-5,
+      .cols-4,
+      .cols-3,
+      .cols-2,
+      .legend {
+        grid-template-columns: 1fr;
+      }
+
+      .section-head,
+      .band-title {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .section-head p,
+      .band-title p {
+        text-align: left;
+      }
+
+      .header h1 {
+        font-size: 24px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header class="header">
+      <div>
+        <h1>造价智能体系统数据流架构图</h1>
+        <p>
+          这张图以“用户消息”为输入，展示消息在系统内部的真实流向：
+          先进入 lead_agent，再根据意图分流到子智能体或完整组价 workflow；
+          子智能体通过 skill 获得受限工具视图；所有 MCP 工具位于系统全局工具池；
+          完整组价通过 session API 和 workflow 管状态、HITL、重入和审计。
+        </p>
+      </div>
+      <div class="legend" aria-label="图例">
+        <span><i class="dot bg-blue"></i>智能体</span>
+        <span><i class="dot bg-teal"></i>子智能体</span>
+        <span><i class="dot bg-rose"></i>Skill / 策略</span>
+        <span><i class="dot bg-amber"></i>全局 MCP 工具</span>
+        <span><i class="dot bg-violet"></i>Workflow / Session</span>
+        <span><i class="dot bg-slate"></i>数据 / 模型</span>
+      </div>
+    </header>
+
+    <section class="section" aria-label="用户消息数据流">
+      <div class="section-head">
+        <h2 class="blue">用户消息进入系统后的数据流</h2>
+        <p>从用户输入开始，用箭头展示系统内部怎么走</p>
+      </div>
+      <div class="flow">
+        <div class="flow-row wide">
+          <div class="node soft-blue">
+            <h3>用户消息</h3>
+            <p>例：问规范、匹配清单、查定额、快速组价，或要求完整组价。</p>
+            <div class="chip-row">
+              <span class="chip">自然语言输入</span>
+              <span class="chip">可带上下文</span>
+            </div>
+          </div>
+          <div class="arrow">→<span class="arrow-label">message</span></div>
+          <div class="node soft-blue">
+            <h3>Chat UI / 后端入口</h3>
+            <p>接收消息，附带会话上下文、当前 task_id、用户上传资料等。</p>
+          </div>
+          <div class="arrow">→<span class="arrow-label">turn context</span></div>
+          <div class="node soft-blue">
+            <h3>lead_agent</h3>
+            <p>主智能体只做入口判断和任务分配，不直接选码、套定额或计算。</p>
+          </div>
+          <div class="arrow">→<span class="arrow-label">intent</span></div>
+          <div class="node soft-slate">
+            <h3>意图分流</h3>
+            <p>判断进入单点专业任务、完整组价 workflow、HITL 恢复、还是普通回答。</p>
+          </div>
+          <div class="arrow">→<span class="arrow-label">route</span></div>
+          <div class="node soft-rose">
+            <h3>Skill 策略</h3>
+            <p>根据当前智能体装配的 skill，过滤可见工具并约束回答边界。</p>
+          </div>
+        </div>
+
+        <div class="branch-label">分支 A：单点专业任务，例如规范问答、清单匹配、定额匹配</div>
+        <div class="flow-row wide">
+          <div class="node soft-blue">
+            <h3>lead_agent</h3>
+            <p>选择合适的子智能体。</p>
+            <div class="chip-row">
+              <span class="chip">task dispatcher</span>
+            </div>
+          </div>
+          <div class="arrow">→<span class="arrow-label">subtask</span></div>
+          <div class="node soft-teal">
+            <h3>子智能体</h3>
+            <p>由 <code>config.yaml</code> 的 <code>subagents.custom_agents</code> 声明。</p>
+            <div class="chip-row">
+              <span class="chip">norm_qa_agent</span>
+              <span class="chip">bill_match_agent</span>
+              <span class="chip">quota_agent</span>
+            </div>
+          </div>
+          <div class="arrow">→<span class="arrow-label">skill filter</span></div>
+          <div class="node soft-rose">
+            <h3>子智能体 Skill</h3>
+            <p><code>SKILL.md allowed-tools</code> 把全局工具池裁剪成该子智能体可见工具。</p>
+          </div>
+          <div class="arrow">→<span class="arrow-label">allowed tool</span></div>
+          <div class="node soft-amber">
+            <h3>全局 MCP 工具池</h3>
+            <p>工具在系统全局注册，不归某个智能体私有。</p>
+            <div class="chip-row">
+              <span class="chip">ce-task</span>
+              <span class="chip">ce-rag</span>
+              <span class="chip">ce-db</span>
+            </div>
+          </div>
+          <div class="arrow">→<span class="arrow-label">query / call</span></div>
+          <div class="node soft-slate">
+            <h3>数据层 / 模型</h3>
+            <p>规范索引、清单库、定额库、信息价库、受控 LLM 消歧。</p>
+          </div>
+        </div>
+
+        <div class="flow-row">
+          <div class="node soft-slate">
+            <h3>结构化结果</h3>
+            <p>返回引用、候选、置信度、provenance、need_review 或结果信封。</p>
+          </div>
+          <div class="arrow">→<span class="arrow-label">result</span></div>
+          <div class="node soft-teal">
+            <h3>子智能体解释</h3>
+            <p>只基于工具返回解释，不补不存在的编码、条文、定额或价格。</p>
+          </div>
+          <div class="arrow">→<span class="arrow-label">answer</span></div>
+          <div class="node soft-blue">
+            <h3>lead_agent 汇总</h3>
+            <p>面向用户组织最终答复。</p>
+          </div>
+          <div class="arrow">→<span class="arrow-label">response</span></div>
+          <div class="node soft-blue">
+            <h3>Chat UI</h3>
+            <p>展示结果、引用、候选或需要人工复核的提示。</p>
+          </div>
+        </div>
+
+        <div class="branch-label">分支 B：完整组价任务，例如“帮我完整组价并算到总造价”</div>
+        <div class="flow-row wide">
+          <div class="node soft-blue">
+            <h3>lead_agent</h3>
+            <p>识别为完整有状态组价，不逐步编排内部步骤。</p>
+          </div>
+          <div class="arrow">→<span class="arrow-label">start</span></div>
+          <div class="node soft-violet">
+            <h3>Cost Session API</h3>
+            <p>应用层会话 API，而不是长期 MCP tool。</p>
+            <div class="chip-row">
+              <span class="chip">/cost/session/start</span>
+              <span class="chip">/state</span>
+              <span class="chip">/resume</span>
+              <span class="chip">/revise</span>
+            </div>
+          </div>
+          <div class="arrow">→<span class="arrow-label">task_id</span></div>
+          <div class="node soft-violet">
+            <h3>cost_workflow</h3>
+            <p>完整组价唯一状态机，负责顺序、状态、HITL、重入和审计。</p>
+          </div>
+          <div class="arrow">→<span class="arrow-label">stage calls</span></div>
+          <div class="node soft-amber">
+            <h3>工具 / 专业能力</h3>
+            <p>workflow 内部调用匹配、定额、询价、计算、汇总能力。</p>
+          </div>
+          <div class="arrow">→<span class="arrow-label">data</span></div>
+          <div class="node soft-slate">
+            <h3>数据层 / Session Store</h3>
+            <p>保存 checkpoint、audit log、价格来源、人工覆盖记录。</p>
+          </div>
+        </div>
+
+        <div class="flow-row">
+          <div class="node soft-violet">
+            <h3>HITL Interrupt</h3>
+            <p>如果需要人工确认，workflow 返回阶段、问题、选项、输入 schema。</p>
+          </div>
+          <div class="arrow">→<span class="arrow-label">interrupt</span></div>
+          <div class="node soft-violet">
+            <h3>HITL Panel</h3>
+            <p>前端控件渲染 select / input / review，不让 lead_agent 逐闸接管。</p>
+          </div>
+          <div class="arrow">→<span class="arrow-label">decision</span></div>
+          <div class="node soft-violet">
+            <h3>Resume API</h3>
+            <p>用户提交后调用 <code>/cost/session/{task_id}/resume</code>，workflow 继续推进。</p>
+          </div>
+          <div class="arrow">→<span class="arrow-label">done / next</span></div>
+          <div class="node soft-blue">
+            <h3>最终结果展示</h3>
+            <p>完成后展示清单码、定额、价格来源、计算结果和审计链。</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" aria-label="分层装配架构">
+      <div class="section-head">
+        <h2 class="slate">智能体、Skill、工具的装配关系</h2>
+        <p>上层是 agent，中层是 skill，底层是一个全局 MCP 工具池</p>
+      </div>
+      <div class="stack">
+        <div class="band">
+          <div class="band-title">
+            <h3 class="blue">Agent Layer</h3>
+            <p>智能体只声明角色和 skill，不私有化工具</p>
+          </div>
+          <div class="band-body cols-4">
+            <div class="node soft-blue">
+              <h4>lead_agent</h4>
+              <p>主入口和任务分配者。</p>
+              <div class="chip-row">
+                <span class="chip">默认入口</span>
+                <span class="chip">调用子智能体</span>
+                <span class="chip">启动 workflow</span>
+              </div>
+            </div>
+            <div class="node soft-teal">
+              <h4>norm_qa_agent</h4>
+              <p>规范问答子智能体。</p>
+              <div class="chip-row">
+                <span class="chip">声明来源: config.yaml</span>
+              </div>
+            </div>
+            <div class="node soft-teal">
+              <h4>bill_match_agent</h4>
+              <p>清单匹配子智能体。</p>
+              <div class="chip-row">
+                <span class="chip">声明来源: config.yaml</span>
+              </div>
+            </div>
+            <div class="node soft-teal">
+              <h4>quota_agent</h4>
+              <p>定额匹配子智能体。</p>
+              <div class="chip-row">
+                <span class="chip">声明来源: config.yaml</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="band">
+          <div class="band-title">
+            <h3 class="rose">Skill Layer</h3>
+            <p>skill 决定每个智能体能看见全局工具池里的哪些工具</p>
+          </div>
+          <div class="band-body cols-4">
+            <div class="node soft-rose">
+              <h4>cost-agent skill</h4>
+              <p>约束 lead_agent 在造价场景下的分配策略和完整组价入口。</p>
+              <div class="chip-row">
+                <span class="chip">allowed-tools</span>
+                <span class="chip">task</span>
+                <span class="chip">session tools</span>
+              </div>
+            </div>
+            <div class="node soft-rose">
+              <h4>norm-qa skill</h4>
+              <p>只允许规范问答和澄清工具。</p>
+              <div class="chip-row">
+                <span class="chip">ce-task_norm_qa_tool</span>
+                <span class="chip">ask_clarification</span>
+              </div>
+            </div>
+            <div class="node soft-rose">
+              <h4>bill-match skill</h4>
+              <p>只允许清单匹配工具和必要澄清。</p>
+              <div class="chip-row">
+                <span class="chip">ce-task_cost_match_bill_item_tool</span>
+                <span class="chip">ask_clarification</span>
+              </div>
+            </div>
+            <div class="node soft-rose">
+              <h4>quota-match skill</h4>
+              <p>只允许定额查询和定额候选选择工具。</p>
+              <div class="chip-row">
+                <span class="chip">ce-task_quota_lookup_tool</span>
+                <span class="chip">ce-task_cost_select_quota_tool</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="band mcp-band">
+          <div class="band-title">
+            <h3 class="amber">Global MCP Tool Pool</h3>
+            <p>工具在系统全局注册一次；不同智能体只获得 skill 过滤后的可见子集</p>
+          </div>
+          <div class="band-body">
+            <div class="tool-cluster">
+              <h4>MCP Servers</h4>
+              <p>由 <code>extensions_config.json</code> 全局启用。</p>
+              <div class="chip-row">
+                <span class="chip">ce-task</span>
+                <span class="chip">ce-rag</span>
+                <span class="chip">ce-db</span>
+              </div>
+            </div>
+            <div class="tool-cluster">
+              <h4>Task Tools</h4>
+              <p>面向智能体的业务级工具。</p>
+              <div class="chip-row">
+                <span class="chip">norm_qa</span>
+                <span class="chip">cost_compose</span>
+                <span class="chip">price_lookup</span>
+                <span class="chip">quota_lookup</span>
+              </div>
+            </div>
+            <div class="tool-cluster">
+              <h4>Specialist Tools</h4>
+              <p>供子智能体或 workflow 内部使用。</p>
+              <div class="chip-row">
+                <span class="chip">bill_match</span>
+                <span class="chip">select_quota</span>
+                <span class="chip">price_compose_envelope</span>
+              </div>
+            </div>
+            <div class="tool-cluster">
+              <h4>Compute Tools</h4>
+              <p>确定性计算工具，输入必须显式完整。</p>
+              <div class="chip-row">
+                <span class="chip">compute_unit_price</span>
+                <span class="chip">rollup</span>
+                <span class="chip">rollup_hierarchy</span>
+                <span class="chip">gate_decision</span>
+              </div>
+            </div>
+            <div class="tool-cluster">
+              <h4>Data / Models</h4>
+              <p>工具最终访问的数据和受控模型能力。</p>
+              <div class="chip-row">
+                <span class="chip">规范索引</span>
+                <span class="chip">清单库</span>
+                <span class="chip">定额库</span>
+                <span class="chip">信息价库</span>
+                <span class="chip">Session Store</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="mapping" aria-label="配置表">
+      <table>
+        <caption>智能体装配与可见工具集</caption>
+        <thead>
+          <tr>
+            <th>运行单元</th>
+            <th>声明来源</th>
+            <th>Skill</th>
+            <th>可见工具集如何派生</th>
+            <th>边界</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>lead_agent</code></td>
+            <td>系统默认入口智能体</td>
+            <td><code>cost-agent</code>, <code>norm-qa</code></td>
+            <td>内置工具 + skill 过滤后的全局 MCP 工具；必须能看到 <code>task</code>、<code>ask_clarification</code> 和 session 入口。</td>
+            <td>对话入口、任务分配、启动 workflow、解释最终结果。</td>
+          </tr>
+          <tr>
+            <td><code>norm_qa_agent</code></td>
+            <td><code>config.yaml</code> / <code>subagents.custom_agents</code></td>
+            <td><code>norm-qa</code></td>
+            <td><code>norm-qa/SKILL.md</code> 的 <code>allowed-tools</code> 允许 <code>ask_clarification</code> 和 <code>ce-task_norm_qa_tool</code>。</td>
+            <td>只做规范知识问答。</td>
+          </tr>
+          <tr>
+            <td><code>bill_match_agent</code></td>
+            <td><code>config.yaml</code> / <code>subagents.custom_agents</code></td>
+            <td><code>bill-match</code></td>
+            <td><code>bill-match/SKILL.md</code> 的 <code>allowed-tools</code> 允许 <code>ask_clarification</code> 和 <code>ce-task_cost_match_bill_item_tool</code>。</td>
+            <td>只做候选内清单码选择。</td>
+          </tr>
+          <tr>
+            <td><code>quota_agent</code></td>
+            <td><code>config.yaml</code> / <code>subagents.custom_agents</code></td>
+            <td><code>quota-match</code></td>
+            <td><code>quota-match/SKILL.md</code> 的 <code>allowed-tools</code> 允许 <code>ce-task_quota_lookup_tool</code> 和 <code>ce-task_cost_select_quota_tool</code>。</td>
+            <td>只做定额查询和候选选择。</td>
+          </tr>
+          <tr>
+            <td><code>cost_workflow</code></td>
+            <td><code>ce-services/cost/session.py</code> + <code>ce-services/cost/graph.py</code></td>
+            <td>无</td>
+            <td>服务端内部调用模块和无状态工具，不受智能体 skill 过滤影响。</td>
+            <td>完整组价状态机、HITL、持久化、重入、审计。</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <table>
+        <caption>全局工具池暴露策略</caption>
+        <thead>
+          <tr>
+            <th>全局工具类别</th>
+            <th>注册位置</th>
+            <th>对智能体的暴露方式</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>规范问答</td>
+            <td><code>ce-task_norm_qa_tool</code></td>
+            <td>暴露给 <code>norm_qa_agent</code>，必要时也可暴露给 <code>lead_agent</code>。</td>
+          </tr>
+          <tr>
+            <td>清单匹配</td>
+            <td><code>ce-task_cost_match_bill_item_tool</code></td>
+            <td>暴露给 <code>bill_match_agent</code>，通常不直接暴露给 <code>lead_agent</code>。</td>
+          </tr>
+          <tr>
+            <td>定额匹配</td>
+            <td><code>ce-task_quota_lookup_tool</code>, <code>ce-task_cost_select_quota_tool</code></td>
+            <td>暴露给 <code>quota_agent</code>；workflow 可在服务端内部使用等价函数。</td>
+          </tr>
+          <tr>
+            <td>询价与计算</td>
+            <td><code>price_lookup</code>, <code>compute_unit_price</code>, <code>rollup</code>, <code>rollup_hierarchy</code></td>
+            <td>主要给 workflow 内部使用；只有 skill 明确需要时才暴露给智能体。</td>
+          </tr>
+          <tr>
+            <td>完整组价 Session</td>
+            <td>不建议作为长期 MCP tool</td>
+            <td>通过应用层 Session API 暴露：<code>start</code>、<code>state</code>、<code>resume</code>、<code>revise</code>。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="callout">
+      <h2>架构规则</h2>
+      <p>
+        工具是全局的，智能体不拥有工具。每个智能体通过自己装配的 skill 获得全局工具池的受限视图。
+        单点判断交给子智能体；完整组价交给有状态 workflow；HITL 是 workflow 的中断协议，不是一个智能体。
+      </p>
+    </section>
+  </main>
+</body>
+</html>

@@ -115,7 +115,7 @@
 
 | 文件 | 改动 |
 |---|---|
-| `ce-services/common/mcp_server.py` | **新增** `@mcp.tool() start_cost_session(feature, spec, region, features?)`：调 `session.start` 起会话，返回 `{task_id, marker:"```cost-hitl…", first_gate}`。agent 原样转贴 marker → 前端出卡。**只点火不编排**（编排留图里，红线） |
+| `ce-services/common/mcp_server.py` | **新增** `@mcp.tool() start_cost_session_tool(feature, spec, region, features?)`：调 `session.start` 起会话，返回 `{task_id, status, interrupt, ui_hint}`。agent 只转述“会话已启动”这类短句，前端据 `task_id` + `interrupt` 出卡。**只点火不编排**（编排留图里，红线） |
 
 `stateless_http` 无碍——状态在 SqliteSaver 按 `task_id` 持久化，工具只负责点火。
 
@@ -147,7 +147,7 @@
 
 ### 7.1 为什么「阻塞工具等 done」不行（死锁）
 
-让 `orchestrate` 起会话后不返回、原地等 done 会死锁：工具不返回 → 前端拿不到 `task_id` → 卡片不渲染
+让 `orchestrate_tool` 起会话后不返回、原地等 done 会死锁：工具不返回 → 前端拿不到 `task_id` → 卡片不渲染
 → 用户无处可点 → 闸推进不了 → 会话永停首闸 → 工具永远等不到 done。**「卡片要 task_id 才能渲染」与
 「工具阻塞等完」互斥**，故工具必须立刻返回（现状解耦即由此逼出）。B2 不走阻塞，走**节点内嵌套 interrupt**。
 
@@ -223,18 +223,18 @@
 
 | # | 决策 | 状态 | 依据 |
 |---|---|---|---|
-| **1 交互模型** | 维持**点火型解耦**：agent 调 `start_cost_session` 点火即返回 marker，逐闸走 REST `/cost/session/*` 由前端卡片驱动，agent 不在环 | ✅ 已实现 | 全系统**单 checkpointer**，图内 compute/gate 双拆已解重放安全 → 零跨状态机一致性风险 |
+| **1 交互模型** | 维持**点火型解耦**：agent 调 `start_cost_session_tool` 点火即返回结构化会话信封，逐闸走 REST `/cost/session/*` 由前端卡片驱动，agent 不在环 | ✅ 已实现 | 全系统**单 checkpointer**，图内 compute/gate 双拆已解重放安全 → 零跨状态机一致性风险 |
 | **2 agent 收尾** | **B2-lite**：卡片 `done` 时前端自动发「组价完成，总造价 X，请收尾」（`hide_from_ui`）→ agent 总结一句。只动前端一处，不碰 backend 核心 | ✅ 本次落地 | 拿"收尾"体验不付全 B2 代价；summarize 有真 rollup、风险低 |
 | **3 步骤可视化** | 卡片 + 时间线 + 两级层级树，只从结构化 `events` 渲染 | ✅ 已实现（阶段0/1/2） | 显示由"图 emit events"决定，与"是否 MCP"无关 |
-| **4 训练模型套定额** | 落成图内**一个 compute 节点外呼**（同 `bill_match`/`price_compose`），**置信门控**（复用混合路由）：高置信自动过、低置信升人闸；算一次写进 session 持久化，gate 只确认 | 🔒 模型未训；**接口已预留** | 贵+非确定性副作用必须留图内 compute 节点、不进重放区；它减少人闸→削弱全 B2 的 ROI |
+| **4 训练模型套定额** | 落成图内**一个 compute 节点外呼**（同 `cost_match_bill_item_tool` / `cost_price_compose_envelope_tool`），**置信门控**（复用混合路由）：高置信自动过、低置信升人闸；算一次写进 session 持久化，gate 只确认 | 🔒 模型未训；**接口已预留** | 贵+非确定性副作用必须留图内 compute 节点、不进重放区；它减少人闸→削弱全 B2 的 ROI |
 | **5 红线守卫** | 套定额模型只在真实候选内选、`消耗量/费率`走确定性库查表；费率/税率必须人录入；缺价 `no_source`、选不出码 `need_review` 如实透传；自动过的闸必留依据卡；**改已完成组价的参数不在对话里重算**（导回卡片重开闸/重起会话） | ✅ 本次补齐 | `HITL_DESIGN §1.2/§10`；类型 B 杜撰重算护栏见 cost-agent skill 红线 7 |
-| **6 MCP 粒度** | 维持不拆：ce-rag/ce-db 取数原语 + ce-task（orchestrate/norm_qa/cost_compose/start_cost_session）。HITL 逐闸**不暴露成 MCP** | ✅ 已实现 | 拆 HITL 步骤=逼弱模型当编排器（红线）+ 无状态失配 + 一致性倒退 |
+| **6 MCP 粒度** | 维持不拆：ce-rag/ce-db 取数原语 + ce-task（orchestrate_tool/norm_qa_tool/cost_compose_tool/start_cost_session_tool）。HITL 逐闸**不暴露成 MCP** | ✅ 已实现 | 拆 HITL 步骤=逼弱模型当编排器（红线）+ 无状态失配 + 一致性倒退 |
 
 ### 8.2 本次落地内容（已实现，代码级）
 
 - **cost-agent skill 红线 7**：组价 `done` 后改费率/税率/定额/工程量再算，**禁止用回复文本数字自行重算造价**，导回卡片重开闸或按修正参数重起会话（重算走服务端确定性图）。
 - **B2-lite 前端收尾**（决策 2）：`cost-hitl-inline.tsx` 在 resume 流 `done` 分支 emit `cost-hitl-events`；`useThreadStream` 订阅后自动向 thread 发一条 `hide_from_ui` 触发消息 → agent 收尾。按 taskId 去重、只发一次；**只在本次交互真实完成时触发，重开会话不触发**。
-- **纯键查任务层薄能力**（Backlog 2）：`ce-task` MCP 新增 `quota_lookup`（已知清单码直查套定额取数）+ `price_lookup`（材料/人工/机械名直查信息价），均纯键查、带 spec 归一 + 口径声明；**docstring 钉红线：从描述选码必走 `cost_compose`，本工具不选码**。底层复用 `cost_client.price_compose`/`price_query`。
+- **纯键查任务层薄能力**（Backlog 2）：`ce-task` MCP 新增 `quota_lookup_tool`（已知清单码直查套定额取数）+ `price_lookup_tool`（材料/人工/机械名直查信息价），均纯键查、带 spec 归一 + 口径声明；**docstring 钉红线：从描述选码必走 `cost_compose_tool`，本工具不选码**。底层复用 `cost_client.price_compose`/`price_query`。
 - **re-rollup 确定性重算**（Backlog 3）：`graph.recompute_rollup`（纯函数：套修正费率/项目费用，复用 `_unit_price_for`/`rollup_hierarchy` 确定性重算，不碰图/会话/LLM）+ `session.re_rollup`（读持久化累积态调之）+ `POST /cost/session/{id}/re_rollup`。兜住类型 B 的**正确**重算（红线 7 只挡杜撰、本能力提供确定性重算通道）。
 - **训练模型套定额接口预留**（决策 4）：新增 `cost/quota_selection.py` —— `select_quota(feature, code, quotas)` + `register_quota_selector(fn)` 挂点，红线兜底（只选候选内子目、越界作废、低置信 need_review）与 `select_code` 同构；`quota_gate_node` 多子目分支改走 `select_quota` 置信门控。**默认无模型 → need_review（多子目维持人工确认，行为不变）**；训练模型就绪后 `register_quota_selector` 注入即生效，无需再改图。
 - 自测 `tools/test_backlog.py`（recompute_rollup 4 项 + select_quota 红线 4 项，无 pytest 依赖，服务器 `uv run python tools/test_backlog.py`）。

@@ -7,7 +7,7 @@ import {
   MessageResponse,
   type MessageResponseProps,
 } from "@/components/ai-elements/message";
-import { extractCostHitlMarker } from "@/core/cost/marker";
+import { extractCostLaunchPayload } from "@/core/cost/marker";
 import { streamdownPlugins } from "@/core/streamdown";
 import { cn } from "@/lib/utils";
 
@@ -65,9 +65,9 @@ export function MarkdownContent({
 
   if (!content) return null;
 
-  // Upgrade an inline cost-HITL marker into an interactive gate widget (the rest
-  // of the message renders as normal markdown). No-op when the marker is absent.
-  const costMarker = extractCostHitlMarker(content);
+  // Upgrade an inline cost-HITL launch payload into an interactive gate widget
+  // (the rest of the message renders as normal markdown). No-op when absent.
+  const costMarker = extractCostLaunchPayload(content);
   const text = costMarker ? costMarker.cleaned : content;
 
   return (

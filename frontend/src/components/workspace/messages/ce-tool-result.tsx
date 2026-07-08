@@ -2,7 +2,7 @@
  * 造价领域 MCP 工具的中间过程渲染（ce-task_* / ce-rag_* / ce-db_*）。
  *
  * 背景：deer-flow 原生 toolCall 流的泛型分支只画一行 label、不渲染工具结果（见 message-group.tsx
- * 的 `else` 分支）。把 norm_qa / cost_compose 等任务层能力做成 MCP 工具后，工具名/入参/结果天然
+ * 的 `else` 分支）。把 norm_qa_tool / cost_compose_tool 等任务层能力做成 MCP 工具后，工具名/入参/结果天然
  * 结构化，这里按**稳定的工具名**派发，把领域结果（cited_clauses / 选码+置信度 / 候选 / 取数）渲染成
  * 折叠中间过程里的依据条目——让造价用户在对话里就看见「凭什么这么答」，而不是埋在 bash stdout 里。
  *
@@ -79,18 +79,23 @@ export function CeToolResult({
   const tool = name.replace(/^ce-(task|cost|rag|db)_/, "");
 
   switch (tool) {
+    case "orchestrate_tool":
     case "orchestrate":
       return <Orchestrate args={args} r={r} />;
+    case "norm_qa_tool":
     case "norm_qa":
     case "search_clause":
       return <NormQa args={args} r={r} />;
+    case "cost_compose_tool":
     case "cost_compose":
       return <CostCompose args={args} r={r} />;
+    case "cost_match_bill_item_tool":
     case "bill_match":
     case "match_bill_item":
       return <BillMatch args={args} r={r} />;
     case "price_compose":
       return <PriceCompose args={args} r={r} />;
+    case "quota_lookup_tool":
     case "quota_lookup":
     case "quota_get":
       return <QuotaLookup args={args} r={r} />;

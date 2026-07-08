@@ -58,7 +58,7 @@ It must not:
 
 - treat `ce-rag` bill-match results as final bill truth;
 - let an LLM fabricate missing prices, quotas, or fee rates;
-- continue to `price_compose` when code selection returns `need_review`;
+- continue to `cost_price_compose_envelope_tool` when code selection returns `need_review`;
 - use `retrieve_evidence` as a shortcut for business workflows that have a dedicated endpoint.
 
 ## 2. Truth Levels
@@ -71,7 +71,7 @@ All cross-service results should be interpreted through these truth levels.
 | `ground_truth` | Structured or directly grounded truth from authoritative local data. | `ce-db /bill/{code}`, regulation clauses from indexed standard corpora | Can support final business output when guardrails pass. |
 | `evidence` | Citable support for an answer or decision. | `ce-rag` clause, auxiliary table, price-rule evidence | Can be shown to users and audited. |
 | `projection` | Structured projection derived from rules, tables, or indexed documents. | `ce-rag search_aux_table`, `search_price_rule` | Supportive evidence; not a substitute for DB truth when a DB endpoint exists. |
-| `price_source` | Structured price, quota, fee, or resource data. | `ce-db price_query`, `price_compose`, `fee_rate_lookup` | Can support pricing output; missing data must stay explicit. |
+| `price_source` | Structured price, quota, fee, or resource data. | `ce-db price_query`, `cost_price_compose_envelope_tool`, `fee_rate_lookup` | Can support pricing output; missing data must stay explicit. |
 
 ## 3. ce-rag Contracts
 
@@ -138,8 +138,8 @@ Contract:
 
 - This endpoint returns evidence or candidates according to the selected corpus.
 - It is not the primary entry point for complete business workflows.
-- For cost composition, callers should use `ce-task /cost/compose` or the equivalent MCP tool.
-- For known-key pricing, callers should use `ce-db` directly or through `ce-task` tools.
+- For cost composition, callers should use `ce-task /cost/compose` or the equivalent MCP tool (`cost_compose_tool`).
+- For known-key pricing, callers should use `ce-db` directly or through `ce-task` tools such as `quota_lookup_tool` and `price_lookup_tool`.
 
 ## 4. ce-db Contracts
 
@@ -271,7 +271,7 @@ Contract:
 - `ce-db` is the source for structured bill, quota, fee, and price truth.
 - `ce-task` must not continue to pricing when code selection is absent or marked `need_review`.
 - Missing prices, quotas, rates, or resources must not be filled by an LLM.
-- `retrieve_evidence` is an evidence facade, not a replacement for `cost_compose`, `price_query`, or `price_compose`.
+- `retrieve_evidence` is an evidence facade, not a replacement for `cost_compose_tool`, `price_query`, or `cost_price_compose_envelope_tool`.
 - Cross-version or cross-standard evidence must be filtered or downgraded by guardrails before final presentation.
 
 ## 8. Current Contract Coverage
@@ -280,7 +280,7 @@ This first version covers the currently validated runtime chain:
 
 - `ce-rag`: `/search/clause`, `/search/bill-match`, `/retrieve/evidence`
 - `ce-db`: `/bill/{code}`, `/price/compose/{region}/{code}`, `/price/query`
-- `ce-task`: `/route`, `/norm/qa`, `/cost/compose`, `/orchestrate`
+- `ce-task`: `/route`, `/norm/qa`, `/cost/compose`, `/orchestrate` (MCP tools: `orchestrate_tool`, `norm_qa_tool`, `cost_compose_tool`)
 
 Future updates should add contract details for quota lookup, fee-rate lookup, auxiliary table lookup, price composition lookup,
 resource lookup, HITL session flows, and MCP `tools/call` request/response examples.

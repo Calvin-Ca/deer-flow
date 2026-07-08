@@ -1,18 +1,20 @@
 # 任务层 · Norm-QA + CostAgent + 路由编排（ce-services）
 
-知识层（`../ce-code`，:8100）的**任务服务**。任务层是知识服务的**纯 HTTP 客户端**——不 `import
+知识层（`../ce-code`，默认 `:8100` + `:8102`）的**任务服务**。任务层是知识服务的**纯 HTTP 客户端**——不 `import
 retrieval`、不连 Milvus / PG，只打知识服务原语，再叠加路由 / 编排 / 生成 / 选码 / 校验闸逻辑。
 共进程 :8101（REST + MCP `/mcp`）。
 
 > 需求/设计见 `PRD.md` 与仓库根 `AGENT_PRD.md`/`AGENT_DEV.md`（四层骨架 §9、口径收窄+联网兜底 §8）；
 > HITL 设计见 `HITL_DESIGN.md`；进度见 `TODO.md`。
+> 服务器运行级联调步骤见 `RUNTIME_E2E_RUNBOOK.md`。
 
 ## 拓扑（四层骨架，AGENT_DEV §9）
 
 ```
-ce-code 知识服务 :8100  (统一入口 service.knowledge_api：条文检索 /search /expand /clause
-                         + 组价取数 /bill/match /price/compose /quota /price/query /bill/get；
-                         retrieval+PG+Milvus 唯一 owner；MCP「ce-cost」四原语)
+ce-code RAG 服务 :8100 (service.rag_api：条文检索 /search/clause /expand/clauses /clause
+                        + bill_match / 半结构化投影检索；MCP「ce-rag」)
+ce-code DB  服务 :8102 (service.db_api：/bill /quota /price/query /price/compose /fee-rates /aux-table；
+                        PG 真值唯一 owner；MCP「ce-db」)
         ▲ HTTP（knowledge_client / cost_client）
         │
 ce-services 任务服务 :8101（MCP「ce-task」= orchestrate 前门 + norm_qa + cost_compose）
@@ -38,11 +40,12 @@ ce-services 任务服务 :8101（MCP「ce-task」= orchestrate 前门 + norm_qa 
 
 ## 启动（服务器）
 
-全栈需 **2 个进程**：知识服务 :8100（先起）+ 任务服务 :8101。
+全栈需 **3 个进程**：RAG 服务 :8100 + DB 服务 :8102（先起）+ 任务服务 :8101。
 
 ```bash
-cd ce-code     && uv run python -m service.knowledge_api   # ① :8100 知识服务（必须先起）
-cd ce-services && uv sync && uv run python main.py         # ② :8101 任务服务
+cd ce-code     && uv run python -m service.rag_api         # ① :8100 ce-rag（必须先起）
+cd ce-code     && uv run python -m service.db_api          # ② :8102 ce-db（必须先起）
+cd ce-services && uv sync && uv run python main.py         # ③ :8101 任务服务
 ```
 
 调用示例：
@@ -59,7 +62,9 @@ curl -s -X POST http://localhost:8101/cost/check -H 'Content-Type: application/j
 
 | 变量 | 默认 | 说明 |
 |---|---|---|
-| `BCRAG_KNOWLEDGE_URL` | `http://localhost:8100` | 知识服务地址 |
+| `BCRAG_RAG_URL` | `http://localhost:8100` | ce-rag 地址 |
+| `BCRAG_DB_URL` | `http://localhost:8102` | ce-db 地址 |
+| `BCRAG_KNOWLEDGE_URL` | `http://localhost:8100` | 兼容别名；未单独设 RAG/DB 时回退单入口 |
 | `BCRAG_LLM_URL` / `BCRAG_LLM_MODEL_ID` | `http://localhost:8099` / `qwen3-8b` | 桶 A 8b（生成/澄清） |
 | `BCRAG_ORCH_LLM_URL` + `BCRAG_ORCH_LLM_MODEL_ID` | 成对回落 8b | 桶 B 32b（拆解/综合/选码消歧），成对设才升 |
 | `CE_COST_DEFAULT_SPEC` | `2013` | 组价缺省国标版本（PRD C-05 唯一默认口径；2013 组价数据就绪前 compose 如实 501，过渡可切 2024） |

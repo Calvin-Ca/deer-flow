@@ -63,6 +63,7 @@ service/knowledge_api（FastAPI :8100，统一入口 = cost_api router + 规范�
 
 服务器容器 `ce-postgres`（端口 `5433`，库 `ce_cost`，用户 `cost`；rootless docker，data-root 落 nvme，见 §6）。
 DDL `cost/schema.sql`（`IF NOT EXISTS` 幂等），导入 `cost/load_pg.py`（按主键 `ON CONFLICT` 幂等 upsert）。
+**表级详解见 `cost/TABLES.md`**（每张表的来源/构造方式/真值等级/组价链路角色，下表是速查）。
 
 | 表 | 内容 | 主键 / 唯一键 | 抽取器 |
 |---|---|---|---|

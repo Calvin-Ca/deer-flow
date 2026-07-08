@@ -1,5 +1,5 @@
 /**
- * 造价领域 MCP 工具的中间过程渲染（ce-task_* / ce-cost_*）。
+ * 造价领域 MCP 工具的中间过程渲染（ce-task_* / ce-cost_* / ce-rag_* / ce-db_*）。
  *
  * 背景：deer-flow 原生 toolCall 流的泛型分支只画一行 label、不渲染工具结果（见 message-group.tsx
  * 的 `else` 分支）。把 norm_qa / cost_compose 等任务层能力做成 MCP 工具后，工具名/入参/结果天然
@@ -26,7 +26,12 @@ import {
 
 /** 本组件能渲染的造价领域 MCP 工具前缀。 */
 export function isCeTool(name: string): boolean {
-  return name.startsWith("ce-task_") || name.startsWith("ce-cost_");
+  return (
+    name.startsWith("ce-task_") ||
+    name.startsWith("ce-cost_") ||
+    name.startsWith("ce-rag_") ||
+    name.startsWith("ce-db_")
+  );
 }
 
 type Rec = Record<string, unknown>;
@@ -72,21 +77,53 @@ export function CeToolResult({
   result?: string | Record<string, unknown>;
 }) {
   const r = resultObj(result);
-  const tool = name.replace(/^ce-(task|cost)_/, "");
+  const tool = name.replace(/^ce-(task|cost|rag|db)_/, "");
 
   switch (tool) {
     case "orchestrate":
       return <Orchestrate args={args} r={r} />;
     case "norm_qa":
+    case "search_clause":
       return <NormQa args={args} r={r} />;
     case "cost_compose":
       return <CostCompose args={args} r={r} />;
     case "bill_match":
+    case "match_bill_item":
       return <BillMatch args={args} r={r} />;
     case "price_compose":
       return <PriceCompose args={args} r={r} />;
     case "quota_lookup":
+    case "quota_get":
       return <QuotaLookup args={args} r={r} />;
+    case "price_query":
+    case "bill_get":
+    case "search_aux_table":
+    case "search_price_rule":
+    case "retrieve_evidence":
+    case "fee_rate_lookup":
+    case "price_composition_get":
+    case "aux_table_get":
+    case "aux_table_list":
+    case "resource_lookup":
+    case "bill_list":
+    case "quota_list":
+      return (
+        <ChainOfThoughtStep icon={DatabaseIcon} label={`造价工具：${tool}`}>
+          {Array.isArray(r?.evidence) && r.evidence.length > 0 && (
+            <ChainOfThoughtSearchResults>
+              {r.evidence.slice(0, 6).map((item, i) => {
+                const rec = asRec(item);
+                const title = str(rec?.title) ?? str(rec?.snippet) ?? "命中";
+                return (
+                  <ChainOfThoughtSearchResult key={i}>
+                    {title}
+                  </ChainOfThoughtSearchResult>
+                );
+              })}
+            </ChainOfThoughtSearchResults>
+          )}
+        </ChainOfThoughtStep>
+      );
     default:
       return (
         <ChainOfThoughtStep icon={DatabaseIcon} label={`造价工具：${tool}`} />
@@ -94,26 +131,37 @@ export function CeToolResult({
   }
 }
 
-/** 规范问答：展示命中条文数 + cited_clauses（标准号 + 条文号）。 */
+/** 规范问答 / 条文检索：展示命中条文数 + cited_clauses 或 evidence。 */
 function NormQa({ args, r }: { args: Rec; r?: Rec }) {
   const query = str(args.query) ?? "规范问答";
   const retrieved = num(asRec(r?.meta)?.retrieved);
   const cited = asArr(r?.cited_clauses)
     .map(asRec)
     .filter((c): c is Rec => !!c);
+  const evidenceClauses =
+    cited.length > 0
+      ? cited
+      : asArr(r?.evidence)
+          .map(asRec)
+          .filter((c): c is Rec => !!c)
+          .map((item) => ({
+            standard: asRec(item.metadata)?.standard,
+            clause: asRec(item.metadata)?.node_path,
+            text: item.snippet,
+          }));
   const desc =
     r === undefined
       ? "检索中…"
-      : retrieved === 0 || cited.length === 0
+      : retrieved === 0 || evidenceClauses.length === 0
         ? "未检索到相关条文"
-        : `命中 ${retrieved ?? cited.length} 条，引用 ${cited.length} 条`;
+        : `命中 ${retrieved ?? evidenceClauses.length} 条，引用 ${evidenceClauses.length} 条`;
   return (
     <ChainOfThoughtStep
       icon={ScrollTextIcon}
       label={`规范问答：${query}`}
       description={desc}
     >
-      <ClauseList clauses={cited} />
+      <ClauseList clauses={evidenceClauses} />
     </ChainOfThoughtStep>
   );
 }

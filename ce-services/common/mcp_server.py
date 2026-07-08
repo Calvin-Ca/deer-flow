@@ -5,8 +5,9 @@ deer-flow agent 把两个**无状态、一把出结果**的任务层能力当 to
 结构化——前端 toolCall 流据此按工具名渲染领域结果（cited_clauses / 选码+置信度），不再 sniff
 bash 命令、不再把结论埋在 bash stdout 里看不见。
 
-与知识层 façade（``ce-code/service/mcp_server.py`` 的 ``ce-cost``，:8100/mcp，三个取数原语）分工：
-  - ``ce-cost``（:8100）—— **纯数据原语**：bill_match / quota_lookup / price_compose；
+与知识层 façade 分工：
+  - ``ce-rag``（默认 :8100）—— **证据/候选原语**：search_clause / match_bill_item / search_price_rule …；
+  - ``ce-db``（默认 :8102）—— **纯数据原语**：bill_get / quota_get / price_query / price_compose …；
   - ``ce-task``（本文件，:8101）—— **带 LLM 编排的任务层能力**：orchestrate（四层骨架前门：
     确定性路由 → 单一直派 / 复合拆解-综合，§9 T-A4）、norm_qa（检索+带引用作答）、
     cost_compose（候选召回 → LLM 选码 → 组价取数）、start_cost_session（起可中断 HITL 完整组价会话，只点火）。
@@ -116,7 +117,7 @@ def norm_qa(
         detail = exc.response.text if exc.response is not None else str(exc)
         raise ToolError(f"知识服务检索失败: {detail}") from exc
     except requests.RequestException as exc:
-        raise ToolError(f"依赖服务不可达（知识服务 :8100 / LLM）: {exc}") from exc
+        raise ToolError(f"依赖服务不可达（ce-rag / LLM）: {exc}") from exc
     except ValueError as exc:  # json.JSONDecodeError 是 ValueError 子类
         raise ToolError(f"LLM 输出非合法 JSON: {exc}") from exc
 
@@ -154,7 +155,7 @@ def cost_compose(
         detail = exc.response.text if exc.response is not None else str(exc)
         raise ToolError(f"依赖服务返回错误: {detail}") from exc
     except requests.RequestException as exc:
-        raise ToolError(f"依赖服务不可达（知识服务 :8100 / LLM :8099）: {exc}") from exc
+        raise ToolError(f"依赖服务不可达（ce-rag / ce-db / LLM :8099）: {exc}") from exc
     except ValueError as exc:  # call_qwen3 的 json.JSONDecodeError
         raise ToolError(f"LLM 选码输出非合法 JSON: {exc}") from exc
 
@@ -186,7 +187,7 @@ def quota_lookup(
         detail = exc.response.text if exc.response is not None else str(exc)
         raise ToolError(f"依赖服务返回错误: {detail}") from exc
     except requests.RequestException as exc:
-        raise ToolError(f"知识服务不可达（:8100 /price/compose）: {exc}") from exc
+        raise ToolError(f"ce-db 不可达（/price/compose）: {exc}") from exc
     caliber = {"declared": f"{region}·{_spec}", "region": region, "spec": _spec,
                "spec_source": "user" if spec else "default"}
     return {"code": code, "spec": _spec, "region": region, "price": price, "caliber": caliber}
@@ -215,7 +216,7 @@ def price_lookup(
         detail = exc.response.text if exc.response is not None else str(exc)
         raise ToolError(f"依赖服务返回错误: {detail}") from exc
     except requests.RequestException as exc:
-        raise ToolError(f"知识服务不可达（:8100 /price/query）: {exc}") from exc
+        raise ToolError(f"ce-db 不可达（/price/query）: {exc}") from exc
 
 
 @mcp.tool()
@@ -247,7 +248,7 @@ def start_cost_session(
         detail = exc.response.text if exc.response is not None else str(exc)
         raise ToolError(f"依赖服务返回错误: {detail}") from exc
     except requests.RequestException as exc:
-        raise ToolError(f"依赖服务不可达（知识服务 :8100 / LLM :8099）: {exc}") from exc
+        raise ToolError(f"依赖服务不可达（ce-rag / ce-db / LLM :8099）: {exc}") from exc
     except ValueError as exc:  # LLM 选码输出非法 JSON
         raise ToolError(f"LLM 选码输出非合法 JSON: {exc}") from exc
     task_id = result.get("task_id")
@@ -284,12 +285,12 @@ def orchestrate(
     返回：
         单一 ``{mode:"single", route, result:<能力层信封，含 meta.guard>}``；
         复合 ``{mode:"compound", route, subtasks:[{subtask, route, result}...], answer:<综合，含 cited_clauses>}``。
-    异常：能力层依赖（知识服务 :8100 / LLM）整体不可达且未被内部降级吸收 → ToolError。
+    异常：能力层依赖（ce-rag / ce-db / LLM）整体不可达且未被内部降级吸收 → ToolError。
     """
     try:
         return _orchestrate(query, has_project_context=has_project_context)
     except requests.RequestException as exc:
-        raise ToolError(f"依赖服务不可达（知识服务 :8100 / LLM）: {exc}") from exc
+        raise ToolError(f"依赖服务不可达（ce-rag / ce-db / LLM）: {exc}") from exc
     except ValueError as exc:  # 拆解/综合 LLM 输出非法 JSON（多已内部降级，兜底映射）
         raise ToolError(f"编排 LLM 输出非合法 JSON: {exc}") from exc
 

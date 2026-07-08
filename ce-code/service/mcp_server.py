@@ -1,5 +1,10 @@
 """组价取数原语 MCP façade（FastMCP streamable-HTTP，知识层 :8100 `/mcp`）。
 
+兼容层说明：
+  - 本文件保留历史 `ce-cost` 复合 MCP，供现有上层依赖继续工作。
+  - 新拆分方案下，语义候选召回改走 `service.rag_mcp_server`（`ce-rag`），结构化真值取数改走
+    `service.db_mcp_server`（`ce-db`）；设计文档见 `ce-code/MCP_SPLIT_PLAN.md`。
+
 把三个取数原语在现有 HTTP REST（``service.cost_api``）之外**加一层讲 MCP 协议的 façade**，
 让任意 deer-flow agent 把它们当 tool 直接调（应对「只查价」「只选码候选」等中间步请求，
 以及将来强模型自由编排）。方案见 ``DEV.md §7「原语对外暴露：HTTP + MCP 双 façade」``。

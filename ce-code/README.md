@@ -6,6 +6,7 @@
 > - 需求/设计（领域铁律、schema、多表征、检索/造价设计、端点规格）见 `PRD.md`
 > - 依赖服务与环境（Embedding/VLM/Milvus/版本约束/GPU）见 `DEV.md`
 > - 进度与评测指标见 `TODO.md`
+> - **MCP 分拆设计**（`ce-rag` / `ce-db`、文件迁移清单、Tool API 列表）见 `MCP_SPLIT_PLAN.md`
 > - 项目级共享上下文（设备分工、git 约定、服务器环境）见仓库根 `CLAUDE.md`
 > - **任务层（生成/合规编排）在 `../ce-services/`**，是本服务的纯 HTTP 客户端，文档见 `../ce-services/README.md`
 
@@ -55,10 +56,17 @@ ce-code/
 │
 │  ── ③ 检索引擎 / 服务层 / 工具 ──
 ├── retrieval/ index/ feature/      #   规范条文 hybrid 检索（bm25+dense+rrf+rerank+引用扩展）·Norm-QA
+├── rag/                            #   ce-rag 对外编排：条文检索 / bill_match / 半结构化投影检索
+├── db/                             #   ce-db 对外编排：PG 只读真值取数 / 补充 DAO
 ├── build.py                        #   摄取→索引流水线（parse/split/view/feature/index）
 ├── service/
-│   ├── knowledge_api.py            #   :8100 统一入口：cost_router + /search /expand /clause
-│   └── cost_api.py                 #   组价取数 router（/bill/match /price/compose /quota，spec 必填）
+│   ├── rag_api.py                  #   :8100 新入口：ce-rag REST + /mcp
+│   ├── db_api.py                   #   :8102 新入口：ce-db REST + /mcp
+│   ├── rag_mcp_server.py           #   ce-rag MCP façade
+│   ├── db_mcp_server.py            #   ce-db MCP façade
+│   ├── knowledge_api.py            #   旧复合入口（兼容层）：cost_router + /search /expand /clause
+│   ├── cost_api.py                 #   旧结构化 router（/bill/match /price/compose /quota，spec 必填）
+│   └── mcp_server.py               #   旧复合 MCP（ce-cost，兼容层）
 └── tools/
     ├── eval_bill.py                #   清单召回评测（Top-1/Top-3/Recall@k/MRR，按编码精确判命中）
     └── build_match_gold.py         #   真实结算 xlsx → 清单匹配 gold（脱敏 + 覆盖过滤）
@@ -66,7 +74,7 @@ ce-code/
 
 > **运行模型**：ce-code 不安装为包（`packages=[]`），**从 ce-code 根运行**，绝对 import 无 sys.path hack。
 > 摄取 `python -m ingest.parser mineru …` / `python -m ingest.splitter toc …`；造价抽取 `python -m cost.<模块>`；
-> 服务 `python -m service.knowledge_api`；评测 `python -m tools.eval_bill`。
+> 服务 `python -m service.rag_api` / `python -m service.db_api`（旧兼容入口仍可 `python -m service.knowledge_api`）；评测 `python -m tools.eval_bill`。
 > **范围**：ce-code = **深圳房建组价知识库**（清单/定额/价格/费率 + 取数原语）**+ 造价规范条文检索**
 > （Norm-QA，2026-06-22 起从 git 历史恢复 hybrid 引擎，语料为 GB 50500/50854/50856 计量计价规范）。
 > 防火规范 RAG 仍停做。算量不在本层。
@@ -161,6 +169,12 @@ uv run python -m ingest.splitter toc --input "data/parsed/<basename>/auto/<basen
 MCP façade `ce-cost` 四原语：bill_match / quota_lookup / price_compose / price_query。
 仅起组价测试可单跑 `service.cost_api`。
 
+2026-07 新拆分入口：
+
+- `service.rag_api`（默认 `:8100`）—— `ce-rag`：条文检索 / bill_match / 半结构化投影检索
+- `service.db_api`（默认 `:8102`）—— `ce-db`：结构化真值取数（bill/quota/price/fee_rate/aux_table）
+- 详细 Tool API 与文件迁移方案见 `MCP_SPLIT_PLAN.md`
+
 ```bash
 # 统一知识服务（组价取数 + 规范条文检索，:8100）—— 从 ce-code 根，模块式
 cd /mnt/nvme/calvin/code/deer-flow/ce-code && uv run python -m service.knowledge_api
@@ -254,6 +268,8 @@ uv run python -m cost.fee_rate --input "data/structured/chunks/深圳市建设�
 当前：7 费率表 / 2 跳过（安文费清单列项表 + 附录 B 包含内容，非费率）/ **24 费率行**（安文费 11 / 总承包服务费 3 / 附加税费 3 / 工程保险费 3 / 赶工 2 / 夜间施工 1 / 增值税 1），0 异常。
 
 ### Step C2 — 建表 + 幂等导入 PG（`cost/schema.sql` + `cost/load_pg.py`）
+
+> 各表的来源/构造方式/真值等级详解见 **`cost/TABLES.md`**。
 
 `schema.sql` 一次建齐全部造价表（`bill_spec` / `aux_table` / `price_composition` / `quota_item` / `quota_resource` / `resource` / `resource_price` / `fee_rate` / `bill_quota_map` / `hist_bill`），强制治理字段 `doc_id`/`spec_version`/`region`/`effective_priority`（价格 `resource_price` 带 `effective_period` 时效 + `btree_gist` EXCLUDE 防重叠；`resource` 唯一键 `NULLS NOT DISTINCT` 让 `spec=NULL` 也算同行）；`IF NOT EXISTS` 幂等。`load_pg.py` 读 jsonl，按主键 `ON CONFLICT DO UPDATE` upsert（`bill_spec` 按 **`code+spec_version`**（国标版本隔离：2013/2024 同 9 位码共存不互相覆盖，见下「国标版本隔离」）、`aux_table` 按 `doc_id+caption+chapter`、`price_composition` 按 `doc_id+composite+seq`、`quota_item` 按 `region+quota_code+spec_version`、`resource` 按 `category+name+spec+unit`），可重复执行不产生重复行。
 

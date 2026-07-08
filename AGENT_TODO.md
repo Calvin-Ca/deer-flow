@@ -42,7 +42,20 @@
 
 ## 2. 两条收尾线（下次开工从这里接手；服务器无后台任务在挂，跑批已结束）
 
-### ① 行为回归 —— v3b 全量定案（2026-07-06 深夜）：v2 三大簇全出清，新形态三修落码待 v4
+### ① 行为回归 —— ✅ v4 双门通过，本线收官（2026-07-07）
+
+**v4 终判**：**clarify 33/33 = 100%**（门 ≥0.95 过，含 v3b 还红的 A4/B8/E5 全部转绿）、
+**route 22/23 = 95.65%**（门 ≥0.8 过；未挂分 11 = A9 + 10 条正确止步于反问——止步条数逐版上升
+正是哑火收编在把纯文本打发转成合规反问）。四个版本的治理曲线：v2 clarify 88.24% → v3b 90.91% →
+v4 100%。**本线关账（用户拍板 2026-07-07：不再深究，闭合）**：
+- v4 唯一一条 route ✗ **记档不修**（95.65% 已过门；如日后好奇，`dump_run_scores.py --run-name m4-behavior-v4`
+  随时可看是哪条）
+- 挂起：E5「引导后哑火」v4 虽绿但该形态属模型非确定性，治本方案（ce-services 0 件引导返回带结构化
+  need_input 标记 → 中间件识别后放行收编）留挂起，真实流量里若复发再启动
+今后任何动 prompt/reminder/中间件的改动，改后跑一轮对比矩阵即为回归护栏（四条命令见下折叠存档）。
+
+<details>
+<summary>v3b 归因定案存档（2026-07-06 深夜：v2 三大簇出清 + 新形态三修）</summary>
 
 **v3b 矩阵**：route 21/24=87.50%（未挂分 10：A9 + 9 条正确止步于反问）、clarify 30/33=90.91%。
 **v2 三大顽疾全部治愈**：E2/E3/E6 哑火出清（收编+观测双修生效）、B2 转绿（先问特征再止步）、A9 按定案挂 —。
@@ -59,12 +72,13 @@
   纯文本收尾——「有工具活动不收编」按设计不介入（E3 的 v3 形态漂移）。**A4/B8 修好后 clarify 32/33=97%
   已过 ≥0.95 门**。治本挂 follow-up：ce-services 0 件引导返回带结构化 need_input 标记 → 中间件识别后对
   该形态放行收编（勿用「工具后仍收编」的宽松版，会干扰组价 HITL 会话话术）。
-**待办（服务器，按序单行）**：
-- [ ] 重传金标（B11 note）：`cd /mnt/nvme/calvin/code/deer-flow && set -a && . ./.env && set +a && uv run --project backend python benchmark/runner/upload_datasets.py --only routing`
-- [ ] 跑 v4：`uv run --project backend python benchmark/runner/run_routing_experiment.py --run-name m4-behavior-v4`
-- [ ] 拉矩阵：`uv run --project backend python benchmark/runner/dump_run_scores.py --run-name m4-behavior-v4`——
-  预期 A4/B8 不再过问、B11 按新口径转绿、clarify ≥0.95 过门；E5 若仍红属已知余留不阻塞。
-（用户口径：benchmark 优化可后置，不阻塞主线。）
+**回归命令（复用模板，改 --run-name 即新一轮）**：
+- [x] 重传金标（B11 note）：`cd /mnt/nvme/calvin/code/deer-flow && set -a && . ./.env && set +a && uv run --project backend python benchmark/runner/upload_datasets.py --only routing`
+- [x] 跑 v4：`uv run --project backend python benchmark/runner/run_routing_experiment.py --run-name m4-behavior-v4`
+- [x] 拉矩阵：`uv run --project backend python benchmark/runner/dump_run_scores.py --run-name m4-behavior-v4`
+  （✅ 2026-07-07 结果见上：clarify 100% / route 95.65%，双门通过。）
+
+</details>
 
 <details>
 <summary>v2/v3 归因过程存档（定案已并入上文，展开看推理链）</summary>

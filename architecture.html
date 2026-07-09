@@ -134,8 +134,9 @@
     <p class="eyebrow">深圳房建造价 · Agent 系统</p>
     <h1>CE 造价 Agent — 系统架构与全意图数据流</h1>
     <p class="lede">基于当前代码（<b>ce-services 任务层已退役</b>后）。组价编排内嵌于 deer-flow harness
-      的 <b>确定性 workflow</b>，规范问答与选码取数由 <b>专化子智能体</b>承担，知识取数走 <b>ce-rag / ce-db 两个 HTTP-MCP</b>。
-      唯一 LLM 为本地 <span class="mono">Qwen3-8B</span>。</p>
+      的 <b>确定性 workflow</b>，规范问答与选码取数由 <b>专化子智能体</b>承担，知识取数走 <b>ce-rag / ce-db 两个 HTTP-MCP</b>，
+      唯一 LLM 为本地 <span class="mono">Qwen3-8B</span>。围绕弱模型加了一层<b>可靠性工程</b>：复核 agent、agentic RAG
+      引用回查、主动学习、确定性护栏，均由 <b>benchmark 评测</b>把关（见末节）。</p>
   </header>
 
   <div class="legend" role="list" aria-label="节点语义图例">
@@ -176,14 +177,19 @@
             <div class="desc">意图分类（norm / cost / both / out_of_domain）+ 分派 + 综合。不选码 / 不算钱。</div>
           </div>
           <div class="node" style="--c:var(--role-llm)">
-            <div class="nh"><span class="name">子智能体 ×2</span><span class="port">task ≤3 并行</span></div>
+            <div class="nh"><span class="name">子智能体 ×3</span><span class="port">task ≤3 并行</span></div>
             <div class="desc">专化 LLM 循环、上下文隔离</div>
-            <div class="tools"><span class="chip">norm-qa</span><span class="chip">cost-agent</span></div>
+            <div class="tools"><span class="chip">norm-qa</span><span class="chip">cost-agent</span><span class="chip">cost-critic</span></div>
           </div>
           <div class="node" style="--c:var(--role-det)">
             <div class="nh"><span class="name">cost_workflow</span><span class="port">状态机+HITL</span></div>
             <div class="desc"><span class="mono">backend/app/ce/cost/</span> langgraph 图，节点确定性调 MCP / 算价</div>
             <div class="tools"><span class="chip" style="--c:var(--role-det)">start</span><span class="chip" style="--c:var(--role-det)">node</span><span class="chip" style="--c:var(--role-det)">resume</span><span class="chip" style="--c:var(--role-det)">state</span></div>
+          </div>
+          <div class="node" style="--c:var(--role-det)">
+            <div class="nh"><span class="name">确定性护栏</span><span class="port">纯函数·可单测</span></div>
+            <div class="desc">工程加固层：不靠弱模型的确定性检查/召回</div>
+            <div class="tools"><span class="chip" style="--c:var(--role-det)">cost_verify 算术重算/串库</span><span class="chip" style="--c:var(--role-det)">norm_verify 引用回查</span><span class="chip" style="--c:var(--role-det)">cost_recall_exemplars 主动学习</span></div>
           </div>
         </div>
       </div>
@@ -245,15 +251,17 @@
 
     <!-- norm -->
     <div class="intent" style="--c:var(--role-mcp)">
-      <div class="ih"><span class="cap">norm</span><span class="title">规范问答</span><span class="meta">上下文隔离 · 带引用 · 无 web 兜底</span></div>
+      <div class="ih"><span class="cap">norm · agentic RAG</span><span class="title">规范问答</span><span class="meta">上下文隔离 · 分解 · 引用回查</span></div>
       <div class="chain">
         <div class="step" style="--c:var(--role-llm)"><div class="s-role">LLM</div><div class="s-name">lead_agent</div><div class="s-sub">派 <span class="mono">task(norm-qa)</span></div></div>
         <div class="arrow">→</div>
-        <div class="step" style="--c:var(--role-llm)"><div class="s-role">LLM · 子智能体</div><div class="s-name">norm-qa</div><div class="s-sub">缺口径→ask_clarification；迭代检索</div></div>
+        <div class="step" style="--c:var(--role-llm)"><div class="s-role">LLM · 子智能体</div><div class="s-name">norm-qa</div><div class="s-sub">缺口径→反问；<b>复合问题先分解</b></div></div>
         <div class="arrow">→</div>
-        <div class="step" style="--c:var(--role-mcp)"><div class="s-role">MCP · :8100</div><div class="s-name mono">ce-rag_*</div><div class="s-sub">search / expand / get / evidence</div></div>
+        <div class="step" style="--c:var(--role-mcp)"><div class="s-role">MCP · :8100</div><div class="s-name mono">ce-rag_*</div><div class="s-sub">逐子问检索 search / evidence</div></div>
         <div class="arrow">→</div>
-        <div class="step" style="--c:var(--role-llm)"><div class="s-role">LLM</div><div class="s-name">生成带引用答案</div><div class="s-sub">仅收 answer + cited_clauses 回主线</div></div>
+        <div class="step" style="--c:var(--role-llm)"><div class="s-role">LLM</div><div class="s-name">生成带引用答案</div></div>
+        <div class="arrow">→</div>
+        <div class="step" style="--c:var(--role-det)"><div class="s-role">确定性护栏</div><div class="s-name mono">norm_verify</div><div class="s-sub">引用条款号回查∈检索证据；幻觉→剥引用/拒答</div></div>
       </div>
     </div>
 
@@ -266,6 +274,8 @@
         <div class="step" style="--c:var(--role-llm)"><div class="s-role">LLM · 子智能体</div><div class="s-name">cost-agent</div><div class="s-sub">缺特征→反问；默认深圳·2013</div></div>
         <div class="arrow">→</div>
         <div class="step" style="--c:var(--role-mcp)"><div class="s-role">MCP · :8100</div><div class="s-name mono">bill_match</div><div class="s-sub">ce-rag 召回清单候选</div></div>
+        <div class="arrow">→</div>
+        <div class="step" style="--c:var(--role-det)"><div class="s-role">主动学习</div><div class="s-name mono">recall_exemplars</div><div class="s-sub">检索历史人工纠正做 few-shot（同 spec）</div></div>
         <div class="arrow">→</div>
         <div class="step" style="--c:var(--role-det)"><div class="s-role">确定性</div><div class="s-name">select_bill</div><div class="s-sub">置信门：高置信 auto / 低置信 need_review</div></div>
         <div class="arrow">→</div>
@@ -283,7 +293,7 @@
         <div class="arrow">→</div>
         <div class="step" style="--c:var(--role-det)"><div class="s-role">确定性 · :8100</div><div class="s-name">bill_match</div><div class="s-sub">召回候选</div></div>
         <div class="arrow">→</div>
-        <div class="step" style="--c:var(--role-hitl)"><div class="s-role">闸 / 置信门</div><div class="s-name">select_bill</div><div class="s-sub">低置信→暂停，用户 resume 选码</div></div>
+        <div class="step" style="--c:var(--role-hitl)"><div class="s-role">闸 / 置信门</div><div class="s-name">select_bill</div><div class="s-sub">低置信→暂停选码；<b>resume 采集纠正入库（⑥主动学习）</b></div></div>
         <div class="arrow">→</div>
         <div class="step" style="--c:var(--role-det)"><div class="s-role">确定性 · :8102</div><div class="s-name">quota_compose</div><div class="s-sub">定额方案 + 工料机</div></div>
         <div class="arrow">→</div>
@@ -291,7 +301,9 @@
         <div class="arrow">→</div>
         <div class="step" style="--c:var(--role-det)"><div class="s-role">确定性 · 纯算</div><div class="s-name">settle → unit_price</div><div class="s-sub">Python 算价引擎（无 LLM / 无 MCP）</div></div>
         <div class="branch"><div class="arrow loop">↩</div></div>
-        <div class="step" style="--c:var(--role-det)"><div class="s-role">循环</div><div class="s-name">advance 下一构件</div><div class="s-sub">全办完 → done</div></div>
+        <div class="step" style="--c:var(--role-det)"><div class="s-role">循环</div><div class="s-name">advance 下一构件</div><div class="s-sub">全办完 →</div></div>
+        <div class="arrow">→</div>
+        <div class="step" style="--c:var(--role-llm)"><div class="s-role">复核 · 子智能体</div><div class="s-name">cost-critic（②）</div><div class="s-sub">定稿前对抗复核：cost_verify 算术/串库 + 语义构件↔码；fail→打回、doubt→转人工</div></div>
       </div>
     </div>
 
@@ -325,9 +337,33 @@
 
   </section>
 
+  <!-- ===================== 工程加固 & 评测 ===================== -->
+  <section>
+    <h2>工程加固 &amp; 评测（弱模型 8B 上的可靠性层）</h2>
+    <div class="nodes">
+      <div class="node" style="--c:var(--role-det)">
+        <div class="nh"><span class="name">② 复核 agent</span><span class="port">generator–verifier</span></div>
+        <div class="desc">cost-critic 对抗复核组价结果：<span class="mono">cost_verify</span> 确定性算术重算/串库/编码 + LLM 语义构件↔码。fail 打回、doubt 转人工。</div>
+      </div>
+      <div class="node" style="--c:var(--role-det)">
+        <div class="nh"><span class="name">⑤ agentic RAG</span><span class="port">norm-qa</span></div>
+        <div class="desc">复合问题分解逐个检索 + <span class="mono">norm_verify</span> 引用条款号回查∈检索证据（治幻觉引用）。开关 <span class="mono">CE_NORM_FAITHFULNESS_CHECK</span>。</div>
+      </div>
+      <div class="node" style="--c:var(--role-det)">
+        <div class="nh"><span class="name">⑥ 主动学习</span><span class="port">few-shot·不训练</span></div>
+        <div class="desc">HITL 纠正入库 → 选码前 <span class="mono">cost_recall_exemplars</span> 检索相似历史纠正作 few-shot（按 spec 隔离）。</div>
+      </div>
+      <div class="node" style="--c:var(--role-user)">
+        <div class="nh"><span class="name">① 评测体系</span><span class="port">benchmark</span></div>
+        <div class="desc">纯函数打分器 + runner：<span class="mono">cost_task</span>(pass^k+红线) / <span class="mono">norm_faithful</span>(traditional↔agentic 对比)。Langfuse 挂分。<b>任何加固过它防退化。</b></div>
+      </div>
+    </div>
+  </section>
+
   <footer class="note">
     <b>红线（贯穿所有 cost 流）：</b>选码只在候选内、不造码，低置信转人工；算钱一律走确定性 Python，LLM 不算钱；
-    地区/版本严格隔离（默认深圳·2013）；无命中不杜撰。&nbsp;
+    地区/版本严格隔离（默认深圳·2013）；无命中不杜撰。<b>红线靠确定性护栏（<span class="mono">cost_verify</span> /
+    <span class="mono">norm_verify</span>）enforced，不靠 prompt 祈祷。</b>&nbsp;
     <b>已退役：</b><code>ce-services :8101</code> 任务层、前端组价 widget、13 节点独立 HITL 图 —— 组价编排现唯一路径为
     harness 内嵌 <code>cost_workflow_*</code> + <code>ce-rag</code>/<code>ce-db</code> MCP。
   </footer>

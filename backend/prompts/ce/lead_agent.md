@@ -40,6 +40,9 @@
 - 用户只要求完整流程中的某一步时，调用 `cost_workflow_node` 的对应节点。
 - 遇到 `interrupt` 时，只说明当前需要用户确认或补充什么，不替用户选择。
 - 用户追问依据、来源或重算时，回到 `cost_workflow_state`、`cost_workflow_resume` 或对应节点结果。
+- **组价结果复核（generator–verifier）**：完整组价或高风险选码在**定稿前**，可派 `cost-critic` 子智能体做对抗复核
+  （它先调 `cost_verify` 确定性预检算术/编码/串库，再语义核对构件↔码）。verdict=`fail`（算术不符/编码非法/选错码）
+  → 打回重选或转人工；`doubt`（缺价/存疑）→ 转人工并摆出异议；`pass` → 放行。复核只做一遍、有界，别无限打回。
 </workflow>
 
 <skill_runbook priority="高">

@@ -148,8 +148,6 @@ def test_workflow_routes_business_steps_through_registry(monkeypatch):
             return {"node": "bill_match", "status": "done", "candidates": [{"code": "010502001"}]}
         if step == "quota_compose":
             return {"node": "price_compose", "status": "done", "result": {"code": payload["code"]}}
-        if step == "calc":
-            return {"node": "unit_price", "status": "done", "amount": 1.0}
         raise AssertionError(f"unexpected step: {step}")
 
     monkeypatch.setattr(workflow_module, "run_business_step", fake_run_business_step)
@@ -189,9 +187,11 @@ def test_workflow_routes_business_steps_through_registry(monkeypatch):
     result = workflow_module._workflow_step(result)
     assert result["items"][0]["settle"]["status"] == "done"
 
+    # 所有阶段产物齐备 → 游标推进到下一条（已删除残留的 unit_price/calc 阶段）
     result = workflow_module._workflow_step(result)
-    assert result["items"][0]["unit_price"]["node"] == "unit_price"
-    assert calls[2][0] == "calc"
+    assert result["current_index"] == 1
+    assert "unit_price" not in result["items"][0]
+    assert [c[0] for c in calls] == ["bill_match", "quota_compose"]
 
 
 def test_start_workflow_pauses_for_bill_selection_and_resumes(monkeypatch):
@@ -653,3 +653,71 @@ def test_start_workflow_pauses_for_quota_scheme_and_resumes(monkeypatch):
     assert selection["selected_scheme_id"] == "S1"
     assert selection["selection_source"] == "explicit_input"
     assert selection["reason"] == "现场采用钢模板"
+
+
+# ---- 显式 stage 状态机（STAGES 表 + 游标推导 + 统一暂停）------------------------------
+def test_stage_table_output_keys_match_item_progression():
+    # STAGES 的 output_key 序列 = 单条清单的组价 DAG，防漏配/错序
+    assert [s.output_key for s in workflow_module.STAGES] == [
+        "bill_match",
+        "selection",
+        "price_compose",
+        "quota_selection",
+        "price_review",
+        "settle",
+    ]
+    # gate 阶段（可 HITL、strict 策略）与取数阶段（lenient）划分正确
+    gate_nodes = {s.name: s.gate_node for s in workflow_module.STAGES}
+    assert gate_nodes["select_bill"] == "select_bill"
+    assert gate_nodes["select_quota"] == "select_quota"
+    assert gate_nodes["price_review"] == "price_review"
+    assert gate_nodes["settle"] == "settle"
+    assert gate_nodes["bill_match"] is None
+    assert gate_nodes["quota_compose"] is None
+    # resume 表与正向 gate 阶段一一对应
+    assert set(workflow_module._RESUME_HANDLERS) == {"select_bill", "select_quota", "price_review", "settle"}
+
+
+def test_current_stage_skips_quota_when_single_scheme_autoselected():
+    # 单方案已自动降级写入 quota_selection → 游标跳过 select_quota 直达 price_review
+    item = {
+        "bill_match": {"status": "done"},
+        "selection": {"selected_code": "010502001"},
+        "price_compose": {"status": "done"},
+        "quota_selection": {"selection_source": "auto_single_scheme"},
+    }
+    assert workflow_module._current_stage(item).name == "price_review"
+
+
+def test_current_stage_returns_select_quota_when_not_autoselected():
+    item = {
+        "bill_match": {"status": "done"},
+        "selection": {"selected_code": "010502001"},
+        "price_compose": {"status": "done"},
+    }
+    assert workflow_module._current_stage(item).name == "select_quota"
+
+
+def test_current_stage_none_when_all_stage_keys_present():
+    item = {k: {"status": "done"} for k in ("bill_match", "selection", "price_compose", "quota_selection", "price_review", "settle")}
+    assert workflow_module._current_stage(item) is None
+
+
+def test_current_stage_first_stage_on_empty_item():
+    assert workflow_module._current_stage({}).name == "bill_match"
+
+
+def test_pause_settle_gate_carries_gate_type_in_pending():
+    settle_stage = next(s for s in workflow_module.STAGES if s.name == "settle")
+    result = {"status": "awaiting_input", "interrupt": {"gate_type": "capability_gap", "node": "compute"}}
+    out = workflow_module._pause({"items": []}, settle_stage, result, 0)
+    assert out["status"] == "awaiting_input"
+    assert out["pending"] == {"node": "settle", "index": 0, "gate_type": "capability_gap"}
+    assert out["interrupt"]["node"] == "compute"
+
+
+def test_pause_review_gate_omits_gate_type_in_pending():
+    stage = next(s for s in workflow_module.STAGES if s.name == "select_bill")
+    result = {"status": "awaiting_input", "interrupt": {"gate_type": "review", "node": "select_bill"}}
+    out = workflow_module._pause({"items": []}, stage, result, 2)
+    assert out["pending"] == {"node": "select_bill", "index": 2}

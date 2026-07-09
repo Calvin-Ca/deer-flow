@@ -5,6 +5,8 @@ from __future__ import annotations
 import copy
 import threading
 import uuid
+from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any, TypedDict
 
@@ -114,12 +116,138 @@ def _selected_quotas(item: dict[str, Any]) -> list[dict[str, Any]]:
     return []
 
 
-def _workflow_step(input_state: CostWorkflowState) -> CostWorkflowState:
-    """Advance the graph by exactly one workflow node.
+# ---- 显式 stage 状态机（STAGES 表 = 单条清单的组价 DAG）---------------------------
+@dataclass(frozen=True)
+class _Ctx:
+    """一次 stage 执行的上下文聚合（免到处透传 state/item/index/base_payload）。"""
 
-    LangGraph checkpoints after every graph step. Keeping this function to one
-    domain-node transition makes resume/replay inspectable without giving the
-    lead agent procedural control over the workflow.
+    state: dict[str, Any]
+    item: dict[str, Any]
+    index: int
+    base_payload: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class _Stage:
+    """一个组价阶段的声明式描述。
+
+    name        阶段 id（也是事件名）；
+    output_key  该阶段写入 item 的键——游标 `_current_stage` 据此推导当前进度（第一个未写入的阶段）；
+    run         产出节点结果的薄封装（内部调 run_business_step / *_node，逻辑与旧阶梯一致）；
+    gate_node   非空 ⇒ 此阶段可触发 HITL 暂停，对应 pending.node，用 strict 状态策略
+                （awaiting_input→暂停 / done→继续 / 其它→阻断）；为空 ⇒ 取数类阶段用 lenient 策略
+                （仅 blocked→阻断，need_review 等非 done 也继续，从不因人工输入停下）；
+    post        done 后的可选副作用（如单方案自动降级，直接写 quota_selection 让游标跳过 select_quota）；
+    pause_with_gate_type  暂停时是否在 pending 里附带 gate_type（仅 settle 的 capability_gap 需要）。
+    """
+
+    name: str
+    output_key: str
+    run: Callable[[_Ctx], dict[str, Any]]
+    gate_node: str | None = None
+    post: Callable[[_Ctx, dict[str, Any]], None] | None = None
+    pause_with_gate_type: bool = False
+
+
+def _run_bill_match(ctx: _Ctx) -> dict[str, Any]:
+    return run_business_step("bill_match", {**ctx.base_payload, **ctx.item}, strategy=_strategy_for(ctx.state, "bill_match"))
+
+
+def _run_select_bill(ctx: _Ctx) -> dict[str, Any]:
+    return select_bill_node({**ctx.base_payload, "candidates": ctx.item.get("bill_match", {}).get("candidates", [])})
+
+
+def _run_quota_compose(ctx: _Ctx) -> dict[str, Any]:
+    selected_code = ctx.item.get("selection", {}).get("selected_code")
+    return run_business_step("quota_compose", {**ctx.base_payload, "code": selected_code}, strategy=_strategy_for(ctx.state, "quota_compose"))
+
+
+def _auto_single_scheme(ctx: _Ctx, result: dict[str, Any]) -> None:
+    """quota_compose 的 post：单方案（服务端未返回多套可替代方案）直接采用，游标据此跳过 select_quota；多方案留给复核。"""
+    schemes = extract_quota_schemes(result)
+    if len(schemes) <= 1:
+        ctx.item["quota_selection"] = {
+            "node": "select_quota",
+            "status": "done",
+            "selection_source": "auto_single_scheme",
+            "selected_scheme": schemes[0] if schemes else None,
+        }
+
+
+def _run_select_quota(ctx: _Ctx) -> dict[str, Any]:
+    return select_quota_node({**ctx.base_payload, "schemes": extract_quota_schemes(ctx.item["price_compose"])})
+
+
+def _run_price_review(ctx: _Ctx) -> dict[str, Any]:
+    # 选定组价的工料机询价：信息价缺失（no_source）的人材机 → 人工补价（仅有缺价料才停）。
+    return price_review_node({"quotas": _selected_quotas(ctx.item), "region": ctx.state["region"], "period": ctx.state.get("period")})
+
+
+def _run_settle(ctx: _Ctx) -> dict[str, Any]:
+    # 结算：选定方案+已询价的工料机 → compute 引擎算到 settle_target（默认综合单价）。
+    # 目标层无确定性公式时 compute 返回 capability_gap，停下交模型按规则试算后 resume。
+    target = ctx.state.get("settle_target") or "unit_rate"
+    return run_node(
+        "compute",
+        {
+            "target": target,
+            "components": _components_from_quotas(_selected_quotas(ctx.item)),
+            "management_rate": ctx.state.get("management_rate"),
+            "profit_rate": ctx.state.get("profit_rate"),
+            "risk_rate": ctx.state.get("risk_rate"),
+            "quantity": ctx.item.get("quantity"),
+        },
+    )
+
+
+# 单条清单的组价阶段序列（有序）= 显式 DAG；游标 = 第一个 output_key 未写入的阶段。
+STAGES: list[_Stage] = [
+    _Stage("bill_match", "bill_match", _run_bill_match),
+    _Stage("select_bill", "selection", _run_select_bill, gate_node="select_bill"),
+    _Stage("quota_compose", "price_compose", _run_quota_compose, post=_auto_single_scheme),
+    _Stage("select_quota", "quota_selection", _run_select_quota, gate_node="select_quota"),
+    _Stage("price_review", "price_review", _run_price_review, gate_node="price_review"),
+    _Stage("settle", "settle", _run_settle, gate_node="settle", pause_with_gate_type=True),
+]
+
+
+def _current_stage(item: dict[str, Any]) -> _Stage | None:
+    """游标：STAGES 中第一个 output_key 尚未写入 item 的阶段；全部写入 → None（该 item 已完成，可推进下一条）。"""
+    for stage in STAGES:
+        if stage.output_key not in item:
+            return stage
+    return None
+
+
+def _pause(state: dict[str, Any], stage: _Stage, result: dict[str, Any], index: int) -> dict[str, Any]:
+    """把一个 awaiting_input 的 stage 结果落成统一的 HITL 暂停态（pending/interrupt/result）。"""
+    gate = result.get("interrupt") or {}
+    pending: dict[str, Any] = {"node": stage.gate_node, "index": index}
+    if stage.pause_with_gate_type:
+        pending["gate_type"] = gate.get("gate_type")
+    state["status"] = "awaiting_input"
+    state["pending"] = pending
+    state["interrupt"] = gate
+    state["result"] = _build_result(state)
+    return state
+
+
+def _advance_item(state: dict[str, Any], current_index: int) -> dict[str, Any]:
+    """一条清单全阶段完成 → 游标推进到下一条。"""
+    state["current_index"] = current_index + 1
+    state["updated_at"] = _now()
+    _append_event(state, "workflow", "advance_item", {"from_index": current_index, "to_index": current_index + 1})
+    return state
+
+
+def _workflow_step(input_state: CostWorkflowState) -> CostWorkflowState:
+    """Advance the graph by exactly one workflow stage.
+
+    Control flow is driven by the declarative ``STAGES`` table (an explicit DAG)
+    plus a single interpreter, rather than an implicit ladder of key-presence
+    checks. LangGraph checkpoints after every graph step, and this function still
+    performs at most one stage transition per call, so resume/replay stays
+    inspectable without giving the lead agent procedural control over the workflow.
     """
     state: dict[str, Any] = _snapshot(dict(input_state))
     status = state.get("status")
@@ -154,140 +282,36 @@ def _workflow_step(input_state: CostWorkflowState) -> CostWorkflowState:
     if not isinstance(item, dict):
         return _block(state, {"node": "workflow", "status": "blocked", "error": f"item {current_index} is not an object"})
 
+    stage = _current_stage(item)
+    if stage is None:
+        return _advance_item(state, current_index)
+
     base_payload = {
         "spec": state["spec"],
         "region": state["region"],
         "period": state.get("period"),
         "top_k": state.get("top_k", 10),
     }
-
-    if "bill_match" not in item:
-        result = run_business_step("bill_match", {**base_payload, **item}, strategy=_strategy_for(state, "bill_match"))
-        item["bill_match"] = result
-        state["items"] = items
-        state["updated_at"] = _now()
-        _append_event(state, "bill_match", result.get("status", "unknown"), {"index": current_index})
-        if result.get("status") == "blocked":
-            return _block(state, result)
-        return state
-
-    if "selection" not in item:
-        result = select_bill_node(
-            {
-                **base_payload,
-                "candidates": item.get("bill_match", {}).get("candidates", []),
-            }
-        )
-        item["selection"] = result
-        state["items"] = items
-        state["updated_at"] = _now()
-        _append_event(state, "select_bill", result.get("status", "unknown"), {"index": current_index})
-        if result.get("status") == "awaiting_input":
-            state["status"] = "awaiting_input"
-            state["pending"] = {"node": "select_bill", "index": current_index}
-            state["interrupt"] = result.get("interrupt")
-            state["result"] = _build_result(state)
-            return state
-        if result.get("status") != "done":
-            return _block(state, result)
-        return state
-
-    selected_code = item.get("selection", {}).get("selected_code")
-    if selected_code and "price_compose" not in item:
-        result = run_business_step("quota_compose", {**base_payload, "code": selected_code}, strategy=_strategy_for(state, "quota_compose"))
-        item["price_compose"] = result
-        state["items"] = items
-        state["updated_at"] = _now()
-        _append_event(state, "quota_compose", result.get("status", "unknown"), {"index": current_index})
-        if result.get("status") == "blocked":
-            return _block(state, result)
-        # 单方案（服务端未返回多套可替代方案）直接采用，不额外中断；多方案留给下一步复核。
-        schemes = extract_quota_schemes(result)
-        if len(schemes) <= 1:
-            item["quota_selection"] = {
-                "node": "select_quota",
-                "status": "done",
-                "selection_source": "auto_single_scheme",
-                "selected_scheme": schemes[0] if schemes else None,
-            }
-            state["items"] = items
-        return state
-
-    if "price_compose" in item and "quota_selection" not in item:
-        # 存在多套可替代定额方案 → 复核选一套（仅低置信/多方案相近才停）。
-        result = select_quota_node({**base_payload, "schemes": extract_quota_schemes(item["price_compose"])})
-        item["quota_selection"] = result
-        state["items"] = items
-        state["updated_at"] = _now()
-        _append_event(state, "select_quota", result.get("status", "unknown"), {"index": current_index})
-        if result.get("status") == "awaiting_input":
-            state["status"] = "awaiting_input"
-            state["pending"] = {"node": "select_quota", "index": current_index}
-            state["interrupt"] = result.get("interrupt")
-            state["result"] = _build_result(state)
-            return state
-        if result.get("status") != "done":
-            return _block(state, result)
-        return state
-
-    if "quota_selection" in item and "price_review" not in item:
-        # 选定组价的工料机询价：信息价缺失（no_source）的人材机 → 人工补价（仅有缺价料才停）。
-        result = price_review_node({"quotas": _selected_quotas(item), "region": state["region"], "period": state.get("period")})
-        item["price_review"] = result
-        state["items"] = items
-        state["updated_at"] = _now()
-        _append_event(state, "price_review", result.get("status", "unknown"), {"index": current_index})
-        if result.get("status") == "awaiting_input":
-            state["status"] = "awaiting_input"
-            state["pending"] = {"node": "price_review", "index": current_index}
-            state["interrupt"] = result.get("interrupt")
-            state["result"] = _build_result(state)
-            return state
-        if result.get("status") != "done":
-            return _block(state, result)
-        return state
-
-    if "price_review" in item and "settle" not in item:
-        # 结算：选定方案+已询价的工料机 → compute 引擎算到 settle_target（默认综合单价）。
-        # 目标层无确定性公式时 compute 返回 capability_gap，停下交模型按规则试算后 resume。
-        target = state.get("settle_target") or "unit_rate"
-        result = run_node(
-            "compute",
-            {
-                "target": target,
-                "components": _components_from_quotas(_selected_quotas(item)),
-                "management_rate": state.get("management_rate"),
-                "profit_rate": state.get("profit_rate"),
-                "risk_rate": state.get("risk_rate"),
-                "quantity": item.get("quantity"),
-            },
-        )
-        item["settle"] = result
-        state["items"] = items
-        state["updated_at"] = _now()
-        _append_event(state, "settle", result.get("status", "unknown"), {"index": current_index, "target": target})
-        if result.get("status") == "awaiting_input":
-            gate = result.get("interrupt") or {}
-            state["status"] = "awaiting_input"
-            state["pending"] = {"node": "settle", "index": current_index, "gate_type": gate.get("gate_type")}
-            state["interrupt"] = gate
-            state["result"] = _build_result(state)
-            return state
-        if result.get("status") != "done":
-            return _block(state, result)
-        return state
-
-    if "unit_price" not in item and isinstance(item.get("components"), list):
-        result = run_business_step("calc", {"operation": "unit_price", "components": item["components"]}, strategy=_strategy_for(state, "calc"))
-        item["unit_price"] = result
-        state["items"] = items
-        state["updated_at"] = _now()
-        _append_event(state, "calc", result.get("status", "unknown"), {"index": current_index})
-        return state
-
-    state["current_index"] = current_index + 1
+    ctx = _Ctx(state=state, item=item, index=current_index, base_payload=base_payload)
+    result = stage.run(ctx)
+    item[stage.output_key] = result
+    state["items"] = items
     state["updated_at"] = _now()
-    _append_event(state, "workflow", "advance_item", {"from_index": current_index, "to_index": current_index + 1})
+    _append_event(state, stage.name, result.get("status", "unknown"), {"index": current_index})
+
+    node_status = result.get("status")
+    if stage.gate_node is not None:
+        # 可触发 HITL 的阶段：awaiting_input→暂停 / done→继续 / 其它→阻断
+        if node_status == "awaiting_input":
+            return _pause(state, stage, result, current_index)
+        if node_status != "done":
+            return _block(state, result)
+    elif node_status == "blocked":
+        # 取数类阶段：只在服务不可达时阻断，need_review 等非 done 状态也继续
+        return _block(state, result)
+
+    if stage.post is not None:
+        stage.post(ctx, result)
     return state
 
 
@@ -364,8 +388,146 @@ def start_workflow(
     return _get_graph().invoke(state, config=_thread_config(task_id))
 
 
+# ---- resume 侧 HITL gate 处理（表驱动，与正向 STAGES.gate_node 对齐）------------------
+# 每个 handler 三种出路：① 返回一个 dict（无效 index 阻断 / 缺回传继续等待）→ 直接作为 resume 结果返回；
+# ② 返回 None（已应用人工决策）→ 落到共用尾巴「标 running + 重新 invoke 图」。
+def _resume_invalid_index(state: dict[str, Any], node: str, task_id: str) -> dict[str, Any]:
+    blocked = _block(state, {"node": node, "status": "blocked", "error": "invalid pending index"})
+    return _get_graph().invoke(blocked, config=_thread_config(task_id))
+
+
+def _resume_still_waiting(state: dict[str, Any], interrupt: dict[str, Any] | None, task_id: str) -> dict[str, Any]:
+    state["interrupt"] = interrupt
+    state["updated_at"] = _now()
+    _get_graph().update_state(_thread_config(task_id), state)
+    return state
+
+
+def _resume_select_bill(state: dict[str, Any], index: Any, decision: dict[str, Any], task_id: str) -> dict[str, Any] | None:
+    items = state.get("items", [])
+    if not isinstance(index, int) or index >= len(items):
+        return _resume_invalid_index(state, "select_bill", task_id)
+
+    selected_code = decision.get("selected_code") or decision.get("code") or decision.get("manual_input")
+    if not isinstance(selected_code, str) or not selected_code.strip():
+        # 未回传编码 → 用原节点重新生成同一 review 中断，继续等待。
+        regen = select_bill_node({"candidates": items[index].get("bill_match", {}).get("candidates", [])})
+        return _resume_still_waiting(state, regen.get("interrupt"), task_id)
+
+    _candidates = items[index].get("bill_match", {}).get("candidates", [])
+    items[index]["selection"] = select_bill_node(
+        {
+            "selected_code": selected_code.strip(),
+            "candidates": _candidates,
+            "reason": decision.get("reason"),
+        }
+    )
+    _append_event(state, "select_bill", "human_selected", {"index": index, "selected_code": selected_code.strip()})
+    # 主动学习闭环·采集端（⑥）：人工在闸上给的正确码入库，供未来相似构件检索作 few-shot。
+    # 采集失败绝不拖垮组价——整段吞异常。
+    try:
+        from .exemplars import record_bill_correction
+        record_bill_correction(
+            items[index].get("description"),
+            selected_code.strip(),
+            candidates=_candidates,
+            region=state.get("region"),
+            spec=state.get("spec"),
+        )
+    except Exception:  # noqa: BLE001
+        pass
+    return None
+
+
+def _resume_select_quota(state: dict[str, Any], index: Any, decision: dict[str, Any], task_id: str) -> dict[str, Any] | None:
+    items = state.get("items", [])
+    if not isinstance(index, int) or index >= len(items):
+        return _resume_invalid_index(state, "select_quota", task_id)
+
+    schemes = extract_quota_schemes(items[index].get("price_compose", {}))
+    selected_scheme = decision.get("selected_scheme") or decision.get("scheme_id")
+    manual_input = decision.get("manual_input")
+    has_selection = (isinstance(selected_scheme, str) and selected_scheme.strip()) or (isinstance(manual_input, str) and manual_input.strip())
+    if not has_selection:
+        # 未回传方案 → 用原节点重新生成同一 review 中断，继续等待。
+        regen = select_quota_node({"schemes": schemes})
+        return _resume_still_waiting(state, regen.get("interrupt"), task_id)
+
+    items[index]["quota_selection"] = select_quota_node(
+        {
+            "schemes": schemes,
+            "selected_scheme": selected_scheme,
+            "manual_input": manual_input,
+            "reason": decision.get("reason"),
+        }
+    )
+    _append_event(state, "select_quota", "human_selected", {"index": index, "selected_scheme": selected_scheme})
+    return None
+
+
+def _resume_price_review(state: dict[str, Any], index: Any, decision: dict[str, Any], task_id: str) -> dict[str, Any] | None:
+    items = state.get("items", [])
+    if not isinstance(index, int) or index >= len(items):
+        return _resume_invalid_index(state, "price_review", task_id)
+
+    item = items[index]
+    base = {"quotas": _selected_quotas(item), "region": state["region"], "period": state.get("period")}
+    if not decision.get("prices"):
+        # 未回传询价结果 → 用原节点重新生成同一询价中断，继续等待。
+        regen = price_review_node(base)
+        return _resume_still_waiting(state, regen.get("interrupt"), task_id)
+
+    items[index]["price_review"] = price_review_node({**base, "prices": decision["prices"]})
+    _append_event(state, "price_review", "human_priced", {"index": index})
+    return None
+
+
+def _resume_settle(state: dict[str, Any], index: Any, decision: dict[str, Any], task_id: str) -> dict[str, Any] | None:
+    items = state.get("items", [])
+    if not isinstance(index, int) or index >= len(items):
+        return _resume_invalid_index(state, "settle", task_id)
+
+    manual = decision.get("manual_result")
+    if not isinstance(manual, dict) or not isinstance(manual.get("value"), (int, float)):
+        # 未回传模型/人工试算结果 → 保持 capability_gap 中断继续等待。
+        state["updated_at"] = _now()
+        _get_graph().update_state(_thread_config(task_id), state)
+        return state
+
+    # 模型/人工按用户规则试算的结果：强制标注「需人工复核、非定稿」+ 保留逐步 breakdown 展示。
+    prev = items[index].get("settle") or {}
+    target = prev.get("target") or decision.get("target") or "结果"
+    items[index]["settle"] = {
+        "node": "settle",
+        "status": "done",
+        "target": target,
+        "value": manual.get("value"),
+        "breakdown": manual.get("breakdown") or [{"item": target, "amount": manual.get("value")}],
+        "rule": manual.get("rule"),
+        "source": manual.get("source") or "llm_estimate",
+        "verdict": "需人工复核",
+        "is_final": False,
+    }
+    _append_event(state, "settle", "human_rule_estimate", {"index": index, "target": target})
+    return None
+
+
+_RESUME_HANDLERS: dict[str, Callable[[dict[str, Any], Any, dict[str, Any], str], dict[str, Any] | None]] = {
+    "select_bill": _resume_select_bill,
+    "select_quota": _resume_select_quota,
+    "price_review": _resume_price_review,
+    "settle": _resume_settle,
+}
+
+
 def resume_workflow(task_id: str, decision: dict[str, Any] | None = None) -> dict[str, Any]:
-    """Resume a paused workflow by updating the checked-point graph state."""
+    """Resume a paused workflow by updating the checked-point graph state.
+
+    HITL gate handling is table-driven (``_RESUME_HANDLERS``) and mirrors the forward
+    ``STAGES`` table: each handler validates the pending index, re-emits the same
+    interrupt when the human input is missing, or applies the decision and falls
+    through to the shared "mark running + re-invoke graph" tail.
+    """
     state = _graph_state(task_id)
     if not state:
         return {"status": "not_found", "task_id": task_id}
@@ -374,118 +536,11 @@ def resume_workflow(task_id: str, decision: dict[str, Any] | None = None) -> dic
 
     pending = state.get("pending") or {}
     decision = decision or {}
-    node = pending.get("node")
-    index = pending.get("index")
-
-    if node == "select_bill":
-        if not isinstance(index, int) or index >= len(state.get("items", [])):
-            state = _block(state, {"node": "select_bill", "status": "blocked", "error": "invalid pending index"})
-            return _get_graph().invoke(state, config=_thread_config(task_id))
-
-        selected_code = decision.get("selected_code") or decision.get("code") or decision.get("manual_input")
-        if not isinstance(selected_code, str) or not selected_code.strip():
-            # 未回传编码 → 用原节点重新生成同一 review 中断，继续等待。
-            regen = select_bill_node({"candidates": state["items"][index].get("bill_match", {}).get("candidates", [])})
-            state["interrupt"] = regen.get("interrupt")
-            state["updated_at"] = _now()
-            _get_graph().update_state(_thread_config(task_id), state)
-            return state
-
-        _candidates = state["items"][index].get("bill_match", {}).get("candidates", [])
-        state["items"][index]["selection"] = select_bill_node(
-            {
-                "selected_code": selected_code.strip(),
-                "candidates": _candidates,
-                "reason": decision.get("reason"),
-            }
-        )
-        _append_event(state, "select_bill", "human_selected", {"index": index, "selected_code": selected_code.strip()})
-        # 主动学习闭环·采集端（⑥）：人工在闸上给的正确码入库，供未来相似构件检索作 few-shot。
-        # 采集失败绝不拖垮组价——整段吞异常。
-        try:
-            from .exemplars import record_bill_correction
-            record_bill_correction(
-                state["items"][index].get("description"),
-                selected_code.strip(),
-                candidates=_candidates,
-                region=state.get("region"),
-                spec=state.get("spec"),
-            )
-        except Exception:  # noqa: BLE001
-            pass
-
-    elif node == "select_quota":
-        if not isinstance(index, int) or index >= len(state.get("items", [])):
-            state = _block(state, {"node": "select_quota", "status": "blocked", "error": "invalid pending index"})
-            return _get_graph().invoke(state, config=_thread_config(task_id))
-
-        schemes = extract_quota_schemes(state["items"][index].get("price_compose", {}))
-        selected_scheme = decision.get("selected_scheme") or decision.get("scheme_id")
-        manual_input = decision.get("manual_input")
-        has_selection = (isinstance(selected_scheme, str) and selected_scheme.strip()) or (isinstance(manual_input, str) and manual_input.strip())
-        if not has_selection:
-            # 未回传方案 → 用原节点重新生成同一 review 中断，继续等待。
-            regen = select_quota_node({"schemes": schemes})
-            state["interrupt"] = regen.get("interrupt")
-            state["updated_at"] = _now()
-            _get_graph().update_state(_thread_config(task_id), state)
-            return state
-
-        state["items"][index]["quota_selection"] = select_quota_node(
-            {
-                "schemes": schemes,
-                "selected_scheme": selected_scheme,
-                "manual_input": manual_input,
-                "reason": decision.get("reason"),
-            }
-        )
-        _append_event(state, "select_quota", "human_selected", {"index": index, "selected_scheme": selected_scheme})
-
-    elif node == "price_review":
-        if not isinstance(index, int) or index >= len(state.get("items", [])):
-            state = _block(state, {"node": "price_review", "status": "blocked", "error": "invalid pending index"})
-            return _get_graph().invoke(state, config=_thread_config(task_id))
-
-        item = state["items"][index]
-        base = {"quotas": _selected_quotas(item), "region": state["region"], "period": state.get("period")}
-        if not decision.get("prices"):
-            # 未回传询价结果 → 用原节点重新生成同一询价中断，继续等待。
-            regen = price_review_node(base)
-            state["interrupt"] = regen.get("interrupt")
-            state["updated_at"] = _now()
-            _get_graph().update_state(_thread_config(task_id), state)
-            return state
-
-        state["items"][index]["price_review"] = price_review_node({**base, "prices": decision["prices"]})
-        _append_event(state, "price_review", "human_priced", {"index": index})
-
-    elif node == "settle":
-        if not isinstance(index, int) or index >= len(state.get("items", [])):
-            state = _block(state, {"node": "settle", "status": "blocked", "error": "invalid pending index"})
-            return _get_graph().invoke(state, config=_thread_config(task_id))
-
-        manual = decision.get("manual_result")
-        if not isinstance(manual, dict) or not isinstance(manual.get("value"), (int, float)):
-            # 未回传模型/人工试算结果 → 保持 capability_gap 中断继续等待。
-            state["updated_at"] = _now()
-            _get_graph().update_state(_thread_config(task_id), state)
-            return state
-
-        # 模型/人工按用户规则试算的结果：强制标注「需人工复核、非定稿」+ 保留逐步 breakdown 展示。
-        prev = state["items"][index].get("settle") or {}
-        target = prev.get("target") or decision.get("target") or "结果"
-        state["items"][index]["settle"] = {
-            "node": "settle",
-            "status": "done",
-            "target": target,
-            "value": manual.get("value"),
-            "breakdown": manual.get("breakdown") or [{"item": target, "amount": manual.get("value")}],
-            "rule": manual.get("rule"),
-            "source": manual.get("source") or "llm_estimate",
-            "verdict": "需人工复核",
-            "is_final": False,
-        }
-        _append_event(state, "settle", "human_rule_estimate", {"index": index, "target": target})
+    handler = _RESUME_HANDLERS.get(pending.get("node"))
+    if handler is not None:
+        outcome = handler(state, pending.get("index"), decision, task_id)
+        if outcome is not None:
+            return outcome
 
     state["status"] = "running"
     state["interrupt"] = None

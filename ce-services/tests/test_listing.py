@@ -21,8 +21,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from cost.listing import MAX_ITEMS, extract_components, refine_missing  # noqa: E402
-from routing.orchestrator import _ignite_listing  # noqa: E402
-from routing.prerouter import route  # noqa: E402
 
 _TEXT = ("基础工程：C30现浇钢筋混凝土独立基础，混凝土量120m³。"
          "主体：C35现浇矩形柱600×600，HRB400钢筋。墙体采用MU10标准砖240厚实心砖墙M5水泥砂浆砌筑。")
@@ -156,77 +154,6 @@ def test_refine_quantity_rule_applies():
     env = refine_missing(_TEXT, [{"feature": "别的件", "source_text": "x"}], llm_fn=stub)
     added_item = env["result"]["items"][-1]
     assert "quantity" not in added_item and env["result"]["added"] == 1
-
-
-# ── 编排接线（stub extract + stub critic + stub session.start，本地零 langgraph）──
-
-_DECISION = route("根据设计说明列清单：" + _TEXT)
-
-_CRITIC_STUB_ENV = {"step": "critic_review", "status": "ok",
-                    "result": {"findings": [{"type": "weak_feature", "item_index": 1,
-                                             "detail": "缺截面尺寸", "source_text": "x"}]},
-                    "provenance": {}}
-
-
-def _stub_critic(text: str, items: list) -> dict:
-    return dict(_CRITIC_STUB_ENV)
-
-
-def test_ignite_listing_multi_item():
-    assert _DECISION.capability == "cost" and _DECISION.matched["listing"]
-    started: dict = {}
-
-    def stub_start(**kw):
-        started.update(kw)
-        return {"task_id": "t-listing", "status": "awaiting_input"}
-
-    out = _ignite_listing("q", _DECISION,
-                          extract_fn=lambda t: extract_components(_TEXT, llm_fn=_stub_ok),
-                          start_fn=stub_start, critic_fn=_stub_critic)
-    assert out["mode"] == "hitl" and out["task_id"] == "t-listing"
-    assert out["interrupt"] is None
-    assert out["ui_hint"]["kind"] == "inline_session"
-    assert out["listing"]["count"] == 2 and len(out["listing"]["preview"]) == 2
-    assert out["listing"]["critic"] == {"status": "ok", "findings": 1}  # 复核摘要外露
-    feats = started["features"]
-    assert feats[0] == {"feature": "C30现浇钢筋混凝土独立基础", "quantity": 120.0}  # Q 随件透传
-    assert feats[1] == {"feature": "C35现浇矩形柱600×600 HRB400钢筋"}
-    assert started["region"]  # 口径透传
-    assert started["critic"]["result"]["findings"]  # 质疑信封随身进会话 state（M3 接线）
-
-
-def test_ignite_listing_zero_items_guides():
-    out = _ignite_listing("帮我列一下清单", _DECISION,
-                          extract_fn=lambda t: extract_components("", llm_fn=_stub_ok),
-                          start_fn=lambda **kw: (_ for _ in ()).throw(AssertionError("不应点火")),
-                          critic_fn=lambda t, i: (_ for _ in ()).throw(AssertionError("0 件不应复核")))
-    assert out["mode"] == "single" and out["result"]["status"] == "need_input"
-    assert "设计说明" in out["result"]["note"]
-
-
-def test_ignite_listing_start_failure_degrades():
-    def bad_start(**kw):
-        raise ValueError("graph down")
-    out = _ignite_listing("q", _DECISION,
-                          extract_fn=lambda t: extract_components(_TEXT, llm_fn=_stub_ok),
-                          start_fn=bad_start, critic_fn=_stub_critic)
-    assert out["result"]["status"] == "degraded"
-    assert out["result"]["extraction"]["result"]["items"]  # 草稿仍在，不丢用户成果
-
-
-def test_ignite_listing_critic_failure_does_not_block():
-    """Critic 降级（need_review 信封）不阻塞点火——复核未执行照样起会话，信封随身供前端灰标。"""
-    started: dict = {}
-    nr_env = {"step": "critic_review", "status": "need_review",
-              "result": {"findings": []}, "note": "复核未执行（LLM 不可用）"}
-    out = _ignite_listing("q", _DECISION,
-                          extract_fn=lambda t: extract_components(_TEXT, llm_fn=_stub_ok),
-                          start_fn=lambda **kw: (started.update(kw) or
-                                                 {"task_id": "t", "status": "awaiting_input"}),
-                          critic_fn=lambda t, i: nr_env)
-    assert out["mode"] == "hitl"
-    assert out["listing"]["critic"]["status"] == "need_review"
-    assert started["critic"]["status"] == "need_review"  # 未执行状态也随身带上（≠绿灯）
 
 
 if __name__ == "__main__":

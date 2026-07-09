@@ -1,24 +1,22 @@
 #!/usr/bin/env python3
 """任务层 —— 任务服务统一入口（常驻 HTTP，端口 8101）。
 
-聚焦深圳房建组价，两条主线共进程：**Norm-QA**（造价规范问答）+ **CostAgent**（构件 → 选码 →
-组价取数）。均为 ce-code 知识层的纯 HTTP 客户端——Norm-QA 打 ce-rag（默认 :8100）取规范条文，
-CostAgent 打 ce-rag 召回清单候选 + ce-db（默认 :8102）取结构化真值。防火 RAG 消费方 qa/compliance 已退役。
+聚焦深圳房建组价，两条主线共进程：**Norm-QA**（造价规范问答）+ **CostAgent 确定性原语**（核对 / 算钱 /
+门控判断）。均为 ce-code 知识层的纯 HTTP 客户端——Norm-QA 打 ce-rag（默认 :8100）取规范条文，
+CostAgent 核对打 ce-db（默认 :8102）取结构化真值。防火 RAG 消费方 qa/compliance 已退役；有状态 HITL
+组价会话（/cost/session/*）、/cost/compose 一次性选码取数、/orchestrate 复合编排及其点燃的 13 节点图，
+已随前端组价 widget 一并退役（组价编排改由 deer-flow 内嵌 cost_workflow_* + ce-rag/ce-db MCP 承载）。
 
 端点：
-  GET  /health        健康检查（含知识服务 / LLM 地址）
-  POST /route         前置路由（T-A1）：确定性能力分流 + 形态判定（无 LLM，供编排器/agent 分流前置）
-  POST /orchestrate   复合编排（T-A4）：单一直派 / 复合 32b 拆解→子任务回①路由→派发→综合
-  POST /norm/qa       造价规范条文检索 + Qwen3 带引用作答（norm-qa）
-  POST /cost/compose  构件描述 → 候选召回 → LLM 选码 → 组价取数（cost-agent，P1 选码闭环；传 rates 则算综合单价）
+  GET  /health          健康检查（含知识服务 / LLM 地址）
+  POST /route           前置路由（T-A1）：确定性能力分流 + 形态判定（无 LLM，供 route_context 注入 / 分流前置）
+  POST /norm/qa         造价规范条文检索 + Qwen3 带引用作答（norm-qa）
+  POST /cost/check      FR-C 项目上下文核对：BOQ 清单行确定性核对（打 ce-db）
   POST /cost/unit-price 综合单价计算原语（P2，确定性算钱、pydantic 闸门、不入 LLM）
   POST /cost/rollup     总造价汇总原语（§13，分部分项+措施/其他/规费→可选税金→总造价，确定性、pydantic 闸门）
-  POST /cost/session/start          可中断组价 HITL 会话：跑到首个闸或 done（langgraph 图 + provenance 信封）
-  POST /cost/session/{id}/resume    以用户决策续跑会话到下个闸或 done
-  GET  /cost/session/{id}/state     读会话持久化状态（已钉编码 / override / audit_log，可跨会话恢复）
-
-三条 session 端点 = HITL 主线：编排为 ce-services 独立 langgraph 图（可暂停可恢复），每数字带结构化来源
-（provenance），闸门处暂停等人介入；与 /cost/compose 端到端「简单场景」旧路并存（判据=是否需 HITL/可审计）。
+  POST /cost/rollup-hierarchy  层级总造价汇总（构件→单位工程→单项工程→总造价，确定性）
+  POST /cost/gate-decision     组价 HITL 门控判断原语（当前步骤数据 → 是否需人工，仅判断不推进）
+  POST /cost/manual-quota-basis 人工补录定额基价规范化（三项全齐才生成 basis）
 
 启动：
   cd ce-services && uv run python main.py

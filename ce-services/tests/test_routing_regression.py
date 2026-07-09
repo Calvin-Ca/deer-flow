@@ -32,12 +32,6 @@ def test_intent_fallback_selftest() -> None:
     assert _selftest() == 0
 
 
-def test_orchestrator_selftest() -> None:
-    from routing.orchestrator import _selftest
-
-    assert _selftest() == 0
-
-
 def test_prerouter_gold() -> None:
     from tools.prerouter_eval import main
 

@@ -391,14 +391,28 @@ def resume_workflow(task_id: str, decision: dict[str, Any] | None = None) -> dic
             _get_graph().update_state(_thread_config(task_id), state)
             return state
 
+        _candidates = state["items"][index].get("bill_match", {}).get("candidates", [])
         state["items"][index]["selection"] = select_bill_node(
             {
                 "selected_code": selected_code.strip(),
-                "candidates": state["items"][index].get("bill_match", {}).get("candidates", []),
+                "candidates": _candidates,
                 "reason": decision.get("reason"),
             }
         )
         _append_event(state, "select_bill", "human_selected", {"index": index, "selected_code": selected_code.strip()})
+        # 主动学习闭环·采集端（⑥）：人工在闸上给的正确码入库，供未来相似构件检索作 few-shot。
+        # 采集失败绝不拖垮组价——整段吞异常。
+        try:
+            from .exemplars import record_bill_correction
+            record_bill_correction(
+                state["items"][index].get("description"),
+                selected_code.strip(),
+                candidates=_candidates,
+                region=state.get("region"),
+                spec=state.get("spec"),
+            )
+        except Exception:  # noqa: BLE001
+            pass
 
     elif node == "select_quota":
         if not isinstance(index, int) or index >= len(state.get("items", [])):

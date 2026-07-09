@@ -100,6 +100,9 @@ tools:
 - name: cost_verify
   group: cost
   use: app.ce.cost.verify:cost_verify_tool
+- name: cost_recall_exemplars
+  group: cost
+  use: app.ce.cost.exemplars:cost_recall_exemplars_tool
 - name: ls
   group: file:read
   use: deerflow.sandbox.tools:ls_tool
@@ -249,12 +252,16 @@ subagents:
 
         **注意**：
         - 描述足够即直接执行（版本缺省默认 2013），不要再就执行本身询问确认
+        - **选码前先调 `cost_recall_exemplars(feature, spec)`** 看有无历史人工纠正的相似构件示例（few-shot，
+          主动学习闭环）：有则**参考它避免重犯同样的选码错**（如"多孔砖 vs 实心砖"），但**仍只在当前候选内选**、
+          示例里的码不在候选内也不得采用；库空返回空、正常继续
         - 选码只接受工具返回的候选内编码，严禁自己编造或补充清单码/价格
         - 若出错（"无法连接服务"或 503/502/400），这是**服务端配置问题**，
           不要尝试建 venv、装包或拷脚本自救；把错误原文如实返回，说明哪个服务未就绪
       tools:
         - ask_clarification
         - cost_workflow_node
+        - cost_recall_exemplars
         - ce-rag_match_bill_item
         - ce-db_bill_get
         - ce-db_bill_list

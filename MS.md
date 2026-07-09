@@ -90,7 +90,26 @@ evidence,severity}]}`；多视角（单位镜/语义镜/漏项镜各查一遍）
 ## Tier 2 — 挑 1 个做深
 - **④ 模型路由/升桶**：默认 8B，低置信/高风险升 32B，报成本/质量权衡曲线（90% 走 8B，准确率持平，成本降 X%）。
 - **⑤ Agentic RAG 升级**：查询分解 + **引用忠实性校验**（生成的条文号回查是否真在检索结果里，不在则拒答）。
-- **⑥ 主动学习闭环**：HITL 人工纠正回流成 few-shot / 选码器微调数据。
+- **⑥ 主动学习闭环（few-shot 版已实现）**：HITL 人工纠正回流成 few-shot（不训练）。
+
+  **核心洞察**：置信门本就是 active-learning 采样器（把低置信选码路由给人）。闭环 = 把人工在闸上给的
+  正确码 log 下来，下次遇相似构件时**检索最相似的历史纠正当 few-shot 示例**注入选码——同样的错不再犯，
+  **不重训、不要 GPU**。四段全在 deer-flow 现成件上接线：采集（HITL 已产 override）→ 存储 → 检索（ce-rag
+  思路）→ 注入（选码 prompt）→ 度量（benchmark eval①）。
+  > 两种沉淀形态：**few-shot / 检索增强示例**（轻，deer-flow 好做，本次实现）；**微调选码器**（重，训练是
+  > 框架外离线 ML，deer-flow 只让"换上练好的模型"trivial）。面试选前者：是系统/agent 工程、能真跑能 demo。
+  > **依赖关系**：没有 eval① 不能安全做闭环——任何回灌须过 benchmark 门禁防退化，故 ① 是 ⑥ 的前置。
+
+  **[✓ 已实现] few-shot 完整闭环**（纯函数 + 现成件接线，`test_cost_exemplars.py` 13 例单测通过）：
+  - `backend/app/ce/cost/exemplars.py`：`CorrectionStore`(append-only JSONL) + `similarity`(字符二元组
+    Jaccard，中文友好无依赖) + `retrieve_exemplars`(**按 spec 版本隔离** top-k，相似度过下限防噪) +
+    `format_fewshot` + `record_bill_correction`(采集) + `cost_recall_exemplars` 工具；
+  - **采集端**：`workflow.py` 的 select_bill 闸 resume 处接 `record_bill_correction`（try/except 兜底，
+    采集失败不拖垮组价）；
+  - **注入端**：`cost_recall_exemplars` 工具注册 + 加进 cost-agent 工具，提示词要求**选码前先检索历史纠正示例**
+    （仅参考、仍只在当前候选内选，示例码不在候选不采用）；生产可把检索换成 ce-rag/embedding，相似度接口不变。
+  > 风险（面试会问）：纠正都是难例→few-shot 池偏边缘要平衡；人工 override 不一定对→**接 ②复核 agent，
+  > 复核过的纠正才高权**（`Correction.verified` 已留字段、检索 verified 优先）；检索到不相关反而伤→用 eval 量。
 
 ## Tier 3 — 锦上添花
 真正的 planner agent（当前是启发式拆）；项目级 memory；延迟优化（并行工具调用 / 缓存）。

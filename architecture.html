@@ -1,0 +1,342 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CE 造价 Agent · 系统架构与意图数据流</title>
+<style>
+  :root{
+    --bg:#f5f7f9; --surface:#ffffff; --surface-2:#eef1f5;
+    --ink:#1a2432; --ink-soft:#586576; --ink-faint:#8a96a5;
+    --line:#d7dde6; --line-soft:#e6eaf0; --accent:#2f6fb0;
+    --role-llm:#a86c15; --role-det:#2f6fb0; --role-hitl:#b23f6a;
+    --role-mcp:#1f8a76; --role-dep:#697585; --role-user:#5a53b8;
+    --shadow:0 1px 2px rgba(20,30,45,.06),0 6px 20px rgba(20,30,45,.05);
+    --radius:10px;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --bg:#0e1217; --surface:#161d26; --surface-2:#1d2530;
+      --ink:#e7ecf3; --ink-soft:#9aa6b5; --ink-faint:#6b7889;
+      --line:#28323e; --line-soft:#212a34; --accent:#5a9bd8;
+      --role-llm:#d5a03e; --role-det:#5a9bd8; --role-hitl:#d16891;
+      --role-mcp:#40b39c; --role-dep:#8b97a6; --role-user:#9a92e6;
+      --shadow:0 1px 2px rgba(0,0,0,.3),0 6px 22px rgba(0,0,0,.28);
+    }
+  }
+  :root[data-theme="light"]{
+    --bg:#f5f7f9; --surface:#ffffff; --surface-2:#eef1f5;
+    --ink:#1a2432; --ink-soft:#586576; --ink-faint:#8a96a5;
+    --line:#d7dde6; --line-soft:#e6eaf0; --accent:#2f6fb0;
+    --role-llm:#a86c15; --role-det:#2f6fb0; --role-hitl:#b23f6a;
+    --role-mcp:#1f8a76; --role-dep:#697585; --role-user:#5a53b8;
+    --shadow:0 1px 2px rgba(20,30,45,.06),0 6px 20px rgba(20,30,45,.05);
+  }
+  :root[data-theme="dark"]{
+    --bg:#0e1217; --surface:#161d26; --surface-2:#1d2530;
+    --ink:#e7ecf3; --ink-soft:#9aa6b5; --ink-faint:#6b7889;
+    --line:#28323e; --line-soft:#212a34; --accent:#5a9bd8;
+    --role-llm:#d5a03e; --role-det:#5a9bd8; --role-hitl:#d16891;
+    --role-mcp:#40b39c; --role-dep:#8b97a6; --role-user:#9a92e6;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 6px 22px rgba(0,0,0,.28);
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;
+    line-height:1.55; font-size:15px;
+    -webkit-font-smoothing:antialiased;
+  }
+  .mono{font-family:ui-monospace,"SF Mono","Cascadia Code","JetBrains Mono",Menlo,Consolas,monospace}
+  .wrap{max-width:1120px; margin:0 auto; padding:clamp(20px,4vw,44px) clamp(16px,4vw,32px) 64px}
+
+  header.top{margin-bottom:34px}
+  .eyebrow{font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:var(--accent); font-weight:650; margin:0 0 10px}
+  h1{font-size:clamp(24px,3.6vw,34px); line-height:1.15; margin:0 0 10px; letter-spacing:-.015em; text-wrap:balance; font-weight:720}
+  .lede{max-width:66ch; color:var(--ink-soft); margin:0; font-size:15.5px}
+  .lede b{color:var(--ink); font-weight:600}
+
+  h2{font-size:12.5px; letter-spacing:.13em; text-transform:uppercase; color:var(--ink-faint);
+     font-weight:660; margin:0 0 16px; display:flex; align-items:center; gap:12px}
+  h2::after{content:""; flex:1; height:1px; background:var(--line-soft)}
+  section{margin-top:46px}
+
+  /* legend */
+  .legend{display:flex; flex-wrap:wrap; gap:8px 16px; margin:0 0 4px; padding:14px 16px;
+    background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow)}
+  .lg{display:inline-flex; align-items:center; gap:8px; font-size:13px; color:var(--ink-soft)}
+  .dot{width:11px; height:11px; border-radius:3px; flex:none; background:var(--c); box-shadow:0 0 0 1px color-mix(in srgb,var(--c) 55%,transparent)}
+
+  /* layered topology */
+  .stack{display:flex; flex-direction:column; gap:14px}
+  .band{background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:16px 16px 18px;
+    box-shadow:var(--shadow); position:relative}
+  .band > .band-h{display:flex; align-items:baseline; gap:10px; margin:0 0 14px; flex-wrap:wrap}
+  .band-h .n{font-weight:680; font-size:15px; color:var(--ink)}
+  .band-h .sub{font-size:12.5px; color:var(--ink-faint)}
+  .band-h .tag{margin-left:auto; font-size:11px; letter-spacing:.06em; text-transform:uppercase;
+    color:var(--ink-soft); border:1px solid var(--line); border-radius:999px; padding:2px 9px}
+
+  .nodes{display:grid; gap:12px; grid-template-columns:repeat(auto-fit,minmax(210px,1fr))}
+  .node{border:1px solid var(--line); border-left:3px solid var(--c,var(--line));
+    border-radius:9px; padding:11px 13px; background:var(--surface-2); transition:transform .12s ease,box-shadow .12s ease}
+  .node:hover{transform:translateY(-1px); box-shadow:var(--shadow)}
+  .node .nh{display:flex; align-items:center; gap:8px; justify-content:space-between}
+  .node .name{font-weight:640; font-size:14px}
+  .node .port{font-size:12px; color:var(--c,var(--ink-soft)); font-weight:640}
+  .node .desc{font-size:12.5px; color:var(--ink-soft); margin-top:4px}
+  .node .tools{margin-top:8px; display:flex; flex-wrap:wrap; gap:5px}
+  .chip{font-size:11px; padding:1.5px 7px; border-radius:6px; background:color-mix(in srgb,var(--c,var(--ink-soft)) 12%,var(--surface));
+    color:var(--c,var(--ink-soft)); border:1px solid color-mix(in srgb,var(--c,var(--ink-soft)) 30%,transparent)}
+
+  .flowdown{display:flex; justify-content:center; margin:-4px 0}
+  .flowdown span{font-size:11px; color:var(--ink-faint); letter-spacing:.04em; display:inline-flex; align-items:center; gap:7px}
+  .flowdown span::before,.flowdown span::after{content:"↓"; color:var(--accent); font-size:13px}
+
+  /* intent flows */
+  .intent{background:var(--surface); border:1px solid var(--line); border-radius:12px; box-shadow:var(--shadow);
+    padding:15px 16px; margin-bottom:13px}
+  .intent > .ih{display:flex; align-items:center; gap:11px; margin-bottom:12px; flex-wrap:wrap}
+  .ih .cap{font:640 11px/1 ui-monospace,monospace; letter-spacing:.03em; padding:4px 9px; border-radius:6px;
+    background:color-mix(in srgb,var(--c) 15%,var(--surface)); color:var(--c);
+    border:1px solid color-mix(in srgb,var(--c) 34%,transparent); white-space:nowrap}
+  .ih .title{font-weight:660; font-size:14.5px}
+  .ih .meta{margin-left:auto; font-size:12px; color:var(--ink-faint)}
+  .chain{display:flex; align-items:stretch; gap:0; overflow-x:auto; padding-bottom:4px}
+  .chain::-webkit-scrollbar{height:7px}
+  .chain::-webkit-scrollbar-thumb{background:var(--line); border-radius:99px}
+  .step{flex:none; max-width:230px; border:1px solid var(--line); border-top:2.5px solid var(--c,var(--line));
+    border-radius:8px; padding:8px 11px; background:var(--surface-2)}
+  .step .s-role{font-size:10px; letter-spacing:.05em; text-transform:uppercase; color:var(--c,var(--ink-faint)); font-weight:660}
+  .step .s-name{font-size:13px; font-weight:600; margin-top:2px; line-height:1.3}
+  .step .s-name .mono{font-size:12px; font-weight:640}
+  .step .s-sub{font-size:11.5px; color:var(--ink-soft); margin-top:3px; line-height:1.35}
+  .arrow{flex:none; align-self:center; color:var(--ink-faint); padding:0 7px; font-size:15px; user-select:none}
+  .arrow.loop{color:var(--role-hitl)}
+  .branch{display:flex; flex-direction:column; gap:7px; justify-content:center; flex:none; padding:0 2px}
+  .branch .arrow{padding:0 7px}
+
+  footer.note{margin-top:44px; padding:16px 18px; border:1px dashed var(--line);
+    border-radius:var(--radius); background:var(--surface); color:var(--ink-soft); font-size:13px}
+  footer.note b{color:var(--ink)}
+  footer.note code{font-family:ui-monospace,monospace; font-size:12px; background:var(--surface-2);
+    padding:1px 5px; border-radius:5px; color:var(--ink)}
+  .foot-meta{margin-top:30px; font-size:12px; color:var(--ink-faint); display:flex; gap:8px 18px; flex-wrap:wrap}
+
+  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <p class="eyebrow">深圳房建造价 · Agent 系统</p>
+    <h1>CE 造价 Agent — 系统架构与全意图数据流</h1>
+    <p class="lede">基于当前代码（<b>ce-services 任务层已退役</b>后）。组价编排内嵌于 deer-flow harness
+      的 <b>确定性 workflow</b>，规范问答与选码取数由 <b>专化子智能体</b>承担，知识取数走 <b>ce-rag / ce-db 两个 HTTP-MCP</b>。
+      唯一 LLM 为本地 <span class="mono">Qwen3-8B</span>。</p>
+  </header>
+
+  <div class="legend" role="list" aria-label="节点语义图例">
+    <span class="lg" style="--c:var(--role-user)"><span class="dot"></span>用户 / 前端</span>
+    <span class="lg" style="--c:var(--role-llm)"><span class="dot"></span>LLM 推理（agent 决策 / 生成）</span>
+    <span class="lg" style="--c:var(--role-det)"><span class="dot"></span>确定性（workflow 节点 / 算价，无 LLM）</span>
+    <span class="lg" style="--c:var(--role-hitl)"><span class="dot"></span>HITL 人工闸（暂停 / 恢复）</span>
+    <span class="lg" style="--c:var(--role-mcp)"><span class="dot"></span>知识取数（HTTP-MCP）</span>
+    <span class="lg" style="--c:var(--role-dep)"><span class="dot"></span>外部依赖（模型 / 库）</span>
+  </div>
+
+  <!-- ===================== 分层拓扑 ===================== -->
+  <section>
+    <h2>分层拓扑</h2>
+    <div class="stack">
+
+      <div class="band">
+        <div class="band-h"><span class="n">① 入口</span><span class="sub">浏览器 / IM channel → 反代 → 编排后端</span><span class="tag">bridge</span></div>
+        <div class="nodes">
+          <div class="node" style="--c:var(--role-user)">
+            <div class="nh"><span class="name">前端 Next.js</span><span class="port mono">:3000</span></div>
+            <div class="desc">对话 UI；经 nginx 反代</div>
+          </div>
+          <div class="node" style="--c:var(--role-user)">
+            <div class="nh"><span class="name">nginx 入口</span><span class="port mono">:2026</span></div>
+            <div class="desc">统一反代；<span class="mono">/api/langgraph/*</span> → gateway</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="flowdown"><span>HTTP / SSE 流式</span></div>
+
+      <div class="band">
+        <div class="band-h"><span class="n">② Harness（编排后端）</span><span class="sub">Gateway · LangGraph</span><span class="tag mono">:8001</span></div>
+        <div class="nodes">
+          <div class="node" style="--c:var(--role-llm)">
+            <div class="nh"><span class="name">lead_agent</span><span class="port">编排者</span></div>
+            <div class="desc">意图分类（norm / cost / both / out_of_domain）+ 分派 + 综合。不选码 / 不算钱。</div>
+          </div>
+          <div class="node" style="--c:var(--role-llm)">
+            <div class="nh"><span class="name">子智能体 ×2</span><span class="port">task ≤3 并行</span></div>
+            <div class="desc">专化 LLM 循环、上下文隔离</div>
+            <div class="tools"><span class="chip">norm-qa</span><span class="chip">cost-agent</span></div>
+          </div>
+          <div class="node" style="--c:var(--role-det)">
+            <div class="nh"><span class="name">cost_workflow</span><span class="port">状态机+HITL</span></div>
+            <div class="desc"><span class="mono">backend/app/ce/cost/</span> langgraph 图，节点确定性调 MCP / 算价</div>
+            <div class="tools"><span class="chip" style="--c:var(--role-det)">start</span><span class="chip" style="--c:var(--role-det)">node</span><span class="chip" style="--c:var(--role-det)">resume</span><span class="chip" style="--c:var(--role-det)">state</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="flowdown"><span>MCP（ce-rag_* / ce-db_*）&nbsp;·&nbsp;LLM 调用</span></div>
+
+      <div class="band">
+        <div class="band-h"><span class="n">③ 知识层（HTTP-MCP）</span><span class="sub">agent 唯一取数入口</span><span class="tag">host-net</span></div>
+        <div class="nodes">
+          <div class="node" style="--c:var(--role-mcp)">
+            <div class="nh"><span class="name">ce-rag</span><span class="port mono">:8100</span></div>
+            <div class="desc">条文 / 清单候选 / 证据检索（BM25+向量）</div>
+            <div class="tools"><span class="chip" style="--c:var(--role-mcp)">search_clause</span><span class="chip" style="--c:var(--role-mcp)">match_bill_item</span><span class="chip" style="--c:var(--role-mcp)">retrieve_evidence</span></div>
+          </div>
+          <div class="node" style="--c:var(--role-mcp)">
+            <div class="nh"><span class="name">ce-db</span><span class="port mono">:8102</span></div>
+            <div class="desc">结构化真值（定额 / 价格 / 费率）</div>
+            <div class="tools"><span class="chip" style="--c:var(--role-mcp)">price_compose</span><span class="chip" style="--c:var(--role-mcp)">quota_get</span><span class="chip" style="--c:var(--role-mcp)">price_query</span><span class="chip" style="--c:var(--role-mcp)">fee_rate_lookup</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="flowdown"><span>后端连接（非 agent 直调）</span></div>
+
+      <div class="band">
+        <div class="band-h"><span class="n">④ 依赖设施</span><span class="sub">模型 · 库 · 精排</span><span class="tag">GPU / 数据</span></div>
+        <div class="nodes">
+          <div class="node" style="--c:var(--role-dep)">
+            <div class="nh"><span class="name">vLLM Qwen3-8B</span><span class="port mono">:8099</span></div>
+            <div class="desc">agent 唯一 LLM（lead / 子智能体共用）</div>
+          </div>
+          <div class="node" style="--c:var(--role-dep)">
+            <div class="nh"><span class="name">PostgreSQL</span><span class="port mono">:5433</span></div>
+            <div class="desc">ce_cost 库 ← ce-db 取结构化真值</div>
+          </div>
+          <div class="node" style="--c:var(--role-dep)">
+            <div class="nh"><span class="name">Milvus + embed + rerank</span><span class="port mono">:19530 / :8097 / :8095</span></div>
+            <div class="desc">← ce-rag 向量检索 + 精排（rerank 挂则降级 RRF）</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ===================== 全意图数据流 ===================== -->
+  <section>
+    <h2>全意图数据流</h2>
+
+    <!-- out_of_domain -->
+    <div class="intent" style="--c:var(--role-dep)">
+      <div class="ih"><span class="cap">out_of_domain</span><span class="title">非造价请求</span><span class="meta">不调任何造价工具</span></div>
+      <div class="chain">
+        <div class="step" style="--c:var(--role-user)"><div class="s-role">用户</div><div class="s-name">自然语言请求</div></div>
+        <div class="arrow">→</div>
+        <div class="step" style="--c:var(--role-llm)"><div class="s-role">LLM</div><div class="s-name">lead_agent</div><div class="s-sub">判为域外 → 只说明能力范围</div></div>
+      </div>
+    </div>
+
+    <!-- norm -->
+    <div class="intent" style="--c:var(--role-mcp)">
+      <div class="ih"><span class="cap">norm</span><span class="title">规范问答</span><span class="meta">上下文隔离 · 带引用 · 无 web 兜底</span></div>
+      <div class="chain">
+        <div class="step" style="--c:var(--role-llm)"><div class="s-role">LLM</div><div class="s-name">lead_agent</div><div class="s-sub">派 <span class="mono">task(norm-qa)</span></div></div>
+        <div class="arrow">→</div>
+        <div class="step" style="--c:var(--role-llm)"><div class="s-role">LLM · 子智能体</div><div class="s-name">norm-qa</div><div class="s-sub">缺口径→ask_clarification；迭代检索</div></div>
+        <div class="arrow">→</div>
+        <div class="step" style="--c:var(--role-mcp)"><div class="s-role">MCP · :8100</div><div class="s-name mono">ce-rag_*</div><div class="s-sub">search / expand / get / evidence</div></div>
+        <div class="arrow">→</div>
+        <div class="step" style="--c:var(--role-llm)"><div class="s-role">LLM</div><div class="s-name">生成带引用答案</div><div class="s-sub">仅收 answer + cited_clauses 回主线</div></div>
+      </div>
+    </div>
+
+    <!-- cost single/batch -->
+    <div class="intent" style="--c:var(--role-mcp)">
+      <div class="ih"><span class="cap">cost · 单点/批量</span><span class="title">选码 + 取数（一次跑完，不算钱、无 HITL）</span><span class="meta">批量 = 并行多个 cost-agent</span></div>
+      <div class="chain">
+        <div class="step" style="--c:var(--role-llm)"><div class="s-role">LLM</div><div class="s-name">lead_agent</div><div class="s-sub"><span class="mono">task(cost-agent)</span> ×N 并行</div></div>
+        <div class="arrow">→</div>
+        <div class="step" style="--c:var(--role-llm)"><div class="s-role">LLM · 子智能体</div><div class="s-name">cost-agent</div><div class="s-sub">缺特征→反问；默认深圳·2013</div></div>
+        <div class="arrow">→</div>
+        <div class="step" style="--c:var(--role-mcp)"><div class="s-role">MCP · :8100</div><div class="s-name mono">bill_match</div><div class="s-sub">ce-rag 召回清单候选</div></div>
+        <div class="arrow">→</div>
+        <div class="step" style="--c:var(--role-det)"><div class="s-role">确定性</div><div class="s-name">select_bill</div><div class="s-sub">置信门：高置信 auto / 低置信 need_review</div></div>
+        <div class="arrow">→</div>
+        <div class="step" style="--c:var(--role-mcp)"><div class="s-role">MCP · :8102</div><div class="s-name mono">price_compose</div><div class="s-sub">ce-db 取工料机 + 信息价</div></div>
+        <div class="arrow">→</div>
+        <div class="step" style="--c:var(--role-llm)"><div class="s-role">回传</div><div class="s-name">code + 工料机 + price</div><div class="s-sub">明确不含综合单价 / 不算钱</div></div>
+      </div>
+    </div>
+
+    <!-- cost full workflow HITL -->
+    <div class="intent" style="--c:var(--role-hitl)">
+      <div class="ih"><span class="cap">cost · 全流程</span><span class="title">有状态逐闸 HITL 组价（cost_workflow_start）</span><span class="meta">多构件外层循环 · checkpoint 暂停/恢复</span></div>
+      <div class="chain">
+        <div class="step" style="--c:var(--role-llm)"><div class="s-role">LLM</div><div class="s-name">lead_agent</div><div class="s-sub"><span class="mono">cost_workflow_start</span></div></div>
+        <div class="arrow">→</div>
+        <div class="step" style="--c:var(--role-det)"><div class="s-role">确定性 · :8100</div><div class="s-name">bill_match</div><div class="s-sub">召回候选</div></div>
+        <div class="arrow">→</div>
+        <div class="step" style="--c:var(--role-hitl)"><div class="s-role">闸 / 置信门</div><div class="s-name">select_bill</div><div class="s-sub">低置信→暂停，用户 resume 选码</div></div>
+        <div class="arrow">→</div>
+        <div class="step" style="--c:var(--role-det)"><div class="s-role">确定性 · :8102</div><div class="s-name">quota_compose</div><div class="s-sub">定额方案 + 工料机</div></div>
+        <div class="arrow">→</div>
+        <div class="step" style="--c:var(--role-hitl)"><div class="s-role">闸</div><div class="s-name">select_quota / price_review</div><div class="s-sub">多方案 / 缺价→暂停询价</div></div>
+        <div class="arrow">→</div>
+        <div class="step" style="--c:var(--role-det)"><div class="s-role">确定性 · 纯算</div><div class="s-name">settle → unit_price</div><div class="s-sub">Python 算价引擎（无 LLM / 无 MCP）</div></div>
+        <div class="branch"><div class="arrow loop">↩</div></div>
+        <div class="step" style="--c:var(--role-det)"><div class="s-role">循环</div><div class="s-name">advance 下一构件</div><div class="s-sub">全办完 → done</div></div>
+      </div>
+    </div>
+
+    <!-- both -->
+    <div class="intent" style="--c:var(--role-llm)">
+      <div class="ih"><span class="cap">both · 复合</span><span class="title">并行拆分（规范 + 多做法比选）</span><span class="meta">一轮内并行 ≤3，无依赖</span></div>
+      <div class="chain">
+        <div class="step" style="--c:var(--role-llm)"><div class="s-role">LLM · 编排</div><div class="s-name">lead_agent 拆分</div><div class="s-sub">同一轮并行 task()</div></div>
+        <div class="arrow">→</div>
+        <div class="branch">
+          <div class="step" style="--c:var(--role-llm)"><div class="s-role">并行 ①</div><div class="s-name">norm-qa</div><div class="s-sub">计量规则条文</div></div>
+          <div class="step" style="--c:var(--role-llm)"><div class="s-role">并行 ②</div><div class="s-name">cost-agent · A 做法</div><div class="s-sub">选码+取数</div></div>
+          <div class="step" style="--c:var(--role-llm)"><div class="s-role">并行 ③</div><div class="s-name">cost-agent · B 做法</div><div class="s-sub">选码+取数</div></div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="step" style="--c:var(--role-llm)"><div class="s-role">LLM · 综合</div><div class="s-name">据三方事实比选</div><div class="s-sub">不自己补编码/定额/价格</div></div>
+      </div>
+    </div>
+
+    <!-- single node -->
+    <div class="intent" style="--c:var(--role-det)">
+      <div class="ih"><span class="cap">单步原语</span><span class="title">只做某一环（套定额 / 询价 / 汇总…）</span><span class="meta">cost_workflow_node(node=…)</span></div>
+      <div class="chain">
+        <div class="step" style="--c:var(--role-llm)"><div class="s-role">LLM</div><div class="s-name">lead_agent / cost-agent</div></div>
+        <div class="arrow">→</div>
+        <div class="step" style="--c:var(--role-det)"><div class="s-role">确定性</div><div class="s-name mono">cost_workflow_node</div><div class="s-sub">quota_get / price_query / unit_price / rollup / check …</div></div>
+        <div class="arrow">→</div>
+        <div class="step" style="--c:var(--role-mcp)"><div class="s-role">MCP / 纯算</div><div class="s-name">ce-rag_* · ce-db_* · Python</div><div class="s-sub">对应取数或确定性计算</div></div>
+      </div>
+    </div>
+
+  </section>
+
+  <footer class="note">
+    <b>红线（贯穿所有 cost 流）：</b>选码只在候选内、不造码，低置信转人工；算钱一律走确定性 Python，LLM 不算钱；
+    地区/版本严格隔离（默认深圳·2013）；无命中不杜撰。&nbsp;
+    <b>已退役：</b><code>ce-services :8101</code> 任务层、前端组价 widget、13 节点独立 HITL 图 —— 组价编排现唯一路径为
+    harness 内嵌 <code>cost_workflow_*</code> + <code>ce-rag</code>/<code>ce-db</code> MCP。
+  </footer>
+
+  <div class="foot-meta">
+    <span>入口 :2026 · Gateway :8001 · 知识 :8100 / :8102 · LLM :8099</span>
+    <span>反映清理后当前代码</span>
+  </div>
+
+</div>
+</body>
+</html>

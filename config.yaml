@@ -30,11 +30,9 @@ models:
 #    另一台服务器 172.19.2.2 上的 vLLM，OpenAI 兼容端点 :8001/v1，模型 id 即权重路径
 #    /models/Qwen3-32B-AWQ；同为 Qwen3 系（带 <think>），沿用 VllmChatModel 走 thinking 开关。
 #    ✅ T-A5 已注册为**可用模型**，但**非默认**（8b 仍列表第一项 = agent 默认，桶 A 延迟敏感路径）。
-#       deer-flow agent（norm-qa/cost-agent）保持 8b；桶 B 的实际消费方是 ce-services 内部——
-#       复合编排（routing/orchestrator）+ 选码消歧（cost/selection），它们**不读本 config.yaml**，
-#       而经 env 成对指到同一端点：`BCRAG_ORCH_LLM_URL=http://172.19.2.2:8001`
-#       + `BCRAG_ORCH_LLM_MODEL_ID=/models/Qwen3-32B-AWQ`（见 ce-services/common/config.py）。
-#       未部署 32b（env 未设）时 ce-services 侧成对回落 8b，选码不受影响、零风险。
+#       deer-flow agent（norm-qa/cost-agent）默认仍走 8b；如后续把 workflow 某个节点升级为
+#       agent/LLM 节点，可在该节点或子智能体配置中显式指定 32B。不要再把组价编排放回
+#       旧任务层 HTTP API。
 # - name: qwen3-32b-awq
 #   display_name: Qwen3-32B-AWQ (172.19.2.2)
 #   use: deerflow.models.vllm_provider:VllmChatModel
@@ -60,6 +58,8 @@ models:
 #   base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
 tool_groups:
 # - name: web        # 停用中(见下方 web 工具注释);恢复时取消本行注释
+- name: ce:io        # 造价文件解析/装配（工程量清单 Excel 等确定性 IO）
+- name: cost
 - name: file:read
 - name: file:write
 - name: bash
@@ -82,6 +82,21 @@ tools:
 #   use: deerflow.community.image_search.tools:image_search_tool
 #   max_results: 5
 # ===== web 工具组 end =====
+- name: parse_boq_excel
+  group: ce:io
+  use: app.ce.io.excel_tools:parse_boq_excel_tool
+- name: cost_workflow_start
+  group: cost
+  use: app.ce.cost.tools:cost_workflow_start_tool
+- name: cost_workflow_node
+  group: cost
+  use: app.ce.cost.tools:cost_workflow_node_tool
+- name: cost_workflow_resume
+  group: cost
+  use: app.ce.cost.tools:cost_workflow_resume_tool
+- name: cost_workflow_state
+  group: cost
+  use: app.ce.cost.tools:cost_workflow_state_tool
 - name: ls
   group: file:read
   use: deerflow.sandbox.tools:ls_tool
@@ -168,18 +183,23 @@ memory:
   fact_confidence_threshold: 0.7
   injection_enabled: true
   max_injection_tokens: 2000
+lead_agent:
+  system_prompt_path: prompts/ce/lead_agent.md
 subagents:
   # 规范合规审查 sub-agent（compliance-checker）已随规范 RAG 退役（2026-06-18）。
   custom_agents:
     cost-agent:
       description: >
-        算量计价 CostAgent。接收构件/做法的自然语言描述，召回清单候选 → 在候选内选定 9 位清单
-        编码 → 取定额工料机含量 + 信息价单价（组价取数）。覆盖深圳房建组价（清单计量国标
-        GB 50854，2013/2024 双版隔离）。适用于"C30现浇矩形柱组价""某砌体墙套什么清单码"等
-        构件→清单码→价的查询。缺版本不反问：默认深圳·2013 口径（PRD §4.0/C-05），首答带口径
-        声明；特征不足才反问；他省口径体面告知。选码只在候选内不造码、低置信转人工、缺价不杜撰。
-        支持两种：快速一次性「选码+取数」（不算钱）；或可中断 HITL 完整组价（走流程算到总造价，
-        前端内嵌交互控件逐闸确认/录入）。
+        算量计价 CostAgent（单点/批量「选码 + 取数」专用，一次跑完、不算钱、无 HITL）。接收构件/
+        做法的自然语言描述，召回清单候选 → 在候选内选定 9 位清单编码 → 取定额工料机含量 + 信息价
+        单价（组价取数）。覆盖深圳房建组价（清单计量国标 GB 50854，2013/2024 双版隔离）。
+        **建议在以下场景委派本 agent**：① 单个构件「这构件什么清单码 / 只要选码+工料机」；
+        ② 一次多个互相独立的构件或材料的批量选码/查价（彼此无依赖，可并行委派多个本 agent 分担）；
+        ③ 复合诉求里的组价子任务（与 norm-qa 规范问答并行跑）。缺版本不反问：默认深圳·2013 口径
+        （PRD §4.0/C-05），首答带口径声明；特征不足才反问；他省口径体面告知。选码只在候选内不造码、
+        低置信转人工、缺价不杜撰。**不负责有状态全流程组价与逐闸 HITL 确认**——「帮我组价并算到
+        总造价 / 列清单逐项算价 / 需要逐步确认后继续」这类由主流程直连 cost_workflow_start，不在本
+        agent 内发起。
       system_prompt: |
         你是算量计价 CostAgent sub-agent，把构件/做法描述端到端做成「选码 + 组价取数」。
 
@@ -196,25 +216,32 @@ subagents:
         - 构件描述不足以选码（如只说"柱"未说混凝土等级/现浇预制）→ 先 ask_clarification
           补全关键特征（**反问只问特征，不问版本**），再调用工具。
 
-        **三种请求粒度——选对入口**：
+        **本 agent 只做「选码 + 取数」，一次跑完、不算钱、不发起有状态全流程**：
         - **日常入口判断** → 由 lead_agent 决定是否分派给 norm-qa / cost-agent / 完整组价 workflow；
-          本子智能体只处理组价相关的单点专业任务，不再调用旧的任务层前门工具。
-        - **快速选码/取数**（「这构件什么清单码」「只要选码+工料机，不走流程」）→
-          `ce-rag_match_bill_item` 召回候选；只在候选内选择；已有明确 code 后再调 `ce-db_price_compose`。
+          本子智能体只处理组价相关的单点/批量专业任务，不再调用旧的任务层前门工具。
+        - **单点选码/取数**（「这构件什么清单码」「只要选码+工料机，不走流程」）→
+          调 `cost_workflow_node` 的 `bill_match` / `price_compose` 等节点；节点内部会调用
+          `ce-rag_match_bill_item`、`ce-db_price_compose` 等窄原语。
+        - **批量**（一次给多个互相独立的构件/材料）→ 逐个调对应 `cost_workflow_node`，
+          汇总为结构化结果；彼此无依赖，可由 lead_agent 并行委派多个本 agent 分担。
+        - **超出本 agent 边界**（「帮我组价并算到总造价 / 列清单逐项算价 / 需要逐步确认后继续」这类
+          有状态全流程 + 逐闸 HITL）→ **不要自己硬凑步骤、不要调 `cost_workflow_start`（本 agent 已无
+          此权限）**；如实返回「这属于完整组价流程，需由主流程发起」，交回 lead_agent。
         - **中间步/单原语请求**（「只召回候选别选码」「只查某清单码的组价取数」「只查某定额的工料机
           含量」）→ 直接调用拆分后的 function-call 工具：
-          · `ce-rag_match_bill_item` —— 构件描述 → 清单候选召回（只给候选、不选码）。
-          · `ce-db_price_compose` —— 清单码 → 定额 → 工料机含量 + 信息价（组价取数）。
-          · `ce-db_quota_get` —— 定额子目 → 子目字段 + 工料机含量。
-          · `ce-db_price_query` —— 材料/人工/机械信息价查询。
+          · `cost_workflow_node(node="bill_match")` —— 构件描述 → 清单候选召回（只给候选、不选码）。
+          · `cost_workflow_node(node="price_compose")` —— 清单码 → 定额 → 工料机含量 + 信息价（组价取数）。
+          · `cost_workflow_node(node="quota_get")` —— 定额子目 → 子目字段 + 工料机含量。
+          · `cost_workflow_node(node="price_query")` —— 材料/人工/机械信息价查询。
         - **关键：这些是工具（像 ask_clarification 一样直接调用，由系统填参数），不是脚本文件。
           绝不要用 bash / python3 去「执行」它们，也不存在 `ce-*.py` 这种文件，不要拼脚本路径。**
           `spec` 是服务边界、必填——用户没说版本时**照口径规则填默认 2013**（不反问）。
 
         **输出处理**：
-        - **HITL**：如需完整逐闸组价，不通过 MCP 工具点火；交给应用层 Cost Session API / 前端会话面板。
-        - **一次性选码/取数**：读 JSON 返回候选、所选 code、依据、price+price_status；明确"本结果不含综合单价/含税造价，不算钱"。
-        - **HITL 红线（两种都守）**：need_review=true / code=null → "需人工复核编码"不当定稿；no_source → 透传缺口不编价；
+        - **本 agent 不发起 HITL**：不做逐闸 HITL 全流程；遇到需要完整组价/逐步确认的诉求，按上面
+          「超出本 agent 边界」处理交回 lead_agent，不调 `cost_workflow_start` / `cost_workflow_resume`。
+        - **选码/取数**：读 JSON 返回候选、所选 code、依据、price+price_status；明确"本结果不含综合单价/含税造价，不算钱"。
+        - **红线**：need_review=true / code=null → "需人工复核编码"不当定稿；no_source → 透传缺口不编价；
           price_status=未就绪（2013）→ "该版本组价数据未就绪，只有选码"。
 
         **注意**：
@@ -224,6 +251,7 @@ subagents:
           不要尝试建 venv、装包或拷脚本自救；把错误原文如实返回，说明哪个服务未就绪
       tools:
         - ask_clarification
+        - cost_workflow_node
         - ce-rag_match_bill_item
         - ce-db_bill_get
         - ce-db_bill_list
@@ -297,6 +325,9 @@ skill_evolution:
 database:
   backend: sqlite
   sqlite_dir: .deer-flow/data
+checkpointer:
+  type: sqlite
+  connection_string: .deer-flow/data/deerflow.db
 run_events:
   backend: jsonl
   max_trace_content: 10240

@@ -109,6 +109,19 @@ def price_query(
 
 
 @mcp.tool()
+def price_suggest(
+    name: Annotated[str, Field(description="缺价料名（定额工料机名，信息价未登录时用近似召回）")],
+    region: Annotated[str, Field(description="地区（默认深圳）")] = "深圳",
+    category: Annotated[str | None, Field(description="类别：人工 / 材料 / 机械（建议带，避免跨类推荐）")] = None,
+    top_k: Annotated[int, Field(ge=1, le=20, description="返回近似料条数")] = 5,
+) -> dict[str, Any]:
+    try:
+        return _svc.price_suggest(name=name, region=region, category=category, top_k=top_k)
+    except Exception as exc:
+        raise ToolError(str(exc)) from exc
+
+
+@mcp.tool()
 def price_compose(
     code: Annotated[str, Field(description="9 位清单编码")],
     spec: Annotated[str, Field(description="国标版本 2013 / 2024（必填）")],

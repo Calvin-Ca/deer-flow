@@ -89,6 +89,16 @@ def price_query(
     return _svc.price_query(name=name, region=region, period=period, category=category, top_k=top_k)
 
 
+@app.get("/price/suggest")
+def price_suggest(
+    name: str,
+    region: str = "深圳",
+    category: str | None = None,
+    top_k: int = 5,
+) -> dict[str, Any]:
+    return _svc.price_suggest(name=name, region=region, category=category, top_k=top_k)
+
+
 @app.get("/price/compose/{region}/{code}")
 def price_compose(region: str, code: str, spec: str, on_date: date | None = None) -> dict[str, Any]:
     try:

@@ -84,6 +84,18 @@ class DbService:
             )
         return {"name": name, "region": region, "period": period, "count": len(rows), "results": rows}
 
+    def price_suggest(
+        self,
+        *,
+        name: str,
+        region: str = "深圳",
+        category: str | None = None,
+        top_k: int = 5,
+    ) -> dict[str, Any]:
+        with cost_query.connect() as conn:
+            rows = cost_query.suggest_resource_prices(conn, name, region=region, category=category, top_k=top_k)
+        return {"name": name, "region": region, "category": category, "count": len(rows), "suggestions": rows}
+
     def price_compose(
         self,
         *,

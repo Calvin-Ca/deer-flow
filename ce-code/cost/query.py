@@ -18,6 +18,10 @@ from datetime import date
 import psycopg
 from psycopg.rows import dict_row
 
+from .price_suggest import ngrams as _price_ngrams
+from .price_suggest import suggest_prices as _suggest_prices
+from .quota_scheme import group_quota_schemes
+
 DEFAULT_DSN = "postgresql://cost@localhost:5433/ce_cost"
 
 # 工料机展示序：人工 → 材料 → 机械 → 其他
@@ -116,6 +120,51 @@ def query_resource_price(conn: psycopg.Connection, name: str, region: str = "深
         r["period_start"] = r["period_start"].isoformat() if r["period_start"] else None
         r["period_end"] = r["period_end"].isoformat() if r["period_end"] else None
     return rows
+
+
+def suggest_resource_prices(conn: psycopg.Connection, name: str, region: str = "深圳",
+                            category: str | None = None, top_k: int = 5,
+                            pool_limit: int = 100) -> list[dict]:
+    """近似料启发式询价：库中无精确/子串命中时，按名称 n-gram 宽松召回同类候选池后打分推荐。
+
+    功能：``query_resource_price`` 的 ``ILIKE %name%`` 子串对 no_source 料常 miss（多字即不命中）。
+      本函数用目标名的 2-gram 构造 ``ILIKE ANY`` 宽松召回候选池（任一 gram 命中），再交纯函数
+      ``suggest_prices`` 按覆盖率 + 同类打分排序。和「清单套定额」同构的启发式近似匹配，宁缺毋造：
+      仍无达标近似料则返回空（不硬推、不编价）。
+    参数：
+      conn —— psycopg 连接（dict_row）。
+      name —— 缺价料名（定额工料机名，如「干混砌筑砂浆」）。
+      region —— 地区（默认深圳）。
+      category —— 人工/材料/机械 过滤（强烈建议带，避免跨类推荐）。
+      top_k —— 返回近似料条数上限。
+      pool_limit —— 宽松召回候选池规模上限（打分前）。
+    返回：``[{name, spec, unit, category, price, price_type, period_start, period_end, doc_id,
+          score, match, reason}...]``（按 score 降序）；无近似料返回空列表。
+    """
+    grams = _price_ngrams(name)
+    if not grams:
+        return []
+    conds = ["rp.region = %(region)s", "r.name ILIKE ANY(%(patterns)s)"]
+    params: dict = {"region": region, "patterns": [f"%{g}%" for g in grams], "pool_limit": pool_limit}
+    if category:
+        conds.append("r.category = %(category)s")
+        params["category"] = category
+    sql = (
+        "SELECT DISTINCT ON (r.id) r.name, r.spec, r.unit, r.category, "
+        "rp.price, rp.price_type, lower(rp.effective_period) AS period_start, "
+        "upper(rp.effective_period) AS period_end, rp.doc_id "
+        "FROM resource_price rp JOIN resource r ON r.id = rp.resource_id "
+        f"WHERE {' AND '.join(conds)} "
+        "ORDER BY r.id, lower(rp.effective_period) DESC LIMIT %(pool_limit)s"
+    )
+    with conn.cursor() as cur:
+        cur.execute(sql, params)
+        pool = cur.fetchall()
+    for r in pool:  # Decimal/date → JSON 可序列化
+        r["price"] = float(r["price"]) if r["price"] is not None else None
+        r["period_start"] = r["period_start"].isoformat() if r["period_start"] else None
+        r["period_end"] = r["period_end"].isoformat() if r["period_end"] else None
+    return _suggest_prices(name, category, pool, top_k=top_k)
 
 
 def get_quota(conn: psycopg.Connection, region: str, code: str) -> dict | None:
@@ -271,10 +320,14 @@ def compose_price(conn: psycopg.Connection, region: str, code: str,
             "price_status": "matched" if price is not None else "no_source",
             "amount": amount,
         })
+    ordered_quotas = [quotas[k] for k in order]
     return {
         "bill": bill,
         "region": region,
         "on_date": on_date.isoformat() if isinstance(on_date, date) else None,
         "quota_count": len(order),
-        "quotas": [quotas[k] for k in order],
+        "quotas": ordered_quotas,
+        # 可替代定额方案候选（启发式分组，供任务层 select_quota HITL 选一套）；
+        # 单方案时长度为 1，消费方自动降级不触发多方案确认。见 cost/quota_scheme.py。
+        "schemes": group_quota_schemes(ordered_quotas),
     }

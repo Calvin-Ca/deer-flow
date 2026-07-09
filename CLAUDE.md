@@ -9,6 +9,7 @@
 | `ce-code/DEV.md` | 组价知识库开发：架构 ingest→cost→PG→取数 / 存储（PG + spec 版本隔离 + Milvus 清单库）/ 取数策略 / 质量度量 / 依赖服务（决策记录为主） | 配环境 / 排查服务依赖时 |
 | `ce-code/TODO.md` | 组价知识库进度 | 看 ce-code 做到哪了 |
 | `backend/` | deer-flow 后端代码目录（组价编排已内嵌于此：`backend/app/ce/cost/` 的 `cost_workflow_*`） | 涉及开发调试时 |
+| `DEPLOY.md` | **全服务 + 依赖的启动手册**（4 层拓扑 + dev/prod 两态命令，单一入口） | 起服务 / 排查启动依赖时 |
 
 ---
 

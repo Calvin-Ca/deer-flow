@@ -22,10 +22,15 @@ import {
   ChainOfThoughtSearchResults,
   ChainOfThoughtStep,
 } from "@/components/ai-elements/chain-of-thought";
+import { cn } from "@/lib/utils";
 
 /** 本组件能渲染的造价领域 MCP 工具前缀。 */
 export function isCeTool(name: string): boolean {
-  return name.startsWith("ce-rag_") || name.startsWith("ce-db_");
+  return (
+    name.startsWith("ce-rag_") ||
+    name.startsWith("ce-db_") ||
+    name.startsWith("cost_workflow_")
+  );
 }
 
 type Rec = Record<string, unknown>;
@@ -71,6 +76,9 @@ export function CeToolResult({
   result?: string | Record<string, unknown>;
 }) {
   const r = resultObj(result);
+  if (name.startsWith("cost_workflow_")) {
+    return <CostWorkflow name={name} args={args} r={r} />;
+  }
   const tool = name.replace(/^ce-(rag|db)_/, "");
 
   switch (tool) {
@@ -116,6 +124,79 @@ export function CeToolResult({
         <ChainOfThoughtStep icon={DatabaseIcon} label={`造价工具：${tool}`} />
       );
   }
+}
+
+function CostWorkflow({
+  name,
+  args,
+  r,
+}: {
+  name: string;
+  args: Rec;
+  r?: Rec;
+}) {
+  const taskId = str(r?.task_id);
+  const status = str(r?.status) ?? str(r?.node) ?? "workflow";
+  const interrupt = asRec(r?.interrupt);
+  const gateType = str(interrupt?.gate_type);
+  const node = str(interrupt?.node) ?? str(r?.node);
+  const label = name.replace(/^cost_workflow_/, "造价 workflow：");
+  const desc =
+    r === undefined
+      ? "执行中…"
+      : [status, taskId, gateType ? `待确认：${gateType}` : undefined, node]
+          .filter(Boolean)
+          .join(" · ");
+  const question = str(interrupt?.question);
+  const argFeature = str(args.feature) ?? str(args.node);
+  // 计算过程 breakdown（unit_rate 等确定性计算返回）：顶层或 result 内
+  const breakdown = asArr(r?.breakdown ?? asRec(r?.result)?.breakdown)
+    .map(asRec)
+    .filter((x): x is Rec => !!x);
+
+  return (
+    <ChainOfThoughtStep icon={ListChecksIcon} label={label} description={desc}>
+      {(argFeature !== undefined || question !== undefined) && (
+        <div className="text-muted-foreground space-y-1 text-xs">
+          {argFeature && <div>{argFeature}</div>}
+          {question && <div>{question}</div>}
+        </div>
+      )}
+      {breakdown.length > 0 && <CalcBreakdown rows={breakdown} />}
+    </ChainOfThoughtStep>
+  );
+}
+
+/** 综合单价等确定性计算的逐步过程展示（人材机费 → 管理费/利润 → 综合单价，每步算式+金额）。 */
+function CalcBreakdown({ rows }: { rows: Rec[] }) {
+  return (
+    <div className="mt-1 space-y-0.5 text-xs">
+      {rows.map((row, i) => {
+        const item = str(row.item);
+        const formula = str(row.formula);
+        const amount = num(row.amount);
+        // 末行是目标值（综合单价 / 清单合价 / 总造价…）→ 加粗分隔
+        const isFinal = i === rows.length - 1;
+        return (
+          <div
+            key={i}
+            className={cn(
+              "flex items-baseline justify-between gap-3",
+              isFinal && "border-border/60 mt-0.5 border-t pt-0.5 font-medium",
+            )}
+          >
+            <span className="text-foreground shrink-0">{item}</span>
+            {formula && (
+              <span className="text-muted-foreground flex-1 truncate text-[11px]">
+                {formula}
+              </span>
+            )}
+            <span className="tabular-nums shrink-0">{amount?.toFixed(2)}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 /** 规范问答 / 条文检索：展示命中条文数 + cited_clauses 或 evidence。 */

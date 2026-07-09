@@ -1,13 +1,20 @@
 ---
 name: cost-agent
-description: "Use this skill when working on construction cost tasks: selecting bill-code candidates, querying structured pricing data, coordinating deterministic calculation, or handing a full HITL workflow to the application session API. The previous broad task-layer MCP front door is disabled because it mixed routing, QA, pricing, calculation, and HITL."
+description: "Use this skill when working on construction cost tasks: selecting bill-code candidates, querying structured pricing data, coordinating deterministic calculation, or starting/resuming the internal DeerFlow cost workflow. The previous broad task-layer MCP front door is disabled because it mixed routing, QA, pricing, calculation, and HITL."
 ---
 
 # Cost Agent
 
 Do not call the previous broad task-layer MCP front door. It is not an agent-visible tool.
 
-Use the current global MCP primitives:
+Use the internal DeerFlow workflow tools for workflow or node-level cost work:
+
+- `cost_workflow_start`
+- `cost_workflow_node`
+- `cost_workflow_resume`
+- `cost_workflow_state`
+
+Workflow nodes may call these current global MCP primitives internally:
 
 - `ce-rag_search_clause`
 - `ce-rag_expand_clause_refs`
@@ -28,20 +35,19 @@ Use the current global MCP primitives:
 - `ce-db_aux_table_list`
 - `ce-db_resource_lookup`
 
-Service-side calculation functions remain internal implementation details, not MCP front doors:
-
-- `cost_compute_unit_price_tool`
-- `cost_rollup_tool`
-- `cost_rollup_hierarchy_tool`
-- `cost_gate_decision_tool`
-- `cost_build_manual_quota_basis_tool`
-- `cost_select_quota_tool`
+Deterministic calculation and HITL gates remain workflow-node responsibilities, not lead-agent steps.
 
 Workflow:
 
 1. Resolve the user request to the right cost capability.
-2. For single-point work, call the narrow `ce-rag_*` / `ce-db_*` primitive that matches the known input.
-3. For bill-code selection, recall candidates with `ce-rag_match_bill_item`, then select only within returned candidates or stop for review.
-4. For full stateful pricing, do not emulate the workflow with MCP calls; hand off to the application Cost Session API.
-5. Stop on `need_review` or `needs_human_input`.
-6. Resume only after the human decision is normalized into the expected input shape.
+2. For a complete stateful pricing task, call `cost_workflow_start`.
+3. For intermediate work inside the pricing process, call `cost_workflow_node` with the exact node:
+   - `bill_match` for candidate recall.
+   - `select_bill` for candidate selection/review contract.
+   - `price_compose` for bill-code pricing data.
+   - `bill_get`, `quota_get`, `price_query`, `fee_rate_lookup` for known-key data.
+   - `unit_price`, `rollup`, `check` for deterministic local nodes.
+4. For a raw fact lookup where a workflow node adds no value, the narrow `ce-rag_*` / `ce-db_*` primitive may still be used directly.
+5. For bill-code selection, select only within returned candidates or stop for review.
+6. Stop on `interrupt`, `need_review`, or `needs_human_input`.
+7. Resume only with `cost_workflow_resume` after the human decision is normalized into the expected input shape.

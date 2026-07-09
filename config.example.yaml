@@ -363,6 +363,7 @@ models:
 
 tool_groups:
   - name: web
+  - name: cost
   - name: file:read
   - name: file:write
   - name: bash
@@ -465,6 +466,25 @@ tools:
   #   image_search_time_range: 10
   #   # Image size filter. Options: "l" (large), "m" (medium), "i" (icon).
   #   image_size: "i"
+
+  # Construction cost workflow tools.
+  # These are application-level CE tools: full pricing goes through
+  # cost_workflow_start; intermediate process work calls cost_workflow_node.
+  - name: cost_workflow_start
+    group: cost
+    use: app.ce.cost.tools:cost_workflow_start_tool
+
+  - name: cost_workflow_node
+    group: cost
+    use: app.ce.cost.tools:cost_workflow_node_tool
+
+  - name: cost_workflow_resume
+    group: cost
+    use: app.ce.cost.tools:cost_workflow_resume_tool
+
+  - name: cost_workflow_state
+    group: cost
+    use: app.ce.cost.tools:cost_workflow_state_tool
 
   # File operations tools
   - name: ls
@@ -746,11 +766,9 @@ skills:
 # that are a subset of apply_prompt_template's format kwargs.
 
 lead_agent:
-  # null = built-in SYSTEM_PROMPT_TEMPLATE, which already embeds the <skill_runbook>
-  # block adopted from the 2026-06-26 prompt-ablation E1 (V2). No override needed for prod.
-  system_prompt_path: null
-  # Example — only to A/B an alternative ablation variant against the default:
-  # system_prompt_path: ce-services/notebooks/2026-06-26-1710-lead-prompt-ablation/prompts/v1_current_costized.txt
+  # Project-level CE lead-agent prompt override. Keeps CE routing outside the
+  # publishable harness package and lets the application own its prompt.
+  system_prompt_path: prompts/ce/lead_agent.md
 
 # ============================================================================
 # Title Generation Configuration
@@ -926,6 +944,10 @@ skill_evolution:
 database:
   backend: sqlite
   sqlite_dir: .deer-flow/data
+
+checkpointer:
+  type: sqlite
+  connection_string: .deer-flow/data/deerflow.db
 
 # ============================================================================
 # Run Events Configuration

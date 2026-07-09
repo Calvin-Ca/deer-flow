@@ -13,8 +13,8 @@
 | **服务层** | nginx 入口 | **2026** | sudo bridge | deploy.sh | `curl -sI :2026`（307=活）| deer-flow-nginx |
 |  | gateway | 8001 | sudo bridge | deploy.sh | 见注 ① | deer-flow-gateway |
 |  | 前端 | 内3000 | sudo bridge | deploy.sh | 经 nginx :2026 | deer-flow-frontend |
-|  | 知识 | **8100** | sudo host-net | ce-services | `curl :8100/health` | rag-knowledge |
-|  | 任务 | **8101** | sudo host-net | ce-services | `curl :8101/health` | rag-tasks |
+|  | 知识 ce-rag | **8100** | sudo host-net | ce-code | `curl :8100/health` | rag-knowledge |
+|  | 知识 ce-db | **8102** | 见注（ce-rag/ce-db 拆分部署以服务器为准） | — | `curl :8102/health` | — |
 | **基础设施** | 精排 rerank | 8095 | sudo GPU | ce-rerank | `curl :8095/health` | ce-rerank |
 |  | embed | 8097 | sudo GPU | 外部·先起 | `curl :8097/v1/models` | vllm-bge-large |
 |  | vLLM 8B（默认）| 8099 | sudo GPU | 外部·先起 | `curl :8099/v1/models` | vllm-qwen3-8b |
@@ -37,7 +37,7 @@
 
 ## 2. 启动（按依赖顺序）
 
-首次先建各 `.env`（从 `.env.example` 复制）：`docker/ce-services/.env`、`docker/ce-rerank/.env`、`docker/ce-monitoring/.env`。
+首次先建各 `.env`（从 `.env.example` 复制）：`docker/ce-rerank/.env`、`docker/ce-monitoring/.env`。
 
 ```
 # ① 数据层（rootless，无 sudo）
@@ -45,8 +45,9 @@ docker compose -f docker/ce-code/docker-compose.deps.yaml up -d
 # ② GPU 模型 embed:8097 / vLLM:8099 —— 外部，须先在跑（curl localhost:8097/v1/models 确认）
 # ③ 精排（sudo，GPU）
 sudo docker compose -f docker/ce-rerank/docker-compose.yaml --env-file docker/ce-rerank/.env up -d
-# ④ 知识+任务（sudo，host-net；include 一并起 ce-code）
-sudo docker compose -f docker/ce-services/docker-compose.yaml --env-file docker/ce-services/.env up -d
+# ④ 知识层 ce-rag :8100（sudo，host-net）。原 ce-services 任务层 :8101 已退役，不再起。
+#    ce-db :8102 的部署以服务器为准（本仓 compose 未含，属 ce-rag/ce-db 拆分后的运维事实）。
+sudo docker compose -f docker/ce-code/docker-compose.yaml up -d
 # ⑤ harness（sudo）；首次先改 config.yaml 的 base_url 为 host.docker.internal
 sed -i 's#http://localhost:8099/v1#http://host.docker.internal:8099/v1#' config.yaml
 sudo ./scripts/deploy.sh
@@ -71,7 +72,7 @@ sudo docker compose -f docker/ce-monitoring/docker-compose.yaml --env-file docke
 
 **一键自检（应用 / 数据 / gateway，宿主机执行）：**
 ```
-for p in 8100 8101 8095 8097 8099; do printf "$p -> "; curl -s -o /dev/null -w "%{http_code}\n" localhost:$p/health 2>/dev/null || echo down; done
+for p in 8100 8102 8095 8097 8099; do printf "$p -> "; curl -s -o /dev/null -w "%{http_code}\n" localhost:$p/health 2>/dev/null || echo down; done
 curl -s localhost:9091/healthz && echo " milvus-ok"                        # Milvus
 curl -s -o /dev/null -w "nginx:2026 -> %{http_code}\n" localhost:2026      # 307=活
 sudo docker exec deer-flow-gateway python -c "import urllib.request;print('gateway->vLLM',urllib.request.urlopen('http://host.docker.internal:8099/v1/models',timeout=5).status)"
@@ -85,7 +86,7 @@ sudo docker exec deer-flow-gateway python -c "import urllib.request;print('gatew
 ```
 # 停（各自 compose down；deps 谨慎、别 -v）
 sudo ./scripts/deploy.sh down                                               # harness（sudo）
-sudo docker compose -f docker/ce-services/docker-compose.yaml down          # 知识+任务
+sudo docker compose -f docker/ce-code/docker-compose.yaml down              # 知识 ce-rag
 sudo docker compose -f docker/ce-rerank/docker-compose.yaml down            # 精排
 sudo docker compose -f docker/ce-monitoring/docker-compose.yaml down        # 监控
 docker compose -f docker/ce-code/docker-compose.deps.yaml down              # 数据（有状态，慎）

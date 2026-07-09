@@ -8,7 +8,7 @@ index 层的编排中枢：
      空骨架——content 空的死单元，承本会话已落地的过滤契约）；section/paragraph 留后补。
   ② ``chunk_to_row(chunk, granularity, feats)``：Chunk + 单节点表征 → Milvus/BM25 共用的标量行
      （**字段名逐字保持旧 index 行契约**：node_path/parent_id/granularity/standard_id/content/
-     node_level/page/references_to/has_tables/has_images——`ce-services` 经 /search 读这些名）。
+     node_level/page/references_to/has_tables/has_images——取数客户端（backend cost_workflow / MCP / select_eval）经 /search 读这些名）。
   ③ ``build_index(units, ..., features)``：分派 bm25_index / metadata_index /（可选）vector_index。
 
 表征经 **sidecar**（``node_path → {kind: ChunkFeature}``）传入，不挂 Chunk。各表征消费方：

@@ -5,9 +5,9 @@
 # 服务与启动顺序（有依赖先后）：
 #   ① :8100 ce-rag    ce-code       uv run python -m service.rag_api
 #   ② :8102 ce-db     ce-code       uv run python -m service.db_api
-#   ③ :8101 tasks     ce-services    uv run python main.py
-#   ④ :8001 gateway   backend        make gateway（uvicorn，无 --reload，单进程）
-#   ⑤ :3000 前端      frontend       pnpm start（生产模式，需先 pnpm build）
+#   ③ :8001 gateway   backend        make gateway（uvicorn，无 --reload，单进程）
+#   ④ :3000 前端      frontend       pnpm start（生产模式，需先 pnpm build）
+# （原 :8101 ce-services 任务层已退役——组价编排改由 gateway 内嵌 cost_workflow_* + ce-rag/ce-db MCP 承载。）
 #
 # 为什么 tmux 而非 nohup：nohup 在本项目服务器上遇到过 Exit 125 静默失败；tmux 每服务一个 window，
 #   可 `tmux attach -t ce` 实时看日志、单独排障，`--stop` 一键全停。
@@ -22,7 +22,7 @@
 #   scripts/ce-serve.sh --restart    # 先停旧 session 再起
 #   scripts/ce-serve.sh --stop       # 停全部（kill tmux session ce）
 #
-# 注：首次或依赖变更后，需各自 `uv sync`（ce-code / ce-services）+ 前端 `pnpm install`，本脚本不代劳。
+# 注：首次或依赖变更后，需各自 `uv sync`（ce-code / backend）+ 前端 `pnpm install`，本脚本不代劳。
 
 set -u
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -75,18 +75,14 @@ wait_health ce-rag http://localhost:8100/health 90 || { echo "ce-rag 未就绪�
 start_win ce-db 'cd ce-code && exec uv run python -m service.db_api'
 wait_health ce-db http://localhost:8102/health 90 || { echo "ce-db 未就绪（多半下游依赖 PG 没起），终止"; exit 1; }
 
-# ③ 任务服务 :8101
-start_win tasks 'cd ce-services && exec uv run python main.py'
-wait_health tasks http://localhost:8101/health 60 || { echo "任务服务未就绪，终止"; exit 1; }
-
-# ④ gateway :8001
+# ③ gateway :8001
 start_win gateway 'cd backend && exec make gateway'
 wait_health gateway http://localhost:8001/health 60 || { echo "gateway 未就绪，终止"; exit 1; }
 
-# ⑤ 前端 :3000（生产模式；若报错先跑 --build）
+# ④ 前端 :3000（生产模式；若报错先跑 --build）
 start_win frontend 'cd frontend && exec pnpm start'
 wait_health frontend http://localhost:3000 90 || { echo "前端未就绪（是否忘了 pnpm build？用 --build 重跑），终止"; exit 1; }
 
 echo
-echo "✅ 服务全部就绪：ce-rag :8100 / ce-db :8102 / tasks :8101 / gateway :8001 / 前端 :3000"
+echo "✅ 服务全部就绪：ce-rag :8100 / ce-db :8102 / gateway :8001 / 前端 :3000"
 echo "   看日志：tmux attach -t $SESSION   停全部：scripts/ce-serve.sh --stop"

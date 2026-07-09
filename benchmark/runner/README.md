@@ -40,7 +40,7 @@ uv run --project backend python benchmark/runner/run_routing_experiment.py --run
 
 ### 任务2 扩展 · 清单匹配评测（retrieval_eval 之 match）
 
-「清单匹配」= 构件描述 → 9 位清单码。**复用 `ce-services/tools/eval_select.py` 的成熟评测**（bill_match 召回 + select_code 选码 + Recall@k / 端到端 Top-1 / 候选内 Top-1 / 高置信错码=0 红线），只加 Langfuse 层。需 :8100 知识服务 + :8099 vLLM 在跑。
+「清单匹配」= 构件描述 → 9 位清单码。**复用 `benchmark/select_eval/tools/eval_select.py` 的成熟评测**（bill_match 召回 + select_code 选码 + Recall@k / 端到端 Top-1 / 候选内 Top-1 / 高置信错码=0 红线；原属已退役的 ce-services，随其退役迁入本仓 `benchmark/select_eval/`），只加 Langfuse 层。需 :8100 知识服务 + :8099 vLLM 在跑。
 
 先灌金标（2013+2024 合进一个 dataset）：
 

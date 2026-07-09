@@ -1,7 +1,7 @@
 """KnowledgeContext IR —— 一次检索的完整结果（retrieval/service 产 → 调用方）。
 
 = 旧 ``/search`` 返回体的类型化承载：查询回显 + 命中列表（RetrievedChunk）+ 可观测 meta
-（各阶段命中数 / 耗时）。任务层（ce-services）拿它拼提示词 / 做合规编排。
+（各阶段命中数 / 耗时）。取数客户端（backend cost_workflow / MCP 消费方）拿它拼提示词 / 做编排。
 
 **对外契约**：``to_response(...)`` 吐逐字等于旧 ``/search`` 响应的结构
 （``query`` / ``standard`` / ``retrieved_clauses_count`` / ``clauses`` / ``meta``）。

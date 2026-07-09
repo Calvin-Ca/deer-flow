@@ -32,8 +32,8 @@ scrape_configs:
       module: [http_2xx]
     static_configs:
       - targets:
-          - http://localhost:8100/health      # 知识
-          - http://localhost:8101/health      # 任务
+          - http://localhost:8100/health      # 知识 ce-rag
+          - http://localhost:8102/health      # 知识 ce-db
           - http://localhost:8095/health      # 精排
           - http://localhost:8001/health      # gateway
           - http://localhost:8097/v1/models   # embed

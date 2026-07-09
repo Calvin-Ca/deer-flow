@@ -6,7 +6,7 @@
 **对外契约（不可破坏）**：``to_response()`` 吐**逐字等于旧 /search 返回 clauses[] 的字段名**
 （``node_path`` / ``parent_id`` / ``granularity`` / ``standard_id`` / ``content`` / ``node_level`` /
 ``page`` / ``references_to`` / ``has_tables`` / ``has_images`` / ``_source`` / ``_*_score``）——
-``ce-services`` 是活的 HTTP 客户端，字段名不得改。``from_row`` 与之互逆。
+取数客户端（backend cost_workflow / MCP / benchmark select_eval）是活的消费方，字段名不得改。``from_row`` 与之互逆。
 
 > 内部数值逻辑（RRF 合并 / 引用扩展 / rerank）仍在「行 dict」层做（retrieval/rrf.py，逐字
 > 保持旧 engine 行为）；本 IR 只在**检索层出口**承接最终排序结果，给 service / 类型化消费方用。

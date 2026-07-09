@@ -1,12 +1,12 @@
-"""任务2c：清单匹配评测——复用 ce-services 选码引擎，挂分到 Langfuse Dataset Run。
+"""任务2c：清单匹配评测——复用选码引擎，挂分到 Langfuse Dataset Run。
 
 「清单匹配」= 构件描述 → 9 位清单码（先 bill_match 候选召回，再 select_code 候选内选码）。
-这套评测在 ``ce-services/tools/eval_select.py`` 里**已成熟实现**（Recall@k / 端到端 Top-1 /
-候选内 Top-1 / 高置信错码=0 等红线指标），且其依赖（requests、:8100 知识服务、:8099 vLLM、
-config）都在 ce-services 解析。本脚本**不重写检索/选码**，只在 backend venv 下把 ce-services
-加进 path、调它的 ``run_eval`` 拿逐条 + 汇总，再加 **Langfuse 层**：逐条建 trace、关联进
-dataset run、挂 ``match_top1`` / ``recalled`` 两分。指标口径见 eval_select 与 AGENT_BENCHMARK
-§L3（Recall@k）。
+这套评测在 ``benchmark/select_eval/tools/eval_select.py`` 里**已成熟实现**（Recall@k / 端到端
+Top-1 / 候选内 Top-1 / 高置信错码=0 等红线指标）——原属 ce-services，随 ce-services 退役已迁入
+本仓 ``benchmark/select_eval/``（self-contained 选码引擎：common/cost/tools 三包）。本脚本**不
+重写检索/选码**，只在 backend venv 下把 select_eval 加进 path、调它的 ``run_eval`` 拿逐条 + 汇总，
+再加 **Langfuse 层**：逐条建 trace、关联进 dataset run、挂 ``match_top1`` / ``recalled`` 两分。
+运行时仍需 :8100 知识服务 + :8099 vLLM。指标口径见 eval_select 与 AGENT_BENCHMARK §L3。
 
 与 routing 实验同构（主线程逐条、不另起 loop）。检索脚本本身不产 Langfuse trace，故用
 ``start_as_current_observation`` 手建一条记录 query/选码/候选数，再据其 trace_id 挂分。
@@ -32,22 +32,22 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _lf import require_langfuse  # noqa: E402
 from upload_datasets import CLIST_DATASET, CLIST_GOLD, clist_item_id  # noqa: E402
 
-# 项目根 = benchmark/runner/ 的上两级；ce-services 与 backend 平级。
+# 项目根 = benchmark/runner/ 的上两级；选码引擎已迁入 benchmark/select_eval/（原 ce-services）。
 _ROOT = Path(__file__).resolve().parents[2]
-_CE_SERVICES = _ROOT / "ce-services"
+_SELECT_EVAL = _ROOT / "benchmark" / "select_eval"
 
 
 def _import_eval_engine():
-    """把 ce-services 加进 path 并导入选码评测引擎；缺路径/依赖时给可执行提示。
+    """把 select_eval 加进 path 并导入选码评测引擎；缺路径/依赖时给可执行提示。
 
-    功能：复用 ce-services 成熟评测的关键——其内部用相对包导入（common/cost/tools），
-        需把 ce-services 根加进 sys.path 才能 import。
+    功能：复用成熟选码评测——其内部用相对包导入（common/cost/tools），需把
+        ``benchmark/select_eval`` 根加进 sys.path 才能 import。
     参数：无。
     返回：``(run_eval, KNOWLEDGE_URL, LLM_URL, LLM_MODEL_ID)``——评测入口 + 三个默认地址。
     异常：``SystemExit`` —— 导入失败（路径不对 / 依赖缺）时带提示退出。
     """
-    if str(_CE_SERVICES) not in sys.path:
-        sys.path.insert(0, str(_CE_SERVICES))
+    if str(_SELECT_EVAL) not in sys.path:
+        sys.path.insert(0, str(_SELECT_EVAL))
     try:
         from common.config import KNOWLEDGE_URL, LLM_MODEL_ID, LLM_URL  # noqa: PLC0415
         from tools.eval_select import run_eval  # noqa: PLC0415
@@ -55,8 +55,8 @@ def _import_eval_engine():
         return run_eval, KNOWLEDGE_URL, LLM_URL, LLM_MODEL_ID
     except Exception as exc:  # noqa: BLE001
         raise SystemExit(
-            f"导入 ce-services 选码评测失败：{type(exc).__name__}: {exc}\n"
-            f"  需在 backend venv（已装 requests）下跑，且 ce-services 存在于 {_CE_SERVICES}。"
+            f"导入选码评测引擎失败：{type(exc).__name__}: {exc}\n"
+            f"  需在 backend venv（已装 requests）下跑，且 select_eval 存在于 {_SELECT_EVAL}。"
         )
 
 
@@ -86,18 +86,18 @@ def _push_one(client, run_name: str, spec: str, top_k: int, d: dict) -> None:
 
 
 def main() -> int:
-    """跑清单匹配评测（复用 ce-services 引擎）并把逐条结果挂到 Langfuse Dataset Run。
+    """跑清单匹配评测（复用 select_eval 引擎）并把逐条结果挂到 Langfuse Dataset Run。
 
     功能：见模块 docstring。
     参数：无（命令行 --spec / --run-name / --top-k / --knowledge-url / --llm-url）。
     返回：进程退出码。
     """
-    parser = argparse.ArgumentParser(description="清单匹配评测：复用 ce-services 选码引擎并挂分到 Langfuse")
+    parser = argparse.ArgumentParser(description="清单匹配评测：复用 select_eval 选码引擎并挂分到 Langfuse")
     parser.add_argument("--spec", required=True, choices=["2013", "2024"], help="国标版本（决定用哪份金标）")
     parser.add_argument("--run-name", default=None, help="dataset run 名（建议带 spec，便于横向比）")
     parser.add_argument("--top-k", type=int, default=10, help="候选召回深度（默认 10）")
-    parser.add_argument("--knowledge-url", default=None, help="知识服务 :8100 地址（默认 ce-services config）")
-    parser.add_argument("--llm-url", default=None, help="vLLM 地址（默认 ce-services config）")
+    parser.add_argument("--knowledge-url", default=None, help="知识服务 :8100 地址（默认 select_eval config）")
+    parser.add_argument("--llm-url", default=None, help="vLLM 地址（默认 select_eval config）")
     args = parser.parse_args()
 
     client = require_langfuse()

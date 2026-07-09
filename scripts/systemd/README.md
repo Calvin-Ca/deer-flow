@@ -1,17 +1,18 @@
 # CE 裸机服务开机自启（systemd）
 
-CE 生产拓扑（见记忆 `project_ce_deploy_topology`）里 **知识 :8100 / 任务 :8101 是裸机 `uv run`**，
-setsid 起的进程不扛重启。用这两个 systemd 单元让它们开机自启 + 崩溃自拉起。
+CE 生产拓扑（见记忆 `project_ce_deploy_topology`）里 **知识 ce-rag :8100 是裸机 `uv run`**，
+setsid 起的进程不扛重启。用 `ce-knowledge` systemd 单元让它开机自启 + 崩溃自拉起。
+（原 **任务层 :8101 已整体退役**，`ce-tasks.service` 已删；**ce-db :8102** 的裸机/单元部署以服务器为准，本仓未含。）
 
 ## 安装（服务器，sudo）
 ```
-sudo cp scripts/systemd/ce-knowledge.service scripts/systemd/ce-tasks.service /etc/systemd/system/
+sudo cp scripts/systemd/ce-knowledge.service /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable --now ce-knowledge ce-tasks
+sudo systemctl enable --now ce-knowledge
 ```
 查看 / 日志：`systemctl status ce-knowledge` · `journalctl -u ce-knowledge -f`
 
-⚠️ **装前先停掉手动起的裸机进程**（避免端口占用）：`lsof -ti:8100 | xargs -r kill; lsof -ti:8101 | xargs -r kill`
+⚠️ **装前先停掉手动起的裸机进程**（避免端口占用）：`lsof -ti:8100 | xargs -r kill`
 
 ## 依赖服务的开机自启（Docker 侧，不用 systemd）
 - **rerank :8095 / embed / vLLM**（sudo 系统 daemon）：容器带 `restart: unless-stopped`，随系统 docker 开机自起。

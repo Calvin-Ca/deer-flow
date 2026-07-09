@@ -1,4 +1,4 @@
-# ce-rag 服务（:8100）—— 单独启动，或被 docker/ce-services/docker-compose.yaml include
+# ce-rag 服务（:8100）—— 知识层检索服务，单独启动
 #
 # ⚠️ 本服务现为**纯 CPU**：唯一的本地 GPU 消费者（cross-encoder 精排）已拆到 docker/ce-rerank
 #    （:8098）。检索时经 CE_RERANK_URL HTTP 调它；rerank 服务不起 → 静默 fallback RRF（召回不变、精排失效）。

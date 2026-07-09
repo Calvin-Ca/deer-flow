@@ -59,7 +59,7 @@ def test_make_lead_agent_attaches_tracing_callbacks_at_graph_root(monkeypatch):
     monkeypatch.setattr(lead_agent_module, "_build_middlewares", lambda config, model_name, agent_name=None, **kwargs: [])
 
     sentinel_handler = object()
-    monkeypatch.setattr(lead_agent_module, "build_tracing_callbacks", lambda: [sentinel_handler])
+    monkeypatch.setattr(lead_agent_module, "build_tracing_callbacks", lambda langfuse_trace_id=None: [sentinel_handler])
 
     seen_attach_tracing: list[bool] = []
 

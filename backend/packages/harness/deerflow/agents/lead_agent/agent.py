@@ -19,7 +19,6 @@ middleware, and the async path inside ``TitleMiddleware``. Any new in-graph
 """
 
 import logging
-import os
 
 from langchain.agents import create_agent
 from langchain.agents.middleware import AgentMiddleware
@@ -289,23 +288,6 @@ def _build_middlewares(
     from deerflow.agents.middlewares.dynamic_context_middleware import DynamicContextMiddleware
 
     middlewares.append(DynamicContextMiddleware(agent_name=agent_name, app_config=resolved_app_config))
-
-    # 意图路由前置注入（M1 第零跳收权）：CE_ROUTE_CONTEXT_URL 未设 = 完全不启用（零影响）。
-    # 每回合把 ce-services /route 的确定性判定以 <system-reminder> 注入在用户消息前，
-    # 模型从「自由分诊」降为「按判定执行」；/route 不可达则 fail-open 跳过（不阻塞对话）。
-    # 路由逻辑单一源在 ce-services，此处只消费判定、不复制词表。
-    route_ctx_url = (os.environ.get("CE_ROUTE_CONTEXT_URL") or "").strip()
-    if route_ctx_url:
-        from deerflow.agents.middlewares.route_context_middleware import RouteContextMiddleware
-
-        middlewares.append(RouteContextMiddleware(
-            route_url=route_ctx_url,
-            timeout_seconds=float(os.environ.get("CE_ROUTE_CONTEXT_TIMEOUT", "2.0")),
-        ))
-    else:
-        # 未设/空串=不启用，但必须出声（2026-07-07 验收实测：dev 调试态 env 没带到、
-        # 中间件静默缺席，模型自由分诊选错码编工具名，浪费一轮排障——「兜底不出声」同款坑）。
-        logger.warning("RouteContextMiddleware 未启用（CE_ROUTE_CONTEXT_URL 未设或为空）——路由注入/哑火收编均不生效，若非有意关闭请检查 env 加载（dev 调试态见根 CLAUDE.md §2.3）")
 
     # Add summarization middleware if enabled
     summarization_middleware = _create_summarization_middleware(app_config=resolved_app_config)

@@ -38,9 +38,8 @@ def test_apply_prompt_template_uses_magent_as_default_identity(monkeypatch):
 
     prompt = prompt_module.apply_prompt_template()
 
-    assert "你是MAgent，一个专注于**建筑成本估算**的智能助手" in prompt
-    assert "核心能力只包括两类：① 规范知识问答；② 智能组价" in prompt
-    assert "价格查询" not in prompt
+    assert "你是MAgent，建设工程造价领域的入口 agent" in prompt
+    assert "核心能力只有两类" in prompt
     assert "DeerFlow 2.0" not in prompt
 
 
@@ -446,23 +445,21 @@ def test_apply_prompt_template_uses_override_template(monkeypatch, tmp_path):
     assert prompt == "OVERRIDE PROMPT for CostBot"
 
 
+def test_project_config_points_lead_agent_to_ce_prompt():
+    config = AppConfig.from_file("../config.yaml")
+
+    assert config.lead_agent.system_prompt_path == "prompts/ce/lead_agent.md"
+
+
 def test_default_template_embeds_skill_runbook():
-    """内置默认模板已固化 <skill_runbook>（E1 消融采纳 V2）：脚本直跑契约 + 反退网兜底。"""
+    """内置默认模板已固化 <skill_runbook>。"""
     template = prompt_module.SYSTEM_PROMPT_TEMPLATE
 
     assert '<skill_runbook priority="高">' in template
     assert "</skill_runbook>" in template
-    # 两个脚本的死命令模板与代号必须在常驻 prompt 面可见（无需先 read_file）
-    assert "/mnt/skills/public/norm-qa/qa.py" in template
-    assert "/mnt/skills/public/cost-agent/cost.py" in template
-    assert "gb50854-2024" in template
-    # 纠正"一任务一工具"先验 + 禁止退回联网搜索（problem 6 命门）
-    assert "不是工具表里的工具" in template
-    assert "严禁用联网搜索代替脚本" in template
-    # 死命令模板的 --output 必须落沙箱可写区（/mnt/user-data/...），不得用 /tmp（沙箱拒写，
-    # 会逼模型多耗一轮自纠）——前端实测回归点。
-    assert "--output /mnt/user-data/workspace/" in template
-    assert "/tmp/" not in template
+    assert "cost_workflow_start" in template
+    assert "ce-rag_match_bill_item" in template
+    assert "cost_workflow_node" in template
 
 
 def test_apply_prompt_template_default_includes_runbook(monkeypatch):
@@ -482,33 +479,29 @@ def test_apply_prompt_template_default_includes_runbook(monkeypatch):
     prompt = prompt_module.apply_prompt_template()
 
     assert "<skill_runbook" in prompt
-    assert "python3 /mnt/skills/public/cost-agent/cost.py" in prompt
-    assert "照 runbook 调脚本" in prompt
+    assert "cost_workflow_start" in prompt
+    assert "ce-rag_match_bill_item" in prompt
 
 
 def test_default_template_embeds_routing_block():
-    """方案 A：内置模板固化 <routing> 显式意图分类块（norm/cost/both/clarify/chat）。"""
+    """内置模板固化 <routing> 显式意图分类块。"""
     template = prompt_module.SYSTEM_PROMPT_TEMPLATE
 
     assert '<routing priority="高">' in template
     assert "</routing>" in template
-    # 五类主意图齐备（模板里花括号需转义为 {{ }}，渲染后才是单括号，避免 .format KeyError）
-    assert "{{ norm | cost | both | clarify | chat }}" in template
-    # routing 在 skill_runbook 之前（先分类、后进入能力块执行）；用带 priority 的真实区块标签定位，
-    # 避免撞到 safety_redline / routing 正文里对 <skill_runbook> 的文本引用
+    assert "capability = cost" in template
+    assert "cost_workflow_start" in template
     assert template.index('<routing priority="高">') < template.index('<skill_runbook priority="高">')
 
 
 def test_version_clarification_is_pushed_down_to_per_capability_gate():
-    """版本澄清下沉：safety_redline 不再写死"必须先问版本"，改由各能力块「版本闸门」承载。"""
+    """版本澄清仍需通过 ask_clarification 承载。"""
     template = prompt_module.SYSTEM_PROMPT_TEMPLATE
 
     redline = template[template.index("<safety_redline") : template.index("</safety_redline>")]
-    # 全局红线只保留指针，不再写笼统的"必须先调用 ask_clarification 反问澄清版本"
-    assert "版本闸门" in redline
-    assert "必须先调用 `ask_clarification` 反问澄清版本" not in redline
-    # norm 与 cost 两条路由各自持有版本闸门（出现两次）
-    assert template.count("**版本闸门**") == 2
+    assert "ask_clarification" in redline
+    assert "2013 / 2024" in redline
+    assert "clarify=caliber" in template
 
 
 def test_warm_enabled_skills_cache_logs_on_timeout(monkeypatch, caplog):

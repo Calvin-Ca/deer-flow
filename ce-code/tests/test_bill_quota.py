@@ -10,7 +10,10 @@ def test_match_emits_bill_spec_version():
     assert len(rows) == 1
     assert rows[0]["bill_code"] == "010401002"
     assert rows[0]["bill_spec_version"] == "GB/T 50854-2024"
-    assert rows[0]["source"] == "auto_name_exact"
+    # exact/substr 已合并为单一启发式 source；匹配强弱由 confidence 承载，方式记入 note
+    assert rows[0]["source"] == "auto_name"
+    assert rows[0]["confidence"] == 0.9
+    assert rows[0]["note"].startswith("exact:")
 
 
 def test_compose_capable_includes_2013():

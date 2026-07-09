@@ -57,6 +57,9 @@ def match(bills: list[dict], quotas: list[dict]) -> list[dict]:
     一个清单匹配多个定额子目（1:N）。每行带 ``bill_spec_version``（清单所属国标版本）做**版本隔离**：
     同 9 位码跨版本不同义，映射须按版本区分（compose_price join 按 bill_spec_version 过滤）。
 
+    source 统一为 ``auto_name``（名称匹配启发式，一类）——exact 与 substr 同属启发式名称匹配，
+    不再分两个 source 标签；匹配强弱由 confidence（0.9 / 0.6）承载，具体匹配方式记入 note。
+
     参数：bills —— 清单列表（每条须含 spec_version）；quotas —— 定额子目列表。
     返回：bill_quota_map 行列表。
     """
@@ -71,9 +74,9 @@ def match(bills: list[dict], quotas: list[dict]) -> list[dict]:
             continue
         for bk, qs in by_base.items():
             if bn == bk:
-                conf, src = 0.9, "auto_name_exact"
+                conf, match_type = 0.9, "exact"
             elif bn in bk:
-                conf, src = 0.6, "auto_name_substr"
+                conf, match_type = 0.6, "substr"
             else:
                 continue
             for q in qs:
@@ -81,8 +84,8 @@ def match(bills: list[dict], quotas: list[dict]) -> list[dict]:
                     "bill_code": b["code"], "bill_spec_version": b.get("spec_version"),
                     "quota_code": q["quota_code"],
                     "quota_doc_id": q.get("doc_id") or "SZ-SJG171",
-                    "relation": "APPLIES", "confidence": conf, "source": src,
-                    "note": f"{bn} → {q['name']}",
+                    "relation": "APPLIES", "confidence": conf, "source": "auto_name",
+                    "note": f"{match_type}: {bn} → {q['name']}",
                 })
     return rows
 

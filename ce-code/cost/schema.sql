@@ -151,7 +151,7 @@ CREATE TABLE IF NOT EXISTS bill_quota_map (
   quota_doc_id TEXT NOT NULL,                -- 定额来源（SZ-SJG171/170），与 quota_code 共同定位
   relation     TEXT NOT NULL DEFAULT 'APPLIES',
   confidence   NUMERIC,                      -- 映射置信度（0~1）
-  source       TEXT,                         -- 来源：auto_name_substr / manual / …
+  source       TEXT,                         -- 来源：auto_name（名称匹配启发式）/ semantic_llm / manual / …
   note         TEXT,
   UNIQUE (bill_code, bill_spec_version, quota_code, quota_doc_id)
 );

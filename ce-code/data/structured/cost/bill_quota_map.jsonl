@@ -1,313 +1,313 @@
-{"bill_code": "010102001", "quota_code": "120001-6", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "挖基坑土方 → 人工挖基坑土方 深度H(m) H≤2"}
-{"bill_code": "010102001", "quota_code": "120001-7", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "挖基坑土方 → 人工挖基坑土方 深度H(m) 2<H≤4"}
-{"bill_code": "010102001", "quota_code": "120001-8", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "挖基坑土方 → 人工挖基坑土方 深度H(m) 4<H≤6"}
-{"bill_code": "010102001", "quota_code": "120001-9", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "挖基坑土方 → 人工挖基坑土方 深度H(m) 6<H≤8"}
-{"bill_code": "010102002", "quota_code": "120001-2", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "挖沟槽土方 → 人工挖沟槽土方 深度H(m) H≤2"}
-{"bill_code": "010102002", "quota_code": "120001-3", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "挖沟槽土方 → 人工挖沟槽土方 深度H(m) 2<H≤4"}
-{"bill_code": "010102002", "quota_code": "120001-4", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "挖沟槽土方 → 人工挖沟槽土方 深度H(m) 4<H≤6"}
-{"bill_code": "010102002", "quota_code": "120001-5", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "挖沟槽土方 → 人工挖沟槽土方 深度H(m) 6<H≤8"}
-{"bill_code": "010103001", "quota_code": "120001-127", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name_exact", "note": "平整场地 → 平整场地 人工平整场地"}
-{"bill_code": "010103001", "quota_code": "120001-128", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name_exact", "note": "平整场地 → 平整场地 机械平整场地"}
-{"bill_code": "010201010", "quota_code": "120002-75", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "褥垫层 → 砂褥垫层"}
-{"bill_code": "010201010", "quota_code": "120002-76", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "褥垫层 → 石褥垫层"}
-{"bill_code": "010202001", "quota_code": "120003-61", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "地下连续墙 → 地下连续墙成槽 履带式液压抓斗 土层 槽深度H(m) H≤35"}
-{"bill_code": "010202001", "quota_code": "120003-62", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "地下连续墙 → 地下连续墙成槽 履带式液压抓斗 土层 槽深度H(m) 35<H≤45"}
-{"bill_code": "010202001", "quota_code": "120003-63", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "地下连续墙 → 地下连续墙成槽 二钻一抓 土层 槽深度H(m) H≤35"}
-{"bill_code": "010202001", "quota_code": "120003-64", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "地下连续墙 → 地下连续墙成槽 旋挖钻机 中风化入岩增加费"}
-{"bill_code": "010202001", "quota_code": "120003-65", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "地下连续墙 → 地下连续墙成槽 旋挖钻机 微风化入岩增加费"}
-{"bill_code": "010202001", "quota_code": "120003-66", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "地下连续墙 → 地下连续墙成槽 双轮铣槽机 中风化入岩增加费"}
-{"bill_code": "010202001", "quota_code": "120003-67", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "地下连续墙 → 地下连续墙成槽 双轮铣槽机 微风化入岩增加费"}
-{"bill_code": "010202001", "quota_code": "120003-68", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name_exact", "note": "地下连续墙 → 地下连续墙 接头处理 锁口管吊拔 槽深度H(m) H≤15"}
-{"bill_code": "010202001", "quota_code": "120003-69", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name_exact", "note": "地下连续墙 → 地下连续墙 接头处理 锁口管吊拔 槽深度H(m) 15<H≤25"}
-{"bill_code": "010202001", "quota_code": "120003-70", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name_exact", "note": "地下连续墙 → 地下连续墙 接头处理 锁口管吊拔 槽深度H(m) 25<H≤35"}
-{"bill_code": "010202001", "quota_code": "120003-71", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name_exact", "note": "地下连续墙 → 地下连续墙 接头处理 锁口管吊拔 槽深度H(m) 35<H≤45"}
-{"bill_code": "010202001", "quota_code": "120003-72", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name_exact", "note": "地下连续墙 → 地下连续墙 接头处理 工字钢封口 制作"}
-{"bill_code": "010202001", "quota_code": "120003-73", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name_exact", "note": "地下连续墙 → 地下连续墙 接头处理 工字钢封口 安装"}
-{"bill_code": "010202001", "quota_code": "120005-1", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name_exact", "note": "地下连续墙 → 地下连续墙 钢筋笼制作"}
-{"bill_code": "010202001", "quota_code": "120005-2", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name_exact", "note": "地下连续墙 → 地下连续墙 钢筋笼安放 槽深度H(m) H≤15"}
-{"bill_code": "010202001", "quota_code": "120005-3", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name_exact", "note": "地下连续墙 → 地下连续墙 钢筋笼安放 槽深度H(m) 15<H≤25"}
-{"bill_code": "010202001", "quota_code": "120005-4", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name_exact", "note": "地下连续墙 → 地下连续墙 钢筋笼安放 槽深度H(m) 25<H≤35"}
-{"bill_code": "010202001", "quota_code": "120005-5", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name_exact", "note": "地下连续墙 → 地下连续墙 钢筋笼安放 槽深度H(m) 35<H≤45"}
-{"bill_code": "010202001", "quota_code": "120003-74", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "地下连续墙 → 浇筑混凝土地下连续墙 清底置换"}
-{"bill_code": "010202001", "quota_code": "120003-75", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "地下连续墙 → 浇筑混凝土地下连续墙 浇筑混凝土"}
-{"bill_code": "010202007", "quota_code": "120003-45", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "锚杆(锚索) → 锚杆(锚索)钻孔、灌浆 土层"}
-{"bill_code": "010202007", "quota_code": "120003-46", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "锚杆(锚索) → 锚杆(锚索)钻孔、灌浆 入岩增加费 中风化"}
-{"bill_code": "010202007", "quota_code": "120003-47", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "锚杆(锚索) → 锚杆(锚索)钻孔、灌浆 入岩增加费 微风化"}
-{"bill_code": "010202008", "quota_code": "120003-43", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "土钉 → 土钉成孔、灌浆"}
-{"bill_code": "010202008", "quota_code": "120003-44", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "土钉 → 短钢筋土钉 打入式"}
-{"bill_code": "010202014", "quota_code": "120003-86", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "钢支撑 → 明挖基坑钢支撑安装及拆除 钢支撑长度L(m) L≤15 安装"}
-{"bill_code": "010202014", "quota_code": "120003-87", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "钢支撑 → 明挖基坑钢支撑安装及拆除 钢支撑长度L(m) L≤15 拆除"}
-{"bill_code": "010202014", "quota_code": "120003-88", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "钢支撑 → 明挖基坑钢支撑安装及拆除 钢支撑长度L(m) 15<L≤30 安装"}
-{"bill_code": "010202014", "quota_code": "120003-89", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "钢支撑 → 明挖基坑钢支撑安装及拆除 钢支撑长度L(m) 15<L≤30 拆除 t"}
-{"bill_code": "010202014", "quota_code": "120003-90", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "钢支撑 → 钢支撑使用费 t·月"}
-{"bill_code": "010301003", "quota_code": "120002-37", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "钢管桩 → 打钢管桩 管径DN(mm) DN≤450 桩长L(m) L≤30"}
-{"bill_code": "010301003", "quota_code": "120002-38", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "钢管桩 → 打钢管桩 管径DN(mm) DN≤450 桩长L(m) 30<L≤50"}
-{"bill_code": "010301003", "quota_code": "120002-39", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "钢管桩 → 打钢管桩 管径DN(mm) DN≤450 桩长L(m) 50<L≤70"}
-{"bill_code": "010301003", "quota_code": "120002-40", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "钢管桩 → 打钢管桩 管径DN(mm) 450<DN≤650 桩长L(m) L≤30"}
-{"bill_code": "010301003", "quota_code": "120002-41", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "钢管桩 → 打钢管桩 管径DN(mm) 450<DN≤650 桩长L(m) 30<L≤50"}
-{"bill_code": "010301003", "quota_code": "120002-42", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "钢管桩 → 打钢管桩 管径DN(mm) 450<DN≤650 桩长L(m) 50<L≤70"}
-{"bill_code": "010301003", "quota_code": "120002-43", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "钢管桩 → 打钢管桩 管径DN(mm) 650<DN≤850 桩长L(m) L≤30"}
-{"bill_code": "010301003", "quota_code": "120002-44", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "钢管桩 → 打钢管桩 管径DN(mm) 650<DN≤850 桩长L(m) 30<L≤50"}
-{"bill_code": "010301003", "quota_code": "120002-45", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "钢管桩 → 打钢管桩 管径DN(mm) 650<LND≤850 桩长L(m) 50<L≤70"}
-{"bill_code": "010301003", "quota_code": "120002-46", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "钢管桩 → 打钢管桩 管径DN(mm) 850<LND≤1050 桩长L(m) L≤30"}
-{"bill_code": "010301003", "quota_code": "120002-47", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "钢管桩 → 打钢管桩 管径DN(mm) 850<LND≤1050 桩长L(m) 30<L≤50"}
-{"bill_code": "010301003", "quota_code": "120002-48", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "钢管桩 → 打钢管桩 管径DN(mm) 850<LND≤1050 桩长L(m) 50<L≤70"}
-{"bill_code": "010301003", "quota_code": "120002-49", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "钢管桩 → 压钢管桩 管径DN(mm) DN≤450 桩长L(m) L≤30"}
-{"bill_code": "010301003", "quota_code": "120002-50", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "钢管桩 → 压钢管桩 管径DN(mm) DN≤450 桩长L(m) 30<L≤50"}
-{"bill_code": "010301003", "quota_code": "120002-51", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "钢管桩 → 压钢管桩 管径DN(mm) 450<DN≤650 桩长L(m) L≤30"}
-{"bill_code": "010301003", "quota_code": "120002-52", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "钢管桩 → 压钢管桩 管径DN(mm) 450<DN≤650 桩长L(m) 30<L≤50"}
-{"bill_code": "010301003", "quota_code": "120002-53", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "钢管桩 → 压钢管桩 管径DN(mm) 650<DN≤850 桩长L(m) L≤30"}
-{"bill_code": "010301003", "quota_code": "120002-54", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "钢管桩 → 压钢管桩 管径DN(mm) 650<DN≤850 桩长L(m) 30<L≤50"}
-{"bill_code": "010301003", "quota_code": "120002-55", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "钢管桩 → 钢管桩接桩 管径DN(mm) DN≤450"}
-{"bill_code": "010301003", "quota_code": "120002-56", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "钢管桩 → 钢管桩接桩 管径DN(mm) 450<DN≤650"}
-{"bill_code": "010301003", "quota_code": "120002-57", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "钢管桩 → 钢管桩接桩 管径DN(mm) 650<DN≤850"}
-{"bill_code": "010301003", "quota_code": "120002-58", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "钢管桩 → 钢管桩接桩 管径DN(mm) 850<DN≤1050"}
-{"bill_code": "010301003", "quota_code": "120002-59", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "钢管桩 → 钢管桩内切割 管径DN(mm) DN≤450"}
-{"bill_code": "010301003", "quota_code": "120002-60", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "钢管桩 → 钢管桩内切割 管径DN(mm) 450<DN≤650"}
-{"bill_code": "010301003", "quota_code": "120002-61", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "钢管桩 → 钢管桩内切割 管径DN(mm) 650<DN≤850"}
-{"bill_code": "010301003", "quota_code": "120002-62", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "钢管桩 → 钢管桩内切割 管径DN(mm) 850<DN≤1050"}
-{"bill_code": "010301003", "quota_code": "120002-63", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "钢管桩 → 钢管桩精割盖帽 管径DN(mm) DN≤450"}
-{"bill_code": "010301003", "quota_code": "120002-64", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "钢管桩 → 钢管桩精割盖帽 管径DN(mm) 450<DN≤650"}
-{"bill_code": "010301003", "quota_code": "120002-65", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "钢管桩 → 钢管桩精割盖帽 管径DN(mm) 650<DN≤850"}
-{"bill_code": "010301003", "quota_code": "120002-66", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "钢管桩 → 钢管桩精割盖帽 管径DN(mm) 850<DN≤1050"}
-{"bill_code": "010302002", "quota_code": "120002-71", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "沉管灌注桩 → 轨道式柴油打桩机沉管灌注桩"}
-{"bill_code": "010302002", "quota_code": "120004-55", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "沉管灌注桩 → 沉管灌注桩成孔 振动式 桩径D(mm) D≤480"}
-{"bill_code": "010302002", "quota_code": "120004-56", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "沉管灌注桩 → 沉管灌注桩成孔 振动式 桩径D(mm) 480<d≤600"}
-{"bill_code": "010302002", "quota_code": "120004-57", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "沉管灌注桩 → 沉管灌注桩成孔 夯扩式"}
-{"bill_code": "010401001", "quota_code": "010001-1", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "砖基础 → 实心砖基础 干混砌筑砂浆"}
-{"bill_code": "010401001", "quota_code": "010001-2", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "砖基础 → 实心砖基础 湿拌砌筑砂浆"}
-{"bill_code": "010401002", "quota_code": "010001-3", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name_exact", "note": "实心砖墙 → 实心砖墙 1/2砖 干混砌筑砂浆"}
-{"bill_code": "010401002", "quota_code": "010001-4", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name_exact", "note": "实心砖墙 → 实心砖墙 1/2砖 湿拌砌筑砂浆"}
-{"bill_code": "010401002", "quota_code": "010001-5", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name_exact", "note": "实心砖墙 → 实心砖墙 3/4砖 干混砌筑砂浆"}
-{"bill_code": "010401002", "quota_code": "010001-6", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name_exact", "note": "实心砖墙 → 实心砖墙 3/4砖 湿拌砌筑砂浆"}
-{"bill_code": "010401002", "quota_code": "010001-7", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name_exact", "note": "实心砖墙 → 实心砖墙 1砖 干混砌筑砂浆"}
-{"bill_code": "010401002", "quota_code": "010001-8", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name_exact", "note": "实心砖墙 → 实心砖墙 1砖 湿拌砌筑砂浆"}
-{"bill_code": "010401005", "quota_code": "010001-9", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name_exact", "note": "实心砖柱 → 实心砖柱 方形 干混砌筑砂浆"}
-{"bill_code": "010401005", "quota_code": "010001-10", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name_exact", "note": "实心砖柱 → 实心砖柱 方形 湿拌砌筑砂浆"}
-{"bill_code": "010401005", "quota_code": "010001-11", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name_exact", "note": "实心砖柱 → 实心砖柱 异型 干混砌筑砂浆"}
-{"bill_code": "010401005", "quota_code": "010001-12", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name_exact", "note": "实心砖柱 → 实心砖柱 异型 湿拌砌筑砂浆"}
-{"bill_code": "010402001", "quota_code": "010001-23", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "砌块墙 → 普通混凝土空心砌块墙 墙厚T(mm) T=90 干混砌筑砂浆"}
-{"bill_code": "010402001", "quota_code": "010001-24", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "砌块墙 → 普通混凝土空心砌块墙 墙厚T(mm) T=90 湿拌砌筑砂浆"}
-{"bill_code": "010402001", "quota_code": "010001-25", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "砌块墙 → 普通混凝土空心砌块墙 墙厚T(mm) T=140 干混砌筑砂浆"}
-{"bill_code": "010402001", "quota_code": "010001-26", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "砌块墙 → 普通混凝土空心砌块墙 墙厚T(mm) T=140 湿拌砌筑砂浆"}
-{"bill_code": "010402001", "quota_code": "010001-27", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "砌块墙 → 普通混凝土空心砌块墙 墙厚T(mm) T=190 干混砌筑砂浆"}
-{"bill_code": "010402001", "quota_code": "010001-28", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "砌块墙 → 普通混凝土空心砌块墙 墙厚T(mm) T=190 湿拌砌筑砂浆"}
-{"bill_code": "010402001", "quota_code": "010001-29", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "砌块墙 → 加气混凝土砌块墙 墙厚T(mm) T≤100 干混砌筑砂浆"}
-{"bill_code": "010402001", "quota_code": "010001-30", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "砌块墙 → 加气混凝土砌块墙 墙厚T(mm) T≤100 湿拌砌筑砂浆"}
-{"bill_code": "010402001", "quota_code": "010001-31", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "砌块墙 → 加气混凝土砌块墙 墙厚T(mm) 100<T≤200 干混砌筑砂浆"}
-{"bill_code": "010402001", "quota_code": "010001-32", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "砌块墙 → 加气混凝土砌块墙 墙厚T(mm) 100<T≤200 湿拌砌筑砂浆"}
-{"bill_code": "010402001", "quota_code": "010001-33", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "砌块墙 → 加气混凝土砌块墙 墙厚T(mm) T>200 干混砌筑砂浆"}
-{"bill_code": "010402001", "quota_code": "010001-34", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "砌块墙 → 加气混凝土砌块墙 墙厚T(mm) T>200 湿拌砌筑砂浆"}
-{"bill_code": "010402001", "quota_code": "010001-35", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "砌块墙 → 蒸压加气混凝土高精砌块墙 墙厚T(mm) 0<T≤100"}
-{"bill_code": "010402001", "quota_code": "010001-36", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "砌块墙 → 蒸压加气混凝土高精砌块墙 墙厚T(mm) 100<T≤200"}
-{"bill_code": "010402001", "quota_code": "010001-37", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "砌块墙 → 蒸压加气混凝土高精砌块墙 墙厚T(mm) T>200"}
-{"bill_code": "010403001", "quota_code": "010001-38", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name_exact", "note": "石基础 → 石基础 毛石 干混砌筑砂浆"}
-{"bill_code": "010403001", "quota_code": "010001-39", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name_exact", "note": "石基础 → 石基础 毛石 湿拌砌筑砂浆"}
-{"bill_code": "010403001", "quota_code": "010001-40", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name_exact", "note": "石基础 → 石基础 料石 干混砌筑砂浆"}
-{"bill_code": "010403001", "quota_code": "010001-41", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name_exact", "note": "石基础 → 石基础 料石 湿拌砌筑砂浆"}
-{"bill_code": "010403003", "quota_code": "010001-42", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "石墙 → 料石墙 干混砌筑砂浆"}
-{"bill_code": "010403003", "quota_code": "010001-43", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "石墙 → 料石墙 湿拌砌筑砂浆"}
-{"bill_code": "010403003", "quota_code": "010001-44", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "石墙 → 毛石墙 干混砌筑砂浆"}
-{"bill_code": "010403003", "quota_code": "010001-45", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "石墙 → 毛石墙 湿拌砌筑砂浆"}
-{"bill_code": "010403004", "quota_code": "010001-46", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "石挡土墙 → 毛石挡土墙 干混砌筑砂浆"}
-{"bill_code": "010403004", "quota_code": "010001-47", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "石挡土墙 → 毛石挡土墙 湿拌砌筑砂浆"}
-{"bill_code": "010501001", "quota_code": "010006-1", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name_exact", "note": "基础垫层 → 基础垫层 木模板"}
-{"bill_code": "010501001", "quota_code": "010006-2", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name_exact", "note": "基础垫层 → 基础垫层 钢模板"}
-{"bill_code": "010502004", "quota_code": "010006-10", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name_exact", "note": "设备基础 → 设备基础 木模板"}
-{"bill_code": "010502004", "quota_code": "010006-11", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name_exact", "note": "设备基础 → 设备基础 钢模板"}
-{"bill_code": "010502004", "quota_code": "010006-12", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "设备基础 → 设备基础螺栓套 深度H(m) 0<H≤0.5"}
-{"bill_code": "010502004", "quota_code": "010006-13", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "设备基础 → 设备基础螺栓套 深度H(m) 0.5<H≤1"}
-{"bill_code": "010502004", "quota_code": "010006-14", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "设备基础 → 设备基础螺栓套 深度H(m) H>1"}
-{"bill_code": "010502009", "quota_code": "010004-82", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "地下室外墙 → 地下室外墙挤塑板保护层 100㎡"}
-{"bill_code": "010502020", "quota_code": "010006-45", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "楼梯 → 整体楼梯 普通型 木模板"}
-{"bill_code": "010502020", "quota_code": "010006-46", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "楼梯 → 整体楼梯 螺旋型、艺术型 木模板"}
-{"bill_code": "010502020", "quota_code": "010003-9", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "楼梯 → 木楼梯 直形梯"}
-{"bill_code": "010502020", "quota_code": "010003-10", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "楼梯 → 木楼梯 弧形梯"}
-{"bill_code": "010502020", "quota_code": "010003-11", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "楼梯 → 木楼梯 旋转梯"}
-{"bill_code": "010502020", "quota_code": "010003-12", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "楼梯 → 钢木楼梯 直形梯"}
-{"bill_code": "010502020", "quota_code": "010003-13", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "楼梯 → 钢木楼梯 弧形梯"}
-{"bill_code": "010502020", "quota_code": "010003-14", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "楼梯 → 钢木楼梯 旋转梯"}
-{"bill_code": "010502020", "quota_code": "010006-63", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "楼梯 → 楼梯模板支撑架 搭拆 支模高度H(m) H>10 每增1m 100m²"}
-{"bill_code": "010502022", "quota_code": "010006-26", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name_exact", "note": "圈梁 → 圈梁 直形 木模板"}
-{"bill_code": "010502022", "quota_code": "010006-27", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name_exact", "note": "圈梁 → 圈梁 直形 钢模板"}
-{"bill_code": "010502022", "quota_code": "010006-28", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name_exact", "note": "圈梁 → 圈梁 弧形 木模板"}
-{"bill_code": "010502023", "quota_code": "010006-53", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "过梁 → 独立过梁 木模板"}
-{"bill_code": "010502023", "quota_code": "010006-54", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "过梁 → 独立过梁 钢模板"}
-{"bill_code": "010502026", "quota_code": "120003-21", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "挡土墙 → 浆砌挡土墙 块石"}
-{"bill_code": "010502026", "quota_code": "120003-22", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "挡土墙 → 浆砌挡土墙 片石"}
-{"bill_code": "010502026", "quota_code": "120003-23", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "挡土墙 → 浆砌挡土墙 预制块"}
-{"bill_code": "010502026", "quota_code": "120003-24", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "挡土墙 → 混凝土挡土墙 混凝土"}
-{"bill_code": "010502026", "quota_code": "120008-11", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "挡土墙 → 混凝土挡土墙 模板"}
-{"bill_code": "010502026", "quota_code": "120003-28", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name_exact", "note": "挡土墙 → 挡土墙 变形缝 沥青木板"}
-{"bill_code": "010502026", "quota_code": "120003-29", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name_exact", "note": "挡土墙 → 挡土墙 伸缩缝 油浸麻丝"}
-{"bill_code": "010502026", "quota_code": "120003-30", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name_exact", "note": "挡土墙 → 挡土墙 橡胶（塑料）止水带"}
-{"bill_code": "010502026", "quota_code": "120003-31", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name_exact", "note": "挡土墙 → 挡土墙 紫铜板止水带"}
-{"bill_code": "010502026", "quota_code": "120003-32", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name_exact", "note": "挡土墙 → 挡土墙 钢板止水带"}
-{"bill_code": "010502026", "quota_code": "120003-33", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name_exact", "note": "挡土墙 → 挡土墙 氯丁橡胶止水条(带)"}
-{"bill_code": "010502026", "quota_code": "120003-34", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "挡土墙 → 挡土墙块石面勾平缝 干砌"}
-{"bill_code": "010502026", "quota_code": "120003-35", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "挡土墙 → 挡土墙块石面勾平缝 浆砌"}
-{"bill_code": "010502026", "quota_code": "120003-36", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "挡土墙 → 挡土墙浆砌勾平缝 料石面"}
-{"bill_code": "010502026", "quota_code": "120003-37", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "挡土墙 → 挡土墙浆砌勾平缝 预制块面"}
-{"bill_code": "010502026", "quota_code": "120003-38", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "挡土墙 → 挡土墙块石面勾凸缝 干砌"}
-{"bill_code": "010502026", "quota_code": "120003-39", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "挡土墙 → 挡土墙块石面勾凸缝 浆砌"}
-{"bill_code": "010502026", "quota_code": "120003-40", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "挡土墙 → 挡土墙浆砌勾凹缝 块石面"}
-{"bill_code": "010502026", "quota_code": "120003-41", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "挡土墙 → 挡土墙浆砌勾凹缝 料石面"}
-{"bill_code": "010502026", "quota_code": "120003-42", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "挡土墙 → 挡土墙浆砌勾凹缝 预制块面"}
-{"bill_code": "010502026", "quota_code": "120008-12", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "挡土墙 → 挡土墙压顶 模板"}
-{"bill_code": "010502026", "quota_code": "010001-46", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "挡土墙 → 毛石挡土墙 干混砌筑砂浆"}
-{"bill_code": "010502026", "quota_code": "010001-47", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "挡土墙 → 毛石挡土墙 湿拌砌筑砂浆"}
-{"bill_code": "010502027", "quota_code": "010006-55", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name_exact", "note": "电缆沟、地沟 → 电缆沟、地沟 木模板"}
-{"bill_code": "010502029", "quota_code": "010001-15", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "散水 → 实心砖散水 平铺 干混砌筑砂浆"}
-{"bill_code": "010502029", "quota_code": "010001-16", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "散水 → 实心砖散水 平铺 湿拌砌筑砂浆"}
-{"bill_code": "010502029", "quota_code": "010001-17", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "散水 → 实心砖散水 侧铺 干混砌筑砂浆"}
-{"bill_code": "010502029", "quota_code": "010001-18", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "散水 → 实心砖散水 侧铺 湿拌砌筑砂浆"}
-{"bill_code": "010502032", "quota_code": "120003-10", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name_exact", "note": "台阶 → 台阶 浆砌块石"}
-{"bill_code": "010502032", "quota_code": "120003-11", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name_exact", "note": "台阶 → 台阶 浆砌粗料石"}
-{"bill_code": "010502032", "quota_code": "120003-12", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name_exact", "note": "台阶 → 台阶 浆砌预制混凝土块"}
-{"bill_code": "010502032", "quota_code": "010006-48", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name_exact", "note": "台阶 → 台阶 木模板"}
-{"bill_code": "010502032", "quota_code": "010001-13", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "台阶 → 实心砖台阶 干混砌筑砂浆"}
-{"bill_code": "010502032", "quota_code": "010001-14", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "台阶 → 实心砖台阶 湿拌砌筑砂浆"}
-{"bill_code": "010502033", "quota_code": "010006-43", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "后浇带 → 后浇带快易收口网 基础底板"}
-{"bill_code": "010502033", "quota_code": "010006-44", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "后浇带 → 后浇带快易收口网 梁、板、墙"}
-{"bill_code": "010503001", "quota_code": "010006-15", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name_exact", "note": "矩形柱 → 矩形柱 木模板"}
-{"bill_code": "010503001", "quota_code": "010006-16", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name_exact", "note": "矩形柱 → 矩形柱 钢模板"}
-{"bill_code": "010503002", "quota_code": "010006-17", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name_exact", "note": "异型柱 → 异型柱 木模板"}
-{"bill_code": "010503002", "quota_code": "010006-18", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name_exact", "note": "异型柱 → 异型柱 钢模板"}
-{"bill_code": "010503003", "quota_code": "010006-21", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name_exact", "note": "矩形梁 → 矩形梁 木模板"}
-{"bill_code": "010503003", "quota_code": "010006-22", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name_exact", "note": "矩形梁 → 矩形梁 钢模板"}
-{"bill_code": "010503004", "quota_code": "010006-25", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name_exact", "note": "异型梁 → 异型梁 木模板"}
-{"bill_code": "010503005", "quota_code": "010006-24", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name_exact", "note": "拱形梁 → 拱形梁 木模板"}
-{"bill_code": "010503006", "quota_code": "010006-53", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "过梁 → 独立过梁 木模板"}
-{"bill_code": "010503006", "quota_code": "010006-54", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "过梁 → 独立过梁 钢模板"}
-{"bill_code": "010503009", "quota_code": "010003-1", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "屋架 → 木屋架 圆木 跨度L(m) 0<L≤10"}
-{"bill_code": "010503009", "quota_code": "010003-2", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "屋架 → 木屋架 圆木 跨度L(m) L>10"}
-{"bill_code": "010503009", "quota_code": "010003-3", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "屋架 → 木屋架 方木 跨度L(m) 0<L≤10"}
-{"bill_code": "010503009", "quota_code": "010003-4", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "屋架 → 木屋架 方木 跨度L(m) L>10"}
-{"bill_code": "010503009", "quota_code": "010003-5", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "屋架 → 钢木屋架 圆木 跨度L(m) 0<L≤18"}
-{"bill_code": "010503009", "quota_code": "010003-6", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "屋架 → 钢木屋架 方木 跨度L(m) 0<L≤18"}
-{"bill_code": "010504010", "quota_code": "010006-45", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "楼梯 → 整体楼梯 普通型 木模板"}
-{"bill_code": "010504010", "quota_code": "010006-46", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "楼梯 → 整体楼梯 螺旋型、艺术型 木模板"}
-{"bill_code": "010504010", "quota_code": "010003-9", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "楼梯 → 木楼梯 直形梯"}
-{"bill_code": "010504010", "quota_code": "010003-10", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "楼梯 → 木楼梯 弧形梯"}
-{"bill_code": "010504010", "quota_code": "010003-11", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "楼梯 → 木楼梯 旋转梯"}
-{"bill_code": "010504010", "quota_code": "010003-12", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "楼梯 → 钢木楼梯 直形梯"}
-{"bill_code": "010504010", "quota_code": "010003-13", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "楼梯 → 钢木楼梯 弧形梯"}
-{"bill_code": "010504010", "quota_code": "010003-14", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "楼梯 → 钢木楼梯 旋转梯"}
-{"bill_code": "010504010", "quota_code": "010006-63", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "楼梯 → 楼梯模板支撑架 搭拆 支模高度H(m) H>10 每增1m 100m²"}
-{"bill_code": "010504011", "quota_code": "010006-47", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "阳台 → 阳台、雨篷 木模板"}
-{"bill_code": "010505006", "quota_code": "010006-76", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "梁模板 → 沉淀池壁基梁模板"}
-{"bill_code": "010505010", "quota_code": "010006-63", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "楼梯模板 → 楼梯模板支撑架 搭拆 支模高度H(m) H>10 每增1m 100m²"}
-{"bill_code": "010506020", "quota_code": "010002-127", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "钢筋网片 → 钢筋网片制作"}
-{"bill_code": "010506020", "quota_code": "010002-128", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "钢筋网片 → 钢筋网片安装"}
-{"bill_code": "010506020", "quota_code": "010002-129", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "钢筋网片 → 钢筋网片(成品)安装"}
-{"bill_code": "010506023", "quota_code": "120003-59", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "钢丝网 → 坡面挂钢丝网"}
-{"bill_code": "010506024", "quota_code": "010006-12", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "螺栓 → 设备基础螺栓套 深度H(m) 0<H≤0.5"}
-{"bill_code": "010506024", "quota_code": "010006-13", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "螺栓 → 设备基础螺栓套 深度H(m) 0.5<H≤1"}
-{"bill_code": "010506024", "quota_code": "010006-14", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "螺栓 → 设备基础螺栓套 深度H(m) H>1"}
-{"bill_code": "010506024", "quota_code": "010002-136", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "螺栓 → 预埋螺栓 安装"}
-{"bill_code": "010506025", "quota_code": "010002-137", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name_exact", "note": "预埋铁件 → 预埋铁件 制作、安装"}
-{"bill_code": "010701001", "quota_code": "010003-1", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "屋架 → 木屋架 圆木 跨度L(m) 0<L≤10"}
-{"bill_code": "010701001", "quota_code": "010003-2", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "屋架 → 木屋架 圆木 跨度L(m) L>10"}
-{"bill_code": "010701001", "quota_code": "010003-3", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "屋架 → 木屋架 方木 跨度L(m) 0<L≤10"}
-{"bill_code": "010701001", "quota_code": "010003-4", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "屋架 → 木屋架 方木 跨度L(m) L>10"}
-{"bill_code": "010701001", "quota_code": "010003-5", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "屋架 → 钢木屋架 圆木 跨度L(m) 0<L≤18"}
-{"bill_code": "010701001", "quota_code": "010003-6", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "屋架 → 钢木屋架 方木 跨度L(m) 0<L≤18"}
-{"bill_code": "010702001", "quota_code": "010003-7", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name_exact", "note": "木柱 → 木柱"}
-{"bill_code": "010702002", "quota_code": "010003-8", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name_exact", "note": "木梁 → 木梁"}
-{"bill_code": "010702004", "quota_code": "010003-9", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name_exact", "note": "木楼梯 → 木楼梯 直形梯"}
-{"bill_code": "010702004", "quota_code": "010003-10", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name_exact", "note": "木楼梯 → 木楼梯 弧形梯"}
-{"bill_code": "010702004", "quota_code": "010003-11", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name_exact", "note": "木楼梯 → 木楼梯 旋转梯"}
-{"bill_code": "010702004", "quota_code": "010003-12", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "木楼梯 → 钢木楼梯 直形梯"}
-{"bill_code": "010702004", "quota_code": "010003-13", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "木楼梯 → 钢木楼梯 弧形梯"}
-{"bill_code": "010702004", "quota_code": "010003-14", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "木楼梯 → 钢木楼梯 旋转梯"}
-{"bill_code": "010703001", "quota_code": "010003-15", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name_exact", "note": "屋面木基层 → 屋面木基层 檩木 m³"}
-{"bill_code": "010703001", "quota_code": "010003-16", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name_exact", "note": "屋面木基层 → 屋面木基层 屋面板 满铺 m²"}
-{"bill_code": "010703001", "quota_code": "010003-17", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name_exact", "note": "屋面木基层 → 屋面木基层 屋面板 花铺 m²"}
-{"bill_code": "010703001", "quota_code": "010003-18", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name_exact", "note": "屋面木基层 → 屋面木基层 木椽子 m²"}
-{"bill_code": "010703001", "quota_code": "010003-19", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name_exact", "note": "屋面木基层 → 屋面木基层 封檐板、博风板 m"}
-{"bill_code": "010703001", "quota_code": "010003-20", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name_exact", "note": "屋面木基层 → 屋面木基层 封檐盒 m²"}
-{"bill_code": "010901001", "quota_code": "010004-5", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name_exact", "note": "瓦屋面 → 瓦屋面 玻纤胎沥青瓦 浆铺"}
-{"bill_code": "010901001", "quota_code": "010004-6", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name_exact", "note": "瓦屋面 → 瓦屋面 玻纤胎沥青瓦 干铺"}
-{"bill_code": "010901001", "quota_code": "010004-7", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name_exact", "note": "瓦屋面 → 瓦屋面 玻纤胎沥青瓦 斜铺"}
-{"bill_code": "010901001", "quota_code": "010004-8", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name_exact", "note": "瓦屋面 → 瓦屋面 琉璃瓦 铺在钢筋混凝土面上 $10\\mathrm{m}^2$"}
-{"bill_code": "010901001", "quota_code": "010004-9", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name_exact", "note": "瓦屋面 → 瓦屋面 琉璃满面瓦檐口线 铺在钢筋混凝土面上 10 延米"}
-{"bill_code": "010901001", "quota_code": "010004-10", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name_exact", "note": "瓦屋面 → 瓦屋面 琉璃脊瓦 铺在钢筋混凝土面上 10 延米"}
-{"bill_code": "010901001", "quota_code": "010004-11", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name_exact", "note": "瓦屋面 → 瓦屋面 西班牙瓦 铺在钢筋混凝土面上 10m²"}
-{"bill_code": "010901001", "quota_code": "010004-12", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name_exact", "note": "瓦屋面 → 瓦屋面 西班牙脊瓦 铺在钢筋混凝土面上 10延米"}
-{"bill_code": "010901002", "quota_code": "010004-14", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name_exact", "note": "阳光板屋面 → 阳光板屋面"}
-{"bill_code": "010901006", "quota_code": "010004-15", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name_exact", "note": "膜结构屋面 → 膜结构屋面"}
-{"bill_code": "010905003", "quota_code": "010004-58", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name_exact", "note": "止水带 → 止水带 橡胶"}
-{"bill_code": "010905003", "quota_code": "010004-59", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name_exact", "note": "止水带 → 止水带 钢板"}
-{"bill_code": "010905003", "quota_code": "010004-60", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name_exact", "note": "止水带 → 止水带 紫铜板"}
-{"bill_code": "010905003", "quota_code": "010004-61", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name_exact", "note": "止水带 → 止水带 氯丁胶片"}
-{"bill_code": "010905003", "quota_code": "010004-62", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name_exact", "note": "止水带 → 止水带 氯丁胶贴玻璃纤维布"}
-{"bill_code": "010905003", "quota_code": "010004-63", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name_exact", "note": "止水带 → 止水带 膨胀止水胶条"}
-{"bill_code": "011601001", "quota_code": "010007-1", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "脚手架 → 扣件式钢管双排脚手架 搭拆 搭设高度H(m) 0<H≤24"}
-{"bill_code": "011601001", "quota_code": "010007-2", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "脚手架 → 扣件式钢管双排脚手架 搭拆 搭设高度H(m) 24<H≤50"}
-{"bill_code": "011601001", "quota_code": "010007-3", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "脚手架 → 扣件式钢管双排脚手架 搭拆 搭设高度H(m) H>50"}
-{"bill_code": "011601001", "quota_code": "010007-4", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "脚手架 → 扣件式钢管双排脚手架 搭拆 每增加一排立杆 搭设高度H(m) 0<H≤24"}
-{"bill_code": "011601001", "quota_code": "010007-5", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "脚手架 → 扣件式钢管双排脚手架 搭拆 每增加一排立杆 搭设高度H(m) 24<H≤50"}
-{"bill_code": "011601001", "quota_code": "010007-6", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "脚手架 → 扣件式钢管双排脚手架 搭拆 每增加一排立杆 搭设高度H(m) H>50"}
-{"bill_code": "011601001", "quota_code": "010007-7", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "脚手架 → 扣件式钢管双排脚手架 使用 搭设高度H(m) 0<H≤24"}
-{"bill_code": "011601001", "quota_code": "010007-8", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "脚手架 → 扣件式钢管双排脚手架 使用 搭设高度H(m) 24<H≤50"}
-{"bill_code": "011601001", "quota_code": "010007-9", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "脚手架 → 扣件式钢管双排脚手架 使用 搭设高度H(m) H>50"}
-{"bill_code": "011601001", "quota_code": "010007-10", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "脚手架 → 扣件式钢管双排脚手架 使用 每增加一排立杆 搭设高度H(m) 0<H≤24"}
-{"bill_code": "011601001", "quota_code": "010007-11", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "脚手架 → 扣件式钢管双排脚手架 使用 每增加一排立杆 搭设高度H(m) 24<H≤50"}
-{"bill_code": "011601001", "quota_code": "010007-12", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "脚手架 → 扣件式钢管双排脚手架 使用 每增加一排立杆 搭设高度H(m) H>50"}
-{"bill_code": "011601001", "quota_code": "010007-13", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "脚手架 → 扣件式钢管单排脚手架 搭拆 搭设高度H(m) 0<H≤6"}
-{"bill_code": "011601001", "quota_code": "010007-14", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "脚手架 → 扣件式钢管单排脚手架 搭拆 搭设高度H(m) 6<H≤14"}
-{"bill_code": "011601001", "quota_code": "010007-15", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "脚手架 → 扣件式钢管单排脚手架 搭拆 搭设高度H(m) 14<H≤24"}
-{"bill_code": "011601001", "quota_code": "010007-16", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "脚手架 → 扣件式单排脚手架 使用 搭设高度H(m) 0<H≤6"}
-{"bill_code": "011601001", "quota_code": "010007-17", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "脚手架 → 扣件式单排脚手架 使用 搭设高度H(m) 6<H≤14"}
-{"bill_code": "011601001", "quota_code": "010007-18", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "脚手架 → 扣件式单排脚手架 使用 搭设高度H(m) 14<H≤24"}
-{"bill_code": "011601001", "quota_code": "010007-19", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "脚手架 → 承插型盘扣式钢管双排脚手架 搭拆 搭设高度H(m) 0<H≤24"}
-{"bill_code": "011601001", "quota_code": "010007-20", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "脚手架 → 承插型盘扣式钢管双排脚手架 搭拆 搭设高度H(m) 24<H≤50"}
-{"bill_code": "011601001", "quota_code": "010007-21", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "脚手架 → 承插型盘扣式钢管双排脚手架 搭拆 搭设高度H(m) H>50"}
-{"bill_code": "011601001", "quota_code": "010007-22", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "脚手架 → 承插型盘扣式钢管双排脚手架 搭拆 每增加一排立杆 搭设高度H(m) 0<H≤24"}
-{"bill_code": "011601001", "quota_code": "010007-23", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "脚手架 → 承插型盘扣式钢管双排脚手架 搭拆 每增加一排立杆 搭设高度H(m) 24<H≤50"}
-{"bill_code": "011601001", "quota_code": "010007-24", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "脚手架 → 承插型盘扣式钢管双排脚手架 搭拆 每增加一排立杆 搭设高度H(m) H>50"}
-{"bill_code": "011601001", "quota_code": "010007-25", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "脚手架 → 承插型盘扣式钢管双排脚手架 使用 搭设高度H(m) 0<H≤24"}
-{"bill_code": "011601001", "quota_code": "010007-26", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "脚手架 → 承插型盘扣式钢管双排脚手架 使用 搭设高度H(m) 24<H≤50"}
-{"bill_code": "011601001", "quota_code": "010007-27", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "脚手架 → 承插型盘扣式钢管双排脚手架 使用 搭设高度H(m) H>50"}
-{"bill_code": "011601001", "quota_code": "010007-28", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "脚手架 → 承插型盘扣式钢管双排脚手架 使用 每增加一排立杆 搭设高度H(m) 0<H≤24"}
-{"bill_code": "011601001", "quota_code": "010007-29", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "脚手架 → 承插型盘扣式钢管双排脚手架 使用 每增加一排立杆 搭设高度H(m) 24<H≤50"}
-{"bill_code": "011601001", "quota_code": "010007-30", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "脚手架 → 承插型盘扣式钢管双排脚手架 使用 每增加一排立杆 搭设高度H(m) H>50"}
-{"bill_code": "011601001", "quota_code": "010007-31", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "脚手架 → 承插型盘扣式钢管单排脚手架 搭拆 搭设高度H(m) 0<H≤6"}
-{"bill_code": "011601001", "quota_code": "010007-32", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "脚手架 → 承插型盘扣式钢管单排脚手架 搭拆 搭设高度H(m) 6<H≤14"}
-{"bill_code": "011601001", "quota_code": "010007-33", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "脚手架 → 承插型盘扣式钢管单排脚手架 搭拆 搭设高度H(m) 14<H≤24"}
-{"bill_code": "011601001", "quota_code": "010007-34", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "脚手架 → 承插型盘扣式钢管单排脚手架 使用 搭设高度H(m) 0<H≤6"}
-{"bill_code": "011601001", "quota_code": "010007-35", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "脚手架 → 承插型盘扣式钢管单排脚手架 使用 搭设高度H(m) 6<H≤14"}
-{"bill_code": "011601001", "quota_code": "010007-36", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "脚手架 → 承插型盘扣式钢管单排脚手架 使用 搭设高度H(m) 14<H≤24"}
-{"bill_code": "011601001", "quota_code": "010007-71", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "脚手架 → 脚手架上挂安全立网 绿色密目式阻燃安全网"}
-{"bill_code": "011601001", "quota_code": "010007-72", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "脚手架 → 脚手架上挂安全立网 金属安全网"}
-{"bill_code": "011601001", "quota_code": "010007-37", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "脚手架 → 电动整体提升式脚手架 搭拆 全钢结构 架高H(m) H=13.5"}
-{"bill_code": "011601001", "quota_code": "010007-38", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "脚手架 → 电动整体提升式脚手架 搭拆 全钢结构 架高H(m) 每增1.5"}
-{"bill_code": "011601001", "quota_code": "010007-39", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "脚手架 → 电动整体提升式脚手架 搭拆 钢管组合 架高H(m) H=13.5"}
-{"bill_code": "011601001", "quota_code": "010007-40", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "脚手架 → 电动整体提升式脚手架 搭拆 钢管组合 架高H(m) 每增1.5"}
-{"bill_code": "011601001", "quota_code": "010007-41", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "脚手架 → 电动整体提升式脚手架 使用 全钢结构 架高H(m) H=13.5"}
-{"bill_code": "011601001", "quota_code": "010007-42", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "脚手架 → 电动整体提升式脚手架 使用 全钢结构 架高H(m) 每增1.5"}
-{"bill_code": "011601001", "quota_code": "010007-43", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "脚手架 → 电动整体提升式脚手架 使用 钢管组合 架高H(m) H=13.5"}
-{"bill_code": "011601001", "quota_code": "010007-44", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "脚手架 → 电动整体提升式脚手架 使用 钢管组合 架高H(m) 每增1.5"}
-{"bill_code": "011601001", "quota_code": "010007-45", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "脚手架 → 电动吊篮式脚手架 搭拆 作业高度H(m) 0<H≤200.5"}
-{"bill_code": "011601001", "quota_code": "010007-46", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "脚手架 → 电动吊篮式脚手架 搭拆 作业高度H(m) 200.5<H≤300.5"}
-{"bill_code": "011601001", "quota_code": "010007-47", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "脚手架 → 电动吊篮式脚手架 使用"}
-{"bill_code": "011601001", "quota_code": "010007-48", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "脚手架 → 里脚手架 民用建筑 基本层H(m) H=3.6"}
-{"bill_code": "011601001", "quota_code": "010007-49", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "脚手架 → 里脚手架 民用建筑 每增1.2"}
-{"bill_code": "011601001", "quota_code": "010007-50", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "脚手架 → 里脚手架 工业建筑 基本层H(m) H=3.6"}
-{"bill_code": "011601001", "quota_code": "010007-51", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "脚手架 → 里脚手架 工业建筑 每增1.2"}
-{"bill_code": "011601001", "quota_code": "010007-52", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "脚手架 → 满堂脚手架 搭拆及使用 层高H(m) 0<H≤6"}
-{"bill_code": "011601001", "quota_code": "010007-53", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "脚手架 → 满堂脚手架 搭拆及使用 层高H(m) H>6"}
-{"bill_code": "011601001", "quota_code": "010007-55", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "脚手架 → 活动脚手架 墙砌筑或装饰"}
-{"bill_code": "011601001", "quota_code": "010007-56", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "脚手架 → 活动脚手架 独立柱装饰"}
-{"bill_code": "011601001", "quota_code": "010007-57", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "脚手架 → 活动脚手架 柱、墙混凝土浇捣"}
-{"bill_code": "011601001", "quota_code": "010007-58", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "脚手架 → 活动脚手架 天棚面装饰及修整"}
-{"bill_code": "011601001", "quota_code": "010007-59", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "脚手架 → 烟筒、水塔脚手架 直径D(m) D≤5 搭设高度H(m) 0<H≤10"}
-{"bill_code": "011601001", "quota_code": "010007-60", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "脚手架 → 烟筒、水塔脚手架 直径D(m) D≤5 搭设高度H(m) 10<H≤15"}
-{"bill_code": "011601001", "quota_code": "010007-61", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "脚手架 → 烟筒、水塔脚手架 直径D(m) D≤5 搭设高度H(m) 15<H≤20"}
-{"bill_code": "011601001", "quota_code": "010007-62", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "脚手架 → 烟筒、水塔脚手架 直径D(m) D≤5 搭设高度H(m) 20<H≤25"}
-{"bill_code": "011601001", "quota_code": "010007-63", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "脚手架 → 烟筒、水塔脚手架 直径D(m) D≤5 搭设高度H(m) 25<H≤35"}
-{"bill_code": "011601001", "quota_code": "010007-64", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "脚手架 → 烟筒、水塔脚手架 直径D(m) D≤5 搭设高度H(m) 35<H≤45"}
-{"bill_code": "011601001", "quota_code": "010007-65", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "脚手架 → 烟筒、水塔脚手架 直径D(m) 5<H≤8 搭设高度H(m) 0<H≤20"}
-{"bill_code": "011601001", "quota_code": "010007-66", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "脚手架 → 烟筒、水塔脚手架 直径D(m) 5<H≤8 搭设高度H(m) 20<H≤40"}
-{"bill_code": "011601001", "quota_code": "010007-67", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "脚手架 → 烟筒、水塔脚手架 直径D(m) 5<d≤8 搭设高度H(m) 40<H≤60"}
-{"bill_code": "011601001", "quota_code": "010007-68", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name_substr", "note": "脚手架 → 烟筒、水塔脚手架 直径D(m) 5<d≤8 搭设高度H(m) 60<H≤80"}
+{"bill_code": "010102001", "quota_code": "120001-6", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "挖基坑土方 → 人工挖基坑土方 深度H(m) H≤2"}
+{"bill_code": "010102001", "quota_code": "120001-7", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "挖基坑土方 → 人工挖基坑土方 深度H(m) 2<H≤4"}
+{"bill_code": "010102001", "quota_code": "120001-8", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "挖基坑土方 → 人工挖基坑土方 深度H(m) 4<H≤6"}
+{"bill_code": "010102001", "quota_code": "120001-9", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "挖基坑土方 → 人工挖基坑土方 深度H(m) 6<H≤8"}
+{"bill_code": "010102002", "quota_code": "120001-2", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "挖沟槽土方 → 人工挖沟槽土方 深度H(m) H≤2"}
+{"bill_code": "010102002", "quota_code": "120001-3", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "挖沟槽土方 → 人工挖沟槽土方 深度H(m) 2<H≤4"}
+{"bill_code": "010102002", "quota_code": "120001-4", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "挖沟槽土方 → 人工挖沟槽土方 深度H(m) 4<H≤6"}
+{"bill_code": "010102002", "quota_code": "120001-5", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "挖沟槽土方 → 人工挖沟槽土方 深度H(m) 6<H≤8"}
+{"bill_code": "010103001", "quota_code": "120001-127", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name", "note": "平整场地 → 平整场地 人工平整场地"}
+{"bill_code": "010103001", "quota_code": "120001-128", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name", "note": "平整场地 → 平整场地 机械平整场地"}
+{"bill_code": "010201010", "quota_code": "120002-75", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "褥垫层 → 砂褥垫层"}
+{"bill_code": "010201010", "quota_code": "120002-76", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "褥垫层 → 石褥垫层"}
+{"bill_code": "010202001", "quota_code": "120003-61", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "地下连续墙 → 地下连续墙成槽 履带式液压抓斗 土层 槽深度H(m) H≤35"}
+{"bill_code": "010202001", "quota_code": "120003-62", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "地下连续墙 → 地下连续墙成槽 履带式液压抓斗 土层 槽深度H(m) 35<H≤45"}
+{"bill_code": "010202001", "quota_code": "120003-63", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "地下连续墙 → 地下连续墙成槽 二钻一抓 土层 槽深度H(m) H≤35"}
+{"bill_code": "010202001", "quota_code": "120003-64", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "地下连续墙 → 地下连续墙成槽 旋挖钻机 中风化入岩增加费"}
+{"bill_code": "010202001", "quota_code": "120003-65", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "地下连续墙 → 地下连续墙成槽 旋挖钻机 微风化入岩增加费"}
+{"bill_code": "010202001", "quota_code": "120003-66", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "地下连续墙 → 地下连续墙成槽 双轮铣槽机 中风化入岩增加费"}
+{"bill_code": "010202001", "quota_code": "120003-67", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "地下连续墙 → 地下连续墙成槽 双轮铣槽机 微风化入岩增加费"}
+{"bill_code": "010202001", "quota_code": "120003-68", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name", "note": "地下连续墙 → 地下连续墙 接头处理 锁口管吊拔 槽深度H(m) H≤15"}
+{"bill_code": "010202001", "quota_code": "120003-69", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name", "note": "地下连续墙 → 地下连续墙 接头处理 锁口管吊拔 槽深度H(m) 15<H≤25"}
+{"bill_code": "010202001", "quota_code": "120003-70", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name", "note": "地下连续墙 → 地下连续墙 接头处理 锁口管吊拔 槽深度H(m) 25<H≤35"}
+{"bill_code": "010202001", "quota_code": "120003-71", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name", "note": "地下连续墙 → 地下连续墙 接头处理 锁口管吊拔 槽深度H(m) 35<H≤45"}
+{"bill_code": "010202001", "quota_code": "120003-72", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name", "note": "地下连续墙 → 地下连续墙 接头处理 工字钢封口 制作"}
+{"bill_code": "010202001", "quota_code": "120003-73", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name", "note": "地下连续墙 → 地下连续墙 接头处理 工字钢封口 安装"}
+{"bill_code": "010202001", "quota_code": "120005-1", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name", "note": "地下连续墙 → 地下连续墙 钢筋笼制作"}
+{"bill_code": "010202001", "quota_code": "120005-2", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name", "note": "地下连续墙 → 地下连续墙 钢筋笼安放 槽深度H(m) H≤15"}
+{"bill_code": "010202001", "quota_code": "120005-3", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name", "note": "地下连续墙 → 地下连续墙 钢筋笼安放 槽深度H(m) 15<H≤25"}
+{"bill_code": "010202001", "quota_code": "120005-4", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name", "note": "地下连续墙 → 地下连续墙 钢筋笼安放 槽深度H(m) 25<H≤35"}
+{"bill_code": "010202001", "quota_code": "120005-5", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name", "note": "地下连续墙 → 地下连续墙 钢筋笼安放 槽深度H(m) 35<H≤45"}
+{"bill_code": "010202001", "quota_code": "120003-74", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "地下连续墙 → 浇筑混凝土地下连续墙 清底置换"}
+{"bill_code": "010202001", "quota_code": "120003-75", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "地下连续墙 → 浇筑混凝土地下连续墙 浇筑混凝土"}
+{"bill_code": "010202007", "quota_code": "120003-45", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "锚杆(锚索) → 锚杆(锚索)钻孔、灌浆 土层"}
+{"bill_code": "010202007", "quota_code": "120003-46", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "锚杆(锚索) → 锚杆(锚索)钻孔、灌浆 入岩增加费 中风化"}
+{"bill_code": "010202007", "quota_code": "120003-47", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "锚杆(锚索) → 锚杆(锚索)钻孔、灌浆 入岩增加费 微风化"}
+{"bill_code": "010202008", "quota_code": "120003-43", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "土钉 → 土钉成孔、灌浆"}
+{"bill_code": "010202008", "quota_code": "120003-44", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "土钉 → 短钢筋土钉 打入式"}
+{"bill_code": "010202014", "quota_code": "120003-86", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "钢支撑 → 明挖基坑钢支撑安装及拆除 钢支撑长度L(m) L≤15 安装"}
+{"bill_code": "010202014", "quota_code": "120003-87", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "钢支撑 → 明挖基坑钢支撑安装及拆除 钢支撑长度L(m) L≤15 拆除"}
+{"bill_code": "010202014", "quota_code": "120003-88", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "钢支撑 → 明挖基坑钢支撑安装及拆除 钢支撑长度L(m) 15<L≤30 安装"}
+{"bill_code": "010202014", "quota_code": "120003-89", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "钢支撑 → 明挖基坑钢支撑安装及拆除 钢支撑长度L(m) 15<L≤30 拆除 t"}
+{"bill_code": "010202014", "quota_code": "120003-90", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "钢支撑 → 钢支撑使用费 t·月"}
+{"bill_code": "010301003", "quota_code": "120002-37", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "钢管桩 → 打钢管桩 管径DN(mm) DN≤450 桩长L(m) L≤30"}
+{"bill_code": "010301003", "quota_code": "120002-38", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "钢管桩 → 打钢管桩 管径DN(mm) DN≤450 桩长L(m) 30<L≤50"}
+{"bill_code": "010301003", "quota_code": "120002-39", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "钢管桩 → 打钢管桩 管径DN(mm) DN≤450 桩长L(m) 50<L≤70"}
+{"bill_code": "010301003", "quota_code": "120002-40", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "钢管桩 → 打钢管桩 管径DN(mm) 450<DN≤650 桩长L(m) L≤30"}
+{"bill_code": "010301003", "quota_code": "120002-41", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "钢管桩 → 打钢管桩 管径DN(mm) 450<DN≤650 桩长L(m) 30<L≤50"}
+{"bill_code": "010301003", "quota_code": "120002-42", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "钢管桩 → 打钢管桩 管径DN(mm) 450<DN≤650 桩长L(m) 50<L≤70"}
+{"bill_code": "010301003", "quota_code": "120002-43", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "钢管桩 → 打钢管桩 管径DN(mm) 650<DN≤850 桩长L(m) L≤30"}
+{"bill_code": "010301003", "quota_code": "120002-44", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "钢管桩 → 打钢管桩 管径DN(mm) 650<DN≤850 桩长L(m) 30<L≤50"}
+{"bill_code": "010301003", "quota_code": "120002-45", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "钢管桩 → 打钢管桩 管径DN(mm) 650<LND≤850 桩长L(m) 50<L≤70"}
+{"bill_code": "010301003", "quota_code": "120002-46", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "钢管桩 → 打钢管桩 管径DN(mm) 850<LND≤1050 桩长L(m) L≤30"}
+{"bill_code": "010301003", "quota_code": "120002-47", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "钢管桩 → 打钢管桩 管径DN(mm) 850<LND≤1050 桩长L(m) 30<L≤50"}
+{"bill_code": "010301003", "quota_code": "120002-48", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "钢管桩 → 打钢管桩 管径DN(mm) 850<LND≤1050 桩长L(m) 50<L≤70"}
+{"bill_code": "010301003", "quota_code": "120002-49", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "钢管桩 → 压钢管桩 管径DN(mm) DN≤450 桩长L(m) L≤30"}
+{"bill_code": "010301003", "quota_code": "120002-50", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "钢管桩 → 压钢管桩 管径DN(mm) DN≤450 桩长L(m) 30<L≤50"}
+{"bill_code": "010301003", "quota_code": "120002-51", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "钢管桩 → 压钢管桩 管径DN(mm) 450<DN≤650 桩长L(m) L≤30"}
+{"bill_code": "010301003", "quota_code": "120002-52", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "钢管桩 → 压钢管桩 管径DN(mm) 450<DN≤650 桩长L(m) 30<L≤50"}
+{"bill_code": "010301003", "quota_code": "120002-53", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "钢管桩 → 压钢管桩 管径DN(mm) 650<DN≤850 桩长L(m) L≤30"}
+{"bill_code": "010301003", "quota_code": "120002-54", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "钢管桩 → 压钢管桩 管径DN(mm) 650<DN≤850 桩长L(m) 30<L≤50"}
+{"bill_code": "010301003", "quota_code": "120002-55", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "钢管桩 → 钢管桩接桩 管径DN(mm) DN≤450"}
+{"bill_code": "010301003", "quota_code": "120002-56", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "钢管桩 → 钢管桩接桩 管径DN(mm) 450<DN≤650"}
+{"bill_code": "010301003", "quota_code": "120002-57", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "钢管桩 → 钢管桩接桩 管径DN(mm) 650<DN≤850"}
+{"bill_code": "010301003", "quota_code": "120002-58", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "钢管桩 → 钢管桩接桩 管径DN(mm) 850<DN≤1050"}
+{"bill_code": "010301003", "quota_code": "120002-59", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "钢管桩 → 钢管桩内切割 管径DN(mm) DN≤450"}
+{"bill_code": "010301003", "quota_code": "120002-60", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "钢管桩 → 钢管桩内切割 管径DN(mm) 450<DN≤650"}
+{"bill_code": "010301003", "quota_code": "120002-61", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "钢管桩 → 钢管桩内切割 管径DN(mm) 650<DN≤850"}
+{"bill_code": "010301003", "quota_code": "120002-62", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "钢管桩 → 钢管桩内切割 管径DN(mm) 850<DN≤1050"}
+{"bill_code": "010301003", "quota_code": "120002-63", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "钢管桩 → 钢管桩精割盖帽 管径DN(mm) DN≤450"}
+{"bill_code": "010301003", "quota_code": "120002-64", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "钢管桩 → 钢管桩精割盖帽 管径DN(mm) 450<DN≤650"}
+{"bill_code": "010301003", "quota_code": "120002-65", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "钢管桩 → 钢管桩精割盖帽 管径DN(mm) 650<DN≤850"}
+{"bill_code": "010301003", "quota_code": "120002-66", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "钢管桩 → 钢管桩精割盖帽 管径DN(mm) 850<DN≤1050"}
+{"bill_code": "010302002", "quota_code": "120002-71", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "沉管灌注桩 → 轨道式柴油打桩机沉管灌注桩"}
+{"bill_code": "010302002", "quota_code": "120004-55", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "沉管灌注桩 → 沉管灌注桩成孔 振动式 桩径D(mm) D≤480"}
+{"bill_code": "010302002", "quota_code": "120004-56", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "沉管灌注桩 → 沉管灌注桩成孔 振动式 桩径D(mm) 480<d≤600"}
+{"bill_code": "010302002", "quota_code": "120004-57", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "沉管灌注桩 → 沉管灌注桩成孔 夯扩式"}
+{"bill_code": "010401001", "quota_code": "010001-1", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "砖基础 → 实心砖基础 干混砌筑砂浆"}
+{"bill_code": "010401001", "quota_code": "010001-2", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "砖基础 → 实心砖基础 湿拌砌筑砂浆"}
+{"bill_code": "010401002", "quota_code": "010001-3", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name", "note": "实心砖墙 → 实心砖墙 1/2砖 干混砌筑砂浆"}
+{"bill_code": "010401002", "quota_code": "010001-4", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name", "note": "实心砖墙 → 实心砖墙 1/2砖 湿拌砌筑砂浆"}
+{"bill_code": "010401002", "quota_code": "010001-5", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name", "note": "实心砖墙 → 实心砖墙 3/4砖 干混砌筑砂浆"}
+{"bill_code": "010401002", "quota_code": "010001-6", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name", "note": "实心砖墙 → 实心砖墙 3/4砖 湿拌砌筑砂浆"}
+{"bill_code": "010401002", "quota_code": "010001-7", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name", "note": "实心砖墙 → 实心砖墙 1砖 干混砌筑砂浆"}
+{"bill_code": "010401002", "quota_code": "010001-8", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name", "note": "实心砖墙 → 实心砖墙 1砖 湿拌砌筑砂浆"}
+{"bill_code": "010401005", "quota_code": "010001-9", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name", "note": "实心砖柱 → 实心砖柱 方形 干混砌筑砂浆"}
+{"bill_code": "010401005", "quota_code": "010001-10", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name", "note": "实心砖柱 → 实心砖柱 方形 湿拌砌筑砂浆"}
+{"bill_code": "010401005", "quota_code": "010001-11", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name", "note": "实心砖柱 → 实心砖柱 异型 干混砌筑砂浆"}
+{"bill_code": "010401005", "quota_code": "010001-12", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name", "note": "实心砖柱 → 实心砖柱 异型 湿拌砌筑砂浆"}
+{"bill_code": "010402001", "quota_code": "010001-23", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "砌块墙 → 普通混凝土空心砌块墙 墙厚T(mm) T=90 干混砌筑砂浆"}
+{"bill_code": "010402001", "quota_code": "010001-24", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "砌块墙 → 普通混凝土空心砌块墙 墙厚T(mm) T=90 湿拌砌筑砂浆"}
+{"bill_code": "010402001", "quota_code": "010001-25", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "砌块墙 → 普通混凝土空心砌块墙 墙厚T(mm) T=140 干混砌筑砂浆"}
+{"bill_code": "010402001", "quota_code": "010001-26", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "砌块墙 → 普通混凝土空心砌块墙 墙厚T(mm) T=140 湿拌砌筑砂浆"}
+{"bill_code": "010402001", "quota_code": "010001-27", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "砌块墙 → 普通混凝土空心砌块墙 墙厚T(mm) T=190 干混砌筑砂浆"}
+{"bill_code": "010402001", "quota_code": "010001-28", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "砌块墙 → 普通混凝土空心砌块墙 墙厚T(mm) T=190 湿拌砌筑砂浆"}
+{"bill_code": "010402001", "quota_code": "010001-29", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "砌块墙 → 加气混凝土砌块墙 墙厚T(mm) T≤100 干混砌筑砂浆"}
+{"bill_code": "010402001", "quota_code": "010001-30", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "砌块墙 → 加气混凝土砌块墙 墙厚T(mm) T≤100 湿拌砌筑砂浆"}
+{"bill_code": "010402001", "quota_code": "010001-31", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "砌块墙 → 加气混凝土砌块墙 墙厚T(mm) 100<T≤200 干混砌筑砂浆"}
+{"bill_code": "010402001", "quota_code": "010001-32", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "砌块墙 → 加气混凝土砌块墙 墙厚T(mm) 100<T≤200 湿拌砌筑砂浆"}
+{"bill_code": "010402001", "quota_code": "010001-33", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "砌块墙 → 加气混凝土砌块墙 墙厚T(mm) T>200 干混砌筑砂浆"}
+{"bill_code": "010402001", "quota_code": "010001-34", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "砌块墙 → 加气混凝土砌块墙 墙厚T(mm) T>200 湿拌砌筑砂浆"}
+{"bill_code": "010402001", "quota_code": "010001-35", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "砌块墙 → 蒸压加气混凝土高精砌块墙 墙厚T(mm) 0<T≤100"}
+{"bill_code": "010402001", "quota_code": "010001-36", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "砌块墙 → 蒸压加气混凝土高精砌块墙 墙厚T(mm) 100<T≤200"}
+{"bill_code": "010402001", "quota_code": "010001-37", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "砌块墙 → 蒸压加气混凝土高精砌块墙 墙厚T(mm) T>200"}
+{"bill_code": "010403001", "quota_code": "010001-38", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name", "note": "石基础 → 石基础 毛石 干混砌筑砂浆"}
+{"bill_code": "010403001", "quota_code": "010001-39", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name", "note": "石基础 → 石基础 毛石 湿拌砌筑砂浆"}
+{"bill_code": "010403001", "quota_code": "010001-40", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name", "note": "石基础 → 石基础 料石 干混砌筑砂浆"}
+{"bill_code": "010403001", "quota_code": "010001-41", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name", "note": "石基础 → 石基础 料石 湿拌砌筑砂浆"}
+{"bill_code": "010403003", "quota_code": "010001-42", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "石墙 → 料石墙 干混砌筑砂浆"}
+{"bill_code": "010403003", "quota_code": "010001-43", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "石墙 → 料石墙 湿拌砌筑砂浆"}
+{"bill_code": "010403003", "quota_code": "010001-44", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "石墙 → 毛石墙 干混砌筑砂浆"}
+{"bill_code": "010403003", "quota_code": "010001-45", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "石墙 → 毛石墙 湿拌砌筑砂浆"}
+{"bill_code": "010403004", "quota_code": "010001-46", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "石挡土墙 → 毛石挡土墙 干混砌筑砂浆"}
+{"bill_code": "010403004", "quota_code": "010001-47", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "石挡土墙 → 毛石挡土墙 湿拌砌筑砂浆"}
+{"bill_code": "010501001", "quota_code": "010006-1", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name", "note": "基础垫层 → 基础垫层 木模板"}
+{"bill_code": "010501001", "quota_code": "010006-2", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name", "note": "基础垫层 → 基础垫层 钢模板"}
+{"bill_code": "010502004", "quota_code": "010006-10", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name", "note": "设备基础 → 设备基础 木模板"}
+{"bill_code": "010502004", "quota_code": "010006-11", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name", "note": "设备基础 → 设备基础 钢模板"}
+{"bill_code": "010502004", "quota_code": "010006-12", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "设备基础 → 设备基础螺栓套 深度H(m) 0<H≤0.5"}
+{"bill_code": "010502004", "quota_code": "010006-13", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "设备基础 → 设备基础螺栓套 深度H(m) 0.5<H≤1"}
+{"bill_code": "010502004", "quota_code": "010006-14", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "设备基础 → 设备基础螺栓套 深度H(m) H>1"}
+{"bill_code": "010502009", "quota_code": "010004-82", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "地下室外墙 → 地下室外墙挤塑板保护层 100㎡"}
+{"bill_code": "010502020", "quota_code": "010006-45", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "楼梯 → 整体楼梯 普通型 木模板"}
+{"bill_code": "010502020", "quota_code": "010006-46", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "楼梯 → 整体楼梯 螺旋型、艺术型 木模板"}
+{"bill_code": "010502020", "quota_code": "010003-9", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "楼梯 → 木楼梯 直形梯"}
+{"bill_code": "010502020", "quota_code": "010003-10", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "楼梯 → 木楼梯 弧形梯"}
+{"bill_code": "010502020", "quota_code": "010003-11", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "楼梯 → 木楼梯 旋转梯"}
+{"bill_code": "010502020", "quota_code": "010003-12", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "楼梯 → 钢木楼梯 直形梯"}
+{"bill_code": "010502020", "quota_code": "010003-13", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "楼梯 → 钢木楼梯 弧形梯"}
+{"bill_code": "010502020", "quota_code": "010003-14", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "楼梯 → 钢木楼梯 旋转梯"}
+{"bill_code": "010502020", "quota_code": "010006-63", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "楼梯 → 楼梯模板支撑架 搭拆 支模高度H(m) H>10 每增1m 100m²"}
+{"bill_code": "010502022", "quota_code": "010006-26", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name", "note": "圈梁 → 圈梁 直形 木模板"}
+{"bill_code": "010502022", "quota_code": "010006-27", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name", "note": "圈梁 → 圈梁 直形 钢模板"}
+{"bill_code": "010502022", "quota_code": "010006-28", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name", "note": "圈梁 → 圈梁 弧形 木模板"}
+{"bill_code": "010502023", "quota_code": "010006-53", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "过梁 → 独立过梁 木模板"}
+{"bill_code": "010502023", "quota_code": "010006-54", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "过梁 → 独立过梁 钢模板"}
+{"bill_code": "010502026", "quota_code": "120003-21", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "挡土墙 → 浆砌挡土墙 块石"}
+{"bill_code": "010502026", "quota_code": "120003-22", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "挡土墙 → 浆砌挡土墙 片石"}
+{"bill_code": "010502026", "quota_code": "120003-23", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "挡土墙 → 浆砌挡土墙 预制块"}
+{"bill_code": "010502026", "quota_code": "120003-24", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "挡土墙 → 混凝土挡土墙 混凝土"}
+{"bill_code": "010502026", "quota_code": "120008-11", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "挡土墙 → 混凝土挡土墙 模板"}
+{"bill_code": "010502026", "quota_code": "120003-28", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name", "note": "挡土墙 → 挡土墙 变形缝 沥青木板"}
+{"bill_code": "010502026", "quota_code": "120003-29", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name", "note": "挡土墙 → 挡土墙 伸缩缝 油浸麻丝"}
+{"bill_code": "010502026", "quota_code": "120003-30", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name", "note": "挡土墙 → 挡土墙 橡胶（塑料）止水带"}
+{"bill_code": "010502026", "quota_code": "120003-31", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name", "note": "挡土墙 → 挡土墙 紫铜板止水带"}
+{"bill_code": "010502026", "quota_code": "120003-32", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name", "note": "挡土墙 → 挡土墙 钢板止水带"}
+{"bill_code": "010502026", "quota_code": "120003-33", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name", "note": "挡土墙 → 挡土墙 氯丁橡胶止水条(带)"}
+{"bill_code": "010502026", "quota_code": "120003-34", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "挡土墙 → 挡土墙块石面勾平缝 干砌"}
+{"bill_code": "010502026", "quota_code": "120003-35", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "挡土墙 → 挡土墙块石面勾平缝 浆砌"}
+{"bill_code": "010502026", "quota_code": "120003-36", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "挡土墙 → 挡土墙浆砌勾平缝 料石面"}
+{"bill_code": "010502026", "quota_code": "120003-37", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "挡土墙 → 挡土墙浆砌勾平缝 预制块面"}
+{"bill_code": "010502026", "quota_code": "120003-38", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "挡土墙 → 挡土墙块石面勾凸缝 干砌"}
+{"bill_code": "010502026", "quota_code": "120003-39", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "挡土墙 → 挡土墙块石面勾凸缝 浆砌"}
+{"bill_code": "010502026", "quota_code": "120003-40", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "挡土墙 → 挡土墙浆砌勾凹缝 块石面"}
+{"bill_code": "010502026", "quota_code": "120003-41", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "挡土墙 → 挡土墙浆砌勾凹缝 料石面"}
+{"bill_code": "010502026", "quota_code": "120003-42", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "挡土墙 → 挡土墙浆砌勾凹缝 预制块面"}
+{"bill_code": "010502026", "quota_code": "120008-12", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "挡土墙 → 挡土墙压顶 模板"}
+{"bill_code": "010502026", "quota_code": "010001-46", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "挡土墙 → 毛石挡土墙 干混砌筑砂浆"}
+{"bill_code": "010502026", "quota_code": "010001-47", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "挡土墙 → 毛石挡土墙 湿拌砌筑砂浆"}
+{"bill_code": "010502027", "quota_code": "010006-55", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name", "note": "电缆沟、地沟 → 电缆沟、地沟 木模板"}
+{"bill_code": "010502029", "quota_code": "010001-15", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "散水 → 实心砖散水 平铺 干混砌筑砂浆"}
+{"bill_code": "010502029", "quota_code": "010001-16", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "散水 → 实心砖散水 平铺 湿拌砌筑砂浆"}
+{"bill_code": "010502029", "quota_code": "010001-17", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "散水 → 实心砖散水 侧铺 干混砌筑砂浆"}
+{"bill_code": "010502029", "quota_code": "010001-18", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "散水 → 实心砖散水 侧铺 湿拌砌筑砂浆"}
+{"bill_code": "010502032", "quota_code": "120003-10", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name", "note": "台阶 → 台阶 浆砌块石"}
+{"bill_code": "010502032", "quota_code": "120003-11", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name", "note": "台阶 → 台阶 浆砌粗料石"}
+{"bill_code": "010502032", "quota_code": "120003-12", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name", "note": "台阶 → 台阶 浆砌预制混凝土块"}
+{"bill_code": "010502032", "quota_code": "010006-48", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name", "note": "台阶 → 台阶 木模板"}
+{"bill_code": "010502032", "quota_code": "010001-13", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "台阶 → 实心砖台阶 干混砌筑砂浆"}
+{"bill_code": "010502032", "quota_code": "010001-14", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "台阶 → 实心砖台阶 湿拌砌筑砂浆"}
+{"bill_code": "010502033", "quota_code": "010006-43", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "后浇带 → 后浇带快易收口网 基础底板"}
+{"bill_code": "010502033", "quota_code": "010006-44", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "后浇带 → 后浇带快易收口网 梁、板、墙"}
+{"bill_code": "010503001", "quota_code": "010006-15", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name", "note": "矩形柱 → 矩形柱 木模板"}
+{"bill_code": "010503001", "quota_code": "010006-16", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name", "note": "矩形柱 → 矩形柱 钢模板"}
+{"bill_code": "010503002", "quota_code": "010006-17", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name", "note": "异型柱 → 异型柱 木模板"}
+{"bill_code": "010503002", "quota_code": "010006-18", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name", "note": "异型柱 → 异型柱 钢模板"}
+{"bill_code": "010503003", "quota_code": "010006-21", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name", "note": "矩形梁 → 矩形梁 木模板"}
+{"bill_code": "010503003", "quota_code": "010006-22", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name", "note": "矩形梁 → 矩形梁 钢模板"}
+{"bill_code": "010503004", "quota_code": "010006-25", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name", "note": "异型梁 → 异型梁 木模板"}
+{"bill_code": "010503005", "quota_code": "010006-24", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name", "note": "拱形梁 → 拱形梁 木模板"}
+{"bill_code": "010503006", "quota_code": "010006-53", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "过梁 → 独立过梁 木模板"}
+{"bill_code": "010503006", "quota_code": "010006-54", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "过梁 → 独立过梁 钢模板"}
+{"bill_code": "010503009", "quota_code": "010003-1", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "屋架 → 木屋架 圆木 跨度L(m) 0<L≤10"}
+{"bill_code": "010503009", "quota_code": "010003-2", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "屋架 → 木屋架 圆木 跨度L(m) L>10"}
+{"bill_code": "010503009", "quota_code": "010003-3", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "屋架 → 木屋架 方木 跨度L(m) 0<L≤10"}
+{"bill_code": "010503009", "quota_code": "010003-4", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "屋架 → 木屋架 方木 跨度L(m) L>10"}
+{"bill_code": "010503009", "quota_code": "010003-5", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "屋架 → 钢木屋架 圆木 跨度L(m) 0<L≤18"}
+{"bill_code": "010503009", "quota_code": "010003-6", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "屋架 → 钢木屋架 方木 跨度L(m) 0<L≤18"}
+{"bill_code": "010504010", "quota_code": "010006-45", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "楼梯 → 整体楼梯 普通型 木模板"}
+{"bill_code": "010504010", "quota_code": "010006-46", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "楼梯 → 整体楼梯 螺旋型、艺术型 木模板"}
+{"bill_code": "010504010", "quota_code": "010003-9", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "楼梯 → 木楼梯 直形梯"}
+{"bill_code": "010504010", "quota_code": "010003-10", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "楼梯 → 木楼梯 弧形梯"}
+{"bill_code": "010504010", "quota_code": "010003-11", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "楼梯 → 木楼梯 旋转梯"}
+{"bill_code": "010504010", "quota_code": "010003-12", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "楼梯 → 钢木楼梯 直形梯"}
+{"bill_code": "010504010", "quota_code": "010003-13", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "楼梯 → 钢木楼梯 弧形梯"}
+{"bill_code": "010504010", "quota_code": "010003-14", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "楼梯 → 钢木楼梯 旋转梯"}
+{"bill_code": "010504010", "quota_code": "010006-63", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "楼梯 → 楼梯模板支撑架 搭拆 支模高度H(m) H>10 每增1m 100m²"}
+{"bill_code": "010504011", "quota_code": "010006-47", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "阳台 → 阳台、雨篷 木模板"}
+{"bill_code": "010505006", "quota_code": "010006-76", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "梁模板 → 沉淀池壁基梁模板"}
+{"bill_code": "010505010", "quota_code": "010006-63", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "楼梯模板 → 楼梯模板支撑架 搭拆 支模高度H(m) H>10 每增1m 100m²"}
+{"bill_code": "010506020", "quota_code": "010002-127", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "钢筋网片 → 钢筋网片制作"}
+{"bill_code": "010506020", "quota_code": "010002-128", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "钢筋网片 → 钢筋网片安装"}
+{"bill_code": "010506020", "quota_code": "010002-129", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "钢筋网片 → 钢筋网片(成品)安装"}
+{"bill_code": "010506023", "quota_code": "120003-59", "quota_doc_id": "SZ-SJG170", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "钢丝网 → 坡面挂钢丝网"}
+{"bill_code": "010506024", "quota_code": "010006-12", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "螺栓 → 设备基础螺栓套 深度H(m) 0<H≤0.5"}
+{"bill_code": "010506024", "quota_code": "010006-13", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "螺栓 → 设备基础螺栓套 深度H(m) 0.5<H≤1"}
+{"bill_code": "010506024", "quota_code": "010006-14", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "螺栓 → 设备基础螺栓套 深度H(m) H>1"}
+{"bill_code": "010506024", "quota_code": "010002-136", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "螺栓 → 预埋螺栓 安装"}
+{"bill_code": "010506025", "quota_code": "010002-137", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name", "note": "预埋铁件 → 预埋铁件 制作、安装"}
+{"bill_code": "010701001", "quota_code": "010003-1", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "屋架 → 木屋架 圆木 跨度L(m) 0<L≤10"}
+{"bill_code": "010701001", "quota_code": "010003-2", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "屋架 → 木屋架 圆木 跨度L(m) L>10"}
+{"bill_code": "010701001", "quota_code": "010003-3", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "屋架 → 木屋架 方木 跨度L(m) 0<L≤10"}
+{"bill_code": "010701001", "quota_code": "010003-4", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "屋架 → 木屋架 方木 跨度L(m) L>10"}
+{"bill_code": "010701001", "quota_code": "010003-5", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "屋架 → 钢木屋架 圆木 跨度L(m) 0<L≤18"}
+{"bill_code": "010701001", "quota_code": "010003-6", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "屋架 → 钢木屋架 方木 跨度L(m) 0<L≤18"}
+{"bill_code": "010702001", "quota_code": "010003-7", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name", "note": "木柱 → 木柱"}
+{"bill_code": "010702002", "quota_code": "010003-8", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name", "note": "木梁 → 木梁"}
+{"bill_code": "010702004", "quota_code": "010003-9", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name", "note": "木楼梯 → 木楼梯 直形梯"}
+{"bill_code": "010702004", "quota_code": "010003-10", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name", "note": "木楼梯 → 木楼梯 弧形梯"}
+{"bill_code": "010702004", "quota_code": "010003-11", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name", "note": "木楼梯 → 木楼梯 旋转梯"}
+{"bill_code": "010702004", "quota_code": "010003-12", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "木楼梯 → 钢木楼梯 直形梯"}
+{"bill_code": "010702004", "quota_code": "010003-13", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "木楼梯 → 钢木楼梯 弧形梯"}
+{"bill_code": "010702004", "quota_code": "010003-14", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "木楼梯 → 钢木楼梯 旋转梯"}
+{"bill_code": "010703001", "quota_code": "010003-15", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name", "note": "屋面木基层 → 屋面木基层 檩木 m³"}
+{"bill_code": "010703001", "quota_code": "010003-16", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name", "note": "屋面木基层 → 屋面木基层 屋面板 满铺 m²"}
+{"bill_code": "010703001", "quota_code": "010003-17", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name", "note": "屋面木基层 → 屋面木基层 屋面板 花铺 m²"}
+{"bill_code": "010703001", "quota_code": "010003-18", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name", "note": "屋面木基层 → 屋面木基层 木椽子 m²"}
+{"bill_code": "010703001", "quota_code": "010003-19", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name", "note": "屋面木基层 → 屋面木基层 封檐板、博风板 m"}
+{"bill_code": "010703001", "quota_code": "010003-20", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name", "note": "屋面木基层 → 屋面木基层 封檐盒 m²"}
+{"bill_code": "010901001", "quota_code": "010004-5", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name", "note": "瓦屋面 → 瓦屋面 玻纤胎沥青瓦 浆铺"}
+{"bill_code": "010901001", "quota_code": "010004-6", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name", "note": "瓦屋面 → 瓦屋面 玻纤胎沥青瓦 干铺"}
+{"bill_code": "010901001", "quota_code": "010004-7", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name", "note": "瓦屋面 → 瓦屋面 玻纤胎沥青瓦 斜铺"}
+{"bill_code": "010901001", "quota_code": "010004-8", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name", "note": "瓦屋面 → 瓦屋面 琉璃瓦 铺在钢筋混凝土面上 $10\\mathrm{m}^2$"}
+{"bill_code": "010901001", "quota_code": "010004-9", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name", "note": "瓦屋面 → 瓦屋面 琉璃满面瓦檐口线 铺在钢筋混凝土面上 10 延米"}
+{"bill_code": "010901001", "quota_code": "010004-10", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name", "note": "瓦屋面 → 瓦屋面 琉璃脊瓦 铺在钢筋混凝土面上 10 延米"}
+{"bill_code": "010901001", "quota_code": "010004-11", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name", "note": "瓦屋面 → 瓦屋面 西班牙瓦 铺在钢筋混凝土面上 10m²"}
+{"bill_code": "010901001", "quota_code": "010004-12", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name", "note": "瓦屋面 → 瓦屋面 西班牙脊瓦 铺在钢筋混凝土面上 10延米"}
+{"bill_code": "010901002", "quota_code": "010004-14", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name", "note": "阳光板屋面 → 阳光板屋面"}
+{"bill_code": "010901006", "quota_code": "010004-15", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name", "note": "膜结构屋面 → 膜结构屋面"}
+{"bill_code": "010905003", "quota_code": "010004-58", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name", "note": "止水带 → 止水带 橡胶"}
+{"bill_code": "010905003", "quota_code": "010004-59", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name", "note": "止水带 → 止水带 钢板"}
+{"bill_code": "010905003", "quota_code": "010004-60", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name", "note": "止水带 → 止水带 紫铜板"}
+{"bill_code": "010905003", "quota_code": "010004-61", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name", "note": "止水带 → 止水带 氯丁胶片"}
+{"bill_code": "010905003", "quota_code": "010004-62", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name", "note": "止水带 → 止水带 氯丁胶贴玻璃纤维布"}
+{"bill_code": "010905003", "quota_code": "010004-63", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.9, "source": "auto_name", "note": "止水带 → 止水带 膨胀止水胶条"}
+{"bill_code": "011601001", "quota_code": "010007-1", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "脚手架 → 扣件式钢管双排脚手架 搭拆 搭设高度H(m) 0<H≤24"}
+{"bill_code": "011601001", "quota_code": "010007-2", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "脚手架 → 扣件式钢管双排脚手架 搭拆 搭设高度H(m) 24<H≤50"}
+{"bill_code": "011601001", "quota_code": "010007-3", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "脚手架 → 扣件式钢管双排脚手架 搭拆 搭设高度H(m) H>50"}
+{"bill_code": "011601001", "quota_code": "010007-4", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "脚手架 → 扣件式钢管双排脚手架 搭拆 每增加一排立杆 搭设高度H(m) 0<H≤24"}
+{"bill_code": "011601001", "quota_code": "010007-5", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "脚手架 → 扣件式钢管双排脚手架 搭拆 每增加一排立杆 搭设高度H(m) 24<H≤50"}
+{"bill_code": "011601001", "quota_code": "010007-6", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "脚手架 → 扣件式钢管双排脚手架 搭拆 每增加一排立杆 搭设高度H(m) H>50"}
+{"bill_code": "011601001", "quota_code": "010007-7", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "脚手架 → 扣件式钢管双排脚手架 使用 搭设高度H(m) 0<H≤24"}
+{"bill_code": "011601001", "quota_code": "010007-8", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "脚手架 → 扣件式钢管双排脚手架 使用 搭设高度H(m) 24<H≤50"}
+{"bill_code": "011601001", "quota_code": "010007-9", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "脚手架 → 扣件式钢管双排脚手架 使用 搭设高度H(m) H>50"}
+{"bill_code": "011601001", "quota_code": "010007-10", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "脚手架 → 扣件式钢管双排脚手架 使用 每增加一排立杆 搭设高度H(m) 0<H≤24"}
+{"bill_code": "011601001", "quota_code": "010007-11", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "脚手架 → 扣件式钢管双排脚手架 使用 每增加一排立杆 搭设高度H(m) 24<H≤50"}
+{"bill_code": "011601001", "quota_code": "010007-12", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "脚手架 → 扣件式钢管双排脚手架 使用 每增加一排立杆 搭设高度H(m) H>50"}
+{"bill_code": "011601001", "quota_code": "010007-13", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "脚手架 → 扣件式钢管单排脚手架 搭拆 搭设高度H(m) 0<H≤6"}
+{"bill_code": "011601001", "quota_code": "010007-14", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "脚手架 → 扣件式钢管单排脚手架 搭拆 搭设高度H(m) 6<H≤14"}
+{"bill_code": "011601001", "quota_code": "010007-15", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "脚手架 → 扣件式钢管单排脚手架 搭拆 搭设高度H(m) 14<H≤24"}
+{"bill_code": "011601001", "quota_code": "010007-16", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "脚手架 → 扣件式单排脚手架 使用 搭设高度H(m) 0<H≤6"}
+{"bill_code": "011601001", "quota_code": "010007-17", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "脚手架 → 扣件式单排脚手架 使用 搭设高度H(m) 6<H≤14"}
+{"bill_code": "011601001", "quota_code": "010007-18", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "脚手架 → 扣件式单排脚手架 使用 搭设高度H(m) 14<H≤24"}
+{"bill_code": "011601001", "quota_code": "010007-19", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "脚手架 → 承插型盘扣式钢管双排脚手架 搭拆 搭设高度H(m) 0<H≤24"}
+{"bill_code": "011601001", "quota_code": "010007-20", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "脚手架 → 承插型盘扣式钢管双排脚手架 搭拆 搭设高度H(m) 24<H≤50"}
+{"bill_code": "011601001", "quota_code": "010007-21", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "脚手架 → 承插型盘扣式钢管双排脚手架 搭拆 搭设高度H(m) H>50"}
+{"bill_code": "011601001", "quota_code": "010007-22", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "脚手架 → 承插型盘扣式钢管双排脚手架 搭拆 每增加一排立杆 搭设高度H(m) 0<H≤24"}
+{"bill_code": "011601001", "quota_code": "010007-23", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "脚手架 → 承插型盘扣式钢管双排脚手架 搭拆 每增加一排立杆 搭设高度H(m) 24<H≤50"}
+{"bill_code": "011601001", "quota_code": "010007-24", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "脚手架 → 承插型盘扣式钢管双排脚手架 搭拆 每增加一排立杆 搭设高度H(m) H>50"}
+{"bill_code": "011601001", "quota_code": "010007-25", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "脚手架 → 承插型盘扣式钢管双排脚手架 使用 搭设高度H(m) 0<H≤24"}
+{"bill_code": "011601001", "quota_code": "010007-26", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "脚手架 → 承插型盘扣式钢管双排脚手架 使用 搭设高度H(m) 24<H≤50"}
+{"bill_code": "011601001", "quota_code": "010007-27", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "脚手架 → 承插型盘扣式钢管双排脚手架 使用 搭设高度H(m) H>50"}
+{"bill_code": "011601001", "quota_code": "010007-28", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "脚手架 → 承插型盘扣式钢管双排脚手架 使用 每增加一排立杆 搭设高度H(m) 0<H≤24"}
+{"bill_code": "011601001", "quota_code": "010007-29", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "脚手架 → 承插型盘扣式钢管双排脚手架 使用 每增加一排立杆 搭设高度H(m) 24<H≤50"}
+{"bill_code": "011601001", "quota_code": "010007-30", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "脚手架 → 承插型盘扣式钢管双排脚手架 使用 每增加一排立杆 搭设高度H(m) H>50"}
+{"bill_code": "011601001", "quota_code": "010007-31", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "脚手架 → 承插型盘扣式钢管单排脚手架 搭拆 搭设高度H(m) 0<H≤6"}
+{"bill_code": "011601001", "quota_code": "010007-32", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "脚手架 → 承插型盘扣式钢管单排脚手架 搭拆 搭设高度H(m) 6<H≤14"}
+{"bill_code": "011601001", "quota_code": "010007-33", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "脚手架 → 承插型盘扣式钢管单排脚手架 搭拆 搭设高度H(m) 14<H≤24"}
+{"bill_code": "011601001", "quota_code": "010007-34", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "脚手架 → 承插型盘扣式钢管单排脚手架 使用 搭设高度H(m) 0<H≤6"}
+{"bill_code": "011601001", "quota_code": "010007-35", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "脚手架 → 承插型盘扣式钢管单排脚手架 使用 搭设高度H(m) 6<H≤14"}
+{"bill_code": "011601001", "quota_code": "010007-36", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "脚手架 → 承插型盘扣式钢管单排脚手架 使用 搭设高度H(m) 14<H≤24"}
+{"bill_code": "011601001", "quota_code": "010007-71", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "脚手架 → 脚手架上挂安全立网 绿色密目式阻燃安全网"}
+{"bill_code": "011601001", "quota_code": "010007-72", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "脚手架 → 脚手架上挂安全立网 金属安全网"}
+{"bill_code": "011601001", "quota_code": "010007-37", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "脚手架 → 电动整体提升式脚手架 搭拆 全钢结构 架高H(m) H=13.5"}
+{"bill_code": "011601001", "quota_code": "010007-38", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "脚手架 → 电动整体提升式脚手架 搭拆 全钢结构 架高H(m) 每增1.5"}
+{"bill_code": "011601001", "quota_code": "010007-39", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "脚手架 → 电动整体提升式脚手架 搭拆 钢管组合 架高H(m) H=13.5"}
+{"bill_code": "011601001", "quota_code": "010007-40", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "脚手架 → 电动整体提升式脚手架 搭拆 钢管组合 架高H(m) 每增1.5"}
+{"bill_code": "011601001", "quota_code": "010007-41", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "脚手架 → 电动整体提升式脚手架 使用 全钢结构 架高H(m) H=13.5"}
+{"bill_code": "011601001", "quota_code": "010007-42", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "脚手架 → 电动整体提升式脚手架 使用 全钢结构 架高H(m) 每增1.5"}
+{"bill_code": "011601001", "quota_code": "010007-43", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "脚手架 → 电动整体提升式脚手架 使用 钢管组合 架高H(m) H=13.5"}
+{"bill_code": "011601001", "quota_code": "010007-44", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "脚手架 → 电动整体提升式脚手架 使用 钢管组合 架高H(m) 每增1.5"}
+{"bill_code": "011601001", "quota_code": "010007-45", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "脚手架 → 电动吊篮式脚手架 搭拆 作业高度H(m) 0<H≤200.5"}
+{"bill_code": "011601001", "quota_code": "010007-46", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "脚手架 → 电动吊篮式脚手架 搭拆 作业高度H(m) 200.5<H≤300.5"}
+{"bill_code": "011601001", "quota_code": "010007-47", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "脚手架 → 电动吊篮式脚手架 使用"}
+{"bill_code": "011601001", "quota_code": "010007-48", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "脚手架 → 里脚手架 民用建筑 基本层H(m) H=3.6"}
+{"bill_code": "011601001", "quota_code": "010007-49", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "脚手架 → 里脚手架 民用建筑 每增1.2"}
+{"bill_code": "011601001", "quota_code": "010007-50", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "脚手架 → 里脚手架 工业建筑 基本层H(m) H=3.6"}
+{"bill_code": "011601001", "quota_code": "010007-51", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "脚手架 → 里脚手架 工业建筑 每增1.2"}
+{"bill_code": "011601001", "quota_code": "010007-52", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "脚手架 → 满堂脚手架 搭拆及使用 层高H(m) 0<H≤6"}
+{"bill_code": "011601001", "quota_code": "010007-53", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "脚手架 → 满堂脚手架 搭拆及使用 层高H(m) H>6"}
+{"bill_code": "011601001", "quota_code": "010007-55", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "脚手架 → 活动脚手架 墙砌筑或装饰"}
+{"bill_code": "011601001", "quota_code": "010007-56", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "脚手架 → 活动脚手架 独立柱装饰"}
+{"bill_code": "011601001", "quota_code": "010007-57", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "脚手架 → 活动脚手架 柱、墙混凝土浇捣"}
+{"bill_code": "011601001", "quota_code": "010007-58", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "脚手架 → 活动脚手架 天棚面装饰及修整"}
+{"bill_code": "011601001", "quota_code": "010007-59", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "脚手架 → 烟筒、水塔脚手架 直径D(m) D≤5 搭设高度H(m) 0<H≤10"}
+{"bill_code": "011601001", "quota_code": "010007-60", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "脚手架 → 烟筒、水塔脚手架 直径D(m) D≤5 搭设高度H(m) 10<H≤15"}
+{"bill_code": "011601001", "quota_code": "010007-61", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "脚手架 → 烟筒、水塔脚手架 直径D(m) D≤5 搭设高度H(m) 15<H≤20"}
+{"bill_code": "011601001", "quota_code": "010007-62", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "脚手架 → 烟筒、水塔脚手架 直径D(m) D≤5 搭设高度H(m) 20<H≤25"}
+{"bill_code": "011601001", "quota_code": "010007-63", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "脚手架 → 烟筒、水塔脚手架 直径D(m) D≤5 搭设高度H(m) 25<H≤35"}
+{"bill_code": "011601001", "quota_code": "010007-64", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "脚手架 → 烟筒、水塔脚手架 直径D(m) D≤5 搭设高度H(m) 35<H≤45"}
+{"bill_code": "011601001", "quota_code": "010007-65", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "脚手架 → 烟筒、水塔脚手架 直径D(m) 5<H≤8 搭设高度H(m) 0<H≤20"}
+{"bill_code": "011601001", "quota_code": "010007-66", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "脚手架 → 烟筒、水塔脚手架 直径D(m) 5<H≤8 搭设高度H(m) 20<H≤40"}
+{"bill_code": "011601001", "quota_code": "010007-67", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "脚手架 → 烟筒、水塔脚手架 直径D(m) 5<d≤8 搭设高度H(m) 40<H≤60"}
+{"bill_code": "011601001", "quota_code": "010007-68", "quota_doc_id": "SZ-SJG171", "relation": "APPLIES", "confidence": 0.6, "source": "auto_name", "note": "脚手架 → 烟筒、水塔脚手架 直径D(m) 5<d≤8 搭设高度H(m) 60<H≤80"}

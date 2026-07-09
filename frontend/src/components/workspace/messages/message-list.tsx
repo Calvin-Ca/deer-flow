@@ -2,7 +2,6 @@ import type { Message } from "@langchain/langgraph-sdk";
 import type { BaseStream } from "@langchain/langgraph-sdk/react";
 import { ChevronUpIcon, Loader2Icon } from "lucide-react";
 import {
-  Fragment,
   type ReactNode,
   useCallback,
   useEffect,
@@ -16,7 +15,6 @@ import {
   ConversationScrollButton,
 } from "@/components/ai-elements/conversation";
 import { Button } from "@/components/ui/button";
-import { extractLaunchTaskIdFromMessages } from "@/core/cost/marker";
 import { useI18n } from "@/core/i18n/hooks";
 import {
   buildTokenDebugSteps,
@@ -42,7 +40,6 @@ import { cn } from "@/lib/utils";
 
 import { ArtifactFileList } from "../artifacts/artifact-file-list";
 import { CopyButton } from "../copy-button";
-import { CostHitlInline } from "../cost/cost-hitl-inline";
 import { StreamingIndicator } from "../streaming-indicator";
 
 import { MarkdownContent } from "./markdown-content";
@@ -190,33 +187,6 @@ export function MessageList({
   const groupedMessages = getMessageGroups(messages);
   const turnUsageMessagesByGroupIndex =
     getAssistantTurnUsageMessages(groupedMessages);
-  // 组价 HITL 控件：把它渲染到**回合末尾**（agent 文字之后），而不是钉在工具调用处（中间过程块）
-  // 导致「卡片在上、文字在下、方位词相反」。按 taskId 从回合工具结果抽取，映射到回合最后一个分组的 index。
-  const hitlCardByGroupIndex = useMemo(() => {
-    const map = new Map<number, string>();
-    let turnStart = -1;
-    for (let i = 0; i < groupedMessages.length; i++) {
-      const group = groupedMessages[i];
-      if (!group) continue;
-      if (group.type === "human") {
-        turnStart = -1;
-        continue;
-      }
-      if (turnStart === -1) turnStart = i;
-      const isTurnEnd =
-        i === groupedMessages.length - 1 ||
-        groupedMessages[i + 1]?.type === "human";
-      if (isTurnEnd) {
-        const turnMessages = groupedMessages
-          .slice(turnStart, i + 1)
-          .flatMap((g) => g.messages);
-        const taskId = extractLaunchTaskIdFromMessages(turnMessages);
-        if (taskId) map.set(i, taskId);
-        turnStart = -1;
-      }
-    }
-    return map;
-  }, [groupedMessages]);
   const tokenDebugSteps = useMemo(
     () => buildTokenDebugSteps(messages, t),
     [messages, t],
@@ -495,16 +465,7 @@ export function MessageList({
           );
           })();
 
-          const hitlTaskId = hitlCardByGroupIndex.get(groupIndex);
-          if (!hitlTaskId) return groupElement;
-          return (
-            <Fragment key={`hitl-turn-${group.id}`}>
-              {groupElement}
-              <div className="w-full">
-                <CostHitlInline taskId={hitlTaskId} />
-              </div>
-            </Fragment>
-          );
+          return groupElement;
         })}
         {thread.isLoading && <StreamingIndicator className="my-4" />}
         <div style={{ height: `${paddingBottom}px` }} />

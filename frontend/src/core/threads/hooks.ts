@@ -10,7 +10,6 @@ import type { PromptInputMessage } from "@/components/ai-elements/prompt-input";
 import { getAPIClient } from "../api";
 import { fetch } from "../api/fetcher";
 import { getBackendBaseURL } from "../config";
-import { onCostDone } from "../cost/cost-hitl-events";
 import { useI18n } from "../i18n/hooks";
 import type { FileInMessage } from "../messages/utils";
 import type { LocalSettings } from "../settings";
@@ -176,8 +175,6 @@ export function useThreadStream({
   const threadIdRef = useRef<string | null>(threadId ?? null);
   const startedRef = useRef(false);
   const pendingUsageBaselineMessageIdsRef = useRef<Set<string>>(new Set());
-  // B2-lite（§8 决策2）：已触发过收尾的组价 taskId，防重复自动发消息。
-  const sentCostSummaryRef = useRef<Set<string>>(new Set());
   const listeners = useRef({
     onSend,
     onStart,
@@ -623,28 +620,6 @@ export function useThreadStream({
     },
     [thread, t.uploads.uploadingFiles, context, queryClient, humanMessageCount],
   );
-
-  // B2-lite（§8 决策2）：组价卡片走到终态时，自动向 agent 发一条隐藏触发消息让它收尾。
-  // hide_from_ui=true → 用户看不到这条合成消息，只看到 agent 的收尾回复；按 taskId 去重、只发一次。
-  useEffect(() => {
-    return onCostDone(({ taskId, total, status }) => {
-      const tid = threadIdRef.current;
-      if (!tid || sentCostSummaryRef.current.has(taskId)) {
-        return;
-      }
-      sentCostSummaryRef.current.add(taskId);
-      const text =
-        status === "blocked"
-          ? `[系统] 组价会话（task ${taskId.slice(0, 8)}）未能算到总造价（缺定额/未选码等）。请据卡片所示原因用一句话向用户如实说明并给出下一步建议，勿杜撰数字。`
-          : `[系统] 组价会话（task ${taskId.slice(0, 8)}）已完成，总造价 ${total ?? "（见卡片）"} 元。请据此真实结果用一句话向用户收尾总结；勿改动数字、勿在对话里重算参数（改参数请引导用户在卡片重开对应闸或重起会话）。`;
-      void sendMessage(
-        tid,
-        { text, files: [] } as PromptInputMessage,
-        undefined,
-        { additionalKwargs: { hide_from_ui: true, cost_summary_trigger: true } },
-      );
-    });
-  }, [sendMessage]);
 
   // Cache the latest thread messages in a ref to compare against incoming history messages for deduplication,
   // and to allow access to the full message list in onUpdateEvent without causing re-renders.

@@ -451,6 +451,42 @@ def test_project_config_points_lead_agent_to_ce_prompt():
     assert config.lead_agent.system_prompt_path == "prompts/ce/lead_agent.md"
 
 
+def test_ce_override_renders_and_carries_subagent_dispatch(monkeypatch, tmp_path):
+    """真·CE override（backend/prompts/ce/lead_agent.md）能过 .format 渲染且含三类 subagent 调度指南。
+
+    这条同时守两件事：① override 里只用合法占位符、字面花括号已转义——否则 apply_prompt_template
+    的 .format 会在运行时 KeyError/ValueError 直接打挂 prompt（_resolve 只吞 OSError，.format 在其外）；
+    ② 复合并行 / 批量 / 上下文隔离三类派子智能体的判据没被后续编辑删掉。
+    """
+    from pathlib import Path
+
+    ce_prompt = Path(__file__).resolve().parent.parent / "prompts" / "ce" / "lead_agent.md"
+    config = SimpleNamespace(
+        sandbox=SimpleNamespace(mounts=[]),
+        skills=SimpleNamespace(container_path="/mnt/skills"),
+        lead_agent=SimpleNamespace(system_prompt_path=str(ce_prompt)),
+    )
+    # 只验 override 被渲染 + 花括号安全，各 section 内容与本用例无关，全部打桩为空。
+    monkeypatch.setattr(prompt_module, "get_skills_prompt_section", lambda *args, **kwargs: "")
+    monkeypatch.setattr(prompt_module, "get_deferred_tools_prompt_section", lambda **kwargs: "")
+    monkeypatch.setattr(prompt_module, "_build_acp_section", lambda **kwargs: "")
+    monkeypatch.setattr(prompt_module, "_get_memory_context", lambda agent_name=None, **kwargs: "")
+    monkeypatch.setattr(prompt_module, "get_agent_soul", lambda agent_name=None: "")
+
+    # subagent_enabled 默认 False → {subagent_section} 渲染为空串，仍完整走一遍 override 的 .format，
+    # 足以暴露本文件里的坏占位符 / 未转义花括号（subagent 大段本身的花括号安全是 harness 的事，非本 override）。
+    prompt = prompt_module.apply_prompt_template(app_config=config, agent_name="CostBot")
+
+    assert "你是CostBot，建设工程造价领域的入口 agent" in prompt
+    assert "<subagent_dispatch" in prompt
+    # 三类场景判据各留一处锚点，防回归被删。
+    assert "复合诉求并行拆分" in prompt
+    assert "批量独立构件" in prompt
+    assert "上下文隔离" in prompt
+    # 边界红线：cost-agent 不发起有状态全流程。
+    assert "无 `cost_workflow_start` 权限" in prompt
+
+
 def test_default_template_embeds_skill_runbook():
     """内置默认模板已固化 <skill_runbook>。"""
     template = prompt_module.SYSTEM_PROMPT_TEMPLATE

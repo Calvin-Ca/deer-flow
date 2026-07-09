@@ -79,12 +79,24 @@ uv run --project backend python benchmark/runner/run_toolcall_experiment.py --ru
 逐条挂 `tool_correct`（调没调对工具）/ `call_correct`（工具名对 + args 按 `arg_match` 命中）。
 ⚠️ 金标 `expected_call.tool` 须用**真实 agent 工具名**（qa.py/cost.py/ce-cost_*）；sample 里的 `query_bill_8100` 是理想名，照搬恒不命中。
 
+**已能跑的 runner —— cost_task 端到端组价评测**（τ-bench 式终态 + pass^k，需 :8100/:8102/:8099 起齐）：
+
+```
+uv run --project backend python benchmark/runner/run_cost_task_experiment.py --run-name cost_v1 --split test [--limit N] [--no-langfuse]
+```
+
+比 **agent 落定的最终清单码**（不比工具名/答案文本）+ 溯源 + 红线行为，逐条挂 `task_pass` / `redline_ok`；
+聚合出**任务成功率 pass^k（连跑全过）+ 红线违规率(独立，门=0) + 逐 difficulty + evaluable 覆盖率**。
+判定器 `benchmark/scoring/cost_task_score.py` 是**纯函数、已单测**（`test_cost_task_score.py`，22 例），
+外部判不了的红线（`no_rag_calc`/`no_fabricate_code` 等）诚实标 not_evaluable、不假装通过。
+> 终态码抽取是启发式（正则捞 9 位码，final=答案里最后一个）；首轮实跑后可按真实工具结果结构收紧（同 routing 的常量回调思路）。
+
 **待补前置、runner 暂未建的**：
 
 | 集 | runner 卡在哪 |
 |---|---|
-| `cost_task` | 端到端终态校验（`terminal_check`）要跑完整 agent + 解析组价终态 schema，待真金标 + 终态校验器 |
 | `norm_faithful` / `clause`（gb50016） | standard `gb50016` 不在 qa.py 支持列表；忠实度类指标走 LLM-judge 又撞 SSRF（§6.6）。待知识服务加载 GB50016 + SSRF 出路 |
+| `adversarial` / `trajectory` | 对抗红线鲁棒性 / 多轮轨迹，待建对应 runner（判定器可复用 cost_task_score 思路） |
 
 数据集口径见 `benchmark/routing_eval/README.md` 与 `benchmark/AGENT_BENCHMARK.md`（§L3 Recall@k、§L6-B arg_match）。
 

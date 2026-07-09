@@ -119,9 +119,11 @@ evidence,severity}]}`；多视角（单位镜/语义镜/漏项镜各查一遍）
     + `norm_verify` 工具 + `faithfulness_enabled()` 读 `CE_NORM_FAITHFULNESS_CHECK` 开关。
   - norm-qa 提示词升级为 agentic：**①复合问题先分解逐个检索 ②定稿前调 `norm_verify` 回查引用**、
     unfaithful→剥引用/降级"无库内依据"；`norm_verify` 工具已加进 norm-qa。
-  - **[待做] baseline 对比 runner**：`run_norm_faithful_experiment.py` 支持 `--mode traditional|agentic`，
-    同一 `norm_faithful` 集跑两轮出忠实率/误拒率对比（core 已就位：runner 从 trace 拿{答案,证据}直接
-    `check_faithfulness` 可靠度量，不依赖弱模型自觉）。**先跑传统基线再开 agentic 对比**。
+  - **[✓ 已实现] baseline 对比 runner**：`run_norm_faithful_experiment.py --mode traditional|agentic`，同一
+    `norm_faithful` 集跑两轮，`--mode` 控 `CE_NORM_FAITHFULNESS_CHECK` + variant 标签；判定器
+    `benchmark/scoring/norm_faithful_score.py`（纯函数、10 例单测）出**忠实率/幻觉引用率/答案要点覆盖/std 级
+    上下文召回 + 误拒率/漏拒率**——runner 从 trace 拿{答案, ce-rag 检索证据}直接 `check_faithfulness` 可靠度量、
+    不依赖弱模型自觉。**先跑 traditional 立基线再开 agentic，比忠实率↑/幻觉率↓**。
   > 面试话术："先立传统 RAG 基线，再加可配置的分解+引用回查同集横向比——忠实度 X→Y、误拒 Z、召回 A→B。"
 - **⑥ 主动学习闭环（few-shot 版已实现）**：HITL 人工纠正回流成 few-shot（不训练）。
 

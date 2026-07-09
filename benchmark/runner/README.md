@@ -91,12 +91,26 @@ uv run --project backend python benchmark/runner/run_cost_task_experiment.py --r
 外部判不了的红线（`no_rag_calc`/`no_fabricate_code` 等）诚实标 not_evaluable、不假装通过。
 > 终态码抽取是启发式（正则捞 9 位码，final=答案里最后一个）；首轮实跑后可按真实工具结果结构收紧（同 routing 的常量回调思路）。
 
+**已能跑的 runner —— norm_faithful 规范问答忠实度（traditional↔agentic 对比）**（需 :8100 + :8099）：
+
+```
+uv run --project backend python benchmark/runner/run_norm_faithful_experiment.py --mode traditional --run-name norm_base
+uv run --project backend python benchmark/runner/run_norm_faithful_experiment.py --mode agentic   --run-name norm_agentic
+```
+
+`--mode` 设 `CE_NORM_FAITHFULNESS_CHECK`（agentic=开引用回查/traditional=关基线）+ 打 variant 标签。判定器
+`benchmark/scoring/norm_faithful_score.py`（纯函数、10 例单测）：**忠实率**（引用条款号∈检索证据，复用
+`app.ce.norm.faithfulness`，即 agentic RAG 招牌）+ **误拒/漏拒率** + **答案要点覆盖** + **std 级上下文召回**；
+拒答用例不算忠实率。**先跑 traditional 立基线再跑 agentic**，比忠实率↑/幻觉率↓（MS.md ⑤ ablation）。
+> 忠实度的 RAGAS**论断落地**那半（每个论断是否真从条文推出）走 LLM-judge（`judges/norm_faithfulness.md`），
+> 撞 SSRF（§6.6）待出路；本 runner 做的是**可程序化判定**的忠实率/拒答/覆盖/召回四项。
+
 **待补前置、runner 暂未建的**：
 
 | 集 | runner 卡在哪 |
 |---|---|
-| `norm_faithful` / `clause`（gb50016） | standard `gb50016` 不在 qa.py 支持列表；忠实度类指标走 LLM-judge 又撞 SSRF（§6.6）。待知识服务加载 GB50016 + SSRF 出路 |
-| `adversarial` / `trajectory` | 对抗红线鲁棒性 / 多轮轨迹，待建对应 runner（判定器可复用 cost_task_score 思路） |
+| `clause`（gb50016） | standard `gb50016` 不在 qa.py 支持列表；待知识服务加载 GB50016 |
+| `adversarial` / `trajectory` | 对抗红线鲁棒性 / 多轮轨迹，待建对应 runner（判定器可复用 cost_task_score / norm_faithful_score 思路） |
 
 数据集口径见 `benchmark/routing_eval/README.md` 与 `benchmark/AGENT_BENCHMARK.md`（§L3 Recall@k、§L6-B arg_match）。
 

@@ -103,6 +103,9 @@ tools:
 - name: cost_recall_exemplars
   group: cost
   use: app.ce.cost.exemplars:cost_recall_exemplars_tool
+- name: norm_verify
+  group: norm
+  use: app.ce.norm.faithfulness:norm_verify_tool
 - name: ls
   group: file:read
   use: deerflow.sandbox.tools:ls_tool
@@ -299,9 +302,14 @@ subagents:
         不再重复问（除非用户改口径）。会话早前已说明口径、或问题自带版本/规范号 → 直接沿用不问。
         **哪部规范（房建/安装/计价）不用问**：服务端按问题类型确定性裁定，standard 只作 hint。
 
-        **工作方式**：直接调用 `ce-rag_search_clause` / `ce-rag_get_clause` / `ce-rag_expand_clause_refs`
-        等窄工具取得条文证据，再只基于证据生成回答。`standard` 可省时由问题类型或已确认口径推断；
-        无法确定地区/版本时先用 ask_clarification 反问。
+        **工作方式（agentic RAG）**：调用 `ce-rag_search_clause` / `ce-rag_get_clause` /
+        `ce-rag_expand_clause_refs` 等窄工具取条文证据，再只基于证据生成回答。`standard` 可省时由问题类型
+        或已确认口径推断；无法确定地区/版本时先 ask_clarification 反问。
+        - **① 复合问题先分解逐个检索**：一句里含多个子问题（如"某构件按什么计量、和另一种有何区别、各套什么清单"）
+          时，**先拆成子问题、对每个独立 `ce-rag_search_clause`**，再综合作答（整句检索会捞一锅粥、漏召）。
+        - **② 定稿前调 `norm_verify` 回查引用忠实性**：把你的答案 + 检索到的证据传给它，回查答案里引的每个条款号
+          是否真在证据里。`verdict=unfaithful`（有幻觉引用）→ **剥掉该引用或把该结论降级为"无库内依据"**，
+          绝不放行编造的条文号；`no_citation` 且非拒答 → 补检索或改为拒答。这是硬红线的确定性兜底。
 
         **输出处理**：读取工具返回的 JSON，向用户返回：
         - answer（带条文引用的回答正文）+ cited_clauses（引用的条文号 + 原文）
@@ -320,6 +328,7 @@ subagents:
         - ce-rag_expand_clause_refs
         - ce-rag_get_clause
         - ce-rag_retrieve_evidence
+        - norm_verify
       disallowed_tools:
         - task
         - present_files

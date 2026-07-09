@@ -112,6 +112,16 @@ evidence,severity}]}`；多视角（单位镜/语义镜/漏项镜各查一遍）
 
   **deer-flow 好做吗**：分解=prompt；存在性回查=纯函数可单测；toggle=env flag + prompt variant（现成）；
   度量=norm_faithful 现成。RAGAS 论断落地是重的那半（要裁判校准）。
+
+  **[✓ 已落地 agentic 半]**（`test_norm_faithfulness.py` 10 例单测通过）：
+  - `backend/app/ce/norm/faithfulness.py`：`check_faithfulness`（抠答案条款号→回查是否在检索证据里，
+    verdict=faithful/unfaithful/no_citation + faithful_rate；条款号正则只吞带小数点的、不误吞年份/标准号）
+    + `norm_verify` 工具 + `faithfulness_enabled()` 读 `CE_NORM_FAITHFULNESS_CHECK` 开关。
+  - norm-qa 提示词升级为 agentic：**①复合问题先分解逐个检索 ②定稿前调 `norm_verify` 回查引用**、
+    unfaithful→剥引用/降级"无库内依据"；`norm_verify` 工具已加进 norm-qa。
+  - **[待做] baseline 对比 runner**：`run_norm_faithful_experiment.py` 支持 `--mode traditional|agentic`，
+    同一 `norm_faithful` 集跑两轮出忠实率/误拒率对比（core 已就位：runner 从 trace 拿{答案,证据}直接
+    `check_faithfulness` 可靠度量，不依赖弱模型自觉）。**先跑传统基线再开 agentic 对比**。
   > 面试话术："先立传统 RAG 基线，再加可配置的分解+引用回查同集横向比——忠实度 X→Y、误拒 Z、召回 A→B。"
 - **⑥ 主动学习闭环（few-shot 版已实现）**：HITL 人工纠正回流成 few-shot（不训练）。
 

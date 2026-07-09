@@ -1,0 +1,14 @@
+{"id": "CC1", "query": "帮我把这根柱子的价弄出来", "group": "colloquial_cost", "expect_confidence": "low", "gold_capability": "cost", "note": "口语·「弄出来价」无组价动作词→确定性落 norm 兜底（low），LLM 应捞回 cost（呼应 F1）"}
+{"id": "CC2", "query": "这道墙砌起来得多少钱", "group": "colloquial_cost", "expect_confidence": "low", "gold_capability": "cost", "note": "口语·问某构件造价=组价诉求（非价格取数）→LLM 判 cost；无关键词故 low"}
+{"id": "CC3", "query": "帮我瞅瞅这块板要花多少造价", "group": "colloquial_cost", "expect_confidence": "low", "gold_capability": "cost", "note": "口语·「要花多少造价」→cost；缺组价动作词故 low"}
+{"id": "CC4", "query": "这个基础大概得多少钱", "group": "colloquial_cost", "expect_confidence": "low", "gold_capability": "cost", "note": "口语·问构件总价→cost；LLM 兜底捞回"}
+{"id": "CC5", "query": "这几个构件的价帮我出一下", "group": "colloquial_cost", "expect_confidence": "low", "gold_capability": "cost", "note": "口语·「出个价」→cost（组价非价格取数）"}
+{"id": "CC6", "query": "钢筋现在什么价", "group": "colloquial_price", "expect_confidence": "low", "gold_capability": "price", "note": "口语·问材料市场价（无期号/信息价关键词）→price 取数；LLM 应判 price 非 cost"}
+{"id": "CC7", "query": "混凝土最近多少钱一方", "group": "colloquial_price", "expect_confidence": "low", "gold_capability": "price", "note": "口语·问材料单价→price；无「信息价」强信号故 low"}
+{"id": "CC8", "query": "水泥这阵子涨了吗", "group": "colloquial_price", "expect_confidence": "low", "gold_capability": "price", "note": "口语·问价格趋势→price（FR-I02）；LLM 兜底识别"}
+{"id": "CC9", "query": "这个柱子的工程量是怎么来的", "group": "generic_norm", "expect_confidence": "low", "gold_capability": "norm", "note": "口语·问计量规则（工程量怎么算）→norm；易与 cost 混，LLM 应判 norm（问规则非要造价）"}
+{"id": "CC10", "query": "砖墙的量到底怎么算的", "group": "generic_norm", "expect_confidence": "low", "gold_capability": "norm", "note": "口语·计量规则问答→norm；缺规范号/版本，兜底后仍应首次反问口径"}
+{"id": "CC11", "query": "综合单价里头都包含些啥", "group": "generic_norm", "expect_confidence": "low", "gold_capability": "norm", "note": "口语·计价概念（综合单价费用构成）→norm/GB50500；非要给某构件组价"}
+{"id": "CC12", "query": "帮我瞄一眼这条清单算得对不对", "group": "colloquial_check", "expect_confidence": "low", "gold_capability": "cost-check", "note": "口语·核对诉求（无「核对/错套」强信号词）→cost-check（FR-C）；LLM 兜底识别核对意图"}
+{"id": "CC13", "query": "这个价按广州那边算得多少", "group": "colloquial_oos", "expect_confidence": "low", "gold_capability": "oos", "note": "口语他省口径→红线闸走确定性重推识别出「广州」出界（EH-03），LLM 不碰红线（呼应 F14）"}
+{"id": "CC14", "query": "这活儿大概什么行情", "group": "colloquial_cost", "expect_confidence": "low", "gold_capability": "cost", "note": "极口语·「什么行情」高度含糊→确定性必 low；LLM 兜底倾向 cost（问造价），二义边界样本"}

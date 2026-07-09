@@ -64,3 +64,16 @@
 ⚠️ 本集**升级率≈70% 是刻意的**（难例集富集含糊/口语样本，用于压测兜底腿）——**非真实流量升级率**；
 真实流量绝大多数命中强信号走确定性直配（零延迟），兜底只是少数长尾。红线闸（EH-03 出界 / caliber）
 两条路都确定性、LLM 不碰（`F14` 专验：口语他省仍由确定性重推识别出「北京」出界）。
+
+---
+
+## 真实用户请求扩充集（2026-07-09 新增，不动上面两个冻结金标）
+
+上面 `agent_routing_eval.jsonl` / `intent_fallback_eval.jsonl` 是**冻结回归护栏**（改动会污染基线）。下面两个是**同 schema 的真实请求扩充集**——按「造价员在前端对话框实际会打的话」造，覆盖全部落点类型，用真实项目特征（混凝土强度/截面/砂浆等级/砖规格/卷材层数…）而非占位符。**id 延续上面编号，可与冻结集直接 union**。
+
+| 文件 | schema | 内容 | 跑法 |
+|---|---|---|---|
+| `user_requests.jsonl` | 同 `agent_routing_eval.jsonl`（`agent`/`group`/`query`/`expect_route`/`expect_clarify`/`gold`/`note`） | 强信号真实请求，覆盖 cost-agent（组价 with/no_version、EH-04 缺特征、listing 列清单、EH-03 跨省、EH-01 比选/复合）、norm-qa（GB50854 计量 / GB50500 计价 / GB50856 安装 with/no_version、boundary 未收录、web_fallback）、price（信息价/趋势/跨省）、cost-check（FR-C 核对）、out-of-domain | 同上：前端对话框逐条贴 `query`，按路由率 + 口径红线遵守率人工判读 |
+| `user_requests_colloquial.jsonl` | 同 `intent_fallback_eval.jsonl`（`id`/`query`/`group`/`expect_confidence`/`gold_capability`/`note`） | 口语变体难例，压测 LLM 兜底腿：`colloquial_cost`/`colloquial_price`/`generic_norm`/`colloquial_check`（新增，FR-C 口语核对）/`colloquial_oos`（红线走确定性重推） | `cd ce-services && uv run python -m tools.intent_fallback_eval [--llm]`，同兜底三指标 |
+
+> 与 §8 无专家版口径一致：这批是**方法3 合成**的 input（真实分布近似、非真实流量），标签由 §4.3 决策表 / T9-1 口径策略机器可推导；`gold` 为**待跑分验证的期望值**，非专家金标，评测报告须声明「非真实流量分布」。新增构件的组价终态（`expected_quota`/`fee_band`）另见 `../agent_eval/cost_task/`。

@@ -2,7 +2,9 @@
 
 CE 生产拓扑（见记忆 `project_ce_deploy_topology`）里 **知识 ce-rag :8100 是裸机 `uv run`**，
 setsid 起的进程不扛重启。用 `ce-knowledge` systemd 单元让它开机自启 + 崩溃自拉起。
-（原 **任务层 :8101 已整体退役**，`ce-tasks.service` 已删；**ce-db :8102** 的裸机/单元部署以服务器为准，本仓未含。）
+（原 **任务层 :8101 已整体退役**，`ce-tasks.service` 已删。**ce-db :8102** 本仓暂无 systemd 单元——
+如需 docker 部署见 `docker/ce-code/docker-compose.yaml`（含 ce-rag + ce-db）；要裸机自启可照
+`ce-knowledge.service` 仿写一个 `ExecStart=... -m service.db_api` 的单元。）
 
 ## 安装（服务器，sudo）
 ```

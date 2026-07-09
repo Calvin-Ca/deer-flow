@@ -1,10 +1,12 @@
-# ce-rag 服务（:8100）—— 知识层检索服务，单独启动
+# 知识层（ce-code）—— 两个服务共用同一镜像（rag-knowledge，含 ce-code 全部代码），仅启动命令不同：
+#   ce-rag :8100  检索（条文/清单候选/证据；BM25+向量，经 CE_RERANK_URL 调精排）
+#   ce-db  :8102  结构化真值取数（定额/工料机/价格/费率，读 ce_cost PG）
 #
-# ⚠️ 本服务现为**纯 CPU**：唯一的本地 GPU 消费者（cross-encoder 精排）已拆到 docker/ce-rerank
-#    （:8098）。检索时经 CE_RERANK_URL HTTP 调它；rerank 服务不起 → 静默 fallback RRF（召回不变、精排失效）。
+# ⚠️ 两者均**纯 CPU**：唯一的本地 GPU 消费者（cross-encoder 精排）已拆到 docker/ce-rerank
+#    （:8095）。ce-rag 检索时经 CE_RERANK_URL HTTP 调它；rerank 不起 → 静默 fallback RRF（召回不变、精排失效）。
 #    embedding 早已在 :8097、Milvus/BM25/PG 皆非 GPU。故本 compose 不再 reserve GPU。
 #
-# 单独启动（从项目根执行）：
+# 单独启动（从项目根执行，一条命令起 ce-rag + ce-db）：
 #   cp docker/ce-code/.env.example docker/ce-code/.env
 #   docker compose -f docker/ce-code/docker-compose.yaml up -d
 #
@@ -31,3 +33,24 @@ services:
       timeout: 5s
       retries: 5
       start_period: 15s    # 纯 CPU 起得快（不再本地加载精排模型）
+
+  ce-db:
+    build:
+      context: ../..                      # 同 ce-rag：项目根（COPY ce-code/ 的基准）
+      dockerfile: docker/ce-code/Dockerfile
+    image: rag-knowledge:latest           # 复用同一镜像（含 ce-code 全部代码），仅 command 不同 → 镜像只 build 一次
+    container_name: rag-db
+    command: ["python", "-m", "service.db_api"]   # 覆盖 Dockerfile 默认 CMD（rag_api）→ 起 db_api :8102
+    network_mode: host                    # 直接复用宿主机网络，访问造价库 PG :5433
+    restart: unless-stopped
+    environment:
+      # 造价库 PG 连接串（ce-db 从 ce_cost 取定额子目/工料机含量/价格/费率结构化真值；密码在 .env、不入 git）。
+      # cost.query.resolve_dsn 读 CE_PG_DSN；缺省回落 postgresql://cost@localhost:5433/ce_cost（密码走 PGPASSWORD）。
+      - CE_PG_DSN=${CE_PG_DSN:-postgresql://cost@localhost:5433/ce_cost}
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:8102/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s    # 纯 CPU + 只连 PG，起得快

@@ -89,7 +89,30 @@ evidence,severity}]}`；多视角（单位镜/语义镜/漏项镜各查一遍）
 
 ## Tier 2 — 挑 1 个做深
 - **④ 模型路由/升桶**：默认 8B，低置信/高风险升 32B，报成本/质量权衡曲线（90% 走 8B，准确率持平，成本降 X%）。
-- **⑤ Agentic RAG 升级**：查询分解 + **引用忠实性校验**（生成的条文号回查是否真在检索结果里，不在则拒答）。
+- **⑤ Agentic RAG 升级（norm-qa）——先立传统 RAG 基线再对比**
+
+  **方法论（先做基线，别跳）**：引入 agentic RAG 前**必须先评传统 RAG 立基线**，否则"提升"没说服力。
+  做法：把两态做成**可配置开关**、用**同一评测集**（`benchmark/agent_eval/norm_faithful`，含 expect_refuse
+  测误拒）分别跑，Langfuse 按 variant 横向比 → 才有"忠实度 X→Y、误拒 Z、召回 A→B"的可信数字。**标准 ablation。**
+
+  **两个正交部件**（各一个开关，才能单变量归因）：
+  - **查询分解**（提召回）：复合规范问题先拆子问题、逐个检索再综合（agentic = LLM 规划检索，非固定检索一次）。
+    造价规范问题天然复合（计量+清单口径+取费），单句检索捞不准。norm-qa 本能多次检索，升级基本是 prompt。
+  - **引用忠实性校验**（提诚实，招牌）：生成后**回查答案引的每个条文号是否真在检索证据里**，不在则拒答/剥引用/
+    降级"无库内依据"——把红线"不编条文"从 prompt 祈祷变**确定性 enforced check**，治 RAG 头号幻觉。两层：
+    ① 存在性回查（确定性、可单测，`norm_verify`，与 cost-critic 的 verify.py 同套路）；② 论断落地（RAGAS 式，
+    走 `judges/norm_faithfulness.md` LLM 裁判，重、需先在小批人标上校准）。招牌是①（便宜且强）。
+
+  **可配置切换（传统 ↔ agentic，deer-flow 现成机制）**：
+  - 忠实校验 → `CE_NORM_FAITHFULNESS_CHECK` env flag（config 支持 `$ENV` + 热重载，确定性 gate，on/off 干净）。
+  - 查询分解 → **prompt variant**（deer-flow 已有 `system_prompt_path` 变体 + `resolve_active_prompt_variant`
+    给 trace 打 `variant:` 标签，本就是为 A/B 设计；agentic 提示词要求分解、传统单轮，切两份）。
+  - 评测 runner 参数化 `--mode traditional|agentic`，同一 `norm_faithful` 数据集跑两轮 → Langfuse dataset run
+    横向比。**顺序**：先跑传统基线 → 加开关 → 切两态对比，让归因诚实（是分解带来的还是忠实校验带来的）。
+
+  **deer-flow 好做吗**：分解=prompt；存在性回查=纯函数可单测；toggle=env flag + prompt variant（现成）；
+  度量=norm_faithful 现成。RAGAS 论断落地是重的那半（要裁判校准）。
+  > 面试话术："先立传统 RAG 基线，再加可配置的分解+引用回查同集横向比——忠实度 X→Y、误拒 Z、召回 A→B。"
 - **⑥ 主动学习闭环（few-shot 版已实现）**：HITL 人工纠正回流成 few-shot（不训练）。
 
   **核心洞察**：置信门本就是 active-learning 采样器（把低置信选码路由给人）。闭环 = 把人工在闸上给的

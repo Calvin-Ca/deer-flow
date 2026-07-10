@@ -32,7 +32,7 @@ sudo docker compose -f docker/ce-rerank/docker-compose.yaml --env-file docker/ce
 ```bash
 for p in 8100 8102; do printf ":$p -> "; curl -s -o /dev/null -w "%{http_code}\n" localhost:$p/health; done
 ```
-> 全服务（含 harness）+ dev/prod 两态启动手册见仓库根 `DEPLOY.md`；vLLM :8099 / embed :8097 是仓外 GPU 服务，须另行在跑。
+> 全服务（含 harness）+ dev/prod 两态启动手册见 `docker/README.md`；vLLM :8099 / embed :8097 是仓外 GPU 服务，须另行在跑。
 
 > - 需求/设计（领域铁律、schema、多表征、检索/造价设计、端点规格）见 `PRD.md`
 > - **服务接口契约**（`ce-rag` / `ce-db` / 任务服务边界、候选/真值/证据语义）见 `../ce-services/INTERFACE_CONTRACTS.md`

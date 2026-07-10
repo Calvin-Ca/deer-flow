@@ -5,6 +5,23 @@
 metadata=用例号/能力/分组/判读提示）。上传后即可用 ``run_routing_experiment.py``
 对同一数据集反复跑实验、在 UI 里按 variant/model 横向比。
 
+本脚本在全链路中的位置（``[本地]``=在 runner 进程内算、不碰 Langfuse；``[LF]``=Langfuse
+服务端执行/存储）。可见 **upload_datasets 只是其中「[LF 写] 登记靶子」这一步**——判分与
+跑 agent 全在本地，Langfuse 只当账本：
+
+    benchmark/routing_eval/agent_routing_eval.jsonl          [本地] 金标源文件
+        │  upload_datasets.py（本脚本）：读 jsonl → create_dataset_item
+        ▼
+    Langfuse Dataset「agent-routing-eval」(items)            [LF 写] 登记靶子
+        │  run_routing_experiment.py：get_dataset().items    [LF 读] 拉回用例
+        ▼
+    跑 agent（DeerFlowClient 调模型/工具、旁观工具调用）       [本地] 驱动 + 观测
+        ▼
+    本地判分 route_ok / clarify_ok（纯 Python 对金标）         [本地] 判官（非 Langfuse）
+        │  create_score / dataset_run_items.create           [LF 写] 挂分 + 挂进 run
+        ▼
+    Datasets → Runs → lead_v1（看板）                        [LF UI] 逐用例 × 跨 run 比
+
 幂等：``create_dataset`` 同名复用；item 以原始用例 id 作 dataset item id，重复上传
 覆盖同 id 而非堆叠。
 

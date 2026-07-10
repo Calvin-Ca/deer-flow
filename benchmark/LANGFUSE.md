@@ -21,15 +21,14 @@
 
 ## 2. 已打通的能力
 
-前 3 件是「脚本/后端驱动」、跑通即得；后 2 件是「Langfuse UI 侧」，代码只喂料、真正的「跑/评」在 UI 点（详见 §5）。
+前 3 件是「脚本/后端驱动」、跑通即得；第 4 件是「Langfuse UI 侧」，代码只留评分细则、真正的「评」在 UI 点（详见 §5）。
 
 | # | 事 | 形态 | 入口 |
 |---|---|---|---|
 | 1 | **链路冒烟**：发一次对话→读回 trace，验标签正确 | 脚本 | `runner/smoke_test.py` |
 | 2 | **benchmark→Dataset+自动评测**：金标灌进 Dataset，逐条跑 agent、程序化挂分 | 脚本 | `runner/upload_datasets.py` + `runner/run_routing_experiment.py` |
 | 3 | **线上反馈→score 闭环**：前端点赞踩→回写成 trace 的 score | **后端内建** | `app/gateway/routers/feedback.py` |
-| 4 | **Prompt Experiments**：自包含 intent 分类 prompt 纳管，UI 里换版本/模型横向比 | 脚本喂料 + UI | `runner/upload_prompts.py` + `prompts/intent_classify.txt`（§5.1） |
-| 5 | **LLM-as-judge**：对已有 trace 自动打语义分（忠实度/选码合理性） | 细则留底 + UI | `judges/*.md`（§5.2） |
+| 4 | **LLM-as-judge**：对已有 trace 自动打语义分（忠实度/选码合理性） | 细则留底 + UI | `judges/*.md`（§5.1） |
 
 ---
 
@@ -83,7 +82,6 @@ trace_id = Langfuse.create_trace_id(seed=run_id)
 - `run_routing_experiment.py`：逐条把 query 喂默认 lead agent，从工具调用判两率，读回 trace → `dataset_run_items.create` 关联进 dataset run + `create_score` 挂分。
 - `run_retrieval_experiment.py`：**清单匹配**评测——复用 `ce-services/tools/eval_select.py` 的 bill_match 召回 + select_code 选码（Recall@k / Top-1 / 高置信错码红线），手建 trace 挂 `match_top1` / `recalled`。需 :8100 + :8099。
 - `run_toolcall_experiment.py`：**工具调用**评测——逐条跑 agent，按 `arg_match`（exact/subset）比完整 tool_calls 与 `expected_call`，挂 `tool_correct` / `call_correct`。需四服务起齐。
-- `upload_prompts.py`：把自包含 prompt（intent 分类）推进 Prompt Management（供 UI 侧 Prompt Experiments，当前受 §6.6 SSRF 阻断搁置）。
 
 **判定口径**（对标 `routing_eval/README` 两率）：
 - `route_correct`：该调脚本就调——按**工具名**判（`qa.py` / `cost.py` / `ce-cost_*`），bash/read_file 瞎折腾不算。
@@ -91,33 +89,17 @@ trace_id = Langfuse.create_trace_id(seed=run_id)
 
 ---
 
-## 5. UI 侧评测：Prompt Experiments 与 LLM-as-judge
+## 5. UI 侧评测：LLM-as-judge
 
-§4 的 runner 是「脚本驱动 agent 真跑」——测路由这类**带工具调用**的能力必须走它。本节是另两条**主体在 Langfuse UI 上点**的路子，代码侧只「喂料」（推 prompt、留 judge 细则），适合**单跳 prompt 消融**和**对已有 trace 自动打分**。
+§4 的 runner 是「脚本驱动 agent 真跑」——测路由这类**带工具调用**的能力必须走它。本节是另一条**主体在 Langfuse UI 上点**的路子，代码侧只留 judge 细则，适合**对已有 trace 自动打分**。
 
-> **边界**：Prompt Experiments 只做「单 prompt → 一次 LLM 调用」，**跑不了完整 agent**（无工具/MCP/路由）。所以它**测不了路由两率**（那条只能走 `run_routing_experiment.py`）；它的位置是「自包含单跳 prompt 的横向比」。
+> 🚧 **当前状态（2026-06-30）：本功能暂搁置。** LLM-as-judge 要 Langfuse **主动去调模型**，而 Langfuse 的 SSRF 防护**硬拦内网私网 IP**，本项目模型全在内网 → 配 model connection 即报 `Blocked IP address detected`，且 v4 无可用放行开关（详见 §6.6）。喂料（`judges/*.md`）已就位，等满足以下任一条件再启用：① 接一个**公网模型**（如 qwen-plus，过 SSRF + judge 更强，但数据出内网）；② 或改成**脚本驱动纯内网**（脚本调内网模型当判官、`create_score` 推分回 trace，复用 `run_routing_experiment.py` 同套管道，数据不出内网）。下面 5.0–5.1 是「墙打通后」的 UI 用法，先留作 runbook。
 
-> 🚧 **当前状态（2026-06-30）：本节两功能暂搁置。** 它们都要 Langfuse **主动去调模型**，而 Langfuse 的 SSRF 防护**硬拦内网私网 IP**，本项目模型全在内网 → 配 model connection 即报 `Blocked IP address detected`，且 v4 无可用放行开关（详见 §6.6）。脚本/喂料（`upload_prompts.py`、`judges/*.md`、`intent_classify.txt`）已就位，等满足以下任一条件再启用：① 接一个**公网模型**（如 qwen-plus，过 SSRF + judge 更强，但数据出内网）；② 或改成**脚本驱动纯内网**（脚本调内网模型当判官、`create_score` 推分回 trace，复用 `run_routing_experiment.py` 同套管道，数据不出内网）。下面 5.0–5.2 是「墙打通后」的 UI 用法，先留作 runbook。
+### 5.0 前置：在 UI 配一个 model connection
 
-### 5.0 前置：在 UI 配一个 model connection（两功能共用）
+Settings → LLM Connections → Add：填 judge 用的模型。⚠️ **填内网 IP 会被 SSRF 拦**（见上方状态横幅 + §6.6）——只有目标是**公网端点**时这步才走得通。LLM-as-judge 的「评」要它，没有它点不动。
 
-Settings → LLM Connections → Add：填被测/judge 用的模型。⚠️ **填内网 IP 会被 SSRF 拦**（见上方状态横幅 + §6.6）——只有目标是**公网端点**时这步才走得通。Prompt Experiments 的「跑」和 LLM-as-judge 的「评」都要它，没有它两个都点不动。
-
-### 5.1 Prompt Experiments —— 纳管 intent 分类 prompt，UI 里横向比
-
-意图分类被抽成**自包含单跳** prompt（`benchmark/prompts/intent_classify.txt`，`{{query}}` → `norm|cost|both|clarify|chat`），不需要 agent，正好喂 Prompt Experiments。
-
-1. 推进 Prompt Management（服务器上）：
-   ```
-   uv run --project backend python benchmark/runner/upload_prompts.py
-   ```
-   → UI Prompts 里出现 `intent-classify`（带 `production` 标签的版本）。改口径只改那个 txt 重跑本脚本，**新版本累积、旧版本保留可回溯**。
-2. 跑实验：Datasets → `agent-routing-eval` → **New experiment** → 选 `intent-classify` prompt + 5.0 的 model connection → Run。它对每条 item 用 `{{query}}` 跑一次出意图标签。
-3. 比/评：多发几个 prompt 版本各跑一次，UI 里并排比；要自动判对错，给该 experiment 挂一个 evaluator（最简：LLM-judge 比对输出标签与金标里能推出的期望意图——金标 `agent` 字段 norm-qa→norm / cost-agent→cost，`expect_clarify=true & 无版本`→clarify）。
-
-**单一事实源**：prompt 文本在 git 的 `intent_classify.txt`，UI 里的版本是它的快照。别在 UI 直接改 prompt 而不回写文件，否则 Mac↔服务器 git 流里会丢。
-
-### 5.2 LLM-as-judge —— 对已有 trace 自动打分
+### 5.1 LLM-as-judge —— 对已有 trace 自动打分
 
 judge 评的是**已落库的 trace**，配好后新 trace 自动出分。两份评分细则已在 git 留底，**改口径改文件、再到 UI 更新 Prompt 版本**：
 
@@ -173,7 +155,7 @@ config.yaml 里没有叫 `qwen-plus` 的模型。先用 `DeerFlowClient().list_m
 
 ### 6.6 Langfuse UI 连内网模型：SSRF 死路 + rootful/rootless 双 daemon 坑
 
-接 Prompt Experiments / LLM-as-judge 时撞了两层坑，都很费时，记下来。
+接 LLM-as-judge 时撞了两层坑，都很费时，记下来。
 
 **坑一·SSRF 拦内网私网 IP（无解，已定论）**：在 UI 配 LLM connection 填内网端点（如 `http://172.19.3.136:8099/v1`）报 `Blocked IP address detected`。根因是 Langfuse 对**用户填的 URL**做 SSRF 防护、**硬拦 RFC1918 私网段**（`10/8`、`172.16/12`、`192.168/16`），本项目模型全在 `172.19.x` → 必拦。
 - 官方变量 `LANGFUSE_UNSAFE_TRUSTED_PRIVATE_IPS=true`（web+worker 都加）**文档有、实际没实装**，4.5.1 实测无效，官方 issue #13097 标 **not planned**。我们加上去重建容器、确认 env 已注入，UI 仍拦——**坐实无效**，遂从 compose 移除（只留注释）。
@@ -208,8 +190,7 @@ config.yaml 里没有叫 `qwen-plus` 的模型。先用 `DeerFlowClient().list_m
 - [ ] `agent_eval/norm_faithful` + 条文召回 runner 待建：均打在 GB50016，**待 qa.py 支持 gb50016**（知识层）；忠实度类指标走 LLM-judge 又卡 SSRF（§6.6）。
 - [ ] 想清噪音后再消 MCP 会话 GC 报错（§6.1 残留）。根因是同进程跨多个事件循环复用全局 MCP 缓存——**串行救不了，靠进程/循环隔离**。两条路线择一：① 把整轮跑进**单个 asyncio 事件循环**（用 agent 异步接口逐条 await，会话全程同 loop）；② **子进程隔离**，每条用例 fork 独立进程跑（复刻已验证干净的冒烟测试路径，更稳、不改异步驱动，但 17× 冷启动明显变慢）。纯美观收益，不损结果，优先级低。
 - [x] norm-qa 忠实度 / cost 选码合理性走 LLM-as-judge：评分细则已落 `benchmark/judges/*.md`（喂料就绪）。
-- [x] intent 分类 Prompt Experiment 喂料就绪：`prompts/intent_classify.txt` + `runner/upload_prompts.py`。
-- [ ] 🚧 **UI 侧两功能（Prompt Experiments / LLM-as-judge）被 SSRF 阻断、暂搁置**（§6.6）：内网模型配 connection 必报 `Blocked IP`，v4 无放行开关。**重启时二选一**：① UI 侧接公网 qwen-plus（数据出内网）；② 改脚本驱动纯内网（脚本当判官 + `create_score` 推分，复用 `run_routing_experiment.py` 管道）。**倾向 ②**（合 §1「数据不出内网」），届时两份 judge 细则与 intent prompt 直接复用。
+- [ ] 🚧 **UI 侧 LLM-as-judge 被 SSRF 阻断、暂搁置**（§6.6）：内网模型配 connection 必报 `Blocked IP`，v4 无放行开关。**重启时二选一**：① UI 侧接公网 qwen-plus（数据出内网）；② 改脚本驱动纯内网（脚本当判官 + `create_score` 推分，复用 `run_routing_experiment.py` 管道）。**倾向 ②**（合 §1「数据不出内网」），届时两份 judge 细则直接复用。
 - [ ] 启用后：两份 judge 先在小批人标样本上**校准**（judge 判 0/1 与人判一致率），再上量；忠实度可进一步对接 RAGAS。
 
 ---
@@ -284,7 +265,7 @@ uv run --project backend python benchmark/runner/run_toolcall_experiment.py --ru
 |---|---|
 | `cost_task` | runner 待建（端到端跑 agent + `terminal_check` 终态校验）。数据集已可灌、可在 UI 见金标 |
 | 条文召回（gb50016）/ `norm_faithful` | standard `gb50016` 不在 qa.py 支持列表（知识层前置）；忠实度类指标走 LLM-judge 又撞 SSRF（§6.6） |
-| LLM-as-judge / Prompt Experiments（UI 侧） | 内网模型被 SSRF 拦，**暂搁置**；改脚本驱动纯内网或指公网模型（§5 状态横幅、§6.6） |
+| LLM-as-judge（UI 侧） | 内网模型被 SSRF 拦，**暂搁置**；改脚本驱动纯内网或指公网模型（§5 状态横幅、§6.6） |
 
 ### 一句话流程
 

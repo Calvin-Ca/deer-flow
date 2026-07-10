@@ -12,9 +12,9 @@ run（UI 里 Datasets→Runs 可横向比 prompt variant），并 ``create_score
 生命周期一打架就崩（cancel scope / Task destroyed）。本脚本改为**主线程、逐条、
 不另起 loop**，与冒烟测试完全同构——那条路已验证干净退出。
 
-判定信号是「外部观测启发式」：路由是否发生靠匹配工具名/参数里的 ROUTE_SIGNALS，
-先按经验给默认值，跑一轮后照真实 trace 里 agent 的实际调用方式（多半是带 ce-cost
-前缀的 MCP 工具名）回调本常量。
+判定信号是「外部观测启发式」：路由是否发生靠匹配 agent 实际调用的工具名是否在
+ROUTE_TOOL_NAMES 里（统一精确名，不用前缀）。跑一轮后照真实 trace 里 agent 的实际
+工具名回校本常量。
 
 运行（服务器上，需四服务起齐使 agent 真能调脚本）：
     uv run --project backend python benchmark/runner/run_routing_experiment.py \
@@ -36,18 +36,29 @@ from _lf import require_langfuse, wait_for_traces  # noqa: E402
 
 DATASET_NAME = "agent-routing-eval"
 
-# 「发生了路由」= agent 调了正经的知识/算量工具（按工具名判定，可靠：名字在流式
+# 「发生了路由」= lead agent 调了正经的算量/路由工具（按工具名判定，可靠：名字在流式
 # tool_call 首片里就到齐，不像 args 会分片）。口径见 routing_eval/README：路由 = 调
-# 脚本/工具，bash/read_file 自己瞎折腾不算。首轮实跑确认真实工具名为 qa.py / cost.py
-# （脚本式工具）与 ce-cost_* / ce-rag_* / ce-db_*（MCP 工具）；新增工具时往这两处加。
-ROUTE_TOOL_NAMES = {"qa.py", "cost.py"}
-ROUTE_TOOL_PREFIXES = ("ce-cost", "ce-rag", "ce-db")
+# cost_workflow_* 工作流节点或 task 分派子智能体；bash/read_file 自己瞎折腾不算。
+# 集合由 config.yaml + lead_agent.md 的「lead 可见工具面」确定（统一精确名、不用前缀）：
+#   · cost 路由 = cost_workflow_start/node/resume/state（group=cost，lead 可见）
+#   · norm 路由 = task 分派 norm-qa（无顶层 norm 路由工具，norm 唯一入口就是 task）
+# 刻意不收：① ce-rag_*/ce-db_* 是 deferred 工具、被 DeferredToolFilterMiddleware 对 lead 模型
+#   默认隐藏（是 cost_workflow 节点/子智能体内部的窄原语，lead 不直接调）；② norm_verify 是
+#   引用忠实度回查、③ cost_verify/cost_recall_exemplars 是组价内部辅助——三者皆非路由入口。
+# task 只表示「分派了某子智能体」，光看名字分不清路由到 cost 还是 norm（要区分得读 subagent_type）。
+ROUTE_TOOL_NAMES = {
+    "cost_workflow_start",
+    "cost_workflow_node",
+    "cost_workflow_resume",
+    "cost_workflow_state",
+    "task",
+}
 CLARIFY_TOOL = "ask_clarification"
 
 
 def _is_route_tool(name: str) -> bool:
-    """工具名是否属于「正经路由工具」（精确名或前缀命中）。"""
-    return name in ROUTE_TOOL_NAMES or any(name.startswith(p) for p in ROUTE_TOOL_PREFIXES)
+    """工具名是否属于「正经路由工具」（精确名命中）。"""
+    return name in ROUTE_TOOL_NAMES
 
 
 def _is_fetch_tool(name: str) -> bool:

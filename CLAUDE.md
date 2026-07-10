@@ -44,8 +44,8 @@
 ### 2.3 服务器验证两态：dev 调试态 / Docker 生产态（2026-07-06 定）
 
 - **日常改码验证一律用 dev 调试态，不重建 Docker**：backend 用 VS Code debugpy 起 uvicorn :8001，
-  launch.json **必须带 `"envFile": "${workspaceFolder}/.env"`**——`CE_ROUTE_CONTEXT_URL` 等灰度开关在
-  `.env` 里，缺了路由注入/哑火收编中间件整个不注册（agent.py 未设=不启用），验了等于白验；frontend
+  launch.json **必须带 `"envFile": "${workspaceFolder}/.env"`**——LANGFUSE / 模型密钥等运行时开关都在
+  `.env` 里，缺了 envFile 等于拿残缺环境验、验了等于白验；frontend
   `pnpm exec next dev --turbo --port 2026`（next.config 的 dev rewrites 直连 :8001 无需 nginx，内网直访
   172.19.3.136:2026 已放行）。改后端 F5 重启调试（秒级），改前端热更新。**debugpy 下禁加 `--reload`**
   （fork 子进程断点脱靶）。

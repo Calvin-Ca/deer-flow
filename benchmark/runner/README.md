@@ -32,9 +32,9 @@ uv run --project backend python benchmark/runner/run_routing_experiment.py --run
 
 自动算两率并把每条结果 + 分数挂到 Langfuse 的 dataset run：
 - `clarify_correct`：该反问就反问（命中 `ask_clarification`）——红线主判据；
-- `route_correct`：该调脚本就调（工具名/ bash 命中 `qa.py`/`cost.py` 等 `ROUTE_SIGNALS`）。
+- `route_correct`：该调脚本就调（工具名命中 `ROUTE_TOOL_NAMES`：`cost_workflow_*` / `task`）。
 
-> **判定是外部观测启发式**：路由是否发生靠匹配工具调用文本里的 `ROUTE_SIGNALS`（见 `run_routing_experiment.py` 顶部常量）。跑首轮后照真实 trace 里 agent 的实际调用方式（多半是带 `ce-cost` 前缀的 MCP 工具名）回调该常量，再上量。
+> **判定是外部观测启发式**：路由是否发生靠匹配 agent 实际调的工具名是否在 `ROUTE_TOOL_NAMES`（**精确名集合、不用前缀**；见 `run_routing_experiment.py` 顶部常量）。跑首轮后照真实 trace 里 agent 的实际工具名回校该常量，再上量。
 >
 > **实现说明**：脚本**主线程逐条**跑（与 `smoke_test.py` 同一调用路径，已验证干净退出），**未用** `dataset.run_experiment`——后者在自己的事件循环里调 task，会和 `DeerFlowClient.stream` 的持久 MCP 会话生命周期相撞而崩（cancel scope / Task destroyed）。每条跑完读回其 trace，用 `dataset_run_items.create` 把这条 agent trace 直接关联进同名 dataset run，再 `create_score` 挂 `route_correct` / `clarify_correct`——所以 UI 里 Datasets→Runs 下每条就是 agent 自己的完整 trace，分数也挂在同一条上，不再是两棵分离的树。
 
@@ -77,7 +77,7 @@ uv run --project backend python benchmark/runner/run_toolcall_experiment.py --ru
 ```
 
 逐条挂 `tool_correct`（调没调对工具）/ `call_correct`（工具名对 + args 按 `arg_match` 命中）。
-⚠️ 金标 `expected_call.tool` 须用**真实 agent 工具名**（qa.py/cost.py/ce-cost_*）；sample 里的 `query_bill_8100` 是理想名，照搬恒不命中。
+⚠️ 金标 `expected_call.tool` 须用**真实 agent 工具名**（`cost_workflow_*` / `ce-rag_*` / `ce-db_*` / `task` 等）；sample 里的 `query_bill_8100` 是理想名，照搬恒不命中。
 
 **已能跑的 runner —— cost_task 端到端组价评测**（τ-bench 式终态 + pass^k，需 :8100/:8102/:8099 起齐）：
 

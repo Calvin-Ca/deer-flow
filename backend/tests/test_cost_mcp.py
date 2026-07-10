@@ -29,8 +29,8 @@ def test_invoke_clean_async_no_running_loop():
     assert _invoke_tool_clean(FakeTool(result={"ok": 1}), {}) == {"ok": 1}
 
 
-def test_invoke_clean_from_running_loop_offloads_to_thread():
-    # 罕见：从 async 上下文直调 → 检测到运行中 loop → offload 到线程，不嵌套 run_until_complete
+def test_invoke_clean_from_running_loop_via_bridge():
+    # 罕见：从 async 上下文直调 → 投到常驻桥接 loop（另一线程）跑、阻塞取结果，不嵌套/不死锁
     async def main():
         return _invoke_tool_clean(FakeTool(result="in-loop"), {})
 

@@ -3,47 +3,44 @@
 from __future__ import annotations
 
 import asyncio
-import concurrent.futures
 import json
+import threading
 from typing import Any
 
+# ── 进程级常驻"桥接 loop"线程 ──────────────────────────────────────────────────
+# HTTP-MCP（streamable_http）工具每次 ainvoke 会用 anyio task group 开/关一个会话；anyio 的 cancel scope
+# 要求**进入与退出在同一个 task**。用 tool.invoke(sync) 或"每次换个新 loop + shutdown_asyncgens"驱动时，
+# 会话的异步生成器会在异任务里被拆解 → `cancel scope in a different task` / `Task destroyed` / `athrow
+# already running` 噪声（功能其实成功，噪声只在清理阶段）。
+# 解法：所有 MCP 异步调用都投到**同一个常驻后台 loop**上跑——会话的开/用/关全落在这个 loop 的同一批 task 里，
+# 永不跨 task、永不被外部强关。缓存的 MCP 客户端会话也稳定绑在此 loop 上，多次调用一致。
+_BRIDGE_LOOP: asyncio.AbstractEventLoop | None = None
+_BRIDGE_LOCK = threading.Lock()
 
-def _run_in_fresh_loop(tool: Any, args: dict[str, Any]) -> Any:
-    """在**专属新 event loop** 里跑 MCP 工具的异步路径并干净收尾。
 
-    HTTP-MCP（streamable_http）工具每次调用会开/关一个 anyio task group 会话。用 ``tool.invoke``（sync）
-    从"无常驻 loop"的上下文（裸脚本、LangGraph 的 sync-tool 线程）驱动时，会话的异步生成器会在与创建
-    时不同的任务里被拆解 → ``cancel scope in a different task`` / ``Task destroyed but pending`` 噪声
-    （功能其实成功了，噪声只在清理阶段）。这里自建一个 loop 跑 ``ainvoke``，跑完**先 shutdown_asyncgens
-    把 streamable_http 的异步生成器全部关掉、再 close loop**，让清理同步发生在本函数内，而非进程退出时。
-    """
-    loop = asyncio.new_event_loop()
-    try:
-        asyncio.set_event_loop(loop)
-        result = loop.run_until_complete(tool.ainvoke(args))
-        loop.run_until_complete(loop.shutdown_asyncgens())  # 排空 streamable_http 异步生成器，杜绝退出期噪声
-        return result
-    finally:
-        asyncio.set_event_loop(None)
-        loop.close()
+def _bridge_loop() -> asyncio.AbstractEventLoop:
+    """取（惰性建）常驻桥接 event loop（跑在专属 daemon 线程上，进程存活期间一直运行）。"""
+    global _BRIDGE_LOOP
+    with _BRIDGE_LOCK:
+        if _BRIDGE_LOOP is not None and not _BRIDGE_LOOP.is_closed():
+            return _BRIDGE_LOOP
+        loop = asyncio.new_event_loop()
+        threading.Thread(target=loop.run_forever, name="ce-mcp-bridge-loop", daemon=True).start()
+        _BRIDGE_LOOP = loop
+        return loop
 
 
 def _invoke_tool_clean(tool: Any, args: dict[str, Any]) -> Any:
-    """驱动 MCP 工具且不产生 async 拆解噪声（兼容"当前线程已有运行中 loop"的罕见情形）。
+    """在常驻桥接 loop 上跑 MCP 工具的异步路径，避免 async 拆解噪声；阻塞等结果返回。
 
-    - 当前线程**无**运行中 loop（裸脚本 / LangGraph sync-tool 线程，最常见）→ 直接在本线程建 fresh loop 跑。
-    - 当前线程**有**运行中 loop（从 async 上下文直调，罕见）→ offload 到一次性线程里用它自己的 fresh loop 跑，
-      避免嵌套 ``run_until_complete``。
     工具无 ``ainvoke``（非 langchain 工具）时回退 ``invoke``。真错误照常向上抛，由 ``call_mcp_tool`` 归一。
+    注：调用线程会阻塞等桥接 loop 出结果——本项目里 MCP 调用都发生在 sync 上下文（裸脚本 / LangGraph
+    的 sync-tool 线程），阻塞的是调用线程、非任何运行中的 loop，安全。
     """
     if not hasattr(tool, "ainvoke"):
         return tool.invoke(args)
-    try:
-        asyncio.get_running_loop()
-    except RuntimeError:
-        return _run_in_fresh_loop(tool, args)  # 无运行中 loop：本线程直接跑
-    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:  # 有运行中 loop：隔离到线程
-        return ex.submit(_run_in_fresh_loop, tool, args).result()
+    fut = asyncio.run_coroutine_threadsafe(tool.ainvoke(args), _bridge_loop())
+    return fut.result()
 
 
 def _parse_json_text(text: str) -> Any:

@@ -69,3 +69,33 @@
 - 服务器路径：`/mnt/nvme/calvin/code/deer-flow/`（home: `/home/caic`）
 - Python **3.12.13**，PyTorch **2.5.1+cu121**；包管理器 **uv 0.11.14**，依赖统一用 `uv add`，**严禁 `uv pip install`** 绕过 `pyproject.toml`
 - GPU：4x RTX 4090（各 24564 MiB），驱动 535.230.02
+
+---
+
+## 3. Benchmark 测试进度与续测入口（2026-07-10）
+
+> 当前阶段：**路由层（L1）评测调试中**。规范/门线见 `benchmark/AGENT_BENCHMARK.md`，runner 操作见 `benchmark/runner/README.md`。
+
+### 3.1 两个测试入口（都在服务器跑，`uv run --project backend python ...`）
+
+1. **批量评分 runner**（进程内嵌入式 DeerFlowClient，**不经 gateway**）——出 `route_correct`/`clarify_correct` 两率：
+   - `benchmark/runner/upload_datasets.py --only routing`（用例源=Langfuse dataset，先灌）
+   - `benchmark/runner/run_routing_experiment.py --run-name <名> [--model qwen-plus]`
+   - 逐 variant 换 `--run-name`，Langfuse `Datasets→Runs→Compare` 横向比。
+2. **单条路由探针** `benchmark/runner/probe_gateway.py "<query>" [--model qwen3-8b]`（外部 HTTP、**经 gateway 全栈**，可配 debugpy 断点）——看单条 `[tool]` + `did_route`/`did_clarify`。凭据放根 `.env`（`DEER_FLOW_PROBE_EMAIL`/`DEER_FLOW_PROBE_PASSWORD`，已 gitignore）。
+
+### 3.2 本阶段已定/已修
+
+- **runner 路径修复**：`benchmark/runner/_paths.py`——从仓库根跑时补 `import app` + 设 `DEER_FLOW_PROJECT_ROOT=backend`，使 lead agent 真读到 `backend/prompts/ce/lead_agent.md`（否则静默回退内置模板、评测失真）。
+- **路由判定常量（config-grounded）**：`ROUTE_TOOL_NAMES = {cost_workflow_start/node/resume/state, task}`，已删 prefix 与死名 `qa.py`/`cost.py`。依据 lead 可见工具面：`ce-rag_*`/`ce-db_*` 因 `DeferredToolFilterMiddleware` 对 lead 隐藏故不收；`norm_verify`/`cost_verify`/`cost_recall_exemplars` 非路由入口。
+- **Langfuse 定位定案**：判官=本地 Python 判定函数、模型=runner/gateway 调、**Langfuse 只当账本**（收 trace + `create_score`）。不上 Langfuse 原生 evaluator（确定性逻辑装不下 + SSRF 拦内网模型）；Prompt Experiment 上传路径（`upload_prompts`）已删。
+- **clarify 单列红线**：`ask_clarification` 触发 HITL（`ClarificationMiddleware`→`Command(goto=END)` 中断等人），门 0.95，**不并入路由分**（红线独立计分）。
+- **已删过时机制**：`CE_ROUTE_CONTEXT_URL`/RouteContextMiddleware（早在 `3691cbd4` 移除，本次清文档残留）。
+
+### 3.3 下一步（按序）
+
+1. **复跑路由**确认新常量修对（`route_correct` 应回升）；`[tool]` 若冒出集合外的真实名 → 补进 `ROUTE_TOOL_NAMES`。
+2. **归因失败用例**（翻 trace）：分「测量错/服务没起/agent 真错」三类，别对着坏尺子调提示词。
+3. （深化，可选）`task` 光看名字分不清 cost/norm → 收 `task` 的 `subagent_type`，把「路由**对不对**」也量起来（现只量「有没有路由」）。
+4. **两态 base_url**：dev gateway 调本地 qwen3-8b 须 `config.yaml` base_url=`localhost:8099`（Docker 态才 `host.docker.internal:8099`）。
+5. 路由稳后**铺开** toolcall/cost_task/norm_faithful——同样先对齐各自判定常量的真实工具名。

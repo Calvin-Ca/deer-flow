@@ -3,6 +3,37 @@
 **深圳房建组价知识库 + 造价规范 RAG 知识层**（清单 / 定额 / 价格 / 费率 + 规范条文检索 + 候选召回）。
 本文件只**涉及**：目录结构、流水线命令、起服务。算量不在本层。
 
+---
+
+## 🚀 启动知识层服务（ce-rag :8100 + ce-db :8102）
+
+两个常驻 HTTP-MCP 服务，供 backend agent 消费（`ce-rag_*` / `ce-db_*` 工具）。**先确认下游依赖在跑**
+（否则健康不过）：Milvus :19530 / embed :8097 / rerank :8095 ←ce-rag；PostgreSQL :5433 ce_cost ←ce-db。
+
+**裸机（推荐 tmux/setsid，⛔别用 nohup——本服务器上遇过 Exit125 静默失败）**
+```bash
+cd ce-code && setsid uv run python -m service.rag_api >/tmp/ce-rag.log 2>&1 &   # ce-rag :8100 条文/清单候选/证据检索
+cd ce-code && setsid uv run python -m service.db_api  >/tmp/ce-db.log  2>&1 &    # ce-db  :8102 定额/价格/费率结构化真值
+```
+（前台调试直接去掉 `setsid ... &`；`uv sync` 首次或依赖变更后各跑一次。）
+
+**Docker（ce-rag + ce-db 一条命令，同镜像不同 command）**
+```bash
+docker compose -f docker/ce-code/docker-compose.yaml --env-file docker/ce-code/.env up -d
+```
+
+**依赖设施（须先起）**
+```bash
+docker compose -f docker/ce-code/docker-compose.deps.yaml up -d          # PG :5433 + Milvus :19530
+sudo docker compose -f docker/ce-rerank/docker-compose.yaml --env-file docker/ce-rerank/.env up -d   # 精排 :8095（GPU）
+```
+
+**健康自检**
+```bash
+for p in 8100 8102; do printf ":$p -> "; curl -s -o /dev/null -w "%{http_code}\n" localhost:$p/health; done
+```
+> 全服务（含 harness）+ dev/prod 两态启动手册见仓库根 `DEPLOY.md`；vLLM :8099 / embed :8097 是仓外 GPU 服务，须另行在跑。
+
 > - 需求/设计（领域铁律、schema、多表征、检索/造价设计、端点规格）见 `PRD.md`
 > - **服务接口契约**（`ce-rag` / `ce-db` / 任务服务边界、候选/真值/证据语义）见 `../ce-services/INTERFACE_CONTRACTS.md`
 > - **运行联调步骤**见 `../ce-services/RUNTIME_E2E_RUNBOOK.md`

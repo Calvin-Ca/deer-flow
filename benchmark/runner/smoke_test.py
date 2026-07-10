@@ -21,6 +21,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+import _paths  # noqa: E402,F401  把 backend/ 补进 sys.path（import app 前置）
 from _lf import require_langfuse, wait_for_traces  # noqa: E402
 
 

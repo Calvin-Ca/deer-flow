@@ -26,6 +26,7 @@ _ROOT = _RUNNER.parents[1]
 sys.path.insert(0, str(_RUNNER))                            # _lf
 sys.path.insert(0, str(_ROOT / "benchmark" / "scoring"))    # norm_faithful_score
 
+import _paths  # noqa: E402,F401  把 backend/ 补进 sys.path（import app 前置）
 from norm_faithful_score import NormObs, aggregate, detect_refusal, score_case  # noqa: E402
 
 DATASET_FILE = _ROOT / "benchmark" / "agent_eval" / "norm_faithful" / "norm_faithful.jsonl"

@@ -5,8 +5,8 @@
 与评测 runner 不同——runner 是进程内嵌入式（DeerFlowClient），本脚本是**外部 HTTP 客户端**，
 真正经过 gateway 的鉴权 / 中间件 / HTTP 那一层。
 
-鉴权 & CSRF（gateway 要求）：先 GET 拿 `csrf_token` cookie（Double Submit），再带
-`x-csrf-token` header 登录拿 session cookie，最后带同一 header POST 跑 run。
+鉴权 & CSRF（gateway 要求）：登录（auth 端点走 Origin 校验、免 csrf token）→ 其响应
+种下 `csrf_token` cookie（Double Submit）→ 取它做 `x-csrf-token` header 打非 auth 的 run POST。
 
 凭据放 `.env`（已被 gitignore，安全）——在根 `.env` 加两行：
     DEER_FLOW_PROBE_EMAIL=you@example.com
@@ -80,19 +80,19 @@ def main() -> int:
 
     gw = args.gateway.rstrip("/")
     with httpx.Client(base_url=gw, timeout=120.0) as client:
-        # ① 安全 GET 拿 csrf_token cookie（GET 是 CSRF 豁免方法）
-        client.get("/api/models")
-        csrf = client.cookies.get("csrf_token")
-        if not csrf:
-            print("警告：没拿到 csrf_token cookie，POST 可能被 CSRF 拦；继续尝试。", file=sys.stderr)
-        headers = {"x-csrf-token": csrf} if csrf else {}
-
-        # ② 登录拿 session cookie
-        r = client.post("/api/v1/auth/login/local", data={"username": args.email, "password": args.password}, headers=headers)
+        # ① 登录（auth 端点走 Origin 校验、不需 csrf token）——其响应会种下 session + csrf_token cookie
+        r = client.post("/api/v1/auth/login/local", data={"username": args.email, "password": args.password})
         if r.status_code != 200:
             print(f"登录失败 {r.status_code}: {r.text[:300]}", file=sys.stderr)
             return 1
         print(f"✓ 登录成功（{args.email}）")
+
+        # ② 登录后 csrf_token cookie 已种下，取来做 Double Submit 的 header（非 auth 的 POST 必需）
+        csrf = client.cookies.get("csrf_token")
+        if not csrf:
+            print("没拿到 csrf_token cookie（登录响应未种下？），run 会被 CSRF 拦。", file=sys.stderr)
+            return 1
+        headers = {"x-csrf-token": csrf}
 
         # ③ 流式跑一条 run
         payload = {

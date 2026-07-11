@@ -42,3 +42,19 @@ uv run --project backend python benchmark/L6_agent/norm_faithful/run_norm_faithf
 ```
 
 > Langfuse dataset 名**不随目录改**（`agent-routing-eval`/`bill-match-routing`/`clist-match-eval`/`agent-toolcall-eval` 等），已跑的 runs 与横向对比不受本次重组影响（2026-07-11 重组，原 `routing_eval`/`retrieval_eval`/`agent_eval`/`runner`/`scoring`/`judges`/`select_eval` 并入上表结构）。
+
+## 嵌入式评测的隔离清单（踩坑记录）
+
+评测有效的前提是用例互相独立。嵌入式 runner（DeerFlowClient）有**三层隔离要分别管住**，只管对话那层不够：
+
+| 层 | 隔离机制 | 状态 |
+|---|---|---|
+| ① thread（对话历史） | runner 逐条 `thread_id = exp-{run}-{item.id}`，checkpointer 按 thread 隔离 | ✅ runner 已内建 |
+| ② user（跨会话记忆） | **无鉴权嵌入式全落 `default` 用户**——`MemoryMiddleware` 按用户存记忆，跨 thread 照样注入 | ⚠️ 靠 `config.yaml` 的 `memory.enabled: false` 关死（2026-07-11 定案） |
+| ③ run 顺序（跨 run 残留） | 记忆落盘跨进程存活：先跑的 variant 会把"经验"留给后跑的 variant，横向对比失真 | 同上 + 清存量 |
+
+**② 的实锤案例（2026-07-11，路由评测）**：Langfuse trace 里发现每条用例的 system prompt 被注入了几千 token 的 `<memory>` 块——前面所有 run 的用例沉淀。危害三重：跨 run 污染 variant 对比；撑爆 qwen3-8b 的 32k 上下文（帮凶）；**行为级带坏**——某次服务没起时的失败被学成 fact「cost-agent tool not available (avoid)」注入后续每条用例，直接劝退路由（route_ok=False 冤案）；历史候选码进记忆后模型可凭记忆答码（串库红线场景），答对了分数反而虚高。
+
+**记忆污染的时序特征**（为什么难察觉）：注入发生在消息处理开头（读旧快照），提取在整轮结束后 debounce 30s + LLM 提炼才落盘——污染**隔轮生效**，不毒害紧邻的下一条，而是悄悄毒害之后的所有 run。
+
+**处置**：`memory.enabled: false` 单开关同时关提取与注入（`memory_middleware.py` / `prompt.py` 两处 gate）；重开记忆前**必须**先清已污染存量：`rm -f backend/.deer-flow/users/default/memory.json`（`default` 目录只有嵌入式评测/调试的沉淀，无真实用户数据）。若日后产品要开记忆，评测 runner 须另想隔离（per-run user_id 只隔 run 间、隔不了 run 内，关掉仍是评测期唯一可靠解）。

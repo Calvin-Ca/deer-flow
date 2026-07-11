@@ -3,7 +3,7 @@
 # Run 'make setup' to reconfigure, or edit this file for advanced options.
 # Full reference: config.example.yaml
 
-config_version: 9
+config_version: 10
 log_level: info
 token_usage:
   enabled: true
@@ -181,14 +181,20 @@ summarization:
   trigger:
   - type: tokens
     value: 15564
+  # keep 按 token 而非条数（2026-07-11，路由评测撞 400 定案）：qwen3-8b 上下文仅 32768，
+  # 原「保最近 10 条」会把 CE 工具的巨型返回（cost_workflow_start/verify_bill_code 大 JSON）
+  # 死保在窗内、摘要压不到它，单次请求冲到 47k 直接 400（LLMErrorHandling 转可恢复后该步
+  # 模型调用作废，评测里表现为「工具=[]」冤判）。按 token 保留时超预算的大工具结果会进
+  # 摘要（trim_tokens_to_summarize 兜底裁剪），保住 32k 内的总量。
   keep:
-    type: messages
-    value: 10
+    type: tokens
+    value: 6000
   trim_tokens_to_summarize: 15564
   summary_prompt: null
   preserve_recent_skill_count: 5
-  preserve_recent_skill_tokens: 25000
-  preserve_recent_skill_tokens_per_skill: 5000
+  # skill 保留预算按 32k 上下文缩水（默认 25000 是给大上下文模型调的，qwen3-8b 扛不住）。
+  preserve_recent_skill_tokens: 8000
+  preserve_recent_skill_tokens_per_skill: 3000
   skill_file_read_tool_names:
   - read_file
   - read

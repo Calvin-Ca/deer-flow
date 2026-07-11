@@ -132,6 +132,10 @@ def main() -> int:
     client = require_langfuse()
     run_name = args.run_name or f"routing-{uuid.uuid4().hex[:8]}"
     dataset = client.get_dataset(args.dataset)
+    # thread_id 掺进程级随机后缀：checkpointer 持久化（跨进程存活），--run-name 重名时若
+    # thread_id 相同会静默**续跑上一轮的旧对话**（实锤：E7 首工具是 cost_workflow_resume，
+    # 背着上轮 47k 历史开局直接 60k 撞 32k 上限）。后缀保证每次进程都是全新 thread。
+    nonce = uuid.uuid4().hex[:6]
 
     # 整轮共用一个客户端：agent/MCP 会话只建一次，会话收尾只发生在进程退出（见 _drive_agent 注释）。
     from deerflow.client import DeerFlowClient
@@ -141,7 +145,7 @@ def main() -> int:
     rows: list[dict] = []
     for i, item in enumerate(dataset.items):
         query = (item.input or {}).get("query", "")
-        thread_id = f"exp-{run_name}-{item.id}"
+        thread_id = f"exp-{run_name}-{nonce}-{item.id}"
         try:
             out = _drive_agent(agent_client, query, thread_id)
         except Exception as exc:  # noqa: BLE001 —— 单条崩不拖垮整轮（v3 实测一条异常废了后续 22 条）

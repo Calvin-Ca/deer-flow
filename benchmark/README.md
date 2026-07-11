@@ -49,7 +49,7 @@ uv run --project backend python benchmark/L6_agent/norm_faithful/run_norm_faithf
 
 | 层 | 隔离机制 | 状态 |
 |---|---|---|
-| ① thread（对话历史） | runner 逐条 `thread_id = exp-{run}-{item.id}`，checkpointer 按 thread 隔离 | ✅ runner 已内建 |
+| ① thread（对话历史） | runner 逐条独立 thread_id，checkpointer 按 thread 隔离。**坑**：checkpointer 持久化跨进程存活，`--run-name` 重名曾致 thread_id 撞旧线程、静默**续跑上轮对话**（实锤：首工具 `cost_workflow_resume`、开局 60k 撞 32k 上限）——已在 thread_id 掺进程级随机后缀根治（2026-07-12） | ✅ runner 已内建 |
 | ② user（跨会话记忆） | **无鉴权嵌入式全落 `default` 用户**——`MemoryMiddleware` 按用户存记忆，跨 thread 照样注入 | ⚠️ 靠 `config.yaml` 的 `memory.enabled: false` 关死（2026-07-11 定案） |
 | ③ run 顺序（跨 run 残留） | 记忆落盘跨进程存活：先跑的 variant 会把"经验"留给后跑的 variant，横向对比失真 | 同上 + 清存量 |
 

@@ -98,6 +98,9 @@ def main() -> int:
     client = require_langfuse()
     run_name = args.run_name or f"toolcall-{uuid.uuid4().hex[:8]}"
     dataset = client.get_dataset(TOOLCALL_DATASET)
+    # thread_id 掺进程级随机后缀：checkpointer 持久化，--run-name 重名会静默续跑旧对话
+    # （routing 实锤 cost_workflow_resume + 60k 撞上限），后缀保证每次进程全新 thread。
+    nonce = uuid.uuid4().hex[:6]
 
     # 整轮共用一个客户端（见 _collect_tool_calls 注释）。
     from deerflow.client import DeerFlowClient
@@ -107,7 +110,7 @@ def main() -> int:
     rows: list[dict] = []
     for i, item in enumerate(dataset.items):
         query = (item.input or {}).get("query", "")
-        thread_id = f"exp-{run_name}-{item.id}"
+        thread_id = f"exp-{run_name}-{nonce}-{item.id}"
         calls = _collect_tool_calls(agent_client, query, thread_id)
 
         exp = item.expected_output or {}

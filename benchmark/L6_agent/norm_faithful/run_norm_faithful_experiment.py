@@ -103,6 +103,9 @@ def main() -> int:
 
     import uuid
     run_name = args.run_name or f"norm-{args.mode}-{uuid.uuid4().hex[:6]}"
+    # thread_id 掺进程级随机后缀：checkpointer 持久化，--run-name 重名会静默续跑旧对话
+    # （routing 实锤 cost_workflow_resume + 60k 撞上限），后缀保证每次进程全新 thread。
+    nonce = uuid.uuid4().hex[:6]
     cases = _load_cases(args.split, args.limit)
     if not cases:
         print(f"无匹配 case（split={args.split}）")
@@ -120,7 +123,7 @@ def main() -> int:
 
     scores = []
     for i, case in enumerate(cases):
-        thread_id = f"exp-{run_name}-{case['id']}"
+        thread_id = f"exp-{run_name}-{nonce}-{case['id']}"
         try:
             obs = _observe(agent_client, case.get("question", ""), thread_id)
         except Exception as exc:  # noqa: BLE001

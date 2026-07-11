@@ -105,6 +105,9 @@ def main() -> int:
 
     import uuid
     run_name = args.run_name or f"cost-task-{uuid.uuid4().hex[:8]}"
+    # thread_id 掺进程级随机后缀：checkpointer 持久化，--run-name 重名会静默续跑旧对话
+    # （routing 实锤 cost_workflow_resume + 60k 撞上限），后缀保证每次进程全新 thread。
+    nonce = uuid.uuid4().hex[:6]
     cases = _load_cases(args.split, args.limit)
     if not cases:
         print(f"没有匹配的 case（split={args.split}）")
@@ -126,7 +129,7 @@ def main() -> int:
         goal = case.get("user_goal", "")
         runs = []
         for k in range(pass_k):
-            thread_id = f"exp-{run_name}-{case['id']}-r{k}"
+            thread_id = f"exp-{run_name}-{nonce}-{case['id']}-r{k}"
             try:
                 obs = _observe(agent_client, goal, thread_id)
             except Exception as exc:  # noqa: BLE001 —— 单次崩不拖垮（记为该次 task 不过）

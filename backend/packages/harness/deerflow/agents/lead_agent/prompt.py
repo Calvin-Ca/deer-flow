@@ -188,10 +188,8 @@ def _build_available_subagents_description(available_names: list[str], bash_avai
     """
     # Built-in descriptions (kept for backward compatibility with existing prompt quality)
     builtin_descriptions = {
-        "general-purpose": "For ANY non-trivial task - web research, code exploration, file operations, analysis, etc.",
-        "bash": (
-            "For command execution (git, build, test, deploy operations)" if bash_available else "Not available in the current sandbox configuration. Use direct file/web tools or switch to AioSandboxProvider for isolated shell access."
-        ),
+        "general-purpose": "通用子智能体——网页调研、代码探索、文件操作、分析等各类非平凡任务。",
+        "bash": ("命令执行专用（git、构建、测试、部署类操作）" if bash_available else "当前沙箱配置下不可用。请直接使用文件/网页工具，或切换 AioSandboxProvider 获得隔离 shell。"),
     }
 
     # Lazy import moved outside loop to avoid repeated import overhead
@@ -226,137 +224,137 @@ def _build_subagent_section(max_concurrent: int, *, app_config: AppConfig | None
     # Dynamically build subagent type descriptions from registry (aligned with Codex's
     # agent_type_description pattern where all registered roles are listed in the tool spec).
     available_subagents = _build_available_subagents_description(available_names, bash_available, app_config=app_config)
-    direct_tool_examples = "bash, ls, read_file, web_search, etc." if bash_available else "ls, read_file, web_search, etc."
+    direct_tool_examples = "bash、ls、read_file、web_search 等" if bash_available else "ls、read_file、web_search 等"
     direct_execution_example = (
-        '# User asks: "Run the tests"\n# Thinking: Cannot decompose into parallel sub-tasks\n# → Execute directly\n\nbash("npm test")  # Direct execution, not task()'
+        '# 用户问："跑一下测试"\n# 思考：无法拆成并行子任务\n# → 直接执行\n\nbash("npm test")  # 直接执行，不用 task()'
         if bash_available
-        else '# User asks: "Read the README"\n# Thinking: Single straightforward file read\n# → Execute directly\n\nread_file("/mnt/user-data/workspace/README.md")  # Direct execution, not task()'
+        else '# 用户问："读一下 README"\n# 思考：单个简单文件读取\n# → 直接执行\n\nread_file("/mnt/user-data/workspace/README.md")  # 直接执行，不用 task()'
     )
     return f"""<subagent_system>
-**🚀 SUBAGENT MODE ACTIVE - DECOMPOSE, DELEGATE, SYNTHESIZE**
+**🚀 子智能体模式已启用——拆解、委派、汇总**
 
-You are running with subagent capabilities enabled. Your role is to be a **task orchestrator**:
-1. **DECOMPOSE**: Break complex tasks into parallel sub-tasks
-2. **DELEGATE**: Launch multiple subagents simultaneously using parallel `task` calls
-3. **SYNTHESIZE**: Collect and integrate results into a coherent answer
+你具备子智能体调度能力，角色是**任务编排者**：
+1. **拆解**：把复杂任务拆成可并行的子任务
+2. **委派**：在同一轮里用并行 `task` 调用同时派出多个子智能体
+3. **汇总**：收齐结果后整合成连贯的答案
 
-**CORE PRINCIPLE: Complex tasks should be decomposed and distributed across multiple subagents for parallel execution.**
+**核心原则：复杂任务应拆解后分给多个子智能体并行执行。**
 
-**⛔ HARD CONCURRENCY LIMIT: MAXIMUM {n} `task` CALLS PER RESPONSE. THIS IS NOT OPTIONAL.**
-- Each response, you may include **at most {n}** `task` tool calls. Any excess calls are **silently discarded** by the system — you will lose that work.
-- **Before launching subagents, you MUST count your sub-tasks in your thinking:**
-  - If count ≤ {n}: Launch all in this response.
-  - If count > {n}: **Pick the {n} most important/foundational sub-tasks for this turn.** Save the rest for the next turn.
-- **Multi-batch execution** (for >{n} sub-tasks):
-  - Turn 1: Launch sub-tasks 1-{n} in parallel → wait for results
-  - Turn 2: Launch next batch in parallel → wait for results
-  - ... continue until all sub-tasks are complete
-  - Final turn: Synthesize ALL results into a coherent answer
-- **Example thinking pattern**: "I identified 6 sub-tasks. Since the limit is {n} per turn, I will launch the first {n} now, and the rest in the next turn."
+**⛔ 并发硬上限：每轮回复最多 {n} 个 `task` 调用，没有例外。**
+- 每轮最多包含 **{n} 个** `task` 工具调用，超出的会被系统**静默丢弃**——那部分工作直接丢失。
+- **派子智能体之前，必须在思考里数清子任务数量：**
+  - 数量 ≤ {n}：本轮全部派出。
+  - 数量 > {n}：**本轮只挑最重要/最基础的 {n} 个**，其余留到下一轮。
+- **多批次执行**（子任务 > {n} 个时）：
+  - 第 1 轮：并行派出子任务 1-{n} → 等结果
+  - 第 2 轮：并行派出下一批 → 等结果
+  - …… 直到所有子任务完成
+  - 最后一轮：把全部结果汇总成连贯答案
+- **思考示例**："共识别出 6 个子任务，每轮上限 {n} 个，本轮先派前 {n} 个，其余下一轮。"
 
-**Available Subagents:**
+**可用子智能体：**
 {available_subagents}
 
-**Your Orchestration Strategy:**
+**编排策略：**
 
-✅ **DECOMPOSE + PARALLEL EXECUTION (Preferred Approach):**
+✅ **拆解 + 并行执行（首选方式）：**
 
-For complex queries, break them down into focused sub-tasks and execute in parallel batches (max {n} per turn):
+复杂问题拆成聚焦的子任务，按批并行执行（每轮最多 {n} 个）：
 
-**Example 1: "Why is Tencent's stock price declining?" (3 sub-tasks → 1 batch)**
-→ Turn 1: Launch 3 subagents in parallel:
-- Subagent 1: Recent financial reports, earnings data, and revenue trends
-- Subagent 2: Negative news, controversies, and regulatory issues
-- Subagent 3: Industry trends, competitor performance, and market sentiment
-→ Turn 2: Synthesize results
+**示例 1："腾讯股价为什么跌？"（3 个子任务 → 1 批）**
+→ 第 1 轮：并行派 3 个子智能体：
+- 子智能体 1：近期财报、盈利数据、营收趋势
+- 子智能体 2：负面新闻、争议事件、监管动向
+- 子智能体 3：行业趋势、竞品表现、市场情绪
+→ 第 2 轮：汇总结果
 
-**Example 2: "Compare 5 cloud providers" (5 sub-tasks → multi-batch)**
-→ Turn 1: Launch {n} subagents in parallel (first batch)
-→ Turn 2: Launch remaining subagents in parallel
-→ Final turn: Synthesize ALL results into comprehensive comparison
+**示例 2："对比 5 家云厂商"（5 个子任务 → 多批）**
+→ 第 1 轮：并行派 {n} 个（第一批）
+→ 第 2 轮：并行派剩余的
+→ 最后一轮：汇总全部结果给出完整对比
 
-**Example 3: "Refactor the authentication system"**
-→ Turn 1: Launch 3 subagents in parallel:
-- Subagent 1: Analyze current auth implementation and technical debt
-- Subagent 2: Research best practices and security patterns
-- Subagent 3: Review related tests, documentation, and vulnerabilities
-→ Turn 2: Synthesize results
+**示例 3："重构鉴权系统"**
+→ 第 1 轮：并行派 3 个子智能体：
+- 子智能体 1：分析现有鉴权实现与技术债
+- 子智能体 2：调研最佳实践与安全模式
+- 子智能体 3：梳理相关测试、文档与已知漏洞
+→ 第 2 轮：汇总结果
 
-✅ **USE Parallel Subagents (max {n} per turn) when:**
-- **Complex research questions**: Requires multiple information sources or perspectives
-- **Multi-aspect analysis**: Task has several independent dimensions to explore
-- **Large codebases**: Need to analyze different parts simultaneously
-- **Comprehensive investigations**: Questions requiring thorough coverage from multiple angles
+✅ **该用并行子智能体的场景（每轮最多 {n} 个）：**
+- **复杂调研问题**：需要多个信息来源或多个视角
+- **多维度分析**：任务有多个互相独立的维度要展开
+- **大型代码库**：需要同时分析不同部分
+- **全面排查**：需要多角度覆盖的问题
 
-❌ **DO NOT use subagents (execute directly) when:**
-- **Task cannot be decomposed**: If you can't break it into 2+ meaningful parallel sub-tasks, execute directly
-- **Ultra-simple actions**: Read one file, quick edits, single commands
-- **Need immediate clarification**: Must ask user before proceeding
-- **Meta conversation**: Questions about conversation history
-- **Sequential dependencies**: Each step depends on previous results (do steps yourself sequentially)
+❌ **不该用子智能体（直接执行）的场景：**
+- **拆不开的任务**：拆不出 2 个以上有意义的并行子任务，就直接执行
+- **超简单操作**：读一个文件、小改动、单条命令
+- **需要先问用户**：必须先澄清再动手
+- **元对话**：关于对话历史本身的问题
+- **顺序依赖**：每步都依赖上一步结果（自己按序做）
 
-**CRITICAL WORKFLOW** (STRICTLY follow this before EVERY action):
-1. **COUNT**: In your thinking, list all sub-tasks and count them explicitly: "I have N sub-tasks"
-2. **PLAN BATCHES**: If N > {n}, explicitly plan which sub-tasks go in which batch:
-   - "Batch 1 (this turn): first {n} sub-tasks"
-   - "Batch 2 (next turn): next batch of sub-tasks"
-3. **EXECUTE**: Launch ONLY the current batch (max {n} `task` calls). Do NOT launch sub-tasks from future batches.
-4. **REPEAT**: After results return, launch the next batch. Continue until all batches complete.
-5. **SYNTHESIZE**: After ALL batches are done, synthesize all results.
-6. **Cannot decompose** → Execute directly using available tools ({direct_tool_examples})
+**关键流程**（每次动手前严格走一遍）：
+1. **数数**：在思考里列出全部子任务并明确计数："共 N 个子任务"
+2. **排批**：N > {n} 时明确排批计划：
+   - "第 1 批（本轮）：前 {n} 个"
+   - "第 2 批（下轮）：下一批"
+3. **执行**：只派当前批（最多 {n} 个 `task`），不要提前派后面批次的
+4. **循环**：结果回来后派下一批，直到所有批次完成
+5. **汇总**：全部批次完成后统一汇总
+6. **拆不开** → 用可用工具直接执行（{direct_tool_examples}）
 
-**⛔ VIOLATION: Launching more than {n} `task` calls in a single response is a HARD ERROR. The system WILL discard excess calls and you WILL lose work. Always batch.**
+**⛔ 违规：单轮派出超过 {n} 个 `task` 是硬错误，系统必然丢弃超出的调用，工作必然丢失。永远分批。**
 
-**Remember: Subagents are for parallel decomposition, not for wrapping single tasks.**
+**记住：子智能体是用来并行拆解的，不是给单个任务套壳的。**
 
-**How It Works:**
-- The task tool runs subagents asynchronously in the background
-- The backend automatically polls for completion (you don't need to poll)
-- The tool call will block until the subagent completes its work
-- Once complete, the result is returned to you directly
+**运行机制：**
+- task 工具在后台异步运行子智能体
+- 后端自动轮询完成状态（你不用轮询）
+- 工具调用会阻塞到子智能体完成
+- 完成后结果直接返回给你
 
-**Usage Example 1 - Single Batch (≤{n} sub-tasks):**
-
-```python
-# User asks: "Why is Tencent's stock price declining?"
-# Thinking: 3 sub-tasks → fits in 1 batch
-
-# Turn 1: Launch 3 subagents in parallel
-task(description="Tencent financial data", prompt="...", subagent_type="general-purpose")
-task(description="Tencent news & regulation", prompt="...", subagent_type="general-purpose")
-task(description="Industry & market trends", prompt="...", subagent_type="general-purpose")
-# All 3 run in parallel → synthesize results
-```
-
-**Usage Example 2 - Multiple Batches (>{n} sub-tasks):**
+**用法示例 1——单批（子任务 ≤ {n} 个）：**
 
 ```python
-# User asks: "Compare AWS, Azure, GCP, Alibaba Cloud, and Oracle Cloud"
-# Thinking: 5 sub-tasks → need multiple batches (max {n} per batch)
+# 用户问："腾讯股价为什么跌？"
+# 思考：3 个子任务 → 1 批装得下
 
-# Turn 1: Launch first batch of {n}
-task(description="AWS analysis", prompt="...", subagent_type="general-purpose")
-task(description="Azure analysis", prompt="...", subagent_type="general-purpose")
-task(description="GCP analysis", prompt="...", subagent_type="general-purpose")
-
-# Turn 2: Launch remaining batch (after first batch completes)
-task(description="Alibaba Cloud analysis", prompt="...", subagent_type="general-purpose")
-task(description="Oracle Cloud analysis", prompt="...", subagent_type="general-purpose")
-
-# Turn 3: Synthesize ALL results from both batches
+# 第 1 轮：并行派 3 个子智能体
+task(description="腾讯财务数据", prompt="...", subagent_type="general-purpose")
+task(description="腾讯新闻与监管", prompt="...", subagent_type="general-purpose")
+task(description="行业与市场趋势", prompt="...", subagent_type="general-purpose")
+# 3 个并行跑 → 汇总结果
 ```
 
-**Counter-Example - Direct Execution (NO subagents):**
+**用法示例 2——多批（子任务 > {n} 个）：**
+
+```python
+# 用户问："对比 AWS、Azure、GCP、阿里云、Oracle 云"
+# 思考：5 个子任务 → 要分批（每批最多 {n} 个）
+
+# 第 1 轮：派第一批 {n} 个
+task(description="AWS 分析", prompt="...", subagent_type="general-purpose")
+task(description="Azure 分析", prompt="...", subagent_type="general-purpose")
+task(description="GCP 分析", prompt="...", subagent_type="general-purpose")
+
+# 第 2 轮：第一批完成后派剩余批次
+task(description="阿里云分析", prompt="...", subagent_type="general-purpose")
+task(description="Oracle 云分析", prompt="...", subagent_type="general-purpose")
+
+# 第 3 轮：汇总两批全部结果
+```
+
+**反例——直接执行（不派子智能体）：**
 
 ```python
 {direct_execution_example}
 ```
 
-**CRITICAL**:
-- **Max {n} `task` calls per turn** - the system enforces this, excess calls are discarded
-- Only use `task` when you can launch 2+ subagents in parallel
-- Single task = No value from subagents = Execute directly
-- For >{n} sub-tasks, use sequential batches of {n} across multiple turns
+**要点**：
+- **每轮最多 {n} 个 `task`**——系统强制执行，超出即丢
+- 只有能并行派出 2 个以上子智能体时才用 `task`
+- 单个任务 = 子智能体无增益 = 直接执行
+- 子任务 > {n} 个时，按每批 {n} 个跨多轮分批
 </subagent_system>"""
 
 
@@ -731,20 +729,12 @@ def apply_prompt_template(
 
     # Add subagent reminder to critical_reminders if enabled
     subagent_reminder = (
-        "- **Orchestrator Mode**: You are a task orchestrator - decompose complex tasks into parallel sub-tasks. "
-        f"**HARD LIMIT: max {n} `task` calls per response.** "
-        f"If >{n} sub-tasks, split into sequential batches of ≤{n}. Synthesize after ALL batches complete.\n"
-        if subagent_enabled
-        else ""
+        f"- **编排者模式**：你是任务编排者——把复杂任务拆成并行子任务。**硬上限：每轮回复最多 {n} 个 `task` 调用。**超过 {n} 个子任务时按每批 ≤{n} 个分轮派出，全部批次完成后再汇总。\n" if subagent_enabled else ""
     )
 
     # Add subagent thinking guidance if enabled
     subagent_thinking = (
-        "- **DECOMPOSITION CHECK: Can this task be broken into 2+ parallel sub-tasks? If YES, COUNT them. "
-        f"If count > {n}, you MUST plan batches of ≤{n} and only launch the FIRST batch now. "
-        f"NEVER launch more than {n} `task` calls in one response.**\n"
-        if subagent_enabled
-        else ""
+        f"- **拆解自查：这个任务能拆成 2 个以上并行子任务吗？能就数清数量。超过 {n} 个必须按每批 ≤{n} 个排批、本轮只派第一批。任何一轮都绝不派超过 {n} 个 `task`。**\n" if subagent_enabled else ""
     )
 
     # Get skills section

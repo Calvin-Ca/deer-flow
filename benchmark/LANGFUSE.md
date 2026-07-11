@@ -78,13 +78,13 @@ trace_id = Langfuse.create_trace_id(seed=run_id)
 `benchmark/` 各层目录（runner 随层住，共享基建在 `_shared/`），服务器上 `uv run --project backend python ...` 跑。命令见 `_shared/README.md` 与根 `README.md` 速查。
 
 - `smoke_test.py`：驱动一次对话→`api.trace.list(session_id=...)` 读回→断言 `session_id`/`model:`/`variant:` 标签。
-- `upload_datasets.py`：金标 → Langfuse Dataset（`--only routing` 路由集 / `--only clist` 清单匹配集，幂等 upsert）。
+- `upload_datasets.py`：金标 → Langfuse Dataset（`--only user_requests` 路由主池 / `--only clist` 清单匹配集，幂等 upsert）。
 - `run_routing_experiment.py`：逐条把 query 喂默认 lead agent，从工具调用判两率，读回 trace → `dataset_run_items.create` 关联进 dataset run + `create_score` 挂分。
 - `run_retrieval_experiment.py`：**清单匹配**评测——复用 `ce-services/tools/eval_select.py` 的 bill_match 召回 + select_code 选码（Recall@k / Top-1 / 高置信错码红线），手建 trace 挂 `match_top1` / `recalled`。需 :8100 + :8099。
 - `run_toolcall_experiment.py`：**工具调用**评测——逐条跑 agent，按 `arg_match`（exact/subset）比完整 tool_calls 与 `expected_call`，挂 `tool_correct` / `call_correct`。需四服务起齐。
 
 **判定口径**（对标 `L1_routing/README` 两率）：
-- `route_correct`：该调脚本就调——按**工具名**判（`qa.py` / `cost.py` / `ce-cost_*`），bash/read_file 瞎折腾不算。
+- `route_correct`：该调能力就调——按**工具名**判（`ROUTE_TOOL_NAMES`：`cost_workflow_*` / `verify_bill_code` / `cost_calc` / `task`），bash/read_file 瞎折腾不算。
 - `clarify_correct`：该反问就反问——命中 `ask_clarification` 工具。
 
 ---

@@ -15,13 +15,14 @@
 
 ## 1. Agent 能力需求（做什么）
 
-> 面向深圳房建组价场景的 5 类核心能力。**5 项能力均可触发 human-in-the-loop**——信息不足时 `ask_clarification` 向用户追问，关键结论落定前请人确认（`ClarificationMiddleware` 中断等人）。
+> **Agent 定位：深圳市房建专业智能组价助手，默认口径深圳·2013 版规范**——规范版本、地区**一律不反问**，直接按默认口径执行并在回复中声明（用户显式指明 2024 版则照用）（2026-07-11 定）。6 类核心能力如下，**均可触发 human-in-the-loop**——**实质信息**不足时（构件特征/清单内容/计算参数，非版本地区）`ask_clarification` 向用户追问，关键结论落定前请人确认（`ClarificationMiddleware` 中断等人）。
 
 1. **规范问答助手**：回答清单计价规范、定额规范（含工程量计算规则等）、信息价相关的问题。
-2. **清单选码核实**：给定项目特征，依据规范核实所匹配的清单编码是否正确、项目特征项是否有遗漏（少特征）。
+2. **清单智能匹配**：给定项目特征，匹配清单编码；给定清单编码及项目特征，核实项目特征项是否完整（有无遗漏）。
 3. **定额方案推荐**：针对已编制好的清单项，推荐匹配的定额组价方案。
-4. **组价自动计算**：当用户提出涉及组价过程任何环节（工程量、含量、单价、合价等）的计算要求时，依据计算规则自动完成计算。
-5. **整单组价全闭环**：给定项目清单，串起「清单选码核实 → 定额方案推荐 → 组价自动计算」，帮用户完成整单组价的端到端闭环（编排能力 2/3/4）。
+4. **智能询价**：回应材料询价请求，按材料/规格/期号取深圳信息价、多期走势对比；口径严格锁深圳（他省体面告知不取数）。
+5. **智能计算**：当用户提出涉及组价过程任何环节（工程量、含量、单价、合价等）的计算要求时，能智能匹配计算规则自动完成计算。
+6. **整单组价全闭环**：给定项目清单，串起「清单智能匹配 → 定额方案推荐 → 组价自动计算」，帮用户完成整单组价的端到端闭环（编排能力 2/3/5）。
 
 ---
 
@@ -60,7 +61,8 @@
   全在同一进程，任意源码断点直接停。launch.json 配置要点（`type: debugpy` / `program: backend/debug.py` /
   `cwd: backend` / `python: backend/.venv/bin/python` / `env: {PYTHONPATH: "."}` / envFile 同 uvicorn 配置）；
   **`"console": "integratedTerminal"` 必须有**——`You:` 提示符要读 stdin，Debug Console 喂不了输入。
-  日志落 `backend/debug.log`（终端保持干净）。**边界**：`create_agent` 无 checkpointer → 每条输入都是
+  日志落 `backend/debug.log`（终端保持干净）。trace 照常上报 Langfuse（与三方案分工/顺序见 §4.1）。
+  **边界**：`create_agent` 无 checkpointer → 每条输入都是
   全新单轮对话，**多轮记忆/HITL 续跑（clarify 后答复）测不了**——那些走 `probe_gateway.py` 或前端。
   config 块已固化 `subagent_enabled: True`（缺了 task 不绑定、子智能体路由假阴性）+ 模型走 config.yaml
   默认（qwen3-8b）。
@@ -97,13 +99,16 @@
 
 > 当前阶段：**路由层（L1）评测调试中**。规范/门线见 `benchmark/AGENT_BENCHMARK.md`，目录地图（层↔目录 + 命令速查）见 `benchmark/README.md`，runner 操作见 `benchmark/_shared/README.md`。**2026-07-11 起 benchmark 按层分目录**（`L1_routing/`…`L7_nfr/` + `_shared/` 基建 + `component_eval/` 零件级）。
 
-### 4.1 两个测试入口（都在服务器跑，`uv run --project backend python ...`）
+### 4.1 三个测试方案（都在服务器跑；标准闭环：**①F5 快验 → ②runner 出分 → ③归因复现**）
 
-1. **批量评分 runner**（进程内嵌入式 DeerFlowClient，**不经 gateway**）——出 `route_correct`/`clarify_correct` 两率：
-   - `benchmark/_shared/upload_datasets.py --only routing`（用例源=Langfuse dataset，先灌）
+改动（提示词/路由/工具）后的使用顺序：先 **① F5 debug** 手动过几条典型 query（秒级迭代，行为不对不必浪费一轮批量评测）→ 行为符合预期后 **② runner** 批量出两率、比 variant → 有失败用例先翻 **Langfuse trace 的 comment/工具链**归因，需要单条复现或涉及 clarify 续跑时才动 **③ probe**。
+
+1. **F5 交互调试 `backend/debug.py`**（VS Code F5，进程内直建 lead agent，配置细节见 §3.3）——**日常首选**：改提示词/路由/中间件后的快速行为验证，任意源码断点同进程直接停。trace **照常上报 Langfuse**（`make_lead_agent` 在图根部挂 CallbackHandler，`load_dotenv` 读到 LANGFUSE 开关），看板 trace 树的 tool span 即工具调用序列，肉眼对 `ROUTE_TOOL_NAMES`/`ask_clarification` 即 did_route/did_clarify。**边界**：a) 无 checkpointer——多轮/HITL 续跑（clarify 后答复）测不了；b) trace 无 session/`variant:`/`model:` 标签（那些在 gateway worker / DeerFlowClient 两条路径注入），Traces 页只能按时间找最新条目，确认 variant 要看根 span 的 system prompt 而非 tag。
+2. **批量评分 runner**（进程内嵌入式 DeerFlowClient，**不经 gateway**）——**出分与比 variant 的唯一口径**，`route_correct`/`clarify_correct` 两率：
+   - `benchmark/_shared/upload_datasets.py --only user_requests`（用例源=Langfuse dataset，先灌；主池 111 条，历史分立集均已审并入）
    - `benchmark/L1_routing/run_routing_experiment.py --run-name <名> [--model qwen-plus]`
-   - 逐 variant 换 `--run-name`，Langfuse `Datasets→Runs→Compare` 横向比。
-2. **单条路由探针** `benchmark/_shared/probe_gateway.py "<query>" [--model qwen3-8b]`（外部 HTTP、**经 gateway 全栈**，可配 debugpy 断点）——看单条 `[tool]` + `did_route`/`did_clarify`。凭据放根 `.env`（`DEER_FLOW_PROBE_EMAIL`/`DEER_FLOW_PROBE_PASSWORD`，已 gitignore）。
+   - 逐 variant 换 `--run-name`，Langfuse `Datasets→Runs→Compare` 横向比。不适合单条调试（跑全集才有意义）。
+3. **单条路由探针** `benchmark/_shared/probe_gateway.py "<query>" [--model qwen3-8b]`（外部 HTTP、**经 gateway 全栈**）——打印单条 `[tool]` 序列 + `did_route`/`did_clarify` 判定。**只在三种场景用**（其余单条验证 F5+看板已覆盖）：a) clarify 续跑/多轮用例（F5 的硬边界）；b) 怀疑问题在 gateway 链路本身（认证/worker/SSE/metadata 注入——F5 不经过这些）；c) 需要带全套 Langfuse 标签（session/variant/model tag）的正式单条复现。断点要挂 uvicorn（dev 全栈态）。凭据放根 `.env`（`DEER_FLOW_PROBE_EMAIL`/`DEER_FLOW_PROBE_PASSWORD`，已 gitignore）。
 
 ### 4.2 本阶段已定/已修
 

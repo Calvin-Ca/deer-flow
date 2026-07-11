@@ -1,18 +1,18 @@
 """任务2a：把 benchmark 金标集上传成 Langfuse Dataset。
 
-把 ``benchmark/L1_routing/data/agent_routing_eval.jsonl`` 灌进 Langfuse Datasets，
-每条用例 → 一个 dataset item（input=问法，expected_output=期望路由/澄清/版本，
-metadata=用例号/能力/分组/判读提示）。上传后即可用 ``run_routing_experiment.py``
+把 ``benchmark/L1_routing/data/user_requests.jsonl``（路由主池）等金标灌进 Langfuse
+Datasets，每条用例 → 一个 dataset item（input=问法，expected_output=期望路由/澄清/版本，
+metadata=用例号/能力/分组/难度/判读提示）。上传后即可用 ``run_routing_experiment.py``
 对同一数据集反复跑实验、在 UI 里按 variant/model 横向比。
 
 本脚本在全链路中的位置（``[本地]``=在 runner 进程内算、不碰 Langfuse；``[LF]``=Langfuse
 服务端执行/存储）。可见 **upload_datasets 只是其中「[LF 写] 登记靶子」这一步**——判分与
 跑 agent 全在本地，Langfuse 只当账本：
 
-    benchmark/L1_routing/data/agent_routing_eval.jsonl       [本地] 金标源文件
+    benchmark/L1_routing/data/user_requests.jsonl            [本地] 金标源文件
         │  upload_datasets.py（本脚本）：读 jsonl → create_dataset_item
         ▼
-    Langfuse Dataset「agent-routing-eval」(items)            [LF 写] 登记靶子
+    Langfuse Dataset「user-requests-routing」(items)         [LF 写] 登记靶子
         │  run_routing_experiment.py：get_dataset().items    [LF 读] 拉回用例
         ▼
     跑 agent（DeerFlowClient 调模型/工具、旁观工具调用）       [本地] 驱动 + 观测
@@ -27,7 +27,8 @@ metadata=用例号/能力/分组/判读提示）。上传后即可用 ``run_rout
 
 运行（服务器上）：
     uv run --project backend python benchmark/_shared/upload_datasets.py
-可选 --only 仅传指定集（缺省全部）：routing 路由 / bill_match_routing 清单匹配路由扩充 /
+可选 --only 仅传指定集（缺省全部）：user_requests 路由主池（111）/
+bill_match_routing 清单匹配路由专项 /
 clist 清单匹配召回 / toolcall 工具调用 /
 cost_task 端到端组价 / norm_faithful 规范忠实度 / clause 条文召回。L6_agent 三子集当前
 多为 sample 模板，按「先接管道、数据后补」上传（优先真金标 .jsonl，回退 .sample.jsonl）。
@@ -48,14 +49,17 @@ from _lf import require_langfuse  # noqa: E402
 # 项目根 = benchmark/_shared/ 的上两级。
 _ROOT = Path(__file__).resolve().parents[2]
 
-ROUTING_DATASET = "agent-routing-eval"
-ROUTING_JSONL = _ROOT / "benchmark" / "L1_routing" / "data" / "agent_routing_eval.jsonl"
-
-# 清单匹配意图路由扩充集（100 条，query 全部锚定 L3_retrieval 真实金标，由
-# L1_routing/data/gen_bill_match_routing.py 确定性生成）。独立 dataset、不并入冻结基线，
+# 清单匹配意图路由专项集（100 条，query 全部锚定 L3_retrieval 真实金标，由
+# L1_routing/data/gen_bill_match_routing.py 确定性生成）。独立 dataset、不并入主池，
 # 跑法：run_routing_experiment.py --dataset bill-match-routing。
 BILL_MATCH_ROUTING_DATASET = "bill-match-routing"
 BILL_MATCH_ROUTING_JSONL = _ROOT / "benchmark" / "L1_routing" / "data" / "bill_match_routing.jsonl"
+
+# 路由主池（111 条）：strong 87 + colloquial 24。历史分立数据集（冻结金标/口语扩充/旧意图
+# 路由器评测集）已于 2026-07-11 全部审校并入（沿革见 L1_routing/README.md §2），旧 Langfuse
+# dataset agent-routing-eval 停用。跑法：run_routing_experiment.py（缺省即本 dataset）。
+USER_REQUESTS_DATASET = "user-requests-routing"
+USER_REQUESTS_JSONL = _ROOT / "benchmark" / "L1_routing" / "data" / "user_requests.jsonl"
 
 # 清单匹配（描述→9位清单码）：2013/2024 两份金标合进一个 dataset，spec 进 input/metadata。
 # 不含 match_gold_2013_uncovered.jsonl —— 那是「库未覆盖码」清单（{code9,name}，无 query），
@@ -95,7 +99,7 @@ def _read_jsonl(path: Path) -> list[dict]:
 
 
 def _upload_routing_file(client, jsonl, dataset_name: str, description: str) -> int:
-    """上传一份路由 schema 的 jsonl 到指定 Langfuse Dataset（agent_routing_eval 与扩充集共用）。
+    """上传一份路由 schema 的 jsonl 到指定 Langfuse Dataset（主池与 bill_match 专项集共用）。
 
     功能：映射 query→input、{route,clarify,gold}→expected_output、其余字段进 metadata。
     参数：client —— Langfuse 客户端；jsonl —— 金标文件路径；dataset_name/description —— 目标 dataset。
@@ -123,7 +127,9 @@ def _upload_routing_file(client, jsonl, dataset_name: str, description: str) -> 
             },
             metadata={
                 "agent": r.get("agent"),
+                "capability": r.get("capability"),  # CLAUDE.md §1 六能力标签（c1~c6 / out_of_domain）
                 "group": r.get("group"),
+                "difficulty": r.get("difficulty"),  # strong / colloquial / real_paste 三档
                 "note": r.get("note"),
             },
         )
@@ -132,13 +138,19 @@ def _upload_routing_file(client, jsonl, dataset_name: str, description: str) -> 
     return len(rows)
 
 
-def upload_routing(client) -> int:
-    """上传路由评测集（冻结基线）到 Langfuse Dataset。"""
+def upload_user_requests(client) -> int:
+    """上传路由主池（111 条 = strong 87 + 口语难例 24）到 Langfuse Dataset。
+
+    功能：单文件已含 capability/difficulty 打标，复用 ``_upload_routing_file``，幂等覆盖。
+    参数：client —— Langfuse 客户端。
+    返回：写入的 item 条数。
+    """
     return _upload_routing_file(
         client,
-        ROUTING_JSONL,
-        ROUTING_DATASET,
-        "Agent 路由/红线评测（AGENT_INTEGRATION_DEV §0 升级判定门）。input=用户问法；expected_output 含 expect_route/expect_clarify/gold。",
+        USER_REQUESTS_JSONL,
+        USER_REQUESTS_DATASET,
+        "路由评测主池（111 条）：真实请求问法，capability 对齐 CLAUDE.md 六能力，"
+        "difficulty=strong/colloquial。判官=run_routing_experiment.py 本地判定（route/clarify 两率）。",
     )
 
 
@@ -318,7 +330,7 @@ def upload_clause(client) -> int:
 
 
 _UPLOADERS = {
-    "routing": upload_routing,
+    "user_requests": upload_user_requests,
     "bill_match_routing": upload_bill_match_routing,
     "clist": upload_clist,
     "toolcall": upload_toolcall,

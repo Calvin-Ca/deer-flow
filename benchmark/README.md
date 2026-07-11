@@ -6,7 +6,7 @@
 
 | 目录 | 层 | 里面有什么 | runner 状态 |
 |---|---|---|---|
-| `L1_routing/` | L1 路由 | `data/` 5 个金标集（冻结基线 agent_routing_eval 34 + 清单匹配路由 100 + 兜底难例 23 + 真实请求扩充 65/14）+ 生成脚本；`run_routing_experiment.py` | ✅ 可跑（当前主战场） |
+| `L1_routing/` | L1 路由 | `data/` 2 集（路由主池 111 + 清单匹配专项 100，均带 capability×difficulty 标签，字段说明见 `data/README.md`）+ 生成脚本；`run_routing_experiment.py` | ✅ 可跑（当前主战场） |
 | `L2_gating/` | L2 置信度门控 | `select_eval/` 选码引擎（召回/选码/**置信校准**/阈值），B1 调优主战场 | ✅ 引擎可跑（`tools/eval_select.py`） |
 | `L3_retrieval/` | L3 检索 | `data/` 清单匹配金标（2013×91 + 2024×10 + 未覆盖码清单）+ GB50016 条文召回；`run_retrieval_experiment.py`（复用 L2 引擎） | ✅ 清单匹配可跑；条文召回待 qa 支持 gb50016 |
 | `L4_redline/` | L4 答案/红线 | `adversarial/` 直接对抗 10 条 + **间接注入 5 条（盲区③）** | ⬜ runner 待建（注入需工具桩） |
@@ -28,9 +28,9 @@
 
 ```
 # 灌金标（全部 / 单集）
-uv run --project backend python benchmark/_shared/upload_datasets.py [--only routing|bill_match_routing|clist|toolcall|cost_task|norm_faithful|clause]
+uv run --project backend python benchmark/_shared/upload_datasets.py [--only user_requests|bill_match_routing|clist|toolcall|cost_task|norm_faithful|clause]
 # L1 路由批量评分
-uv run --project backend python benchmark/L1_routing/run_routing_experiment.py --run-name <variant> [--model qwen-plus] [--dataset bill-match-routing]
+uv run --project backend python benchmark/L1_routing/run_routing_experiment.py --run-name <variant> [--model qwen-plus] [--dataset bill-match-routing]   # 缺省跑主池 user-requests-routing
 # 单条路由探针（经 gateway 全栈）
 uv run --project backend python benchmark/_shared/probe_gateway.py "<query>" [--model qwen3-8b]
 # L3 清单匹配（复用 L2 选码引擎）
@@ -41,7 +41,7 @@ uv run --project backend python benchmark/L6_agent/cost_task/run_cost_task_exper
 uv run --project backend python benchmark/L6_agent/norm_faithful/run_norm_faithful_experiment.py --mode traditional --run-name norm_base
 ```
 
-> Langfuse dataset 名**不随目录改**（`agent-routing-eval`/`bill-match-routing`/`clist-match-eval`/`agent-toolcall-eval` 等），已跑的 runs 与横向对比不受本次重组影响（2026-07-11 重组，原 `routing_eval`/`retrieval_eval`/`agent_eval`/`runner`/`scoring`/`judges`/`select_eval` 并入上表结构）。
+> Langfuse dataset 名**不随目录改**（`user-requests-routing`/`bill-match-routing`/`clist-match-eval`/`agent-toolcall-eval` 等），已跑的 runs 与横向对比不受目录重组影响（2026-07-11 重组，原 `routing_eval`/`retrieval_eval`/`agent_eval`/`runner`/`scoring`/`judges`/`select_eval` 并入上表结构）。例外：`agent-routing-eval`（原 34 条冻结金标）2026-07-11 按六能力需求审并进路由主池后**停用**，其历史 runs 保留可查但不再新增。
 
 ## 嵌入式评测的隔离清单（踩坑记录）
 

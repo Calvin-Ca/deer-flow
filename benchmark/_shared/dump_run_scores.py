@@ -18,7 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from _lf import require_langfuse  # noqa: E402
 
-DATASET_NAME = "agent-routing-eval"
+DATASET_NAME = "user-requests-routing"  # 路由主池（原 agent-routing-eval 已于 2026-07-11 审并入此、停用；查旧 run 时临时改回）
 
 
 def _answer_snippet(output: object, limit: int = 60) -> str:

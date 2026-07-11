@@ -1,6 +1,6 @@
 """任务2b：路由评测——逐条跑 agent、读回 trace、挂分到 Langfuse Dataset Run。
 
-对 ``agent-routing-eval`` 数据集逐条把 query 喂给默认 lead agent（skill-only），
+对 ``user-requests-routing``（缺省，路由主池）等数据集逐条把 query 喂给默认 lead agent（skill-only），
 从 agent 的工具调用里程序化判定两项（对标 L1_routing/README 的两率）：
     - clarify_correct：是否「该反问就反问」（命中 ask_clarification 工具）；
     - route_correct ：是否「该调脚本就调」（工具调用/参数命中 ROUTE_SIGNALS）。
@@ -34,7 +34,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "_shared"))  # _lf 
 import _paths  # noqa: E402,F401  把 backend/ 补进 sys.path（import app 前置）
 from _lf import require_langfuse, wait_for_traces  # noqa: E402
 
-DATASET_NAME = "agent-routing-eval"
+DATASET_NAME = "user-requests-routing"  # 路由主池（101 条；原冻结集 agent-routing-eval 已于 2026-07-11 审并入此）
 
 # 「发生了路由」= lead agent 调了正经的算量/路由工具（按工具名判定，可靠：名字在流式
 # tool_call 首片里就到齐，不像 args 会分片）。口径见 L1_routing/README：路由 = 调
@@ -126,7 +126,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="路由评测：逐条跑 agent 并挂分到 Langfuse Dataset Run")
     parser.add_argument("--run-name", default=None, help="dataset run 名（建议填 prompt variant，便于横向比）")
     parser.add_argument("--model", default=None, help="覆盖模型名，如 qwen-plus")
-    parser.add_argument("--dataset", default=DATASET_NAME, help=f"Langfuse dataset 名（缺省 {DATASET_NAME}；清单匹配扩充集用 bill-match-routing）")
+    parser.add_argument("--dataset", default=DATASET_NAME, help=f"Langfuse dataset 名（缺省 {DATASET_NAME} 主池；清单匹配专项集用 bill-match-routing）")
     args = parser.parse_args()
 
     client = require_langfuse()
@@ -191,7 +191,7 @@ def main() -> int:
     print(f"run_name        = {run_name}   model = {args.model or '默认'}")
     print(f"路由率           = {route_rate:.2%}  ( {sum(r['out']['did_route'] for r in route_set)}/{len(route_set)} ，另 {n_halted} 条正确止步于反问不计，建议门 ≥0.8 )")
     print(f"红线遵守率(反问) = {clarify_rate:.2%}  ( {sum(r['out']['did_clarify'] for r in clarify_set)}/{len(clarify_set)} ，建议门 ≥0.95 )")
-    print("逐条分数已挂到 Langfuse：Datasets → agent-routing-eval → Runs → " + run_name)
+    print(f"逐条分数已挂到 Langfuse：Datasets → {args.dataset} → Runs → " + run_name)
     return 0
 
 

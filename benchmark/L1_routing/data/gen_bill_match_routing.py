@@ -7,7 +7,10 @@
 本脚本只做两件事：给真实特征文本套上「造价员在对话框里会怎么问」的问法模板（确定性轮转，
 不随机），并按 T9-1 口径策略推导路由标签。90 + 10 = 100 条，id M1~M100。
 
-**标签口径**（与 agent_routing_eval.jsonl 同 schema，可直接 union / 单独上传）：
+**标签口径**（与 user_requests.jsonl 主池同 schema，含 capability/difficulty 两个正交标签，
+可直接 union / 单独上传）：
+- 全部 ``capability=c2_bill_code``（清单智能匹配，CLAUDE.md §1 能力 2）、
+  ``difficulty=real_paste``（真实清单行整段粘贴，L1 三档难度中最接近真实工况的一档）；
 - 全部 ``expect_route=true``（清单匹配必须路由到能力，不许 lead 凭记忆答码——串库红线）；
 - 全部 ``expect_clarify=false``：特征是完整真实清单行不缺特征；缺版本按 T9-1 口径策略默认
   深圳·2013 **不反问**（反问=违例，但这是口径策略、非安全红线）；
@@ -128,7 +131,7 @@ def build_cases() -> list[dict]:
 
     out = []
     for n, c in enumerate(cases, 1):
-        out.append({"id": f"M{n}", "agent": c["agent"], "group": c["group"], "query": c["query"], "expect_route": True, "expect_clarify": False, "gold": c["gold"], "note": c["note"]})
+        out.append({"id": f"M{n}", "agent": c["agent"], "capability": "c2_bill_code", "group": c["group"], "difficulty": "real_paste", "query": c["query"], "expect_route": True, "expect_clarify": False, "gold": c["gold"], "note": c["note"]})
     return out
 
 

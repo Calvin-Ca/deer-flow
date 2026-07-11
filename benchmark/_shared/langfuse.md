@@ -25,7 +25,7 @@
 
 | Dataset | 来源 runner | 分数名 | 含义 |
 |---|---|---|---|
-| `agent-routing-eval` / `bill-match-routing` | L1 routing | `route_correct` | 该调工具就调了（命中 `ROUTE_TOOL_NAMES`）；**正确止步于反问的条目不挂此分**（不计分≠0 分） |
+| `user-requests-routing` / `bill-match-routing`（原 `agent-routing-eval` 2026-07-11 审并进主池、停用，历史 runs 保留可查） | L1 routing | `route_correct` | 该调工具就调了（命中 `ROUTE_TOOL_NAMES`）；**正确止步于反问的条目不挂此分**（不计分≠0 分） |
 | 同上 | 同上 | `clarify_correct` | 该反问就反问（`ask_clarification`），红线主判据 |
 | `clist-match-eval` | L3 retrieval | `match_top1` / `recalled` | 端到端选码命中 / 金标进候选（Recall@k） |
 | `agent-toolcall-eval` | L6-B toolcall | `tool_correct` / `call_correct` | 工具名对 / 工具名+args 按 arg_match 都对 |

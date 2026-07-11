@@ -6,7 +6,7 @@ from app.ce.norm.faithfulness import (
     evidence_clauses,
     extract_cited_clauses,
     faithfulness_enabled,
-    norm_verify_tool,
+    verify_norm_tool,
 )
 
 _EVIDENCE = [
@@ -68,5 +68,5 @@ def test_flag_off(monkeypatch):
 
 # ── 工具封装 ──
 def test_tool_wrapper():
-    out = norm_verify_tool.invoke({"answer": "依据 5.3.4", "evidence": _EVIDENCE})
+    out = verify_norm_tool.invoke({"answer": "依据 5.3.4", "evidence": _EVIDENCE})
     assert out["verdict"] == "faithful"

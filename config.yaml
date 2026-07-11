@@ -103,15 +103,15 @@ tools:
 - name: cost_calc
   group: cost
   use: app.ce.cost.tools:cost_calc_tool
-- name: cost_verify
+- name: verify_cost
   group: cost
-  use: app.ce.cost.verify:cost_verify_tool
+  use: app.ce.cost.verify:verify_cost_tool
 - name: cost_recall_exemplars
   group: cost
   use: app.ce.cost.exemplars:cost_recall_exemplars_tool
-- name: norm_verify
+- name: verify_norm
   group: norm
-  use: app.ce.norm.faithfulness:norm_verify_tool
+  use: app.ce.norm.faithfulness:verify_norm_tool
 - name: ls
   group: file:read
   use: deerflow.sandbox.tools:ls_tool
@@ -375,7 +375,7 @@ subagents:
         或已确认口径推断；无法确定地区/版本时先 ask_clarification 反问。
         - **① 复合问题先分解逐个检索**：一句里含多个子问题（如"某构件按什么计量、和另一种有何区别、各套什么清单"）
           时，**先拆成子问题、对每个独立 `ce-rag_search_clause`**，再综合作答（整句检索会捞一锅粥、漏召）。
-        - **② 定稿前调 `norm_verify` 回查引用忠实性**：把你的答案 + 检索到的证据传给它，回查答案里引的每个条款号
+        - **② 定稿前调 `verify_norm` 回查引用忠实性**：把你的答案 + 检索到的证据传给它，回查答案里引的每个条款号
           是否真在证据里。`verdict=unfaithful`（有幻觉引用）→ **剥掉该引用或把该结论降级为"无库内依据"**，
           绝不放行编造的条文号；`no_citation` 且非拒答 → 补检索或改为拒答。这是硬红线的确定性兜底。
 
@@ -396,7 +396,7 @@ subagents:
         - ce-rag_expand_clause_refs
         - ce-rag_get_clause
         - ce-rag_retrieve_evidence
-        - norm_verify
+        - verify_norm
       disallowed_tools:
         - task
         - present_files
@@ -415,7 +415,7 @@ subagents:
         你是组价结果复核专家 sub-agent，对上游给的组价结果做**对抗性复核（找茬，不是确认）**。
 
         **两半分工（务必先确定性、后语义）**：
-        1) **确定性预检必须先调 `cost_verify` 工具**：把组价结果对象传给它，拿回算术独立重算 + 编码格式 +
+        1) **确定性预检必须先调 `verify_cost` 工具**：把组价结果对象传给它，拿回算术独立重算 + 编码格式 +
            地域/版本隔离 + 完整性/价格覆盖的 verdict/findings。**规则能定死的对错以它为准，你不要自己算数、
            不要用文本判断替代它**（弱模型算术不可靠，算钱交确定性工具）。
         2) **只对规则判不了的语义再动用你自己的判断**，可调窄工具查证：
@@ -429,14 +429,14 @@ subagents:
         - `verdict`：`fail`（有 critical：算术不符 / 编码非法 / 串库 / 选错码）/ `doubt`（有 warn：缺价 /
           重算不完整 / 语义存疑）/ `pass`（都清）。
         - `findings`：逐条 `{type, severity(critical|warn|info), evidence, detail}`，其中确定性那批**原样透传
-          `cost_verify` 的 findings**，语义那批附你查到的证据。
+          `verify_cost` 的 findings**，语义那批附你查到的证据。
         - 一句话结论 + 建议动作：fail → 建议打回重选/转人工；doubt → 转人工确认并摆出具体异议。
 
-        **红线**：只复核不改结果、不重新组价、不调 `cost_workflow_start`；`cost_verify` 说 fail 就是 fail，
+        **红线**：只复核不改结果、不重新组价、不调 `cost_workflow_start`；`verify_cost` 说 fail 就是 fail，
         不替它翻案；查不到证据支持的怀疑降级为 doubt、不要升成 fail（避免误拒正确答案）。
         若出错（服务不可达 / 工具报错），如实返回，不建 venv / 不拷脚本自救。
       tools:
-        - cost_verify
+        - verify_cost
         - ce-db_bill_get
         - ce-db_quota_get
         - ce-rag_match_bill_item

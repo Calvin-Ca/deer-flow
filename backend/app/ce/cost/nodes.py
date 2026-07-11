@@ -6,6 +6,11 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, Literal
 
+from .bill_match_engine import as_candidates as _as_candidates
+from .bill_match_engine import candidate_code as _candidate_code
+from .bill_match_engine import candidate_score as _score
+from .bill_match_engine import feature_gap_report, recall_candidates, select_from_candidates
+from .bill_match_engine import top_candidates as _top_candidates
 from .mcp import call_mcp_tool
 from .state import CostNodeName, normalize_region, normalize_spec
 
@@ -30,41 +35,6 @@ class StepInterfaces:
 
 def _payload_without_none(payload: dict[str, Any]) -> dict[str, Any]:
     return {key: value for key, value in payload.items() if value is not None}
-
-
-def _as_candidates(value: Any) -> list[dict[str, Any]]:
-    if not isinstance(value, dict):
-        return []
-    for key in ("candidates", "items", "matches", "results", "suggestions"):
-        raw = value.get(key)
-        if isinstance(raw, list):
-            return [item for item in raw if isinstance(item, dict)]
-    return []
-
-
-def _score(candidate: dict[str, Any]) -> float | None:
-    for key in ("score", "confidence", "rerank_score", "similarity"):
-        value = candidate.get(key)
-        if isinstance(value, (int, float)):
-            return float(value)
-        if isinstance(value, str):
-            try:
-                return float(value)
-            except ValueError:
-                continue
-    return None
-
-
-def _candidate_code(candidate: dict[str, Any]) -> str | None:
-    for key in ("code", "bill_code", "item_code"):
-        value = candidate.get(key)
-        if isinstance(value, str) and value.strip():
-            return value.strip()
-    return None
-
-
-def _top_candidates(candidates: list[dict[str, Any]], limit: int = 5) -> list[dict[str, Any]]:
-    return candidates[:limit]
 
 
 def _unsupported_strategy_result(step: str, strategy: str) -> dict[str, Any]:
@@ -166,33 +136,30 @@ def bill_match_node(payload: dict[str, Any]) -> dict[str, Any]:
             },
         }
 
-    arguments = _payload_without_none(
-        {
-            "description": str(description),
-            "spec": normalize_spec(payload.get("spec")),
-            "top_k": int(payload.get("top_k") or 10),
-            "code_prefixes": payload.get("code_prefixes"),
-        }
+    recalled = recall_candidates(
+        str(description),
+        spec=payload.get("spec"),
+        top_k=int(payload.get("top_k") or 10),
+        code_prefixes=payload.get("code_prefixes"),
+        call_tool=call_mcp_tool,
     )
-    tool_result = call_mcp_tool("ce-rag_match_bill_item", arguments)
-    if tool_result.get("status") != "ok":
+    if recalled["status"] != "ok":
         return {
             "node": "bill_match",
             "status": "blocked",
-            "error": tool_result,
+            "error": recalled["error"],
         }
 
-    result = tool_result.get("result")
-    candidates = _as_candidates(result)
+    candidates = recalled["candidates"]
     return {
         "node": "bill_match",
         "status": "done" if candidates else "need_review",
         "candidates": candidates,
         "count": len(candidates),
-        "result": result,
+        "result": recalled["result"],
         "provenance": {
             "source": "ce-rag_match_bill_item",
-            "arguments": arguments,
+            "arguments": recalled["arguments"],
         },
     }
 
@@ -243,30 +210,37 @@ def select_bill_node(payload: dict[str, Any]) -> dict[str, Any]:
 
     threshold = float(payload.get("auto_select_threshold") or 0.86)
     margin = float(payload.get("auto_select_margin") or 0.08)
-    sorted_candidates = sorted(candidates, key=lambda candidate: _score(candidate) or -1.0, reverse=True)
-    top = sorted_candidates[0]
-    top_score = _score(top)
-    second_score = _score(sorted_candidates[1]) if len(sorted_candidates) > 1 else None
-    enough_margin = second_score is None or (top_score is not None and top_score - second_score >= margin)
-    top_code = _candidate_code(top)
+    decision = select_from_candidates(candidates, threshold=threshold, margin=margin)
 
-    if top_code and top_score is not None and top_score >= threshold and enough_margin:
-        return {
+    if decision["decided"]:
+        result = {
             "node": "select_bill",
             "status": "done",
-            "selected_code": top_code,
-            "selected": top,
+            "selected_code": decision["selected_code"],
+            "selected": decision["selected"],
             "selection_source": "auto_confident_candidate",
-            "confidence": top_score,
+            "confidence": decision["confidence"],
         }
+        # 选定后顺带做特征项缺口检查（能力 2 的"少特征"提醒也覆盖正向选码路径）；
+        # best-effort：payload 无描述或真值不可得时静默跳过，不阻断选码。
+        feature_text = payload.get("description") or payload.get("feature")
+        if isinstance(feature_text, str) and feature_text.strip():
+            gap = feature_gap_report(
+                decision["selected_code"], payload.get("spec"), feature_text,
+                payload.get("provided_features"), call_tool=call_mcp_tool,
+            )
+            if gap["checked"]:
+                result["required_features"] = gap["required_features"]
+                result["missing_features"] = gap["missing_features"]
+        return result
 
     return {
         "node": "select_bill",
         "status": "awaiting_input",
-        "candidates": _top_candidates(sorted_candidates),
+        "candidates": _top_candidates(decision["sorted_candidates"]),
         "interrupt": _review_gate(
             "select_bill",
-            _top_candidates(sorted_candidates),
+            _top_candidates(decision["sorted_candidates"]),
             "清单候选需要人工复核，请选择一个候选编码，或自行输入编码（可选填理由）。",
             required_fields=["selected_code"],
         ),

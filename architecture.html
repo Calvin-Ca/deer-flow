@@ -189,7 +189,7 @@
           <div class="node" style="--c:var(--role-det)">
             <div class="nh"><span class="name">确定性护栏</span><span class="port">纯函数·可单测</span></div>
             <div class="desc">工程加固层：不靠弱模型的确定性检查/召回</div>
-            <div class="tools"><span class="chip" style="--c:var(--role-det)">cost_verify 算术重算/串库</span><span class="chip" style="--c:var(--role-det)">norm_verify 引用回查</span><span class="chip" style="--c:var(--role-det)">cost_recall_exemplars 主动学习</span></div>
+            <div class="tools"><span class="chip" style="--c:var(--role-det)">verify_cost 算术重算/串库</span><span class="chip" style="--c:var(--role-det)">verify_norm 引用回查</span><span class="chip" style="--c:var(--role-det)">cost_recall_exemplars 主动学习</span></div>
           </div>
         </div>
       </div>
@@ -261,7 +261,7 @@
         <div class="arrow">→</div>
         <div class="step" style="--c:var(--role-llm)"><div class="s-role">LLM</div><div class="s-name">生成带引用答案</div></div>
         <div class="arrow">→</div>
-        <div class="step" style="--c:var(--role-det)"><div class="s-role">确定性护栏</div><div class="s-name mono">norm_verify</div><div class="s-sub">引用条款号回查∈检索证据；幻觉→剥引用/拒答</div></div>
+        <div class="step" style="--c:var(--role-det)"><div class="s-role">确定性护栏</div><div class="s-name mono">verify_norm</div><div class="s-sub">引用条款号回查∈检索证据；幻觉→剥引用/拒答</div></div>
       </div>
     </div>
 
@@ -303,7 +303,7 @@
         <div class="branch"><div class="arrow loop">↩</div></div>
         <div class="step" style="--c:var(--role-det)"><div class="s-role">循环</div><div class="s-name">advance 下一构件</div><div class="s-sub">全办完 →</div></div>
         <div class="arrow">→</div>
-        <div class="step" style="--c:var(--role-llm)"><div class="s-role">复核 · 子智能体</div><div class="s-name">cost-critic（②）</div><div class="s-sub">定稿前对抗复核：cost_verify 算术/串库 + 语义构件↔码；fail→打回、doubt→转人工</div></div>
+        <div class="step" style="--c:var(--role-llm)"><div class="s-role">复核 · 子智能体</div><div class="s-name">cost-critic（②）</div><div class="s-sub">定稿前对抗复核：verify_cost 算术/串库 + 语义构件↔码；fail→打回、doubt→转人工</div></div>
       </div>
     </div>
 
@@ -343,11 +343,11 @@
     <div class="nodes">
       <div class="node" style="--c:var(--role-det)">
         <div class="nh"><span class="name">② 复核 agent</span><span class="port">generator–verifier</span></div>
-        <div class="desc">cost-critic 对抗复核组价结果：<span class="mono">cost_verify</span> 确定性算术重算/串库/编码 + LLM 语义构件↔码。fail 打回、doubt 转人工。</div>
+        <div class="desc">cost-critic 对抗复核组价结果：<span class="mono">verify_cost</span> 确定性算术重算/串库/编码 + LLM 语义构件↔码。fail 打回、doubt 转人工。</div>
       </div>
       <div class="node" style="--c:var(--role-det)">
         <div class="nh"><span class="name">⑤ agentic RAG</span><span class="port">norm-qa</span></div>
-        <div class="desc">复合问题分解逐个检索 + <span class="mono">norm_verify</span> 引用条款号回查∈检索证据（治幻觉引用）。开关 <span class="mono">CE_NORM_FAITHFULNESS_CHECK</span>。</div>
+        <div class="desc">复合问题分解逐个检索 + <span class="mono">verify_norm</span> 引用条款号回查∈检索证据（治幻觉引用）。开关 <span class="mono">CE_NORM_FAITHFULNESS_CHECK</span>。</div>
       </div>
       <div class="node" style="--c:var(--role-det)">
         <div class="nh"><span class="name">⑥ 主动学习</span><span class="port">few-shot·不训练</span></div>
@@ -362,8 +362,8 @@
 
   <footer class="note">
     <b>红线（贯穿所有 cost 流）：</b>选码只在候选内、不造码，低置信转人工；算钱一律走确定性 Python，LLM 不算钱；
-    地区/版本严格隔离（默认深圳·2013）；无命中不杜撰。<b>红线靠确定性护栏（<span class="mono">cost_verify</span> /
-    <span class="mono">norm_verify</span>）enforced，不靠 prompt 祈祷。</b>&nbsp;
+    地区/版本严格隔离（默认深圳·2013）；无命中不杜撰。<b>红线靠确定性护栏（<span class="mono">verify_cost</span> /
+    <span class="mono">verify_norm</span>）enforced，不靠 prompt 祈祷。</b>&nbsp;
     <b>已退役：</b><code>ce-services :8101</code> 任务层、前端组价 widget、13 节点独立 HITL 图 —— 组价编排现唯一路径为
     harness 内嵌 <code>cost_workflow_*</code> + <code>ce-rag</code>/<code>ce-db</code> MCP。
   </footer>

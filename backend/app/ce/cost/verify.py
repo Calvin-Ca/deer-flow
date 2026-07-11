@@ -142,7 +142,7 @@ def verify_cost_result(result: dict[str, Any]) -> dict[str, Any]:
     return {"verdict": verdict, "findings": findings, "recomputed": recomputed, "code": code9}
 
 
-def cost_verify(result: dict[str, Any]) -> dict[str, Any]:
+def verify_cost(result: dict[str, Any]) -> dict[str, Any]:
     """确定性复核一条组价结果（算术独立重算 + 完整性/编码/地域隔离/价格覆盖），返回结构化 verdict。
 
     用于 cost-critic 复核子智能体的"确定性预检"：规则能定死的对错在此判掉，语义匹配（构件↔码是否贴切、
@@ -155,6 +155,6 @@ def cost_verify(result: dict[str, Any]) -> dict[str, Any]:
     return verify_cost_result(result)
 
 
-cost_verify_tool = tool("cost_verify", parse_docstring=True)(cost_verify)
+verify_cost_tool = tool("verify_cost", parse_docstring=True)(verify_cost)
 
-__all__ = ["recompute_unit_price", "verify_cost_result", "cost_verify", "cost_verify_tool"]
+__all__ = ["recompute_unit_price", "verify_cost_result", "verify_cost", "verify_cost_tool"]

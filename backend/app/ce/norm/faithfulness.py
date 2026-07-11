@@ -5,7 +5,7 @@
 
 用法两处（同一 core）：
 - **eval runner**：从 trace 里拿 {答案, 检索证据} 直接算忠实率——**可靠度量**，不依赖弱模型自觉；
-- **norm-qa 子智能体**：定稿前调 `norm_verify` 工具自查——**agentic 行为**，不忠实则剥引用/降级"无库内依据"。
+- **norm-qa 子智能体**：定稿前调 `verify_norm` 工具自查——**agentic 行为**，不忠实则剥引用/降级"无库内依据"。
 
 只做**存在性回查**（条款号 ∈ 检索证据的条款号集）——确定性、可单测。更重的**论断落地**（每个论断是否
 真能从所引条文推出）走 RAGAS LLM 裁判（`benchmark/judges/norm_faithfulness.md`），不在本模块。
@@ -73,7 +73,7 @@ def check_faithfulness(answer: str | None, evidence: list[dict[str, Any]] | None
     }
 
 
-def norm_verify(answer: str, evidence: list[dict[str, Any]]) -> dict[str, Any]:
+def verify_norm(answer: str, evidence: list[dict[str, Any]]) -> dict[str, Any]:
     """回查规范问答答案里引的条款号是否真在检索证据里（引用忠实性校验，确定性、不调 LLM）。
 
     agentic RAG 的诚实闸：定稿前自查——``verdict=unfaithful`` 说明有幻觉引用（引了没检索到的条款号），
@@ -86,9 +86,9 @@ def norm_verify(answer: str, evidence: list[dict[str, Any]]) -> dict[str, Any]:
     return check_faithfulness(answer, evidence)
 
 
-norm_verify_tool = tool("norm_verify", parse_docstring=True)(norm_verify)
+verify_norm_tool = tool("verify_norm", parse_docstring=True)(verify_norm)
 
 __all__ = [
     "faithfulness_enabled", "extract_cited_clauses", "evidence_clauses",
-    "check_faithfulness", "norm_verify", "norm_verify_tool",
+    "check_faithfulness", "verify_norm", "verify_norm_tool",
 ]

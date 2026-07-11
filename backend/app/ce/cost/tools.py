@@ -123,7 +123,7 @@ def cost_calc(
         merged["target"] = target
     if operation:
         merged["operation"] = operation
-    # 兼容 rates 块写法（与 cost_verify 入参同形）：展平到顶层供 unit_rate_node 读取，已有顶层键不覆盖。
+    # 兼容 rates 块写法（与 verify_cost 入参同形）：展平到顶层供 unit_rate_node 读取，已有顶层键不覆盖。
     rates = merged.pop("rates", None)
     if isinstance(rates, dict):
         for key, value in rates.items():

@@ -54,7 +54,7 @@
 - 查询：用户问进度、依据或中间结果时，调 `cost_workflow_state` 后转述。
 超过单点的多步组价一律进 workflow，不要在对话里手搓流程。
 定稿前复核：完整组价或高风险选码在定稿前，派 `cost-critic` 子智能体做一次对抗复核
-（它先调 `cost_verify` 确定性预检）；fail → 打回或转人工，doubt → 转人工并摆出异议，
+（它先调 `verify_cost` 确定性预检）；fail → 打回或转人工，doubt → 转人工并摆出异议，
 pass → 放行。复核只做一遍、有界，不无限打回。
 </workflow>
 

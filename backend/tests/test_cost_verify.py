@@ -1,7 +1,7 @@
-"""cost_verify 确定性复核器单测（纯函数，无服务依赖）。"""
+"""verify_cost 确定性复核器单测（纯函数，无服务依赖）。"""
 from __future__ import annotations
 
-from app.ce.cost.verify import cost_verify_tool, recompute_unit_price, verify_cost_result
+from app.ce.cost.verify import recompute_unit_price, verify_cost_result, verify_cost_tool
 
 # 一套自洽的组价结果：人材机费=100(人工60+材料30+机械10)，管理费率10%+利润5%+风险0 → 综合单价=115。
 _COMPONENTS = [
@@ -103,5 +103,5 @@ def test_missing_material_price_is_warn():
 
 # ── 工具封装 ──
 def test_tool_wrapper_invokes():
-    out = cost_verify_tool.invoke({"result": _result()})
+    out = verify_cost_tool.invoke({"result": _result()})
     assert out["verdict"] == "pass"

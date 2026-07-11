@@ -154,7 +154,8 @@ def _run_bill_match(ctx: _Ctx) -> dict[str, Any]:
 
 
 def _run_select_bill(ctx: _Ctx) -> dict[str, Any]:
-    return select_bill_node({**ctx.base_payload, "candidates": ctx.item.get("bill_match", {}).get("candidates", [])})
+    # description 供选定后的特征缺口检查（少特征提醒）；缺则引擎静默跳过该检查。
+    return select_bill_node({**ctx.base_payload, "description": ctx.item.get("description"), "candidates": ctx.item.get("bill_match", {}).get("candidates", [])})
 
 
 def _run_quota_compose(ctx: _Ctx) -> dict[str, Any]:

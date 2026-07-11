@@ -46,7 +46,7 @@ evidence,severity}]}`；多视角（单位镜/语义镜/漏项镜各查一遍）
 > 面试话术："generator–verifier，复核在已知错样本召回 X%、误拒 Y%，端到端 pass^5 提了 Z 点。"
 
 **实现**：确定性校验器 `backend/app/ce/cost/verify.py`（纯函数，独立重算综合单价 + 完整性/格式/地域校验，
-`test_cost_verify.py` 单测）→ 暴露为 `cost_verify` 工具；`cost-critic` 子智能体（config.yaml）调 `cost_verify`
+`test_cost_verify.py` 单测）→ 暴露为 `verify_cost` 工具；`cost-critic` 子智能体（config.yaml）调 `verify_cost`
 + `ce-db_bill_get`（码存在）+ `ce-rag_match_bill_item`（候选/语义），对抗性提示、结构化 verdict。
 
 ### ③ 弱模型可靠性层 — 最好的 war story
@@ -100,7 +100,7 @@ evidence,severity}]}`；多视角（单位镜/语义镜/漏项镜各查一遍）
     造价规范问题天然复合（计量+清单口径+取费），单句检索捞不准。norm-qa 本能多次检索，升级基本是 prompt。
   - **引用忠实性校验**（提诚实，招牌）：生成后**回查答案引的每个条文号是否真在检索证据里**，不在则拒答/剥引用/
     降级"无库内依据"——把红线"不编条文"从 prompt 祈祷变**确定性 enforced check**，治 RAG 头号幻觉。两层：
-    ① 存在性回查（确定性、可单测，`norm_verify`，与 cost-critic 的 verify.py 同套路）；② 论断落地（RAGAS 式，
+    ① 存在性回查（确定性、可单测，`verify_norm`，与 cost-critic 的 verify.py 同套路）；② 论断落地（RAGAS 式，
     走 `judges/norm_faithfulness.md` LLM 裁判，重、需先在小批人标上校准）。招牌是①（便宜且强）。
 
   **可配置切换（传统 ↔ agentic，deer-flow 现成机制）**：
@@ -116,9 +116,9 @@ evidence,severity}]}`；多视角（单位镜/语义镜/漏项镜各查一遍）
   **[✓ 已落地 agentic 半]**（`test_norm_faithfulness.py` 10 例单测通过）：
   - `backend/app/ce/norm/faithfulness.py`：`check_faithfulness`（抠答案条款号→回查是否在检索证据里，
     verdict=faithful/unfaithful/no_citation + faithful_rate；条款号正则只吞带小数点的、不误吞年份/标准号）
-    + `norm_verify` 工具 + `faithfulness_enabled()` 读 `CE_NORM_FAITHFULNESS_CHECK` 开关。
-  - norm-qa 提示词升级为 agentic：**①复合问题先分解逐个检索 ②定稿前调 `norm_verify` 回查引用**、
-    unfaithful→剥引用/降级"无库内依据"；`norm_verify` 工具已加进 norm-qa。
+    + `verify_norm` 工具（原名 `norm_verify`，2026-07-11 统一 verify 前置命名）+ `faithfulness_enabled()` 读 `CE_NORM_FAITHFULNESS_CHECK` 开关。
+  - norm-qa 提示词升级为 agentic：**①复合问题先分解逐个检索 ②定稿前调 `verify_norm` 回查引用**、
+    unfaithful→剥引用/降级"无库内依据"；`verify_norm` 工具已加进 norm-qa。
   - **[✓ 已实现] baseline 对比 runner**：`run_norm_faithful_experiment.py --mode traditional|agentic`，同一
     `norm_faithful` 集跑两轮，`--mode` 控 `CE_NORM_FAITHFULNESS_CHECK` + variant 标签；判定器
     `benchmark/scoring/norm_faithful_score.py`（纯函数、10 例单测）出**忠实率/幻觉引用率/答案要点覆盖/std 级

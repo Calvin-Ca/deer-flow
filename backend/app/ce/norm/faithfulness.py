@@ -8,7 +8,7 @@
 - **norm-qa 子智能体**：定稿前调 `verify_norm` 工具自查——**agentic 行为**，不忠实则剥引用/降级"无库内依据"。
 
 只做**存在性回查**（条款号 ∈ 检索证据的条款号集）——确定性、可单测。更重的**论断落地**（每个论断是否
-真能从所引条文推出）走 RAGAS LLM 裁判（`benchmark/judges/norm_faithfulness.md`），不在本模块。
+真能从所引条文推出）走 RAGAS LLM 裁判（`benchmark/L6_agent/norm_faithful/norm_faithfulness.md`），不在本模块。
 
 开关：``CE_NORM_FAITHFULNESS_CHECK``（默认开）——传统 RAG 基线对比时置 0 关掉（见 MS.md ⑤ ablation）。
 """

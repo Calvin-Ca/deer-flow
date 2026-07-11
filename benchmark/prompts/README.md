@@ -24,7 +24,7 @@ config.yaml 指向本目录某文件
 
 1. 改 `config.yaml` 一行：`lead_agent.system_prompt_path: benchmark/prompts/lead_agent_v2.md`
    —— **热加载**，下一条消息即生效，不用重启 gateway / 重建容器。
-2. 跑评测：`benchmark/runner/run_routing_experiment.py --run-name <名>`（逐 variant 换 run-name）。
+2. 跑评测：`benchmark/L1_routing/run_routing_experiment.py --run-name <名>`（逐 variant 换 run-name）。
 3. Langfuse `Datasets → Runs → Compare` 横向比 `route_correct`/`clarify_correct`；
    trace 均带 `variant:<文件名stem>` 标签，可直接过滤分组。
 

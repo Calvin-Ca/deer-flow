@@ -48,9 +48,9 @@
 - 每次改完代码，**先询问用户是否 commit/push，等确认后再执行**，不得自动提交
 - **本地不提交、不 push `uv.lock`**（`backend/uv.lock`、`ce-code/uv.lock`）：依赖锁文件以服务器（实际装依赖处）为准，本地 Mac 改动不入 commit。commit/push 时把 `uv.lock` 留在工作区不 `git add`
 - **给用户的任何终端命令一律写成单行**（不只文档/示例，也包括对话里直接贴给用户去服务器执行的命令）：不用 `\` 多行续行，不用 `<<EOF` 多行 heredoc，不用跨行的 `for/if/while` 块——多行内容复制粘贴到服务器终端时续行常被 `>` 提示符打断，导致 `Command 'run' not found` 之类报错。需要多步就拆成多条独立单行命令，或用 `&&`/`;` 串成一行；需要多行文件内容时改用「写好文件再执行」而非 heredoc 贴命令
-- POC 代码放项目根下（`ce-code/` 知识层，与 `backend/` 平级），正常 commit 同步。端口约定：ce-rag :8100 检索 / ce-db :8102 结构化真值（均为 MCP 服务，供 backend agent 消费）。**原 `ce-services/` 任务层（:8101）已整体退役**——组价编排/规范问答已内嵌进 backend（`cost_workflow_*` + norm-qa/cost-agent 子智能体 + ce-rag/ce-db MCP）；其唯一遗留的选码评测引擎已迁至 `benchmark/select_eval/`
+- POC 代码放项目根下（`ce-code/` 知识层，与 `backend/` 平级），正常 commit 同步。端口约定：ce-rag :8100 检索 / ce-db :8102 结构化真值（均为 MCP 服务，供 backend agent 消费）。**原 `ce-services/` 任务层（:8101）已整体退役**——组价编排/规范问答已内嵌进 backend（`cost_workflow_*` + norm-qa/cost-agent 子智能体 + ce-rag/ce-db MCP）；其唯一遗留的选码评测引擎已迁至 `benchmark/L2_gating/select_eval/`
 - 各层 `PRD/DEV/TODO/README` 随 git 同步到服务器（项目文档跟着代码走）；**本文档 `CLAUDE.md` 也随 git 同步**（项目级共享上下文跟着代码走，与各层文档一致）——含服务器路径/内网 IP/端口等环境细节，仅内网可达、非公网机密，可入 git/push
-- 数据文件 `ce-code/data/`：**入 git 同步** `parsed/`（MinerU 输出）、`structured/`（chunk 树 / bill_spec.jsonl 等结构化产物）——派生数据走 git 在 Mac/服务器间同步（2026-06-16 起）；**仍不进 git** `raw/`（PDF 原件，版权敏感）、`vector_store/`（BM25 + Milvus 索引，大体积二进制、可重新生成）、`eval_set/`（仅余评测 xlsx 原件）。**评测金标集已迁项目根 `benchmark/`**（`routing_eval/` 路由评测 + `retrieval_eval/` 清单匹配/条文召回金标，随 git 同步）
+- 数据文件 `ce-code/data/`：**入 git 同步** `parsed/`（MinerU 输出）、`structured/`（chunk 树 / bill_spec.jsonl 等结构化产物）——派生数据走 git 在 Mac/服务器间同步（2026-06-16 起）；**仍不进 git** `raw/`（PDF 原件，版权敏感）、`vector_store/`（BM25 + Milvus 索引，大体积二进制、可重新生成）、`eval_set/`（仅余评测 xlsx 原件）。**评测金标集已迁项目根 `benchmark/`**（按层分目录：`L1_routing/data/` 路由评测 + `L3_retrieval/data/` 清单匹配/条文召回金标，随 git 同步）
 - **作为开发者，禁止用「前端调大模型对话生成」的方式新建 skill 或 agent**（即 `/workspace/agents/new` 的 bootstrap 流程、`/workspace/chats/new?mode=skill` 的 skill-creator 流程）：① 产物落 `.deer-flow/users/{user}/agents/` 与 `skills/custom/`，均**不随 git 同步**、按机器隔离，与 Mac↔服务器 git 工作流不一致；② **这些前端自助创建功能未来会被删除**。开发态的 skill 一律**手写进 `skills/public/{name}/SKILL.md`（随 git 同步）**，agent 定义同理走代码/git 纳管，不依赖前端生成
 
 ### 3.3 服务器验证两态：dev 调试态 / Docker 生产态（2026-07-06 定）
@@ -95,15 +95,15 @@
 
 ## 4. Benchmark 测试进度与续测入口（2026-07-10）
 
-> 当前阶段：**路由层（L1）评测调试中**。规范/门线见 `benchmark/AGENT_BENCHMARK.md`，runner 操作见 `benchmark/runner/README.md`。
+> 当前阶段：**路由层（L1）评测调试中**。规范/门线见 `benchmark/AGENT_BENCHMARK.md`，目录地图（层↔目录 + 命令速查）见 `benchmark/README.md`，runner 操作见 `benchmark/_shared/README.md`。**2026-07-11 起 benchmark 按层分目录**（`L1_routing/`…`L7_nfr/` + `_shared/` 基建 + `component_eval/` 零件级）。
 
 ### 4.1 两个测试入口（都在服务器跑，`uv run --project backend python ...`）
 
 1. **批量评分 runner**（进程内嵌入式 DeerFlowClient，**不经 gateway**）——出 `route_correct`/`clarify_correct` 两率：
-   - `benchmark/runner/upload_datasets.py --only routing`（用例源=Langfuse dataset，先灌）
-   - `benchmark/runner/run_routing_experiment.py --run-name <名> [--model qwen-plus]`
+   - `benchmark/_shared/upload_datasets.py --only routing`（用例源=Langfuse dataset，先灌）
+   - `benchmark/L1_routing/run_routing_experiment.py --run-name <名> [--model qwen-plus]`
    - 逐 variant 换 `--run-name`，Langfuse `Datasets→Runs→Compare` 横向比。
-2. **单条路由探针** `benchmark/runner/probe_gateway.py "<query>" [--model qwen3-8b]`（外部 HTTP、**经 gateway 全栈**，可配 debugpy 断点）——看单条 `[tool]` + `did_route`/`did_clarify`。凭据放根 `.env`（`DEER_FLOW_PROBE_EMAIL`/`DEER_FLOW_PROBE_PASSWORD`，已 gitignore）。
+2. **单条路由探针** `benchmark/_shared/probe_gateway.py "<query>" [--model qwen3-8b]`（外部 HTTP、**经 gateway 全栈**，可配 debugpy 断点）——看单条 `[tool]` + `did_route`/`did_clarify`。凭据放根 `.env`（`DEER_FLOW_PROBE_EMAIL`/`DEER_FLOW_PROBE_PASSWORD`，已 gitignore）。
 
 ### 4.2 本阶段已定/已修
 

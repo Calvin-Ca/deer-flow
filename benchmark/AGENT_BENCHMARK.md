@@ -4,6 +4,7 @@
 > 文档定位：把 PRD §8「验收要点」落成**分层、可执行、可复现**的评测体系。
 > 文档对：本文定义 **「测什么 / 指标口径」**；**「怎么用 Langfuse 实际跑（前置→灌金标→跑 runner→看分，逐步命令）」见 [`LANGFUSE.md`](LANGFUSE.md) §9 runbook**。即——本文是规范，那份是操作手册；本文某层指标改了，那份对应 runner/`create_score` 名随之对齐。
 > 单一事实源约定：路由金标准的依据是 `../history_doc/AGENT_PRD.md` §4.3 决策表；本文档不重定义路由规则，只定义如何测。§4.3 改了，本文档的路由金标准随之更新。
+> 目录组织（2026-07-11 重组）：数据/runner/判分器**按层住进 `L1_routing/`…`L7_nfr/` 目录**（共享基建 `_shared/`、零件级 `component_eval/`、提示词库 `prompts/` 不动）——目录 ↔ 层映射与命令速查见 [`README.md`](README.md)。
 
 ---
 
@@ -142,6 +143,15 @@ L1–L4 测「零件对不对」（确定性、单次可复现）；**L6 测「�
 
 > 任务级 case schema 见 **§4.4**；门线见 **§5**。
 
+**运行态扩展子集（2026-07-11 补盲区，数据先行、runner 待建）**——L6 三范式之外，agent 系统还有四个通用失败面，各以小数据集立口径（先少后扩）：
+
+| 子集 | 盲区 | 落点 | 核心指标（详见各目录 README） |
+|---|---|---|---|
+| `L6_agent/trajectory/` | ① HITL 续跑质量 | 多轮 `turns` schema + 8 条（含两轮补料/澄清中改需求难例） | `resume_success` / `no_redundant_reask` |
+| `L6_agent/trajectory/`（同集） | ④ 轨迹效率 | 每条 `budget`（步数/同工具重复/澄清轮数上限） | 预算超限率 / 打转率 / pass^k 漂移率 |
+| `L6_agent/fault_injection/` | ② 故障注入 | 6 条（服务挂/空/超时/畸形/复合半路失败） | 优雅降级率 + **失败后编造率 = 0（硬 gate）** |
+| `L4_redline/adversarial/prompt_injection.jsonl` | ③ 间接注入 | 5 条（指令藏工具返回内容里，`injected_via=tool_result`） | 注入抵抗率 = 100%（红线对抗态，挂 L4） |
+
 ### L7 NFR（横切维度）
 
 NFR 不属于某一层，而是**横切各层/路径**：延迟按路径分测、隔离测数据面、可观测测跨层埋点（落点/置信度/来源分别落 L1/L2/L3）。单列成层只为门线归集，不改变其横切本质。
@@ -189,7 +199,7 @@ NFR 不属于某一层，而是**横切各层/路径**：延迟按路径分测�
 | 标注质量 | 路由标签**双标 + 仲裁**（路由是主指标，标注噪声直接吃掉 5% 余量）；有专家时专家标金标，无专家时按 §8 反向构造 + 异源模型校验定金标 |
 | 难例来源 | 真实用户日志里的歧义/缺特征/跨省/复合请求优先入库，比人造样本更能暴露问题；流量未起时先用 §8 合成 + 对抗造难例顶上 |
 
-### 4.2 请求级标注 schema（建议 JSONL，落 `benchmark/routing_eval/`）
+### 4.2 请求级标注 schema（建议 JSONL，落 `benchmark/L1_routing/data/`）
 
 **适用范围**：本 schema 标的是"一条请求该怎么走"，仅覆盖请求级评测；其余层各有独立数据形态，不共用本 schema。
 
@@ -200,7 +210,7 @@ NFR 不属于某一层，而是**横切各层/路径**：延迟按路径分测�
 | L4 答案·红线 | ✅ 覆盖 | `expected_sources`（溯源）/ `expect_refuse`（拒答） |
 | L5 复合拆解 | ✅ 覆盖 | `expected_subtasks` |
 | L3 检索召回 | ⚠️ 仅版本·地域信号 | Recall@k / MRR 需"query → 带排序的金标文档/条文 id"形态，见 §2-L3 |
-| L6 agent 任务层 | ❌ 不覆盖 | §4.4 **任务级 schema**（`agent_eval/`，含 `terminal_check`/`policy`/`pass_k`），与本 schema 不同源 |
+| L6 agent 任务层 | ❌ 不覆盖 | §4.4 **任务级 schema**（`L6_agent/`，含 `terminal_check`/`policy`/`pass_k`），与本 schema 不同源 |
 | L7 NFR | ❌ 不覆盖 | 延迟/隔离/可观测，横切各层/路径，见 §2-L7 |
 
 ```jsonc
@@ -251,11 +261,11 @@ NFR 不属于某一层，而是**横切各层/路径**：延迟按路径分测�
 - **谁是主**：PRD §4.3 落点是业务主视角（L1 主指标），编排层是下游实现验证视角（验「落点对了，脚本也调对了」）。以 §4 schema 为骨架，编排字段作附加列挂上。
 - **字段映射可推导、可机器校验**：`expected_route=规范问答Agent ↔ agent=norm-qa`、`组价Agent ↔ cost-agent`；`eh_type=EH-02(越界) → expect_refuse=true`；`gate_gold=react ↔ 缺版本反问`（缺版本即缺特征，EH-04）。映射表机器对账，防两层标注漂移。
 
-### 4.4 任务级 case schema（L6 用，落 `benchmark/agent_eval/`）
+### 4.4 任务级 case schema（L6 用，落 `benchmark/L6_agent/`）
 
 与 §4.2 请求级 schema 不同——4.2 标"一句话请求该路由到哪"，本 schema 标"一个完整任务的初态、目标、工具环境与可程序化判定的终态"，喂 L6（A/B/C），按子层分文件。
 
-**L6-A 端到端组价任务**（`agent_eval/cost_task/*.jsonl`）：
+**L6-A 端到端组价任务**（`L6_agent/cost_task/*.jsonl`）：
 
 ```jsonc
 {
@@ -279,7 +289,7 @@ NFR 不属于某一层，而是**横切各层/路径**：延迟按路径分测�
 }
 ```
 
-**L6-B 工具调用**（`agent_eval/toolcall/*.jsonl`，BFCL 式单步/少步）：
+**L6-B 工具调用**（`L6_agent/toolcall/*.jsonl`，BFCL 式单步/少步）：
 
 ```jsonc
 {
@@ -294,7 +304,7 @@ NFR 不属于某一层，而是**横切各层/路径**：延迟按路径分测�
 }
 ```
 
-**L6-C 规范问答忠实度**（`agent_eval/norm_faithful/*.jsonl`，RAGAS 式）：
+**L6-C 规范问答忠实度**（`L6_agent/norm_faithful/*.jsonl`，RAGAS 式）：
 
 ```jsonc
 {
@@ -453,9 +463,9 @@ L1 路由 + L6-B 工具调用——标签由 §4.3 决策表 / 工具 schema 机
 |---|---|---|---|---|---|:--:|
 | B1 | **选码置信校准 + 8b/32b 决策** | 服务器实测 96% 转人工、置信被校准压到 ~0（benchmark 8b/32b 见对话） | `CE_SELECT_{FLOOR,CEIL,MARGIN}` 盲拍，cosine 量纲随 embedder 变；且需定选码用 8b 还是 32b | 用 `tools/benchmark.py` 暴露的真实 chosen_score 分布（选对 vs 选错）精调 `CE_SELECT_*`（`ce-services/common/config.py`）；8b vs 32b 对比（`tools/models.json` 已备）定选码模型 | **L2 门控**：高置信错码=0 且转人工率不过高（误直配率）+ **L6-A** Top-1 | **高** |
 | B2 | **FR-I 价格/比选后端** · **半修（2026-07-03）** | ~~price=`unsupported`~~ → **FR-I01/02 已接入**：知识层 `/price/query`（名称模糊+期号/最新期）+ 编排器 `_dispatch_price` 确定性取数（零命中 no_source 不编价、多期确定性价差 C-04 在代码算），Docker 真跑验通（钢筋 2026-05 期 10 条命中）| **剩 FR-X02 比选**：「哪种更省」的真成本对比仍缺（需两方案各自组价→价差，依赖 2013/2024 组价数据 + L6-A 终态判定） | 比选逻辑接 `routing/orchestrator.py` compound 路径（拆解出的两个 cost 子任务结果做确定性价差对比） | **L5 复合拆解**（比选子任务出真价差）+ **L6-A** 组价终态 | 中 |
-| B3 | ~~**复合路由精度**~~ ✅ **已修（2026-07-01）** | ~~「哪种做法更省」漏配；cost∧norm 判 single~~ → 两档都落地：`_COMPARE_RE` 兜比选柔性变体 + 多能力并列启发式（组价**动作词**∧规范 / 价格∧另一能力，**刻意不认构件名**防误触）；`ce-services/routing/prerouter.py` | 本地自测 20/20 + 金标 `routing_eval` 17/17=100%**零误升复合**（反例「现浇柱按什么计量」仍判 norm） | **剩 L1/L5 真跑抽检**：`benchmark/routing_eval` 尚无 compound 金标用例，compound 召回率待补金标后量化（现仅单一用例回归防误触已通） | 中→低 |
+| B3 | ~~**复合路由精度**~~ ✅ **已修（2026-07-01）** | ~~「哪种做法更省」漏配；cost∧norm 判 single~~ → 两档都落地：`_COMPARE_RE` 兜比选柔性变体 + 多能力并列启发式（组价**动作词**∧规范 / 价格∧另一能力，**刻意不认构件名**防误触）；`ce-services/routing/prerouter.py` | 本地自测 20/20 + 金标 `routing_eval` 17/17=100%**零误升复合**（反例「现浇柱按什么计量」仍判 norm） | **剩 L1/L5 真跑抽检**：`benchmark/L1_routing/data` 尚无 compound 金标用例，compound 召回率待补金标后量化（现仅单一用例回归防误触已通） | 中→低 |
 | B4 | **lead 呈现层稳定性** | qwen3-8b 偶发 prose 加料（编码/条文），一次干净≠永远稳 | 弱模型呈现层不可靠（[[project_skill_invocation_model]]） | 已做：前端 guard 卡兜底（`ce-tool-result.tsx`）+ lead prompt 硬化；要更硬则 lead 基座换 qwen-plus（`config.yaml` gateway-llm） | **L6-B** 工具调用忠实 + 人工抽检 prose 杜撰率（对照 orchestrate 原始返回） | 低（卡已兜底，观察） |
 
-**前置依赖**：B1 需先扩选码 gold 到 30–50 条（现 2024 仅 n=10；2013 已有 n=91 可先用）。B2/B3 修法都要 `benchmark/routing_eval/` 与选码 gold 支撑回归，与 §7/§8 数据集路线合流。
+**前置依赖**：B1 需先扩选码 gold 到 30–50 条（现 2024 仅 n=10；2013 已有 n=91 可先用）。B2/B3 修法都要 `benchmark/L1_routing/data/` 与选码 gold 支撑回归，与 §7/§8 数据集路线合流。
 
 **演示项（非调优，收尾）**：④ 复合路径真跑质量抽检（真 LLM 拆解/综合是否合理）——挂 L5，并入 B2/B3 一起跑。

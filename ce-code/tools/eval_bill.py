@@ -8,7 +8,7 @@ PRD §6 红线：Top-1 ≥ 85% / Top-3 ≥ 95%。未达即 `/search/bill-match` 
 
 使用（服务器，从 ce-code 根，需 Milvus + 嵌入服务在跑）：
   uv run python -m tools.eval_bill                                  # 默认 gold + top_k=10
-  uv run python -m tools.eval_bill --gold ../benchmark/retrieval_eval/match_gold.jsonl --top-k 10
+  uv run python -m tools.eval_bill --gold ../benchmark/L3_retrieval/data/match_gold.jsonl --top-k 10
 """
 from __future__ import annotations
 
@@ -132,8 +132,8 @@ def _cli():
     import click
 
     @click.command()
-    @click.option("--gold", "gold_path", default="../benchmark/retrieval_eval/match_gold.jsonl",
-                  help="金标 jsonl 路径（相对 ce-code 根；默认指向 benchmark/retrieval_eval/）")
+    @click.option("--gold", "gold_path", default="../benchmark/L3_retrieval/data/match_gold.jsonl",
+                  help="金标 jsonl 路径（相对 ce-code 根；默认指向 benchmark/L3_retrieval/data/）")
     @click.option("--top-k", default=10, help="召回深度 k")
     @click.option("--collection", default=COST_BILL_COLLECTION, help="清单向量库 collection")
     @click.option("--structural/--no-structural", default=True, help="是否结构约束重排（默认开；--no-structural 量 dense 基线）")

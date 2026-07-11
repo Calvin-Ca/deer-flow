@@ -9,15 +9,15 @@
 ## Tier 1 — 优先做
 
 ### ① 评测体系（= `benchmark/`，做对的那种）— 单项最值钱【实施中】
-`benchmark/` 已相当成熟：`routing_eval`/`retrieval_eval` 有 runner；`agent_eval/{cost_task,toolcall,norm_faithful,
-adversarial,trajectory}` 有数据集 + `judges/*.md` 裁判 rubric。**缺口：`cost_task`（端到端组价·τ-bench 式终态 +
+`benchmark/` 已相当成熟（2026-07-11 起按层分目录，见 `benchmark/README.md`）：`L1_routing`/`L3_retrieval` 有 runner；`L6_agent/{cost_task,toolcall,norm_faithful,
+trajectory,fault_injection}` 与 `L4_redline/adversarial` 有数据集 + 各子集内 judge 细则 md 裁判 rubric。**缺口：`cost_task`（端到端组价·τ-bench 式终态 +
 pass^k）等四个数据集没 runner。**
 - **[✓ 已实现] cost_task runner**：逐条跑 agent × `pass_k` 次，程序化判**终态**（`expected_bill_code` 落没落对、
   `must_cite`/`must_ask`/`must_refuse`/`must_declare_caliber`）+ **红线 policy 独立计分**（违规即 fail、门线 0）；
-  报**任务成功率 + pass^k（连跑全过）+ 红线违规率 + evaluable 覆盖率**。判定器 `benchmark/scoring/cost_task_score.py`
-  纯函数、`test_cost_task_score.py` 22 例单测通过；runner `benchmark/runner/run_cost_task_experiment.py`。
+  报**任务成功率 + pass^k（连跑全过）+ 红线违规率 + evaluable 覆盖率**。判定器 `benchmark/L6_agent/cost_task/cost_task_score.py`
+  纯函数、`test_cost_task_score.py` 22 例单测通过；runner `benchmark/L6_agent/cost_task/run_cost_task_experiment.py`。
   **诚实原则**：外部判不了的红线标 not_evaluable、不假装通过（可写进简历/面试的取信细节）。
-- **[后续] norm_faithful runner**：RAGAS 忠实度，走 `judges/norm_faithfulness.md` LLM 裁判，**裁判须先在小批
+- **[后续] norm_faithful runner**：RAGAS 忠实度，走 `L6_agent/norm_faithful/norm_faithfulness.md` LLM 裁判，**裁判须先在小批
   人标样本上校准一致率**再上量。
 - **[后续] 轨迹/对抗 runner**：`trajectory`（多轮闭环）、`adversarial`（红线鲁棒性）。
 - **[后续] CI 门禁**：金标回归挂 CI，PR 掉点即红。
@@ -92,7 +92,7 @@ evidence,severity}]}`；多视角（单位镜/语义镜/漏项镜各查一遍）
 - **⑤ Agentic RAG 升级（norm-qa）——先立传统 RAG 基线再对比**
 
   **方法论（先做基线，别跳）**：引入 agentic RAG 前**必须先评传统 RAG 立基线**，否则"提升"没说服力。
-  做法：把两态做成**可配置开关**、用**同一评测集**（`benchmark/agent_eval/norm_faithful`，含 expect_refuse
+  做法：把两态做成**可配置开关**、用**同一评测集**（`benchmark/L6_agent/norm_faithful`，含 expect_refuse
   测误拒）分别跑，Langfuse 按 variant 横向比 → 才有"忠实度 X→Y、误拒 Z、召回 A→B"的可信数字。**标准 ablation。**
 
   **两个正交部件**（各一个开关，才能单变量归因）：
@@ -101,7 +101,7 @@ evidence,severity}]}`；多视角（单位镜/语义镜/漏项镜各查一遍）
   - **引用忠实性校验**（提诚实，招牌）：生成后**回查答案引的每个条文号是否真在检索证据里**，不在则拒答/剥引用/
     降级"无库内依据"——把红线"不编条文"从 prompt 祈祷变**确定性 enforced check**，治 RAG 头号幻觉。两层：
     ① 存在性回查（确定性、可单测，`verify_norm`，与 cost-critic 的 verify.py 同套路）；② 论断落地（RAGAS 式，
-    走 `judges/norm_faithfulness.md` LLM 裁判，重、需先在小批人标上校准）。招牌是①（便宜且强）。
+    走 `L6_agent/norm_faithful/norm_faithfulness.md` LLM 裁判，重、需先在小批人标上校准）。招牌是①（便宜且强）。
 
   **可配置切换（传统 ↔ agentic，deer-flow 现成机制）**：
   - 忠实校验 → `CE_NORM_FAITHFULNESS_CHECK` env flag（config 支持 `$ENV` + 热重载，确定性 gate，on/off 干净）。
@@ -121,7 +121,7 @@ evidence,severity}]}`；多视角（单位镜/语义镜/漏项镜各查一遍）
     unfaithful→剥引用/降级"无库内依据"；`verify_norm` 工具已加进 norm-qa。
   - **[✓ 已实现] baseline 对比 runner**：`run_norm_faithful_experiment.py --mode traditional|agentic`，同一
     `norm_faithful` 集跑两轮，`--mode` 控 `CE_NORM_FAITHFULNESS_CHECK` + variant 标签；判定器
-    `benchmark/scoring/norm_faithful_score.py`（纯函数、10 例单测）出**忠实率/幻觉引用率/答案要点覆盖/std 级
+    `benchmark/L6_agent/norm_faithful/norm_faithful_score.py`（纯函数、10 例单测）出**忠实率/幻觉引用率/答案要点覆盖/std 级
     上下文召回 + 误拒率/漏拒率**——runner 从 trace 拿{答案, ce-rag 检索证据}直接 `check_faithfulness` 可靠度量、
     不依赖弱模型自觉。**先跑 traditional 立基线再开 agentic，比忠实率↑/幻觉率↓**。
   > 面试话术："先立传统 RAG 基线，再加可配置的分解+引用回查同集横向比——忠实度 X→Y、误拒 Z、召回 A→B。"

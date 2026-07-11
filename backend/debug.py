@@ -95,8 +95,12 @@ async def main():
             "thread_id": "debug-thread-001",
             "thinking_enabled": True,
             "is_plan_mode": True,
-            # Uncomment to use a specific model
-            "model_name": "kimi-k2.5",
+            # subagent_enabled 必须显式开：make_lead_agent 默认 False 时不绑 task 工具，
+            # norm-qa / quota-recommend 等子智能体路由在 CLI 里会静默消失（假阴性）。
+            "subagent_enabled": True,
+            # 缺省用 config.yaml 第一个模型（当前 = qwen3-8b，与生产/评测同款）；
+            # 要换模型再放开下一行。
+            # "model_name": "qwen3-8b",
         }
     }
 

@@ -13,15 +13,27 @@
 
 ---
 
-## 1. deer-flow 参考
+## 1. Agent 能力需求（做什么）
+
+> 面向深圳房建组价场景的 5 类核心能力。**5 项能力均可触发 human-in-the-loop**——信息不足时 `ask_clarification` 向用户追问，关键结论落定前请人确认（`ClarificationMiddleware` 中断等人）。
+
+1. **规范问答助手**：回答清单计价规范、定额规范（含工程量计算规则等）、信息价相关的问题。
+2. **清单选码核实**：给定项目特征，依据规范核实所匹配的清单编码是否正确、项目特征项是否有遗漏（少特征）。
+3. **定额方案推荐**：针对已编制好的清单项，推荐匹配的定额组价方案。
+4. **组价自动计算**：当用户提出涉及组价过程任何环节（工程量、含量、单价、合价等）的计算要求时，依据计算规则自动完成计算。
+5. **整单组价全闭环**：给定项目清单，串起「清单选码核实 → 定额方案推荐 → 组价自动计算」，帮用户完成整单组价的端到端闭环（编排能力 2/3/4）。
+
+---
+
+## 2. deer-flow 参考
 
 编排入口见 `backend/CLAUDE.md`，agent 约定见 `backend/AGENTS.md`，后端代码见 `backend/`。所使用的LLM：Qwen3-8B。
 
 ---
 
-## 2. 开发工作流与环境
+## 3. 开发工作流与环境
 
-### 2.1 设备分工
+### 3.1 设备分工
 
 | 设备 | 用途 |
 |---|---|
@@ -29,7 +41,7 @@
 | 远程 Linux 服务器（有 GPU） | 运行/调试、跑 MinerU / 向量化 / 模型推理 |
 | 同步通道 | GitHub（用户 fork 作中转） |
 
-### 2.2 开发约定
+### 3.2 开发约定
 
 - **commit 信息必须使用中文**
 - **改动 deerflow 后端源码（`backend/` 目录）的 commit，消息开头必须加 `[backend]` 标注**（如 `[backend] feat: ...`）：deerflow 是上游 super-agent harness，对它的修改需与项目自有代码（`ce-*`）在提交历史里一眼可分，便于日后向上游回流/对账。一个 commit 同时动了 `backend/` 和 `ce-*` 时也加 `[backend]`（只要碰了后端源码就标）；纯 `ce-*`/文档改动不加
@@ -41,7 +53,7 @@
 - 数据文件 `ce-code/data/`：**入 git 同步** `parsed/`（MinerU 输出）、`structured/`（chunk 树 / bill_spec.jsonl 等结构化产物）——派生数据走 git 在 Mac/服务器间同步（2026-06-16 起）；**仍不进 git** `raw/`（PDF 原件，版权敏感）、`vector_store/`（BM25 + Milvus 索引，大体积二进制、可重新生成）、`eval_set/`（仅余评测 xlsx 原件）。**评测金标集已迁项目根 `benchmark/`**（`routing_eval/` 路由评测 + `retrieval_eval/` 清单匹配/条文召回金标，随 git 同步）
 - **作为开发者，禁止用「前端调大模型对话生成」的方式新建 skill 或 agent**（即 `/workspace/agents/new` 的 bootstrap 流程、`/workspace/chats/new?mode=skill` 的 skill-creator 流程）：① 产物落 `.deer-flow/users/{user}/agents/` 与 `skills/custom/`，均**不随 git 同步**、按机器隔离，与 Mac↔服务器 git 工作流不一致；② **这些前端自助创建功能未来会被删除**。开发态的 skill 一律**手写进 `skills/public/{name}/SKILL.md`（随 git 同步）**，agent 定义同理走代码/git 纳管，不依赖前端生成
 
-### 2.3 服务器验证两态：dev 调试态 / Docker 生产态（2026-07-06 定）
+### 3.3 服务器验证两态：dev 调试态 / Docker 生产态（2026-07-06 定）
 
 - **日常改码验证一律用 dev 调试态，不重建 Docker**：backend 用 VS Code debugpy 起 uvicorn :8001，
   launch.json **必须带 `"envFile": "${workspaceFolder}/.env"`**——LANGFUSE / 模型密钥等运行时开关都在
@@ -63,7 +75,7 @@
   动过后端源码须防 COPY 层缓存坑：`build --no-cache gateway` + `up -d --force-recreate gateway`（详见
   `docker/README.md` §7）；动 harness/ce-code 容器一律 `sudo`（rootless 会建出影子容器）。
 
-### 2.4 服务器环境
+### 3.4 服务器环境
 
 - 服务器ip：172.19.3.136
 - 服务器路径：`/mnt/nvme/calvin/code/deer-flow/`（home: `/home/caic`）
@@ -72,11 +84,11 @@
 
 ---
 
-## 3. Benchmark 测试进度与续测入口（2026-07-10）
+## 4. Benchmark 测试进度与续测入口（2026-07-10）
 
 > 当前阶段：**路由层（L1）评测调试中**。规范/门线见 `benchmark/AGENT_BENCHMARK.md`，runner 操作见 `benchmark/runner/README.md`。
 
-### 3.1 两个测试入口（都在服务器跑，`uv run --project backend python ...`）
+### 4.1 两个测试入口（都在服务器跑，`uv run --project backend python ...`）
 
 1. **批量评分 runner**（进程内嵌入式 DeerFlowClient，**不经 gateway**）——出 `route_correct`/`clarify_correct` 两率：
    - `benchmark/runner/upload_datasets.py --only routing`（用例源=Langfuse dataset，先灌）
@@ -84,7 +96,7 @@
    - 逐 variant 换 `--run-name`，Langfuse `Datasets→Runs→Compare` 横向比。
 2. **单条路由探针** `benchmark/runner/probe_gateway.py "<query>" [--model qwen3-8b]`（外部 HTTP、**经 gateway 全栈**，可配 debugpy 断点）——看单条 `[tool]` + `did_route`/`did_clarify`。凭据放根 `.env`（`DEER_FLOW_PROBE_EMAIL`/`DEER_FLOW_PROBE_PASSWORD`，已 gitignore）。
 
-### 3.2 本阶段已定/已修
+### 4.2 本阶段已定/已修
 
 - **runner 路径修复**：`benchmark/runner/_paths.py`——从仓库根跑时补 `import app` + 设 `DEER_FLOW_PROJECT_ROOT=backend`，使 lead agent 真读到 `backend/prompts/ce/lead_agent.md`（否则静默回退内置模板、评测失真）。
 - **路由判定常量（config-grounded）**：`ROUTE_TOOL_NAMES = {cost_workflow_start/node/resume/state, task}`，已删 prefix 与死名 `qa.py`/`cost.py`。依据 lead 可见工具面：`ce-rag_*`/`ce-db_*` 因 `DeferredToolFilterMiddleware` 对 lead 隐藏故不收；`norm_verify`/`cost_verify`/`cost_recall_exemplars` 非路由入口。
@@ -92,7 +104,7 @@
 - **clarify 单列红线**：`ask_clarification` 触发 HITL（`ClarificationMiddleware`→`Command(goto=END)` 中断等人），门 0.95，**不并入路由分**（红线独立计分）。
 - **已删过时机制**：`CE_ROUTE_CONTEXT_URL`/RouteContextMiddleware（早在 `3691cbd4` 移除，本次清文档残留）。
 
-### 3.3 下一步（按序）
+### 4.3 下一步（按序）
 
 1. **复跑路由**确认新常量修对（`route_correct` 应回升）；`[tool]` 若冒出集合外的真实名 → 补进 `ROUTE_TOOL_NAMES`。
 2. **归因失败用例**（翻 trace）：分「测量错/服务没起/agent 真错」三类，别对着坏尺子调提示词。

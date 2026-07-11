@@ -37,20 +37,19 @@ from _lf import require_langfuse, wait_for_traces  # noqa: E402
 from upload_datasets import TOOLCALL_DATASET  # noqa: E402
 
 
-def _collect_tool_calls(query: str, model_name: str | None, thread_id: str) -> dict[str, dict]:
+def _collect_tool_calls(agent_client, query: str, thread_id: str) -> dict[str, dict]:
     """把一条 query 喂默认 lead agent，收集其完整 tool_calls（name+args，按 id 去重）。
 
     功能：评测核心动作——只观测不改 agent 行为；按 tool_call id「后写覆盖」，使流式早期
         的残缺 args 被 values 快照里的完整 args 覆盖，最终拿到完整调用。
-    参数：query 用户问法；model_name 覆盖模型（None 用默认）；thread_id 会话 id（= langfuse
-        session_id，跑完据此读回 trace）。
+    参数：agent_client 整轮复用的 DeerFlowClient（逐条新建会让上一条的持久 MCP 会话被 GC
+        在别的 task 里收尾 → anyio cancel scope RuntimeError 噪音）；query 用户问法；
+        thread_id 会话 id（= langfuse session_id，跑完据此读回 trace）。
     返回：``{tool_call_id: {"name": str, "args": dict}}``——本轮 agent 发出的全部工具调用。
     """
-    from deerflow.client import DeerFlowClient
-
     calls: dict[str, dict] = {}
     fallback_idx = 0
-    for ev in DeerFlowClient(model_name=model_name).stream(query, thread_id=thread_id):
+    for ev in agent_client.stream(query, thread_id=thread_id):
         if ev.type != "messages-tuple":
             continue
         d = ev.data
@@ -100,11 +99,16 @@ def main() -> int:
     run_name = args.run_name or f"toolcall-{uuid.uuid4().hex[:8]}"
     dataset = client.get_dataset(TOOLCALL_DATASET)
 
+    # 整轮共用一个客户端（见 _collect_tool_calls 注释）。
+    from deerflow.client import DeerFlowClient
+
+    agent_client = DeerFlowClient(model_name=args.model)
+
     rows: list[dict] = []
     for i, item in enumerate(dataset.items):
         query = (item.input or {}).get("query", "")
         thread_id = f"exp-{run_name}-{item.id}"
-        calls = _collect_tool_calls(query, args.model, thread_id)
+        calls = _collect_tool_calls(agent_client, query, thread_id)
 
         exp = item.expected_output or {}
         want_tool = exp.get("tool")

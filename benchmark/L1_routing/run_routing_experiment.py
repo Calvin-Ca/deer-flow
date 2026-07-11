@@ -70,20 +70,19 @@ def _is_fetch_tool(name: str) -> bool:
     return _is_route_tool(name)
 
 
-def _drive_agent(query: str, model_name: str | None, thread_id: str) -> dict:
+def _drive_agent(agent_client, query: str, thread_id: str) -> dict:
     """把一条 query 喂给默认 lead agent，收集其工具调用与最终回复（主线程同步）。
 
     功能：评测的核心动作——只观测，不改 agent 行为；与冒烟测试同一调用路径。
-    参数：query 用户问法；model_name 覆盖模型名（None 用默认）；thread_id 本条会话 id
-        （即 langfuse session_id，跑完据此读回 trace）。
+    参数：agent_client 整轮复用的 DeerFlowClient（每条新建会让上一条的持久 MCP 会话在
+        下一条的事件循环里被 GC 收尾 → anyio cancel scope 跨 task 的 RuntimeError 噪音）；
+        query 用户问法；thread_id 本条会话 id（即 langfuse session_id，跑完据此读回 trace）。
     返回：dict —— answer 最终文本、tool_names 工具名列表、did_clarify/did_route 两判定。
     """
-    from deerflow.client import DeerFlowClient
-
     tool_names: list[str] = []  # 只收非空工具名（流式后续分片 name 为空，跳过）
     answer_parts: list[str] = []
 
-    for ev in DeerFlowClient(model_name=model_name).stream(query, thread_id=thread_id):
+    for ev in agent_client.stream(query, thread_id=thread_id):
         if ev.type != "messages-tuple":
             continue
         d = ev.data
@@ -134,12 +133,17 @@ def main() -> int:
     run_name = args.run_name or f"routing-{uuid.uuid4().hex[:8]}"
     dataset = client.get_dataset(args.dataset)
 
+    # 整轮共用一个客户端：agent/MCP 会话只建一次，会话收尾只发生在进程退出（见 _drive_agent 注释）。
+    from deerflow.client import DeerFlowClient
+
+    agent_client = DeerFlowClient(model_name=args.model)
+
     rows: list[dict] = []
     for i, item in enumerate(dataset.items):
         query = (item.input or {}).get("query", "")
         thread_id = f"exp-{run_name}-{item.id}"
         try:
-            out = _drive_agent(query, args.model, thread_id)
+            out = _drive_agent(agent_client, query, thread_id)
         except Exception as exc:  # noqa: BLE001 —— 单条崩不拖垮整轮（v3 实测一条异常废了后续 22 条）
             print(f"[{i + 1}/{len(dataset.items)}] {item.id} 跑挂了，跳过（不挂分）：{type(exc).__name__}: {exc}")
             continue

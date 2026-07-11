@@ -60,13 +60,15 @@ def _harvest_clauses(data) -> list[dict]:
     return out
 
 
-def _observe(question: str, model_name: str | None, thread_id: str) -> NormObs:
-    """跑一次 agent，抽 {答案, 检索证据(ce-rag 工具结果里的条文), 是否拒答}。"""
-    from deerflow.client import DeerFlowClient
+def _observe(agent_client, question: str, thread_id: str) -> NormObs:
+    """跑一次 agent，抽 {答案, 检索证据(ce-rag 工具结果里的条文), 是否拒答}。
 
+    agent_client 整轮复用（逐条新建会让上一条的持久 MCP 会话被 GC 在别的 task 里收尾 →
+    anyio cancel scope RuntimeError 噪音）。
+    """
     answer_parts: list[str] = []
     evidence: list[dict] = []
-    for ev in DeerFlowClient(model_name=model_name).stream(question, thread_id=thread_id):
+    for ev in agent_client.stream(question, thread_id=thread_id):
         if ev.type != "messages-tuple":
             continue
         d = ev.data
@@ -111,11 +113,16 @@ def main() -> int:
         from _lf import require_langfuse, wait_for_traces
         lf = require_langfuse()
 
+    # 整轮共用一个客户端（见 _observe 注释）。注意须在 CE_NORM_FAITHFULNESS_CHECK 设定之后构建。
+    from deerflow.client import DeerFlowClient
+
+    agent_client = DeerFlowClient(model_name=args.model)
+
     scores = []
     for i, case in enumerate(cases):
         thread_id = f"exp-{run_name}-{case['id']}"
         try:
-            obs = _observe(case.get("question", ""), args.model, thread_id)
+            obs = _observe(agent_client, case.get("question", ""), thread_id)
         except Exception as exc:  # noqa: BLE001
             print(f"[{i + 1}/{len(cases)}] {case['id']} 跑挂，跳过：{type(exc).__name__}: {exc}")
             continue

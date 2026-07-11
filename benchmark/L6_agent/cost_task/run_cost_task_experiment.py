@@ -47,19 +47,19 @@ def _load_cases(split: str | None, limit: int | None) -> list[dict]:
     return cases[:limit] if limit else cases
 
 
-def _observe(query: str, model_name: str | None, thread_id: str) -> RunObservation:
+def _observe(agent_client, query: str, thread_id: str) -> RunObservation:
     """跑一次 agent，抽取判定所需的外部观测（只观测、不改行为，与冒烟同一路径）。
 
+    agent_client 整轮复用（逐条新建会让上一条的持久 MCP 会话被 GC 在别的 task 里收尾 →
+    anyio cancel scope RuntimeError 噪音）。
     终态码抽取（启发式，首轮实跑后可按真实工具结果结构收紧）：从工具结果文本 + 最终答案里正则
     捞 9 位码；``final_code`` 取最终答案里最后出现的码（agent"落定"的），无则退回工具结果里最后一个。
     """
-    from deerflow.client import DeerFlowClient
-
     tool_names: list[str] = []
     answer_parts: list[str] = []
     tool_texts: list[str] = []
 
-    for ev in DeerFlowClient(model_name=model_name).stream(query, thread_id=thread_id):
+    for ev in agent_client.stream(query, thread_id=thread_id):
         if ev.type != "messages-tuple":
             continue
         d = ev.data
@@ -115,6 +115,11 @@ def main() -> int:
         from _lf import require_langfuse, wait_for_traces
         lf = require_langfuse()
 
+    # 整轮共用一个客户端（见 _observe 注释）。
+    from deerflow.client import DeerFlowClient
+
+    agent_client = DeerFlowClient(model_name=args.model)
+
     results = []
     for i, case in enumerate(cases):
         pass_k = int(case.get("pass_k") or 1)
@@ -123,7 +128,7 @@ def main() -> int:
         for k in range(pass_k):
             thread_id = f"exp-{run_name}-{case['id']}-r{k}"
             try:
-                obs = _observe(goal, args.model, thread_id)
+                obs = _observe(agent_client, goal, thread_id)
             except Exception as exc:  # noqa: BLE001 —— 单次崩不拖垮（记为该次 task 不过）
                 print(f"    run {k} 跑挂：{type(exc).__name__}: {exc}")
                 runs.append(score_run(case, RunObservation()))  # 空观测 → task 不过

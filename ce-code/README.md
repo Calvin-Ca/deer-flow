@@ -12,10 +12,13 @@
 
 **裸机（推荐 tmux/setsid，⛔别用 nohup——本服务器上遇过 Exit125 静默失败）**
 ```bash
-cd ce-code && setsid uv run python -m service.rag_api >/tmp/ce-rag.log 2>&1 &   # ce-rag :8100 条文/清单候选/证据检索
-cd ce-code && setsid uv run python -m service.db_api  >/tmp/ce-db.log  2>&1 &    # ce-db  :8102 定额/价格/费率结构化真值
+cd /mnt/nvme/calvin/code/deer-flow/ce-code && setsid uv run python -m service.rag_api >/tmp/ce-rag.log 2>&1 &   # ce-rag :8100 条文/清单候选/证据检索
+cd /mnt/nvme/calvin/code/deer-flow/ce-code && setsid uv run python -m service.db_api  >/tmp/ce-db.log  2>&1 &    # ce-db  :8102 定额/价格/费率结构化真值
 ```
-（前台调试直接去掉 `setsid ... &`；`uv sync` 首次或依赖变更后各跑一次。）
+（前台调试直接去掉 `setsid ... &`；`uv sync` 首次或依赖变更后各跑一次。⚠️ 用绝对路径 cd：曾在 `backend/`
+下执行相对版 `cd ce-code`——rag 那条 `&&` 短路静默没跑、db 那条被 uv 解析到 backend/.venv 报
+`No module named 'service'`。`setsid ... &` = 后台常驻 + 脱离终端（退出 SSH 不死），但**无进程管理器，
+挂了不自动拉起**，用下方三级检查主动查。）
 
 **Docker（ce-rag + ce-db 一条命令，同镜像不同 command）**
 ```bash
@@ -28,10 +31,21 @@ docker compose -f docker/ce-code/docker-compose.deps.yaml up -d          # PG :5
 sudo docker compose -f docker/ce-rerank/docker-compose.yaml --env-file docker/ce-rerank/.env up -d   # 精排 :8095（GPU）
 ```
 
-**健康自检**
+**运行监控：挂没挂（三级，由浅入深）+ 被调用时看日志**
+
+| 级别 | 命令 | 说明 |
+|---|---|---|
+| 端口在不在听 | `ss -ltnp \| grep -E ':8100\|:8102'` | 最快，两行都在 = 进程活着 |
+| 进程在不在 | `ps aux \| grep -E "rag_api\|db_api" \| grep -v grep` | 看 PID、起了多久 |
+| **服务真的健康** | `curl -s http://localhost:8100/health && echo && curl -s http://localhost:8102/health` | 两服务都有 `/health`；ce-db 会回显它连的 PG 地址（`target` 字段）——**端口活着但依赖断了这级才查得出** |
+
 ```bash
+# 快速版：只看状态码
 for p in 8100 8102; do printf ":$p -> "; curl -s -o /dev/null -w "%{http_code}\n" localhost:$p/health; done
+# 实时盯调用：uvicorn access log 每个请求一行（POST /mcp 200 即 agent 在调），日志仅此一份
+tail -f /tmp/ce-rag.log /tmp/ce-db.log
 ```
+> `/tmp` 重启即清、可能被定时清理——日志要留久些就把重定向改到 `~/logs/`。
 > 全服务（含 harness）+ dev/prod 两态启动手册见 `docker/README.md`；vLLM :8099 / embed :8097 是仓外 GPU 服务，须另行在跑。
 
 > - 需求/设计（领域铁律、schema、多表征、检索/造价设计、端点规格）见 `PRD.md`

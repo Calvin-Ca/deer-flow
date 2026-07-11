@@ -70,7 +70,57 @@ Trace 上的标签由 tracing 层自动打（`build_langfuse_trace_metadata`）�
 | tag `env:<名>` | `DEER_FLOW_ENV` 环境标 | 区分评测/生产流量 |
 | score `user_feedback` | 前端点赞踩自动回写 ±1 | Scores 页过滤 <0 捞真实差评 case |
 
-## 6. 已知边界
+## 6. trace 树深读：observation 类型与图标的真相
+
+### 6.1 observation type 体系
+
+trace 是树，每个节点（observation）带一个 type，type 决定图标与详情页的专属面板。真正干活的信息只在两种叶子上：
+
+| 类型 | 本质 | 本项目 trace 里的实例 |
+|---|---|---|
+| **generation** | 一次 LLM 调用（prompt/输出/token/成本面板）| `VllmChatModel` —— **归因主战场** |
+| **tool** | 一次工具执行（参数/返回体）| `rag_search_clause`、`cost_workflow_start` 等 |
+| span / chain / agent | 编排容器，只贡献瀑布图耗时 | `LangGraph`、`model`、`tools`、各中间件节点 |
+| event / retriever / evaluator / embedding / guardrail | 打点/检索/评估/向量化/防护 | 本项目基本见不到（判官在本地 Python、向量化在 ce-rag 内部，均不上报）|
+
+### 6.2 图标怎么定的（别当架构真相读）
+
+type 由 SDK 的 LangChain CallbackHandler 按**机械规则**推断，两层（源码 `langfuse-python` 的 `_get_observation_type_from_serialized`）：
+
+1. **run_type 硬映射**：llm→generation、tool→tool、retriever→retriever、其余 chain 回调→chain；
+2. **名字启发式**：chain 回调的名字/类路径**含 "agent" 子串**即升格为 agent 类型。
+
+所以看板上 `UploadsMiddleware.before_agent` 等中间件节点是 agent 图标，纯因**钩子方法名带 "agent" 后缀**撞了子串匹配，不代表它是决策节点；`model`/`tools` 是 chain 图标，因为它们是 LangGraph 的图节点（编排壳），真正的模型调用/工具执行是它们里面的 generation/tool 子节点。**看节点名比看图标可靠。**
+
+### 6.3 中间件为什么会出现在看板（挂接点代码位置）
+
+没有任何代码"专门"上报中间件——链路是三段：
+
+1. **钩子成为图节点**（langchain v1 `agents/factory.py`，三方包）：`create_agent` 把中间件实现的 `before_agent`/`after_agent`/`before_model`/`after_model` 钩子注册成图节点，节点名 = `f"{类名}.{钩子名}"`；**`wrap_model_call` 类钩子不成节点**（在 model 节点内组合执行）——所以 LLMErrorHandling/DeferredToolFilter/LoopDetection 的拦截动作在 trace 上不可见，只能从 generation 的 input 反推。
+2. **handler 挂在图调用根部**（本项目代码）：gateway 路径 `backend/packages/harness/deerflow/agents/lead_agent/agent.py:459-464`、嵌入式路径 `client.py:595-598`，都把 `build_tracing_callbacks()`（`tracing/factory.py:74`，内部实例化 `langfuse.langchain.CallbackHandler`）追加进 `config["callbacks"]`。必须挂根部：handler 只在 `on_chain_start(parent_run_id=None)` 时才把 session_id/user_id 提升到 trace（agent.py:452 注释）。
+3. **回调继承下发**：LangChain 执行任意子 Runnable 时把父级 callbacks 原样传下去，图上每个节点执行即触发同一个 handler 建 observation。中间件侧零埋点。
+
+### 6.4 observation 详情页字段来源
+
+| 字段 | 来源 |
+|---|---|
+| **USER / assistant / system / tool 徽章** | input/output 被识别为 ChatML 消息数组时按每条 `role` 渲染；role 由 CallbackHandler 从 LangChain 消息类型转换（HumanMessage→user 等） |
+| **Additional Input** | input JSON 里**没被识别成消息的剩余键**：LangGraph 节点 input 是整个 state dict，`messages` 抽走渲染对话后，`artifacts`/`todos` 等落这里 |
+| **Corrected Output** | Langfuse 的 Corrections **功能位**（人工修正入口，存成 `dataType: CORRECTION` 的 score，攒微调集用）——默认空，不是我们的数据 |
+| **Metadata** | CallbackHandler 上报的元数据：LangGraph 自动带 `langgraph_node/step/thread_id`，trace 根另有 deer-flow 注入的 `langfuse_session_id`/`variant`（`tracing/metadata.py`） |
+
+> 徽章文字 = `role` 字段原样大写。看到不认识的徽章（如 USER_INPUT），把 Input 面板切 **JSON 视图**看那条消息的 `role`/`type` 实际值——是数据造出来的非标角色还是 UI 新标签，一看便知。
+
+### 6.5 版本架构：服务端与 SDK 是两个东西
+
+| 组件 | 是什么 | 版本查法 | 当前（2026-07-12） |
+|---|---|---|---|
+| **服务端**（Docker 四件套，UI+API+存储） | 收 trace、渲染看板 | `curl -s http://localhost:3030/api/public/health` | 3.202.1（compose 钉浮动 `langfuse/langfuse:3`） |
+| **Python SDK**（backend 依赖包） | `CallbackHandler` 上报数据 | `uv run --project backend python -c "import langfuse; print(langfuse.__version__)"` | 4.5.1 |
+
+两者版本序列独立、不必对齐（服务端没有 4.x；兼容靠接口协议，服务端 3.22+ 即支持 v4 SDK 的 OTel 摄入）。分工：**看板渲染归服务端**（查 UI 行为对 `langfuse/langfuse` 仓库 v3.202.1 tag），**type 判定/上报内容归 SDK**（对 `langfuse-python` 仓库 v4.5.1 tag）。注意 SDK 大版本升级有 API 语义变化（v3→v4 改过 trace_id 设置方式，`tracing/factory.py` 的 `trace_context` 写法即 v4 专属）——`uv` 重新解析依赖跳大版本时须核对 `tracing/factory.py`。
+
+## 7. 已知边界
 
 - **LLM-as-judge（UI 内置 Evaluator）不可用**：Langfuse SSRF 防护硬拦内网模型地址，判官一律走本地 Python 判定函数（详见 `../LANGFUSE.md` §5/§6.6）；judge 细则 md 备在各 L6 子集目录。
 - 分数只增不改：重跑同 run_name 会追加而非覆盖——又一个「每次换新 run_name」的理由。

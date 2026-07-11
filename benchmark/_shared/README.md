@@ -3,6 +3,8 @@
 把 `benchmark/` 金标集与 Langfuse 打通的三件事，全部在**服务器**上跑（本地 Mac 只改代码）。命令一律单行，用 `uv run --project backend` 使 `deerflow` / `langfuse` 可导入。
 
 > 2026-07-11 重组后：本目录只放**跨层共用**的基建（`_lf.py`/`_paths.py` 引导、`upload_datasets.py` 灌库、`probe_gateway.py` 探针、`smoke_test.py` 冒烟、`dump_run_scores.py` 拉分）；各层的 `run_*_experiment.py` 已搬进所属层目录（L1_routing / L3_retrieval / L6_agent 各子集），与数据、判分器同住。目录 ↔ 层映射见 [`../README.md`](../README.md)。本文档保留全链路 runbook（下述命令路径已更新）。
+>
+> **跑完去哪看分**：Langfuse UI 看板速读（页面导航 / Runs 找分 / variant 对比 / 单条归因 / 标签约定）见 [`langfuse.md`](langfuse.md)。
 
 ## 前置（一次）
 

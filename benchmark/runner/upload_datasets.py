@@ -27,7 +27,8 @@ metadata=用例号/能力/分组/判读提示）。上传后即可用 ``run_rout
 
 运行（服务器上）：
     uv run --project backend python benchmark/runner/upload_datasets.py
-可选 --only 仅传指定集（缺省全部）：routing 路由 / clist 清单匹配 / toolcall 工具调用 /
+可选 --only 仅传指定集（缺省全部）：routing 路由 / bill_match_routing 清单匹配路由扩充 /
+clist 清单匹配召回 / toolcall 工具调用 /
 cost_task 端到端组价 / norm_faithful 规范忠实度 / clause 条文召回。agent_eval 三子集当前
 多为 sample 模板，按「先接管道、数据后补」上传（优先真金标 .jsonl，回退 .sample.jsonl）。
 """
@@ -49,6 +50,12 @@ _ROOT = Path(__file__).resolve().parents[2]
 
 ROUTING_DATASET = "agent-routing-eval"
 ROUTING_JSONL = _ROOT / "benchmark" / "routing_eval" / "agent_routing_eval.jsonl"
+
+# 清单匹配意图路由扩充集（100 条，query 全部锚定 retrieval_eval 真实金标，由
+# routing_eval/gen_bill_match_routing.py 确定性生成）。独立 dataset、不并入冻结基线，
+# 跑法：run_routing_experiment.py --dataset bill-match-routing。
+BILL_MATCH_ROUTING_DATASET = "bill-match-routing"
+BILL_MATCH_ROUTING_JSONL = _ROOT / "benchmark" / "routing_eval" / "bill_match_routing.jsonl"
 
 # 清单匹配（描述→9位清单码）：2013/2024 两份金标合进一个 dataset，spec 进 input/metadata。
 # 不含 match_gold_2013_uncovered.jsonl —— 那是「库未覆盖码」清单（{code9,name}，无 query），
@@ -87,27 +94,26 @@ def _read_jsonl(path: Path) -> list[dict]:
     return rows
 
 
-def upload_routing(client) -> int:
-    """上传路由评测集到 Langfuse Dataset。
+def _upload_routing_file(client, jsonl, dataset_name: str, description: str) -> int:
+    """上传一份路由 schema 的 jsonl 到指定 Langfuse Dataset（agent_routing_eval 与扩充集共用）。
 
-    功能：见模块 docstring；映射 query→input、{route,clarify,gold}→expected_output。
-    参数：client —— Langfuse 客户端。
+    功能：映射 query→input、{route,clarify,gold}→expected_output、其余字段进 metadata。
+    参数：client —— Langfuse 客户端；jsonl —— 金标文件路径；dataset_name/description —— 目标 dataset。
     返回：写入的 item 条数。
     """
-    if not ROUTING_JSONL.exists():
-        raise SystemExit(f"找不到金标集：{ROUTING_JSONL}")
+    if not jsonl.exists():
+        raise SystemExit(f"找不到金标集：{jsonl}")
 
     client.create_dataset(
-        name=ROUTING_DATASET,
-        description="Agent 路由/红线评测（AGENT_INTEGRATION_DEV §0 升级判定门）。"
-        "input=用户问法；expected_output 含 expect_route/expect_clarify/gold。",
-        metadata={"source": "benchmark/routing_eval/agent_routing_eval.jsonl"},
+        name=dataset_name,
+        description=description,
+        metadata={"source": str(jsonl.relative_to(_ROOT))},
     )
 
-    rows = _read_jsonl(ROUTING_JSONL)
+    rows = _read_jsonl(jsonl)
     for r in rows:
         client.create_dataset_item(
-            dataset_name=ROUTING_DATASET,
+            dataset_name=dataset_name,
             id=str(r["id"]),  # 以用例号作 item id → 重复上传幂等覆盖
             input={"query": r["query"]},
             expected_output={
@@ -122,8 +128,29 @@ def upload_routing(client) -> int:
             },
         )
     client.flush()
-    print(f"✓ 已上传 {len(rows)} 条到 Langfuse Dataset «{ROUTING_DATASET}»")
+    print(f"✓ 已上传 {len(rows)} 条到 Langfuse Dataset «{dataset_name}»")
     return len(rows)
+
+
+def upload_routing(client) -> int:
+    """上传路由评测集（冻结基线）到 Langfuse Dataset。"""
+    return _upload_routing_file(
+        client,
+        ROUTING_JSONL,
+        ROUTING_DATASET,
+        "Agent 路由/红线评测（AGENT_INTEGRATION_DEV §0 升级判定门）。input=用户问法；expected_output 含 expect_route/expect_clarify/gold。",
+    )
+
+
+def upload_bill_match_routing(client) -> int:
+    """上传清单匹配意图路由扩充集（100 条，query 锚定 retrieval_eval 真实金标）。"""
+    return _upload_routing_file(
+        client,
+        BILL_MATCH_ROUTING_JSONL,
+        BILL_MATCH_ROUTING_DATASET,
+        "清单匹配意图路由评测（100 条）：真实项目特征选码/核实问法，全部应路由（expect_route=true）"
+        "、全部不反问（cost 侧缺版本默认深圳·2013）。query 逐字锚定 retrieval_eval/match_gold*.jsonl。",
+    )
 
 
 def upload_clist(client) -> int:
@@ -292,6 +319,7 @@ def upload_clause(client) -> int:
 
 _UPLOADERS = {
     "routing": upload_routing,
+    "bill_match_routing": upload_bill_match_routing,
     "clist": upload_clist,
     "toolcall": upload_toolcall,
     "cost_task": upload_cost_task,

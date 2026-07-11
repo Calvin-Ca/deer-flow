@@ -77,3 +77,15 @@
 | `user_requests_colloquial.jsonl` | 同 `intent_fallback_eval.jsonl`（`id`/`query`/`group`/`expect_confidence`/`gold_capability`/`note`） | 口语变体难例，压测 LLM 兜底腿：`colloquial_cost`/`colloquial_price`/`generic_norm`/`colloquial_check`（新增，FR-C 口语核对）/`colloquial_oos`（红线走确定性重推） | `cd ce-services && uv run python -m tools.intent_fallback_eval [--llm]`，同兜底三指标 |
 
 > 与 §8 无专家版口径一致：这批是**方法3 合成**的 input（真实分布近似、非真实流量），标签由 §4.3 决策表 / T9-1 口径策略机器可推导；`gold` 为**待跑分验证的期望值**，非专家金标，评测报告须声明「非真实流量分布」。新增构件的组价终态（`expected_quota`/`fee_band`）另见 `../agent_eval/cost_task/`。
+
+---
+
+## 清单匹配意图路由集 `bill_match_routing.jsonl`（2026-07-11 新增，100 条，零编造）
+
+专测**清单匹配这一种意图**的路由：造价员给出项目特征要选码/核实编码时，lead 是否路由到能力（而非凭记忆答码）、是否遵守「cost 侧缺版本不反问、默认深圳·2013」口径策略（T9-1，非安全红线）。
+
+- **零编造**：100 条 query 的项目特征全文**逐字取自** `../retrieval_eval/match_gold_2013.jsonl`（91 条真实项目清单行，按 query 去重后 90）与 `../retrieval_eval/match_gold.jsonl`（10 条 2024），只套「对话框问法」模板（确定性轮转，非随机）；核实类问句里的编码也是该行**真实金码**。每条 `note` 带源文件行号 + 金码可溯源。
+- **生成**：`python gen_bill_match_routing.py`（幂等覆盖；金标增补后重跑扩容，勿与已跑基线混比）。
+- **schema** 同 `agent_routing_eval.jsonl`，id M1~M100，可 union。分组：`no_version` 60（选码不带版本，gold=2013 默认口径策略，反问=违例）/ `with_version` 28（18 条带 2013 + 10 条 2024 金标必须带版本）/ `code_check` 12（agent=cost-check，带真实金码问「对不对/特征有漏吗」，期望 `verify_bill_code` 或 task 派 cost-agent）。全部 `expect_route=true`、`expect_clarify=false`。
+- **跑法**（服务器）：`uv run --project backend python benchmark/runner/upload_datasets.py --only bill_match_routing` 灌库，再 `uv run --project backend python benchmark/runner/run_routing_experiment.py --dataset bill-match-routing --run-name <variant>`。独立 dataset（`bill-match-routing`），不并入冻结基线。
+- **与 `clist-match-eval` 的分工**：那边量**检索召回**（描述→金码命中率，L2 知识层）；这边只量**路由**（该调工具时真调了没，L1 编排层）——同一批真实特征，两层各测各的。

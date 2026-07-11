@@ -45,8 +45,8 @@ DATASET_NAME = "agent-routing-eval"
 #   · 单点确定性路由 = verify_bill_code（选码核实）/ cost_calc（单点计算）——lead_agent_v2
 #     的直调工具面（v1 提示词不引用但工具全局可见，调了同样算路由）
 # 刻意不收：① ce-rag_*/ce-db_* 是 deferred 工具、被 DeferredToolFilterMiddleware 对 lead 模型
-#   默认隐藏（是 cost_workflow 节点/子智能体内部的窄原语，lead 不直接调）；② norm_verify 是
-#   引用忠实度回查、③ cost_verify/cost_recall_exemplars 是组价内部辅助——三者皆非路由入口。
+#   默认隐藏（是 cost_workflow 节点/子智能体内部的窄原语，lead 不直接调）；② verify_norm 是
+#   引用忠实度回查、③ verify_cost/cost_recall_exemplars 是组价内部辅助——三者皆非路由入口。
 # task 只表示「分派了某子智能体」，光看名字分不清路由到 cost 还是 norm（要区分得读 subagent_type）。
 ROUTE_TOOL_NAMES = {
     "cost_workflow_start",
@@ -127,11 +127,12 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="路由评测：逐条跑 agent 并挂分到 Langfuse Dataset Run")
     parser.add_argument("--run-name", default=None, help="dataset run 名（建议填 prompt variant，便于横向比）")
     parser.add_argument("--model", default=None, help="覆盖模型名，如 qwen-plus")
+    parser.add_argument("--dataset", default=DATASET_NAME, help=f"Langfuse dataset 名（缺省 {DATASET_NAME}；清单匹配扩充集用 bill-match-routing）")
     args = parser.parse_args()
 
     client = require_langfuse()
     run_name = args.run_name or f"routing-{uuid.uuid4().hex[:8]}"
-    dataset = client.get_dataset(DATASET_NAME)
+    dataset = client.get_dataset(args.dataset)
 
     rows: list[dict] = []
     for i, item in enumerate(dataset.items):

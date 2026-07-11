@@ -6,7 +6,7 @@
 
 | 目录 | 层 | 里面有什么 | runner 状态 |
 |---|---|---|---|
-| `L1_routing/` | L1 路由 | `data/` 2 集（路由主池 111 + 清单匹配专项 100，均带 capability×difficulty 标签，字段说明见 `data/README.md`）+ 生成脚本；`run_routing_experiment.py` | ✅ 可跑（当前主战场） |
+| `L1_routing/` | L1 路由 | `data/` 2 集（路由主池 78 + 清单匹配专项 90，仅深圳·2013 口径，均带 capability×difficulty 标签，字段说明见 `data/README.md`）+ 生成脚本；`run_routing_experiment.py` | ✅ 可跑（当前主战场） |
 | `L2_gating/` | L2 置信度门控 | `select_eval/` 选码引擎（召回/选码/**置信校准**/阈值），B1 调优主战场 | ✅ 引擎可跑（`tools/eval_select.py`） |
 | `L3_retrieval/` | L3 检索 | `data/` 清单匹配金标（2013×91 + 2024×10 + 未覆盖码清单）+ GB50016 条文召回；`run_retrieval_experiment.py`（复用 L2 引擎） | ✅ 清单匹配可跑；条文召回待 qa 支持 gb50016 |
 | `L4_redline/` | L4 答案/红线 | `adversarial/` 直接对抗 10 条 + **间接注入 5 条（盲区③）** | ⬜ runner 待建（注入需工具桩） |

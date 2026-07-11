@@ -26,8 +26,8 @@
 
 | 文件 | 维护方式 | 条数 | 内容 | Langfuse dataset |
 |---|---|---|---|---|
-| `data/user_requests.jsonl` | 手工主池 | 111 | 路由主池，覆盖全部能力：strong 87 + colloquial 24（「这道墙砌起来得多少钱」类无关键词问法） | `user-requests-routing` |
-| `data/bill_match_routing.jsonl` | 机器生成专项 | 100 | 清单选码/核实单意图深测（difficulty=real_paste）：真实清单行整段特征粘贴，零编造，`gen_bill_match_routing.py` 幂等重生成（详见 §5） | `bill-match-routing` |
+| `data/user_requests.jsonl` | 手工主池 | 78 | 路由主池，覆盖全部能力：strong 54 + colloquial 24（「这道墙砌起来得多少钱」类无关键词问法） | `user-requests-routing` |
+| `data/bill_match_routing.jsonl` | 机器生成专项 | 90 | 清单选码/核实单意图深测（difficulty=real_paste）：真实 2013 清单行整段特征粘贴，零编造，`gen_bill_match_routing.py` 幂等重生成（详见 §5） | `bill-match-routing` |
 
 两个 dataset 独立出分不混跑：主池管**全能力覆盖与 variant 横比**，专项集管**单意图深测**
 （机器重生成会整体覆盖，故不并入主池）。id 无冲突，需要全量口径时可 union。
@@ -61,6 +61,11 @@
 `ask_clarification` 触发 HITL 属**红线单列**（门 0.95），不并入路由分。建议初判阈值：路由率 ≥ 0.8、
 红线遵守率 ≥ 0.95（安全攸关从严），最终由用户结合首轮跑分确认。
 
+**2024 版已裁出产品范围（2026-07-11 用户裁定，系统仅深圳·2013）**：点名 2024 的请求与他省口径
+同等处理——不取数、不拿 2013 数据冒充、体面告知（`group=out_of_scope`）。主池原 36 条 2024 问法
+留 4 条转标为版本出界护栏（A3/A18/B3/B12），其余删除；专项集的 10 条 2024 金标随之移除（90 条）。
+今后扩充用例（c5 计算/c6 整单等）一律按深圳·2013 口径造。
+
 **归因三分法**（失败用例先翻 Langfuse trace 再动手）：测量错（`ROUTE_TOOL_NAMES` 漏真实工具名）/
 服务没起（MCP 依赖）/ agent 真错（这时才调提示词或换基座）。
 
@@ -70,30 +75,31 @@
 
 | 能力 | capability | 现有覆盖 | 缺口 |
 |---|---|---|---|
-| 1 规范问答 | `c1_norm_qa` | 主池 30（含口语 4），三本规范、带/缺版本（缺版本=默认口径直接答）、boundary、web_fallback 齐 | — |
-| 2 清单智能匹配 | `c2_bill_code` | **专项 100**（零编造真实特征，选码 88 + 编码/特征核实 12）+ 主池 2 | — |
+| 1 规范问答 | `c1_norm_qa` | 主池 19（含口语 4）：GB50500/50854-2013 条文、缺版本默认口径、boundary、web_fallback、2024/安装出界护栏 | — |
+| 2 清单智能匹配 | `c2_bill_code` | **专项 90**（零编造真实 2013 特征，选码 78 + 编码/特征核实 12）+ 主池 2 | — |
 | 3 定额方案推荐 | `c3_quota` | 仅 B37 一条（且是缺特征反问用例） | **缺**「已编好的清单项→只要定额推荐」问法 |
 | 4 智能询价 | `c4_price` | 主池 13（含口语 6）：材料+规格+期号取数、趋势、他省越界 | — |
 | 5 组价自动计算 | `c5_calc` | 仅 D1/D2/D4/CC12 核对类 4 条 | **缺**纯计算请求（给量/含量/单价求合价等），`cost_calc` 路由出口无分可算 |
-| 6 整单组价闭环 | `c6_full_costing` | 单构件组价 56（with/no_version、no_feature、out_of_scope、compound） | **缺**多行清单「整单组价」问法（终态质量归 L6 cost_task，但 L1 的整单路由面没测） |
+| 6 整单组价闭环 | `c6_full_costing` | 单构件组价 34（no_version、no_feature、out_of_scope、compound） | **缺**多行清单「整单组价」问法（终态质量归 L6 cost_task，但 L1 的整单路由面没测） |
 
 补齐顺序（走专项集，照 `bill_match_routing` 模板锚定真实数据）：① c5 纯计算请求
 10~20 条；② c6 多行清单整单组价 5~10 条；③ c3「清单项→定额推荐」问法变体若干。
 
 ---
 
-## 5. 清单匹配专项集 `bill_match_routing.jsonl`（100 条，零编造）
+## 5. 清单匹配专项集 `bill_match_routing.jsonl`（90 条，零编造）
 
 专测**清单选码/核实这一种意图**的路由：造价员给出项目特征要选码/核实编码时，lead 是否路由到能力
-（而非凭记忆答码——串库红线）、是否遵守「cost 侧缺版本不反问、默认深圳·2013」口径策略。
+（而非凭记忆答码——串库红线）、是否遵守「缺版本不反问、按深圳·2013」口径策略。
 
-- **零编造**：100 条 query 的项目特征全文逐字取自 `../L3_retrieval/data/match_gold_2013.jsonl`
-  （91 条真实项目清单行，去重后 90）与 `match_gold.jsonl`（10 条 2024），只套「对话框问法」模板
-  （确定性轮转非随机）；核实问句里的编码也是该行真实金码。每条 `note` 带源文件行号可溯源。
+- **零编造**：90 条 query 的项目特征全文逐字取自 `../L3_retrieval/data/match_gold_2013.jsonl`
+  （91 条真实项目清单行，按 query 去重后 90），只套「对话框问法」模板（确定性轮转非随机）；
+  核实问句里的编码也是该行真实金码。每条 `note` 带源文件行号可溯源。2024 金标源已随产品范围
+  裁定移除（2026-07-11）。
 - **生成**：`python data/gen_bill_match_routing.py`（幂等覆盖；金标增补后重跑扩容，勿与已跑基线混比）。
-- **分组**：`no_version` 60（gold=2013 默认口径，反问=违例）/ `with_version` 28（18 条 2013 +
-  10 条 2024 金标必须带版本）/ `code_check` 12（带真实金码问「对不对/特征有漏吗」，期望
-  `verify_bill_code` 或 task 派 cost-agent）。全部 `expect_route=true`、`expect_clarify=false`。
+- **分组**：`no_version` 60（默认深圳·2013 口径，反问=违例）/ `with_version` 18（问法带 2013）/
+  `code_check` 12（带真实金码问「对不对/特征有漏吗」，期望 `verify_bill_code` 或 task 派
+  cost-agent）。全部 `expect_route=true`、`expect_clarify=false`。
 - **与 `clist-match-eval` 的分工**：那边量**检索召回**（描述→金码命中率，L3 知识层）；这边只量
   **路由**（该调工具时真调了没，L1 编排层）——同一批真实特征，两层各测各的。
 
@@ -103,8 +109,8 @@
 
 ```bash
 # 灌金标（按集）
-uv run --project backend python benchmark/_shared/upload_datasets.py --only user_requests    # 主池 111（含口语 24）
-uv run --project backend python benchmark/_shared/upload_datasets.py --only bill_match_routing  # 专项 100
+uv run --project backend python benchmark/_shared/upload_datasets.py --only user_requests    # 主池 78（含口语 24）
+uv run --project backend python benchmark/_shared/upload_datasets.py --only bill_match_routing  # 专项 90
 
 # 批量出分（逐 variant 换 --run-name，Langfuse Datasets→Runs→Compare 横向比）
 uv run --project backend python benchmark/L1_routing/run_routing_experiment.py --run-name <variant> [--model qwen-plus]   # 缺省跑主池 user-requests-routing

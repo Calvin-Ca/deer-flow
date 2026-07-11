@@ -560,19 +560,23 @@ def test_ce_v2_override_renders_with_routing_table(monkeypatch):
     assert "<discipline" in prompt and "<clarify" in prompt
 
 
-def test_default_template_embeds_skill_runbook():
-    """内置默认模板已固化 <skill_runbook>。"""
+def test_default_template_is_upstream_neutral():
+    """内置模板已恢复为 deerflow 上游通用版：CE 内容一律走 config 指向的 benchmark/prompts/ 版本库。
+
+    守两件事：① 内置模板不再夹带 CE 私货（否则回退兜底时 variant=default 的语义就不干净）；
+    ② 上游的 clarification 体系仍在（回退时 HITL 追问能力不丢）。
+    """
     template = prompt_module.SYSTEM_PROMPT_TEMPLATE
 
-    assert '<skill_runbook priority="高">' in template
-    assert "</skill_runbook>" in template
-    assert "cost_workflow_start" in template
-    assert "ce-rag_match_bill_item" in template
-    assert "cost_workflow_node" in template
+    assert "open-source super agent" in template
+    assert "<clarification_system>" in template
+    # CE 专属内容不得回流内置模板。
+    for ce_marker in ("cost_workflow_start", "ce-rag_match_bill_item", "<skill_runbook", "<safety_redline", "capability = cost"):
+        assert ce_marker not in template
 
 
-def test_apply_prompt_template_default_includes_runbook(monkeypatch):
-    """默认路径（system_prompt_path 未设）渲染出的 prompt 含 runbook，且 .format 不因花括号报错。"""
+def test_apply_prompt_template_default_renders_upstream(monkeypatch):
+    """默认路径（system_prompt_path 未设）渲染上游模板成功，.format 不因花括号报错。"""
     config = SimpleNamespace(
         sandbox=SimpleNamespace(mounts=[]),
         skills=SimpleNamespace(container_path="/mnt/skills"),
@@ -587,30 +591,9 @@ def test_apply_prompt_template_default_includes_runbook(monkeypatch):
 
     prompt = prompt_module.apply_prompt_template()
 
-    assert "<skill_runbook" in prompt
-    assert "cost_workflow_start" in prompt
-    assert "ce-rag_match_bill_item" in prompt
-
-
-def test_default_template_embeds_routing_block():
-    """内置模板固化 <routing> 显式意图分类块。"""
-    template = prompt_module.SYSTEM_PROMPT_TEMPLATE
-
-    assert '<routing priority="高">' in template
-    assert "</routing>" in template
-    assert "capability = cost" in template
-    assert "cost_workflow_start" in template
-    assert template.index('<routing priority="高">') < template.index('<skill_runbook priority="高">')
-
-
-def test_version_clarification_is_pushed_down_to_per_capability_gate():
-    """版本澄清仍需通过 ask_clarification 承载。"""
-    template = prompt_module.SYSTEM_PROMPT_TEMPLATE
-
-    redline = template[template.index("<safety_redline") : template.index("</safety_redline>")]
-    assert "ask_clarification" in redline
-    assert "2013 / 2024" in redline
-    assert "clarify=caliber" in template
+    assert "open-source super agent" in prompt
+    assert "<clarification_system>" in prompt
+    assert "cost_workflow_start" not in prompt
 
 
 def test_warm_enabled_skills_cache_logs_on_timeout(monkeypatch, caplog):

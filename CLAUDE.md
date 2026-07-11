@@ -55,7 +55,16 @@
 
 ### 3.3 服务器验证两态：dev 调试态 / Docker 生产态（2026-07-06 定）
 
-- **日常改码验证一律用 dev 调试态，不重建 Docker**：backend 用 VS Code debugpy 起 uvicorn :8001，
+- **首选：`backend/debug.py` 命令行交互调试（agent 行为/路由/提示词类改动都先走这个，不起前端/gateway）**：
+  进程内直建 lead agent 的 REPL——VS Code F5 启动后在集成终端里对话，执行链（中间件→模型→工具）
+  全在同一进程，任意源码断点直接停。launch.json 配置要点（`type: debugpy` / `program: backend/debug.py` /
+  `cwd: backend` / `python: backend/.venv/bin/python` / `env: {PYTHONPATH: "."}` / envFile 同 uvicorn 配置）；
+  **`"console": "integratedTerminal"` 必须有**——`You:` 提示符要读 stdin，Debug Console 喂不了输入。
+  日志落 `backend/debug.log`（终端保持干净）。**边界**：`create_agent` 无 checkpointer → 每条输入都是
+  全新单轮对话，**多轮记忆/HITL 续跑（clarify 后答复）测不了**——那些走 `probe_gateway.py` 或前端。
+  config 块已固化 `subagent_enabled: True`（缺了 task 不绑定、子智能体路由假阴性）+ 模型走 config.yaml
+  默认（qwen3-8b）。
+- **改到 gateway/API/前端联动时才起 dev 全栈（日常验证两级都不重建 Docker）**：backend 用 VS Code debugpy 起 uvicorn :8001，
   launch.json **必须带 `"envFile": "${workspaceFolder}/.env"`**——LANGFUSE / 模型密钥等运行时开关都在
   `.env` 里，缺了 envFile 等于拿残缺环境验、验了等于白验；frontend
   `pnpm exec next dev --turbo --port 2026`（next.config 的 dev rewrites 直连 :8001 无需 nginx，内网直访

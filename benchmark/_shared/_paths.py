@@ -18,9 +18,40 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import sys
 from pathlib import Path
+
+
+class _McpTeardownNoiseFilter(logging.Filter):
+    """压掉 MCP streamable_http 会话收尾的良性噪音（只影响终端可读性，不改行为）。
+
+    背景：langchain-mcp-adapters 对 streamable_http 是**每次工具调用各开一个会话**，
+    DeerFlowClient 同步驱动下这些会话的 asyncgen 在事件循环收尾时被跨 task finalize，
+    间歇抛「cancel scope in a different task」/「asynchronous generator is already
+    running」——mcp/anyio 上游收尾竞态，不吃分（逐条分数照常出），但批量跑每条刷一屏
+    traceback 严重干扰归因。这些报错全部走 asyncio logger 的 ERROR 通道
+    （default_exception_handler），按特征串窄过滤；其余 asyncio 错误照常放行。
+    """
+
+    _NEEDLES = (
+        "an error occurred during closing of asynchronous generator",
+        "Attempted to exit cancel scope in a different task",
+        "asynchronous generator is already running",
+    )
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        try:
+            text = record.getMessage()
+            if record.exc_info and record.exc_info[1] is not None:
+                text = f"{text} {record.exc_info[1]!r}"
+        except Exception:  # noqa: BLE001 —— 过滤器绝不能反过来弄崩日志
+            return True
+        return not any(n in text for n in self._NEEDLES)
+
+
+logging.getLogger("asyncio").addFilter(_McpTeardownNoiseFilter())
 
 # _paths.py 位于 benchmark/_shared/ → parents[2] 即仓库根，其下 backend/ 是 app 包与 runtime 文件所在。
 _BACKEND = Path(__file__).resolve().parents[2] / "backend"

@@ -107,16 +107,16 @@ def cost_calc(
     instead of guessing.
 
     Args:
-        target: Calculation target for chained computation: unit_rate (综合单价)
+        target: Calculation target for chained computation, unit_rate (综合单价)
             or line_total (清单合价). The engine computes prerequisite layers
             automatically and returns a step-by-step breakdown.
         operation: Single-step operation, one of unit_price, unit_rate,
             line_total, rollup, check. Ignored when target is given.
-        payload: Input data object. For unit_rate: components (工料机行，每行
-            category/consumption/unit_price) + rates (management_rate/profit_rate/
-            risk_rate). For line_total: unit_price + quantity (unit_price 缺省时
-            由 components 先算). For rollup: items (each with amount). For check:
-            items (bill rows to validate).
+        payload: Input data object. unit_rate 需要 components（工料机行，每行
+            category/consumption/unit_price）与费率（management_rate/profit_rate/
+            risk_rate，或打包成 rates 块）；line_total 需要 unit_price 与 quantity
+            （unit_price 缺省时由 components 先算）；rollup 需要 items（每行含
+            amount）；check 需要 items（待校验清单行）。
     """
     merged = dict(payload or {})
     if target:

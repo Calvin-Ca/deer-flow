@@ -78,6 +78,9 @@ services:
       - ${DEER_FLOW_CONFIG_PATH}:/app/backend/config.yaml:ro
       - ${DEER_FLOW_EXTENSIONS_CONFIG_PATH}:/app/backend/extensions_config.json:ro
       - ../skills:/app/skills:ro
+      # CE lead-agent 提示词版本库（benchmark/prompts/ 不在镜像里，config.yaml 的
+      # lead_agent.system_prompt_path 指向它；不挂 = 静默回退内置模板，variant 打 default）
+      - ../benchmark/prompts:/app/benchmark/prompts:ro
       - ${DEER_FLOW_HOME}:/app/backend/.deer-flow
       # DooD: AioSandboxProvider starts sandbox containers via host Docker daemon
       - ${DEER_FLOW_DOCKER_SOCKET}:/var/run/docker.sock

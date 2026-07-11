@@ -97,6 +97,12 @@ tools:
 - name: cost_workflow_state
   group: cost
   use: app.ce.cost.tools:cost_workflow_state_tool
+- name: verify_bill_code
+  group: cost
+  use: app.ce.cost.bill_check:verify_bill_code_tool
+- name: cost_calc
+  group: cost
+  use: app.ce.cost.tools:cost_calc_tool
 - name: cost_verify
   group: cost
   use: app.ce.cost.verify:cost_verify_tool
@@ -135,8 +141,13 @@ tools:
 # 3. LLM 需要某能力时,先调 tool_search(按关键词搜),把匹配的 MCP 工具从 registry 里 "promote(提升)" 出来,这时 schema 才暴露给模型,变成可调用;
 # 4. 这样上下文里平时只有一个 tool_search,而不是全部 MCP 工具——按需加载、节省 token。
 # tool_search解决的是 MCP 工具太多撑爆 LLM 上下文的问题
+# 2026-07-11 开启：不开则 DeferredToolFilterMiddleware 不装载，ce-rag/ce-db 全部 18 个 MCP schema
+# 直接绑给 lead（8B 工具面爆到 ~38 个，路由稳定性受损，且 lead 直调 ce-rag_* 会被路由评测判失败）。
+# 开启后仅 lead 隐藏 MCP schema（多一个 tool_search 入口）；子智能体走白名单过滤、绑定不经
+# DeferredToolFilterMiddleware（见 build_subagent_runtime_middlewares），ce-* 工具不受影响；
+# workflow 节点走 call_mcp_tool 直取缓存，同样不受影响。
 tool_search:
-  enabled: false
+  enabled: true
 loop_detection:
   enabled: true
   warn_threshold: 3
@@ -193,7 +204,11 @@ memory:
   injection_enabled: true
   max_injection_tokens: 2000
 lead_agent:
-  system_prompt_path: prompts/ce/lead_agent.md
+  # CE 提示词版本库在 benchmark/prompts/（映射表见其 README.md）；此处填相对路径即可，
+  # 解析与 cwd 无关（project_root → backend → 仓库根 依次探测）。切 variant = 改这一行（热加载，
+  # 下一条消息生效）；trace 自动按文件名打 variant 标（lead_agent_v1 / lead_agent_v2 / ...）。
+  # Docker 生产态依赖 compose 把 ../benchmark/prompts 挂进容器（见 docker-compose.yaml gateway.volumes）。
+  system_prompt_path: benchmark/prompts/lead_agent_v1.md
 subagents:
   # 规范合规审查 sub-agent（compliance-checker）已随规范 RAG 退役（2026-06-18）。
   custom_agents:
@@ -272,6 +287,59 @@ subagents:
         - ce-db_quota_list
         - ce-db_price_compose
         - ce-db_price_query
+        - ce-db_fee_rate_lookup
+        - ce-db_resource_lookup
+      disallowed_tools:
+        - task
+        - present_files
+      skills: []
+      model: inherit
+      max_turns: 10
+      timeout_seconds: 600
+    quota-recommend:
+      description: >
+        定额方案推荐专家（已编制清单项 → 定额组价方案，一次跑完、不算钱、不选清单码、无 HITL）。
+        接收**已编制好的清单项**（9/12 位清单编码 + 项目特征，可带工程量），取该清单码可组的
+        定额子目与工料机含量，给出带依据的定额组价方案推荐（可多方案比选）。覆盖深圳房建组价
+        （2013/2024 双版隔离）。**建议在以下场景委派本 agent**：「这条清单套什么定额」「给这个
+        清单项推荐组价方案」「A/B 两种做法的定额方案比一比」。**不负责**：从特征选清单码
+        （那是选码，交 cost-agent / verify_bill_code）、算综合单价/合价（交 cost_calc / workflow）、
+        有状态全流程逐闸确认（交 cost_workflow_start）。
+      system_prompt: |
+        你是定额方案推荐 sub-agent：给**已编制好的清单项**推荐定额组价方案。
+
+        **口径规则（与 cost-agent 相同，缺版本不反问）**：默认深圳·2013。用户没说版本 → 不问、
+        按默认调用，首答带一行口径声明「口径：深圳·2013（未指定版本时的默认，需要 2024 版请说明）」；
+        显式说了版本按说的传；2013 组价数据未就绪 → 如实转达「未就绪」，不静默换 2024；
+        他省口径 → 体面告知仅覆盖深圳，不取数不反问。
+
+        **工作方式**：
+        - 入参核对：清单编码缺失或非 9/12 位 → ask_clarification 让用户补编码（本 agent 不代选码）；
+          特征不足以区分定额子目（如未说泵送/非泵送）→ ask_clarification 只问缺的特征。
+        - **先调 `cost_recall_exemplars(feature, spec)`** 看有无历史人工纠正的相似清单项组价示例
+          （few-shot）：有则参考其定额选择避免重犯，但推荐仍只在本次取数返回的子目内做。
+        - 取数：调 `cost_workflow_node(node="price_compose")`（清单码 → 可组定额 → 工料机含量 + 信息价）；
+          需要看单条定额明细时补 `cost_workflow_node(node="quota_get")`。
+        - 推荐：基于取数返回的候选定额子目组合出 1~3 个方案，每个方案给出：定额子目号与名称、
+          适用条件（何时选它）、工料机要点、price_status；多方案时说明取舍判据（如泵送与否、
+          模板工艺），**排序理由必须落在特征与定额适用范围的对应上**，不空谈。
+
+        **红线**：
+        - 定额子目号、含量、价格只用工具返回的，严禁编造或凭记忆补全；候选之外的定额不得推荐。
+        - 不算钱：不报综合单价/合价，明确"本结果为定额方案与取数，计算请走 cost_calc 或完整组价流程"。
+        - no_source → 透传缺价缺口不编价；need_review → 标注"需人工复核"不当定稿。
+        - 这些是工具（像 ask_clarification 一样直接调用），不是脚本文件；绝不要用 bash/python 去执行，
+          不存在 `ce-*.py` 文件。`spec` 缺省按默认 2013 填，不反问。
+        - 若出错（"无法连接服务"或 503/502/400），这是服务端配置问题，不要自救装包；
+          把错误原文如实返回，说明哪个服务未就绪。
+      tools:
+        - ask_clarification
+        - cost_workflow_node
+        - cost_recall_exemplars
+        - ce-db_bill_get
+        - ce-db_quota_get
+        - ce-db_quota_list
+        - ce-db_price_compose
         - ce-db_fee_rate_lookup
         - ce-db_resource_lookup
       disallowed_tools:

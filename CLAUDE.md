@@ -98,7 +98,7 @@
 
 ### 4.2 本阶段已定/已修
 
-- **runner 路径修复**：`benchmark/runner/_paths.py`——从仓库根跑时补 `import app` + 设 `DEER_FLOW_PROJECT_ROOT=backend`，使 lead agent 真读到 `backend/prompts/ce/lead_agent.md`（否则静默回退内置模板、评测失真）。
+- **提示词加载根治 cwd 依赖（2026-07-11）**：CE 提示词版本库迁至 `benchmark/prompts/`（`lead_agent_v1.md` 现役 / `lead_agent_v2.md` 评测 variant，映射表见其 README.md）；`resolve_system_prompt_file()` 多基座解析（project_root→backend→仓库根），任意 cwd 都能加载；文件解析不到时 variant 标签如实降级 `default`（此前静默回退内置模板还照打文件名，尺子说谎）。切 variant=改 `config.yaml` 的 `lead_agent.system_prompt_path` 一行（热加载）。**Docker 生产态靠 compose 挂载 `../benchmark/prompts:/app/benchmark/prompts:ro`**（benchmark 不在镜像里）。`_paths.py` 的 `DEER_FLOW_PROJECT_ROOT=backend` 仍保留（`import app` + `.deer-flow` 状态目录对齐用）。
 - **路由判定常量（config-grounded）**：`ROUTE_TOOL_NAMES = {cost_workflow_start/node/resume/state, task}`，已删 prefix 与死名 `qa.py`/`cost.py`。依据 lead 可见工具面：`ce-rag_*`/`ce-db_*` 因 `DeferredToolFilterMiddleware` 对 lead 隐藏故不收；`norm_verify`/`cost_verify`/`cost_recall_exemplars` 非路由入口。
 - **Langfuse 定位定案**：判官=本地 Python 判定函数、模型=runner/gateway 调、**Langfuse 只当账本**（收 trace + `create_score`）。不上 Langfuse 原生 evaluator（确定性逻辑装不下 + SSRF 拦内网模型）；Prompt Experiment 上传路径（`upload_prompts`）已删。
 - **clarify 单列红线**：`ask_clarification` 触发 HITL（`ClarificationMiddleware`→`Command(goto=END)` 中断等人），门 0.95，**不并入路由分**（红线独立计分）。

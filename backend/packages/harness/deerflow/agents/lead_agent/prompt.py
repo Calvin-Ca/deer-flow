@@ -7,7 +7,6 @@ from functools import lru_cache
 from typing import TYPE_CHECKING
 
 from deerflow.config.agents_config import load_agent_soul
-from deerflow.config.runtime_paths import resolve_path
 from deerflow.skills.storage import get_or_new_skill_storage
 from deerflow.skills.types import Skill, SkillCategory
 from deerflow.subagents import get_available_subagent_names
@@ -705,10 +704,16 @@ def _resolve_system_prompt_template(app_config: AppConfig | None) -> str:
     template_path = getattr(lead_agent_config, "system_prompt_path", None)
     if not template_path:
         return SYSTEM_PROMPT_TEMPLATE
+    from deerflow.config.lead_agent_config import resolve_system_prompt_file
+
+    resolved = resolve_system_prompt_file(str(template_path))
+    if resolved is None:
+        logger.warning("Lead-agent system prompt override %s not found under any base (cwd-independent lookup); falling back to built-in template", template_path)
+        return SYSTEM_PROMPT_TEMPLATE
     try:
-        return resolve_path(template_path).read_text(encoding="utf-8")
+        return resolved.read_text(encoding="utf-8")
     except OSError:
-        logger.warning("Failed to read lead-agent system prompt override at %s; falling back to built-in template", template_path, exc_info=True)
+        logger.warning("Failed to read lead-agent system prompt override at %s; falling back to built-in template", resolved, exc_info=True)
         return SYSTEM_PROMPT_TEMPLATE
 
 

@@ -6,6 +6,7 @@ from typing import Any
 
 from langchain.tools import tool
 
+from .nodes import calc_tool_node
 from .state import CostNodeName
 from .workflow import get_workflow_state, resume_workflow, run_workflow_node, start_workflow
 
@@ -92,12 +93,53 @@ def cost_workflow_state(task_id: str) -> dict[str, Any]:
     return get_workflow_state(task_id)
 
 
+def cost_calc(
+    target: str | None = None,
+    operation: str | None = None,
+    payload: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Run a single deterministic construction-cost calculation (LLM never does math).
+
+    Use this when the user asks to calculate one value in the pricing process,
+    such as 综合单价 (unit rate), 清单合价 (line total), 汇总 (rollup), or a
+    完整性检查 (check) — without starting the stateful workflow. Formulas come
+    from built-in calculation rules; unsupported targets pause for human rules
+    instead of guessing.
+
+    Args:
+        target: Calculation target for chained computation: unit_rate (综合单价)
+            or line_total (清单合价). The engine computes prerequisite layers
+            automatically and returns a step-by-step breakdown.
+        operation: Single-step operation, one of unit_price, unit_rate,
+            line_total, rollup, check. Ignored when target is given.
+        payload: Input data object. For unit_rate: components (工料机行，每行
+            category/consumption/unit_price) + rates (management_rate/profit_rate/
+            risk_rate). For line_total: unit_price + quantity (unit_price 缺省时
+            由 components 先算). For rollup: items (each with amount). For check:
+            items (bill rows to validate).
+    """
+    merged = dict(payload or {})
+    if target:
+        merged["target"] = target
+    if operation:
+        merged["operation"] = operation
+    # 兼容 rates 块写法（与 cost_verify 入参同形）：展平到顶层供 unit_rate_node 读取，已有顶层键不覆盖。
+    rates = merged.pop("rates", None)
+    if isinstance(rates, dict):
+        for key, value in rates.items():
+            merged.setdefault(key, value)
+    return calc_tool_node(merged)
+
+
 cost_workflow_start_tool = tool("cost_workflow_start", parse_docstring=True)(cost_workflow_start)
 cost_workflow_node_tool = tool("cost_workflow_node", parse_docstring=True)(cost_workflow_node)
 cost_workflow_resume_tool = tool("cost_workflow_resume", parse_docstring=True)(cost_workflow_resume)
 cost_workflow_state_tool = tool("cost_workflow_state", parse_docstring=True)(cost_workflow_state)
+cost_calc_tool = tool("cost_calc", parse_docstring=True)(cost_calc)
 
 __all__ = [
+    "cost_calc",
+    "cost_calc_tool",
     "cost_workflow_node",
     "cost_workflow_node_tool",
     "cost_workflow_resume",

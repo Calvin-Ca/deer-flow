@@ -39,9 +39,11 @@ DATASET_NAME = "agent-routing-eval"
 # 「发生了路由」= lead agent 调了正经的算量/路由工具（按工具名判定，可靠：名字在流式
 # tool_call 首片里就到齐，不像 args 会分片）。口径见 routing_eval/README：路由 = 调
 # cost_workflow_* 工作流节点或 task 分派子智能体；bash/read_file 自己瞎折腾不算。
-# 集合由 config.yaml + lead_agent.md 的「lead 可见工具面」确定（统一精确名、不用前缀）：
+# 集合由 config.yaml + benchmark/prompts/lead_agent_v*.md 的「lead 可见工具面」确定（统一精确名、不用前缀）：
 #   · cost 路由 = cost_workflow_start/node/resume/state（group=cost，lead 可见）
 #   · norm 路由 = task 分派 norm-qa（无顶层 norm 路由工具，norm 唯一入口就是 task）
+#   · 单点确定性路由 = verify_bill_code（选码核实）/ cost_calc（单点计算）——lead_agent_v2
+#     的直调工具面（v1 提示词不引用但工具全局可见，调了同样算路由）
 # 刻意不收：① ce-rag_*/ce-db_* 是 deferred 工具、被 DeferredToolFilterMiddleware 对 lead 模型
 #   默认隐藏（是 cost_workflow 节点/子智能体内部的窄原语，lead 不直接调）；② norm_verify 是
 #   引用忠实度回查、③ cost_verify/cost_recall_exemplars 是组价内部辅助——三者皆非路由入口。
@@ -51,6 +53,8 @@ ROUTE_TOOL_NAMES = {
     "cost_workflow_node",
     "cost_workflow_resume",
     "cost_workflow_state",
+    "verify_bill_code",
+    "cost_calc",
     "task",
 }
 CLARIFY_TOOL = "ask_clarification"

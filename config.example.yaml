@@ -768,7 +768,10 @@ skills:
 lead_agent:
   # Project-level CE lead-agent prompt override. Keeps CE routing outside the
   # publishable harness package and lets the application own its prompt.
-  system_prompt_path: prompts/ce/lead_agent.md
+  # Variants live in benchmark/prompts/ (see its README.md for the mapping);
+  # resolution is cwd-independent (project_root → backend/ → repo root).
+  # Docker prod relies on the compose volume mount of ../benchmark/prompts.
+  system_prompt_path: benchmark/prompts/lead_agent_v1.md
 
 # ============================================================================
 # Title Generation Configuration

@@ -52,9 +52,6 @@
     }
   },
   "skills": {
-    "norm-qa": {
-      "enabled": true
-    },
     "cost-agent": {
       "enabled": true
     },

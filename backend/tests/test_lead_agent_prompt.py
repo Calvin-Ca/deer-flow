@@ -421,7 +421,54 @@ def test_resolve_system_prompt_template_falls_back_on_missing_file(tmp_path, cap
         result = prompt_module._resolve_system_prompt_template(config)
 
     assert result is prompt_module.SYSTEM_PROMPT_TEMPLATE
-    assert "Failed to read lead-agent system prompt override" in caplog.text
+    assert "not found under any base" in caplog.text
+
+
+# ── resolve_system_prompt_file：多基座、cwd 无关解析（历史坑：cwd 依赖导致静默回退+打标说谎）──
+
+
+def test_resolve_system_prompt_file_absolute_path(tmp_path):
+    from deerflow.config.lead_agent_config import resolve_system_prompt_file
+
+    f = tmp_path / "abs.md"
+    f.write_text("x", encoding="utf-8")
+    assert resolve_system_prompt_file(str(f)) == f.resolve()
+
+
+def test_resolve_system_prompt_file_relative_resolves_against_repo_root_regardless_of_cwd(monkeypatch, tmp_path):
+    """相对路径在 cwd=随便哪里 时仍能经 backend 根的上一级（仓库根）命中——根治 Path.cwd() 依赖。"""
+    from deerflow.config.lead_agent_config import resolve_system_prompt_file
+
+    monkeypatch.chdir(tmp_path)  # 故意换到无关目录
+    monkeypatch.delenv("DEER_FLOW_PROJECT_ROOT", raising=False)
+    resolved = resolve_system_prompt_file("benchmark/prompts/lead_agent_v1.md")
+    assert resolved is not None and resolved.is_file()
+    assert resolved.parts[-3:] == ("benchmark", "prompts", "lead_agent_v1.md")
+
+
+def test_resolve_system_prompt_file_returns_none_when_nowhere(monkeypatch, tmp_path):
+    from deerflow.config.lead_agent_config import resolve_system_prompt_file
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("DEER_FLOW_PROJECT_ROOT", raising=False)
+    assert resolve_system_prompt_file("no/such/prompt.md") is None
+
+
+def test_variant_label_degrades_to_default_when_file_missing(monkeypatch, tmp_path):
+    """打标与加载同口径：文件解析不到时 variant 如实打 default，不再冒充文件名。"""
+    from deerflow.tracing.metadata import resolve_active_prompt_variant
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("DEER_FLOW_PROJECT_ROOT", raising=False)
+    config = SimpleNamespace(lead_agent=SimpleNamespace(system_prompt_path="no/such/prompt.md"))
+    assert resolve_active_prompt_variant(config) == "default"
+
+
+def test_variant_label_uses_stem_when_file_exists():
+    from deerflow.tracing.metadata import resolve_active_prompt_variant
+
+    config = SimpleNamespace(lead_agent=SimpleNamespace(system_prompt_path="benchmark/prompts/lead_agent_v2.md"))
+    assert resolve_active_prompt_variant(config) == "lead_agent_v2"
 
 
 def test_apply_prompt_template_uses_override_template(monkeypatch, tmp_path):
@@ -448,11 +495,11 @@ def test_apply_prompt_template_uses_override_template(monkeypatch, tmp_path):
 def test_project_config_points_lead_agent_to_ce_prompt():
     config = AppConfig.from_file("../config.yaml")
 
-    assert config.lead_agent.system_prompt_path == "prompts/ce/lead_agent.md"
+    assert config.lead_agent.system_prompt_path == "benchmark/prompts/lead_agent_v1.md"
 
 
 def test_ce_override_renders_and_carries_subagent_dispatch(monkeypatch, tmp_path):
-    """真·CE override（backend/prompts/ce/lead_agent.md）能过 .format 渲染且含三类 subagent 调度指南。
+    """真·CE override（benchmark/prompts/lead_agent_v1.md）能过 .format 渲染且含三类 subagent 调度指南。
 
     这条同时守两件事：① override 里只用合法占位符、字面花括号已转义——否则 apply_prompt_template
     的 .format 会在运行时 KeyError/ValueError 直接打挂 prompt（_resolve 只吞 OSError，.format 在其外）；
@@ -460,7 +507,7 @@ def test_ce_override_renders_and_carries_subagent_dispatch(monkeypatch, tmp_path
     """
     from pathlib import Path
 
-    ce_prompt = Path(__file__).resolve().parent.parent / "prompts" / "ce" / "lead_agent.md"
+    ce_prompt = Path(__file__).resolve().parent.parent.parent / "benchmark" / "prompts" / "lead_agent_v1.md"
     config = SimpleNamespace(
         sandbox=SimpleNamespace(mounts=[]),
         skills=SimpleNamespace(container_path="/mnt/skills"),
@@ -485,6 +532,32 @@ def test_ce_override_renders_and_carries_subagent_dispatch(monkeypatch, tmp_path
     assert "上下文隔离" in prompt
     # 边界红线：cost-agent 不发起有状态全流程。
     assert "无 `cost_workflow_start` 权限" in prompt
+
+
+def test_ce_v2_override_renders_with_routing_table(monkeypatch):
+    """v2 variant（benchmark/prompts/lead_agent_v2.md）能过 .format 渲染，查表路由与红线锚点在位。"""
+    from pathlib import Path
+
+    ce_prompt = Path(__file__).resolve().parent.parent.parent / "benchmark" / "prompts" / "lead_agent_v2.md"
+    config = SimpleNamespace(
+        sandbox=SimpleNamespace(mounts=[]),
+        skills=SimpleNamespace(container_path="/mnt/skills"),
+        lead_agent=SimpleNamespace(system_prompt_path=str(ce_prompt)),
+    )
+    monkeypatch.setattr(prompt_module, "get_skills_prompt_section", lambda *args, **kwargs: "")
+    monkeypatch.setattr(prompt_module, "get_deferred_tools_prompt_section", lambda **kwargs: "")
+    monkeypatch.setattr(prompt_module, "_build_acp_section", lambda **kwargs: "")
+    monkeypatch.setattr(prompt_module, "_get_memory_context", lambda agent_name=None, **kwargs: "")
+    monkeypatch.setattr(prompt_module, "get_agent_soul", lambda agent_name=None: "")
+
+    prompt = prompt_module.apply_prompt_template(app_config=config, agent_name="CostBot")
+
+    assert "你是CostBot" in prompt
+    # 查表路由的五个动作入口（工具真名）在位。
+    assert "verify_bill_code" in prompt and "cost_calc" in prompt
+    assert "quota-recommend" in prompt and "cost_workflow_start" in prompt
+    # 红线节在位。
+    assert "<discipline" in prompt and "<clarify" in prompt
 
 
 def test_default_template_embeds_skill_runbook():

@@ -16,10 +16,13 @@ right metadata without leaking Langfuse internals into the call sites.
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Any
 
 from deerflow.config import get_enabled_tracing_providers
+
+logger = logging.getLogger(__name__)
 
 # Lazy-imported below to avoid a circular import: ``deerflow.runtime`` eagerly
 # imports the run worker, which in turn needs ``deerflow.tracing``.
@@ -55,6 +58,16 @@ def resolve_active_prompt_variant(app_config: Any | None = None) -> str:
     lead_agent_config = getattr(config, "lead_agent", None)
     template_path = getattr(lead_agent_config, "system_prompt_path", None)
     if not template_path:
+        return _DEFAULT_PROMPT_VARIANT
+    # 打标与加载共用同一解析（cwd 无关多基座）：文件解析不到时提示词实际已回退内置模板，
+    # variant 必须如实打 default——否则评测按文件名分组，尺子在说谎。
+    try:
+        from deerflow.config.lead_agent_config import resolve_system_prompt_file
+
+        if resolve_system_prompt_file(str(template_path)) is None:
+            logger.warning("variant 标签降级为 %s：system_prompt_path=%s 未解析到实际文件（提示词已回退内置模板）", _DEFAULT_PROMPT_VARIANT, template_path)
+            return _DEFAULT_PROMPT_VARIANT
+    except Exception:
         return _DEFAULT_PROMPT_VARIANT
     return Path(template_path).stem
 

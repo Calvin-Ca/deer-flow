@@ -5,10 +5,11 @@
     任一 runner 在建 DeerFlowClient 前 `import _paths` 一次修好（免每次记着加 PYTHONPATH=backend）：
     ① `import app`：backend/ 不在 sys.path，config.yaml 里 `use: app.ce.io.excel_tools:...`
        一加载工具即 `ModuleNotFoundError: No module named 'app'` → 把 backend/ 前插进 sys.path。
-    ② runtime 路径：`project_root()` 取 `Path.cwd()`（=仓库根），使 `resolve_path('prompts/ce/
-       lead_agent.md')` 落到「仓库根/prompts/…」而漏读（真文件在 backend/prompts/ 下），lead-agent
-       CE 定制提示词静默回退内置模板、`.deer-flow` 状态目录也指错 → 把 DEER_FLOW_PROJECT_ROOT
-       设成 backend/，让 project_root()/runtime_home()/resolve_path 全部对齐生产（cwd=backend）。
+    ② runtime 路径：`project_root()` 取 `Path.cwd()`（=仓库根）时 `.deer-flow` 状态目录会指错
+       → 把 DEER_FLOW_PROJECT_ROOT 设成 backend/，让 project_root()/runtime_home()/resolve_path
+       全部对齐生产（cwd=backend）。注：lead-agent 提示词已不依赖本对齐——现走
+       `resolve_system_prompt_file()` 多基座解析（cwd 无关，见 benchmark/prompts/README.md），
+       但状态目录/其他相对路径仍需要 ②。
     config.yaml / extensions_config.json 均有从 __file__ 推出的仓库根 legacy 兜底（与 cwd 无关），
     故设了 DEER_FLOW_PROJECT_ROOT=backend 后它们仍从仓库根正常加载，不受影响。
 参数：无（import 时执行副作用）。

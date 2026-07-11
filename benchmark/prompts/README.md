@@ -16,7 +16,9 @@ config.yaml 指向本目录某文件
 |---|---|---|---|
 | `lead_agent_v1.md` | `lead_agent_v1` | capability 预分类（norm/cost/both）两跳路由；单点任务派 cost-agent 子智能体；详尽 subagent_dispatch 并行调度指南 | 线上现役基线 |
 | `lead_agent_v2.md` | `lead_agent_v2` | 查表式单跳路由（诉求特征→动作）；单点核实/计算直调 `verify_bill_code`/`cost_calc`；五能力对齐 CLAUDE.md §1；clarify/discipline 红线单列 | 评测 variant |
-| （无文件 / 解析失败） | `default` | harness 内置英文通用模板（`prompt.py:SYSTEM_PROMPT_TEMPLATE`），无 CE 路由 | 回退兜底 |
+| （无文件 / 解析失败） | `default` | harness 内置英文通用模板（`prompt.py:SYSTEM_PROMPT_TEMPLATE`，已恢复上游原版），无 CE 路由 | 回退兜底 |
+
+> v1/v2 均含 `<safety_redline>`（串库红线 + 禁编造，2026-07-11 自旧 CE 内置模板移植——该红线是 agent 自补 `010504001`/`E.4.1` 事故换来的，任何新 variant 都应保留）。
 
 ## 怎么切版本（对比实验流程）
 

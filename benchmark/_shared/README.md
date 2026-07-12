@@ -60,7 +60,7 @@ uv run --project backend python benchmark/L3_retrieval/run_retrieval_experiment.
 
 逐条挂 `match_top1`（端到端选码命中）/ `recalled`（金标是否进候选）两分到 `clist-match-eval` 的 dataset run；终端同时打印 eval_select 的完整指标表（含 PRD Top-1≥85% 红线对照）。
 
-> 范围：只接了**清单匹配**（`match_gold*.jsonl`）。**条文召回**（`gb50016_eval.json`）的 standard `gb50016` 不在 qa.py 支持列表（仅 gb50500/50854/50856），待知识服务加载该规范后再按同套路加 qa.py 驱动。`match_gold_2013_uncovered.jsonl` 是「库未覆盖码」清单（无 query），量覆盖缺口、不进召回评测。
+> 范围：只接了**清单匹配**（`match_gold*.jsonl`）。**条文召回**（`gb50016_eval.json`）的 standard `gb50016` 不在 agent 面允许清单（默认仅 gb50500/50854-2013）——跑该评测时以 ce-code env `CE_RAG_AGENT_STANDARDS` 放开 gb50016（其索引已建），再按同套路加驱动。`match_gold_2013_uncovered.jsonl` 是「库未覆盖码」清单（无 query），量覆盖缺口、不进召回评测。
 
 ### 任务2 扩展 · L6_agent 三子集（先接管道，数据后补）
 

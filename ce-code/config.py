@@ -98,6 +98,48 @@ STANDARD_ALIASES: dict[str, str] = {
 }
 
 
+# ── Agent 面规范口径闸（2026-07-12，产品裁定：系统仅深圳·2013）─────────────────
+# 索引/别名全量保留（benchmark 评测、历史轨照跑），但 **agent 面检索只放行 2013 两部**——
+# 点名 2024/安装规范的请求在服务端硬拒（提示词之外的第二道闸，防串库纵深）。评测进程需要
+# 放开其它 store 时用 env 覆盖（如 CE_RAG_AGENT_STANDARDS=gb50500-2013,gb50854-2013,gb50016）。
+_AGENT_STANDARDS_ENV = "CE_RAG_AGENT_STANDARDS"
+_AGENT_STANDARDS_DEFAULT = "gb50500-2013,gb50854-2013"
+
+# 缺 standard 时的确定性推断（问题类型 → 2013 两部之一）：命中计价关键词走 GB50500（计价规范），
+# 否则默认 GB50854（房建计量）——计量类问法（工程量/计算规则/项目特征）是画像用户的大头。
+_PRICING_HINTS = (
+    "综合单价", "费用构成", "取费", "费率", "计价", "清单编制", "招标", "投标",
+    "结算", "合同价", "措施项目费", "规费", "税金", "风险费", "暂列金", "暂估价",
+)
+
+
+def agent_allowed_standards() -> set[str]:
+    """Agent 面允许的规范代号集合（env ``CE_RAG_AGENT_STANDARDS`` 覆盖，默认仅 2013 两部）。"""
+    raw = os.environ.get(_AGENT_STANDARDS_ENV) or _AGENT_STANDARDS_DEFAULT
+    return {s.strip().lower() for s in raw.split(",") if s.strip()}
+
+
+def ensure_agent_standard(standard: str) -> None:
+    """规范代号不在 agent 面允许清单 → 抛 ValueError（错误话术供 agent 原样透传给用户）。"""
+    if str(standard).strip().lower() not in agent_allowed_standards():
+        raise ValueError(
+            f"不支持的规范口径: {standard!r}——本系统仅支持深圳·2013（gb50500-2013 计价 / gb50854-2013 房建计量），"
+            "不提供 2024 版及安装规范检索"
+        )
+
+
+def infer_standard(query: str) -> str:
+    """缺 standard 时按问题类型确定性推断（仅在 2013 两部之间裁定，无 LLM）。
+
+    计价类关键词（综合单价/费用/取费…）→ gb50500-2013；其余（工程量/计量规则/项目特征等）
+    → gb50854-2013。推断结果由调用方写进返回 meta（standard_source=inferred）供追溯。
+    """
+    q = str(query or "")
+    if any(k in q for k in _PRICING_HINTS):
+        return "gb50500-2013"
+    return "gb50854-2013"
+
+
 def collection_name(store_name: str) -> str:
     """store 名 → Milvus collection 名（**ASCII 安全**：只含字母/数字/下划线）。
 

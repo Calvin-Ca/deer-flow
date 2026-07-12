@@ -24,10 +24,16 @@ class RagService:
         self,
         query: str,
         *,
-        standard: str,
+        standard: str | None = None,
         top_k: int = 15,
         skip_rerank: bool = False,
     ) -> dict[str, Any]:
+        # standard 缺省 → 服务端确定性推断（2013 两部之间按问题类型裁定）；显式/推断都过 agent 面闸。
+        standard_source = "explicit"
+        if not standard:
+            standard = config.infer_standard(query)
+            standard_source = "inferred"
+        config.ensure_agent_standard(standard)
         rq = RetrievalQuery(text=query, standard=standard, top_k=top_k, skip_rerank=skip_rerank)
         ctx = self.retrieval.search(rq)
         raw_resp = ctx.to_response()
@@ -52,9 +58,11 @@ class RagService:
             **raw_resp,
             "count": len(clauses),
             "evidence": evidence,
+            "standard_source": standard_source,
         }
 
     def expand_clause_refs(self, *, standard: str, node_paths: list[str]) -> dict[str, Any]:
+        config.ensure_agent_standard(standard)
         store_name, n_seeds, added = self.retrieval.expand(node_paths, standard)
         expanded_clauses = [item.to_response() for item in added]
         evidence = [
@@ -84,6 +92,7 @@ class RagService:
         }
 
     def get_clause(self, *, standard: str, node_path: str) -> dict[str, Any]:
+        config.ensure_agent_standard(standard)
         store_name, clause = self.retrieval.get_clause(standard, node_path)
         return {"standard": store_name, "node_path": node_path, "clause": clause}
 
@@ -221,8 +230,7 @@ class RagService:
     ) -> dict[str, Any]:
         filters = filters or {}
         if corpus == "clause":
-            if not standard:
-                raise ValueError("corpus=clause 时 standard 必填")
+            # standard 可省——search_clause 内部按问题类型推断（默认 2013 口径）并过 agent 面闸。
             return self.search_clause(query, standard=standard, top_k=top_k, skip_rerank=bool(filters.get("skip_rerank")))
         if corpus == "bill_match":
             if not spec:

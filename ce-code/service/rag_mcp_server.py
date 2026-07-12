@@ -37,7 +37,7 @@ mcp = FastMCP(
 @mcp.tool()
 def search_clause(
     query: Annotated[str, Field(description="规范问句，如“现浇混凝土柱按什么计量”")],
-    standard: Annotated[str, Field(description="规范代号，如 gb50854-2024")],
+    standard: Annotated[str | None, Field(description="规范代号（gb50500-2013 计价 / gb50854-2013 房建计量）；可省，服务端按问题类型推断（均为深圳·2013 口径）")] = None,
     top_k: Annotated[int, Field(ge=1, le=50, description="返回条数")] = 15,
     skip_rerank: Annotated[bool, Field(description="跳过 rerank（调试）")] = False,
 ) -> dict[str, Any]:
@@ -49,7 +49,7 @@ def search_clause(
 
 @mcp.tool()
 def expand_clause_refs(
-    standard: Annotated[str, Field(description="规范代号，如 gb50854-2024")],
+    standard: Annotated[str, Field(description="规范代号，如 gb50854-2013")],
     node_paths: Annotated[list[str], Field(description="种子条款号列表")],
 ) -> dict[str, Any]:
     try:
@@ -60,7 +60,7 @@ def expand_clause_refs(
 
 @mcp.tool()
 def get_clause(
-    standard: Annotated[str, Field(description="规范代号，如 gb50854-2024")],
+    standard: Annotated[str, Field(description="规范代号，如 gb50854-2013")],
     node_path: Annotated[str, Field(description="条款号，如 4.1.2")],
 ) -> dict[str, Any]:
     try:
@@ -114,7 +114,7 @@ def retrieve_evidence(
     query: Annotated[str, Field(description="统一证据查询文本")],
     corpus: Annotated[str, Field(description="证据域：clause / bill_match / aux_table / price_rule")],
     top_k: Annotated[int, Field(ge=1, le=50, description="返回条数")] = 10,
-    standard: Annotated[str | None, Field(description="corpus=clause 时传规范代号")] = None,
+    standard: Annotated[str | None, Field(description="corpus=clause 时的规范代号（可省，服务端按问题类型推断，默认深圳·2013 口径）")] = None,
     spec: Annotated[str | None, Field(description="corpus=bill_match 或 aux_table 时传国标版本")] = None,
     filters: Annotated[dict[str, Any] | None, Field(description="附加过滤，如 chapter/code_prefixes/region")] = None,
 ) -> dict[str, Any]:

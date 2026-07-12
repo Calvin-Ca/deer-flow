@@ -80,7 +80,7 @@ def verify_norm(answer: str, evidence: list[dict[str, Any]]) -> dict[str, Any]:
     应**剥掉该引用或降级为"无库内依据"**，绝不放行编造的条文号。``no_citation`` + 非拒答答案也可疑。
 
     Args:
-        answer: 生成的答案文本（含条款号引用，如 "依据 GB 50854-2024 第 5.3.4 条…"）。
+        answer: 生成的答案文本（含条款号引用，如 "依据 GB 50854-2013 第 5.3.4 条…"）。
         evidence: 本次检索回来的条文列表，每条含结构化字段（clause / node_path 等）供回查。
     """
     return check_faithfulness(answer, evidence)

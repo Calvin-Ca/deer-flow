@@ -210,13 +210,15 @@ curl -s -X POST http://localhost:8100/search/bill-match -H 'Content-Type: applic
 curl -s "http://localhost:8102/price/compose/%E6%B7%B1%E5%9C%B3/010401002?spec=2024"
 ```
 
-规范条文检索（Norm-QA，须带 `standard` 代号，见 `config.STANDARD_ALIASES`）：
+规范条文检索（Norm-QA；`standard` 可省——服务端按问题类型推断，agent 面默认仅放行
+gb50500/50854-2013，其余 store 用 env `CE_RAG_AGENT_STANDARDS` 放开，见 `config.py`）：
 ```bash
-curl -s -X POST http://localhost:8100/search/clause -H 'Content-Type: application/json' -d '{"query":"满堂脚手架工程量怎么计算","standard":"gb50854-2024","top_k":10}'
+curl -s -X POST http://localhost:8100/search/clause -H 'Content-Type: application/json' -d '{"query":"满堂脚手架工程量怎么计算","standard":"gb50854-2013","top_k":10}'
 ```
 
-端到端：组价编排（构件→选码→组价）由 CostAgent、规范问答由 Norm-QA——均在任务层 `../ce-services/`
-以 HTTP 客户端复用本服务。规范检索索引构建见 `TODO.md` 四、A3（`build.py view→feature→index`）。
+端到端：组价编排（构件→选码→组价）与规范问答均已内嵌 deer-flow backend（`cost_workflow_*` +
+norm-qa 子智能体），以 MCP 客户端复用本服务（原任务层 `ce-services/` 已退役）。规范检索索引
+构建见 `TODO.md` 四、A3（`build.py view→feature→index`）。
 
 ---
 

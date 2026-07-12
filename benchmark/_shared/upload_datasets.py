@@ -308,7 +308,8 @@ def upload_clause(client) -> int:
     """上传条文召回评测集（gb50016_eval.json：问题 → 应召回条文）到 Langfuse Dataset。
 
     功能：input=问题；expected_output=expected_clauses + must_be_mandatory；metadata=相关条文/类型。
-        ⚠️ standard `gb50016` 尚不在 qa.py 支持列表（仅 50500/50854/50856），驱动 runner 待知识
+        ⚠️ standard `gb50016` 不在 agent 面允许清单（默认仅 gb50500/50854-2013，见 ce-code
+        `CE_RAG_AGENT_STANDARDS`）——驱动 runner 跑评测时需以该 env 放开 gb50016，或待知识
         服务加载该规范后再建——本上传只先把金标纳管进 Langfuse。
     参数：client —— Langfuse 客户端。
     返回：写入的 item 条数。

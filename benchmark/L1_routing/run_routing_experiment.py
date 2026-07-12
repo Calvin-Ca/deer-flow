@@ -34,7 +34,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "_shared"))  # _lf 
 import _paths  # noqa: E402,F401  把 backend/ 补进 sys.path（import app 前置）
 from _lf import require_langfuse, wait_for_traces  # noqa: E402
 
-DATASET_NAME = "user-requests-routing"  # 路由主池（101 条；原冻结集 agent-routing-eval 已于 2026-07-11 审并入此）
+DATASET_NAME = "user-requests-routing"  # 路由主池（78 条，仅深圳·2013 口径；原冻结集 agent-routing-eval 已审并入、停用）
 
 # 「发生了路由」= lead agent 调了正经的算量/路由工具（按工具名判定，可靠：名字在流式
 # tool_call 首片里就到齐，不像 args 会分片）。口径见 L1_routing/README：路由 = 调
@@ -94,9 +94,10 @@ def _drive_agent(agent_client, query: str, thread_id: str) -> dict:
             if isinstance(d.get("content"), str):
                 answer_parts.append(d["content"])
         elif d.get("type") == "tool" and d.get("name"):
-            # 工具结果也计名（m4-behavior-v3 归因，2026-07-06）：哑火收编（after_model 把纯文本
-            # 反问转 ask_clarification）不经模型流式 tool_calls 出来，只有 ClarificationMiddleware
-            # 的 ToolMessage 可观测——只数 ai tool_calls 会把收编成功误判成「工具=[]」（E6 冤案）。
+            # 工具结果侧也计名（去重保序兜掉正常路径的重影）：保险口径——凡**中间件代发**的
+            # 工具调用（不经模型流式 tool_calls、只有 ToolMessage 可观测）都靠这行兜住。
+            # 历史动机是哑火收编（after_model 把纯文本反问转 ask_clarification，E6 冤案），该机制
+            # 随 RouteContextMiddleware 删除已不存在（3691cbd4，其实从未接线）；保留此行作保险。
             tool_names.append(d["name"])
 
     tool_names = list(dict.fromkeys(tool_names))  # 去重保序（tool_call 与其结果各计一次的重影）

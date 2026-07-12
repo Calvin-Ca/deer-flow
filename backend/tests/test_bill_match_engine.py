@@ -1,6 +1,6 @@
 """bill_match_engine 匹配引擎单测（monkeypatch 掉 MCP，纯逻辑验证）。
 
-核实模式的完整契约由 test_bill_check.py 覆盖（薄壳等价回归）；本文件重点测
+核实模式的完整契约由 test_bill_match_tool.py 覆盖（工具壳契约）；本文件重点测
 选码模式（match_bill code=None）、门限选定纯函数、以及 select_bill_node 选定后
 的特征缺口检查增益。
 """
@@ -95,7 +95,7 @@ def test_select_mode_truth_unavailable_skips_feature_gap(monkeypatch):
     assert r["verdict"] == "pass"
 
 
-# ── 核实模式经统一入口仍可用（完整契约回归见 test_bill_check.py）──
+# ── 核实模式经统一入口仍可用（完整契约回归见 test_bill_match_tool.py）──
 def test_verify_mode_via_match_bill(monkeypatch):
     monkeypatch.setattr(engine, "call_mcp_tool", _fake_mcp())
     r = match_bill(feature=_FEATURE, spec="2013", code="010401004001")

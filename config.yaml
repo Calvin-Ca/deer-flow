@@ -99,7 +99,7 @@ tools:
   use: app.ce.cost.tools:cost_workflow_state_tool
 - name: bill_match
   group: cost
-  use: app.ce.cost.bill_check:bill_match_tool
+  use: app.ce.cost.bill_match_engine:bill_match_tool
 - name: quota_recommend
   group: cost
   use: app.ce.cost.quota_engine:quota_recommend_tool
@@ -108,7 +108,7 @@ tools:
   use: app.ce.cost.price_engine:price_query_tool
 - name: cost_calc
   group: cost
-  use: app.ce.cost.tools:cost_calc_tool
+  use: app.ce.cost.calc_engine:cost_calc_tool
 - name: verify_cost
   group: cost
   use: app.ce.cost.verify:verify_cost_tool

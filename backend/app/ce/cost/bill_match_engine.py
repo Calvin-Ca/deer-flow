@@ -8,8 +8,8 @@ CLAUDE.md §1 能力 2 的正反两面本质是同一个匹配问题：
 
 此前两半各写一套（``bill_check.py`` / ``nodes.py``），候选归一、取码、召回调用、verdict 口径
 重复实现。本模块单源沉淀，消费面全部薄壳化且契约不变：
-- ``bill_check.bill_match`` —— lead 直调的双模工具（code 缺省=选码 / 给定=核实，2026-07-12 合并，
-  原 ``verify_bill_code`` 单核实工具随之退役）；
+- ``bill_match``（本模块底部工具壳）—— lead 直调的双模工具（code 缺省=选码 / 给定=核实，
+  2026-07-12 合并，原 ``verify_bill_code`` 单核实工具与独立壳文件 ``bill_check.py`` 均已退役）；
 - ``nodes.bill_match_node`` / ``nodes.select_bill_node`` —— workflow 节点（选码模式，HITL 契约不变）；
 - ``nodes.py`` 其余节点复用候选归一/取分等纯函数。
 
@@ -29,6 +29,8 @@ from __future__ import annotations
 import re
 from collections.abc import Callable
 from typing import Any
+
+from langchain.tools import tool
 
 from .mcp import call_mcp_tool
 from .state import normalize_spec, unsupported_spec_error
@@ -415,9 +417,49 @@ def _match_select(feature: str, spec: str | None, provided_features: list[str] |
     }
 
 
+# ---- lead 直调工具壳（2026-07-12 自 bill_check.py 并入：引擎自带工具面，与 quota/price 同款）----
+def bill_match(
+    feature: str,
+    code: str | None = None,
+    spec: str | None = None,
+    provided_features: list[str] | None = None,
+    top_k: int = 10,
+) -> dict[str, Any]:
+    """清单智能匹配：给项目特征选清单编码，或核实一条已选编码对不对、特征有无遗漏。
+
+    Deterministic bill-item matcher with two modes sharing one engine. Without
+    ``code`` it recalls candidates from the project feature and auto-selects when
+    confidence clears the threshold (low confidence returns candidates for human
+    review, with few-shot hints from past human corrections). With ``code`` it
+    verifies that choice: code format, existence in the bill spec truth (ce-db),
+    required-feature diff, and a recall cross-check. Use this for single or a few
+    components; for a full bill of quantities use cost_workflow_start instead.
+
+    Args:
+        feature: Project feature description of the component or construction method.
+        code: Optional bill code to verify (9 or 12 digits). Omit to select a new code.
+        spec: Bill standard version. Only 2013 (Shenzhen caliber) is supported;
+            omit to use it by default.
+        provided_features: Feature item names the user has already filled in.
+            If omitted, feature names are matched against the description text.
+        top_k: Number of recall candidates.
+    """
+    return match_bill(
+        feature=feature,
+        spec=spec,
+        code=code,
+        provided_features=provided_features,
+        top_k=top_k,
+        call_tool=call_mcp_tool,
+    )
+
+
+bill_match_tool = tool("bill_match", parse_docstring=True)(bill_match)
+
 __all__ = [
     "AUTO_SELECT_MARGIN", "AUTO_SELECT_THRESHOLD", "CODE_RE",
-    "as_candidates", "candidate_code", "candidate_code9", "candidate_score", "code9_of",
+    "as_candidates", "bill_match", "bill_match_tool",
+    "candidate_code", "candidate_code9", "candidate_score", "code9_of",
     "diff_features", "extract_feature_names", "feature_gap_report", "fetch_bill_truth",
     "finding", "match_bill", "normalize_provided", "recall_candidates",
     "select_from_candidates", "top_candidates", "unwrap_bill", "verdict_from",

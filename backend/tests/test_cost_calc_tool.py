@@ -1,7 +1,7 @@
 """cost_calc 单点计算工具单测（直连 calc_tool_node 确定性引擎，无服务依赖）。"""
 from __future__ import annotations
 
-from app.ce.cost.tools import cost_calc, cost_calc_tool
+from app.ce.cost.calc_engine import cost_calc, cost_calc_tool
 
 # 人材机费=100(人工60+材料30+机械10)，管理费 10% + 利润 5% → 综合单价 115。
 _COMPONENTS = [

@@ -1,4 +1,9 @@
-"""DeerFlow tool wrappers for the application-level CE cost workflow."""
+"""DeerFlow tool wrappers for the cost workflow four-piece（能力 6 的模型可见面）。
+
+单点能力的工具壳各随其引擎（2026-07-12 收拢定案）：``bill_match`` 在 bill_match_engine、
+``quota_recommend`` 在 quota_engine、``price_query`` 在 price_engine、``cost_calc`` 在
+calc_engine——本文件只剩 workflow 四件套（start / node / resume / state）。
+"""
 
 from __future__ import annotations
 
@@ -6,7 +11,6 @@ from typing import Any
 
 from langchain.tools import tool
 
-from .nodes import calc_tool_node
 from .state import CostNodeName
 from .workflow import get_workflow_state, resume_workflow, run_workflow_node, start_workflow
 
@@ -93,75 +97,12 @@ def cost_workflow_state(task_id: str) -> dict[str, Any]:
     return get_workflow_state(task_id)
 
 
-def cost_calc(
-    target: str | None = None,
-    operation: str | None = None,
-    components: list[dict[str, Any]] | None = None,
-    unit_price: float | None = None,
-    quantity: float | None = None,
-    items: list[dict[str, Any]] | None = None,
-    management_rate: float | None = None,
-    profit_rate: float | None = None,
-    risk_rate: float | None = None,
-    payload: dict[str, Any] | None = None,
-) -> dict[str, Any]:
-    """Run a single deterministic construction-cost calculation (LLM never does math).
-
-    Use this when the user asks to calculate one value in the pricing process,
-    such as 综合单价 (unit rate), 清单合价 (line total), 汇总 (rollup), or a
-    完整性检查 (check) — without starting the stateful workflow. Formulas come
-    from built-in calculation rules; unsupported targets pause for human rules
-    instead of guessing. When no fee rates are given the result is flagged
-    rates_missing (综合单价 degenerates to 人材机费) — relay that caveat.
-
-    Args:
-        target: Calculation target for chained computation, unit_rate (综合单价)
-            or line_total (清单合价). The engine computes prerequisite layers
-            automatically and returns a step-by-step breakdown.
-        operation: Single-step operation, one of unit_price, unit_rate,
-            line_total, rollup, check. Ignored when target is given.
-        components: 工料机行 for unit_rate/unit_price, each with category
-            (人工/材料/机械), consumption (or quantity), and unit_price (or price).
-        unit_price: 综合单价 for line_total. Omit to compute it from components first.
-        quantity: 工程量 for line_total.
-        items: Rows for rollup (each with amount) or check (bill items to validate).
-        management_rate: 企业管理费率 as a decimal, e.g. 0.1. Should come from
-            fee_rate_lookup or the user, never invented.
-        profit_rate: 利润率 as a decimal.
-        risk_rate: 风险费率 as a decimal.
-        payload: Extra input fields not covered by the explicit args (merged in,
-            explicit args win).
-    """
-    merged = dict(payload or {})
-    explicit = {
-        "target": target,
-        "operation": operation,
-        "components": components,
-        "unit_price": unit_price,
-        "quantity": quantity,
-        "items": items,
-        "management_rate": management_rate,
-        "profit_rate": profit_rate,
-        "risk_rate": risk_rate,
-    }
-    merged.update({k: v for k, v in explicit.items() if v is not None})
-    # 兼容 rates 块写法（与 verify_cost 入参同形）：展平到顶层供 unit_rate 读取，已有顶层键不覆盖。
-    rates = merged.pop("rates", None)
-    if isinstance(rates, dict):
-        for key, value in rates.items():
-            merged.setdefault(key, value)
-    return calc_tool_node(merged)
-
-
 cost_workflow_start_tool = tool("cost_workflow_start", parse_docstring=True)(cost_workflow_start)
 cost_workflow_node_tool = tool("cost_workflow_node", parse_docstring=True)(cost_workflow_node)
 cost_workflow_resume_tool = tool("cost_workflow_resume", parse_docstring=True)(cost_workflow_resume)
 cost_workflow_state_tool = tool("cost_workflow_state", parse_docstring=True)(cost_workflow_state)
-cost_calc_tool = tool("cost_calc", parse_docstring=True)(cost_calc)
 
 __all__ = [
-    "cost_calc",
-    "cost_calc_tool",
     "cost_workflow_node",
     "cost_workflow_node_tool",
     "cost_workflow_resume",

@@ -11,6 +11,7 @@ from .bill_match_engine import as_candidates as _as_candidates
 from .bill_match_engine import candidate_code as _candidate_code
 from .bill_match_engine import feature_gap_report, recall_candidates, select_from_candidates
 from .bill_match_engine import top_candidates as _top_candidates
+from .calc_engine import calc_check, calc_dispatch, calc_line_total, calc_rollup, calc_unit_price, calc_unit_rate, compute_cost
 from .mcp import call_mcp_tool
 from .price_engine import query_price, query_with_fallback
 from .quota_engine import fetch_quota_compose, rank_schemes
@@ -602,209 +603,34 @@ def fee_rate_lookup_node(payload: dict[str, Any]) -> dict[str, Any]:
     return {"node": "fee_rate_lookup", "status": "done" if tool_result.get("status") == "ok" else "blocked", "result": tool_result}
 
 
+# ---- 计算家族（能力 5）：全部单源迁至 calc_engine（2026-07-12），此处保留原节点名薄壳 ----
 def unit_price_node(payload: dict[str, Any]) -> dict[str, Any]:
-    components = payload.get("components")
-    if not isinstance(components, list):
-        return {
-            "node": "unit_price",
-            "status": "awaiting_input",
-            "message": "unit_price 节点只对显式 components 做确定性计算；不会从自然语言或不明字段里猜价格。",
-            "required_fields": ["components"],
-        }
-
-    total = 0.0
-    rows: list[dict[str, Any]] = []
-    for component in components:
-        if not isinstance(component, dict):
-            continue
-        quantity = component.get("quantity", 1)
-        unit_price = component.get("unit_price", component.get("price"))
-        if not isinstance(quantity, (int, float)) or not isinstance(unit_price, (int, float)):
-            rows.append({"component": component, "status": "skipped", "reason": "missing numeric quantity/unit_price"})
-            continue
-        amount = float(quantity) * float(unit_price)
-        total += amount
-        rows.append({"component": component, "status": "computed", "amount": amount})
-    return {
-        "node": "unit_price",
-        "status": "done",
-        "amount": total,
-        "rows": rows,
-    }
+    return calc_unit_price(payload)
 
 
 def unit_rate_node(payload: dict[str, Any]) -> dict[str, Any]:
-    """综合单价确定性计算（GB 50500 口径：人材机费 + 企业管理费 + 利润 + 风险）。
-
-    功能：按类汇总工料机（含量×单价）得人工/材料/机械费 → 人材机费；再按传入费率叠加管理费/利润/
-        风险，得综合单价。**LLM 不参与计算**：components 与费率均来自工具取数/传入，本函数只做算术，
-        并输出逐步 breakdown（每项算式+金额，可审计、供前端展示）。
-    参数：payload —— components（工料机：category ∈ 人工/材料/机械，consumption 或 quantity，
-        unit_price 或 price）；management_rate / profit_rate / risk_rate（费率，应来自 fee_rate 库，
-        缺省 0）；rate_basis（费率基数口径，默认 rmm=人材机费）。
-    返回：status=done + unit_price（综合单价）+ 各分项费 + breakdown（逐步计算过程行）。
-    """
-    components = payload.get("components")
-    if not isinstance(components, list):
-        return {
-            "node": "unit_rate",
-            "status": "awaiting_input",
-            "message": "unit_rate 只对显式 components 做确定性计算；不会从自然语言或不明字段里猜数。",
-            "required_fields": ["components"],
-        }
-
-    totals = {"人工": 0.0, "材料": 0.0, "机械": 0.0, "其他": 0.0}
-    component_rows: list[dict[str, Any]] = []
-    for component in components:
-        if not isinstance(component, dict):
-            continue
-        category = component.get("category")
-        quantity = component.get("consumption", component.get("quantity"))
-        unit_price = component.get("unit_price", component.get("price"))
-        if not isinstance(quantity, (int, float)) or not isinstance(unit_price, (int, float)):
-            component_rows.append({"name": component.get("name"), "category": category, "status": "skipped", "reason": "缺 consumption/unit_price 数值"})
-            continue
-        amount = round(float(quantity) * float(unit_price), 2)
-        totals[category if category in totals else "其他"] += amount
-        component_rows.append({"name": component.get("name"), "category": category, "formula": f"{quantity}×{unit_price}", "amount": amount})
-
-    labor = round(totals["人工"], 2)
-    material = round(totals["材料"], 2)
-    machine = round(totals["机械"], 2)
-    other = round(totals["其他"], 2)
-    rmm = round(labor + material + machine + other, 2)  # 人材机费（费率基数）
-
-    management_rate = float(payload.get("management_rate") or 0)
-    profit_rate = float(payload.get("profit_rate") or 0)
-    risk_rate = float(payload.get("risk_rate") or 0)
-    management_fee = round(rmm * management_rate, 2)
-    profit = round(rmm * profit_rate, 2)
-    risk_fee = round(rmm * risk_rate, 2)
-    unit_price = round(rmm + management_fee + profit + risk_fee, 2)
-
-    # 逐步计算过程（供前端 ChainOfThoughtStep / present_files 展示，可审计）
-    breakdown = [
-        {"item": "人工费", "formula": "Σ人工(含量×单价)", "amount": labor},
-        {"item": "材料费", "formula": "Σ材料(含量×单价)", "amount": material},
-        {"item": "机械费", "formula": "Σ机械(含量×单价)", "amount": machine},
-    ]
-    if other:
-        breakdown.append({"item": "其他费", "formula": "Σ其他(含量×单价)", "amount": other})
-    breakdown.append({"item": "人材机费", "formula": "人工费+材料费+机械费" + ("+其他费" if other else ""), "amount": rmm})
-    breakdown.append({"item": "企业管理费", "formula": f"人材机费×{management_rate:.2%}", "rate": management_rate, "amount": management_fee})
-    breakdown.append({"item": "利润", "formula": f"人材机费×{profit_rate:.2%}", "rate": profit_rate, "amount": profit})
-    if risk_rate:
-        breakdown.append({"item": "风险费", "formula": f"人材机费×{risk_rate:.2%}", "rate": risk_rate, "amount": risk_fee})
-    breakdown.append({"item": "综合单价", "formula": "人材机费+管理费+利润" + ("+风险费" if risk_rate else ""), "amount": unit_price})
-
-    return {
-        "node": "unit_rate",
-        "status": "done",
-        "unit_price": unit_price,
-        "labor_cost": labor,
-        "material_cost": material,
-        "machine_cost": machine,
-        "rmm_cost": rmm,
-        "management_fee": management_fee,
-        "profit": profit,
-        "risk_fee": risk_fee,
-        "component_rows": component_rows,
-        "breakdown": breakdown,
-        "rate_provenance": {"basis": "rmm", "note": "管理费率/利润率/风险率应来自 fee_rate 库，非 LLM 编造"},
-    }
+    return calc_unit_rate(payload)
 
 
 def line_total_node(payload: dict[str, Any]) -> dict[str, Any]:
-    """清单合价确定性计算：综合单价 × 工程量。
+    return calc_line_total(payload)
 
-    功能：单条清单合价，纯算术并产 breakdown。LLM 不算钱：unit_price 与 quantity 均为显式数值。
-    参数：payload —— unit_price（综合单价）、quantity（工程量）。
-    返回：status=done + amount（合价）+ breakdown；缺数值则 awaiting_input。
+
+def rollup_node(payload: dict[str, Any]) -> dict[str, Any]:
+    return calc_rollup(payload)
+
+
+def check_node(payload: dict[str, Any]) -> dict[str, Any]:
+    return calc_check(payload)
+
+
+def calc_tool_node(payload: dict[str, Any]) -> dict[str, Any]:
+    """Tool-backed calculation entry point (calc_engine.calc_dispatch 薄壳)。
+
+    The calc business step is intentionally split from the concrete calculation
+    operation so future agent/LLM strategies can target one stable entry point.
     """
-    unit_price = payload.get("unit_price")
-    quantity = payload.get("quantity")
-    if not isinstance(unit_price, (int, float)) or not isinstance(quantity, (int, float)):
-        return {
-            "node": "line_total",
-            "status": "awaiting_input",
-            "message": "line_total 需要综合单价与工程量两个显式数值。",
-            "required_fields": ["unit_price", "quantity"],
-        }
-    amount = round(float(unit_price) * float(quantity), 2)
-    return {
-        "node": "line_total",
-        "status": "done",
-        "amount": amount,
-        "unit_price": float(unit_price),
-        "quantity": float(quantity),
-        "breakdown": [{"item": "清单合价", "formula": f"综合单价 {unit_price} × 工程量 {quantity}", "amount": amount}],
-    }
-
-
-# 单条清单确定性计算链（有序，越后层级越高）；target-driven 求解算到目标层即停
-_CALC_CHAIN = ["unit_rate", "line_total"]
-
-
-def compute_cost(payload: dict[str, Any]) -> dict[str, Any]:
-    """target-driven 造价计算引擎：按依赖链算到 target，产沿途合并 breakdown（随时可调）。
-
-    功能：给定 target（综合单价 unit_rate / 清单合价 line_total）与已有数据，从底层沿确定性计算链
-        算到 target 即停；前置数据若已在 payload（如直接给了 unit_price）则跳过对应步。所有步只做
-        确定性算术，合并输出逐步 breakdown。与"何时触发"解耦——末尾 settle（深 target）或中途/单点
-        （浅 target）都调本引擎，数据来自请求或调用方从 workflow state 读取后传入。LLM 不算钱。
-    参数：payload —— target（默认 line_total）；components/管理费率等（算综合单价用）；
-        unit_price/quantity（算合价用，unit_price 缺则由 unit_rate 层算出）。
-    返回：status=done + 目标数值 + breakdown（沿途所有步）+ steps（实际执行的层）；
-        某层缺输入则透传该层 awaiting_input。
-    """
-    target = payload.get("target") or "line_total"
-    if target not in _CALC_CHAIN:
-        # 目标层无内置确定性公式（如 grand_total / 非标口径）→ capability_gap：
-        # 停下让用户描述计算规则，由 lead_agent 的模型按规则试算后 resume（标注需人工复核）。
-        return {
-            "node": "compute",
-            "status": "awaiting_input",
-            "target": target,
-            "interrupt": _capability_gate(
-                "compute",
-                f"目标「{target}」无内置确定性计算公式（当前确定性链：{' → '.join(_CALC_CHAIN)}）；"
-                "请描述该计算规则（基数、系数、来源），将交模型按规则试算并标注「需人工复核、非定稿」。",
-                detail={"requested_target": target, "supported_targets": _CALC_CHAIN},
-            ),
-        }
-
-    state = dict(payload)
-    breakdown: list[dict[str, Any]] = []
-    steps: list[str] = []
-    target_idx = _CALC_CHAIN.index(target)
-
-    # 层 0：综合单价（未直接给 unit_price 才算）
-    if target_idx >= _CALC_CHAIN.index("unit_rate") and not isinstance(state.get("unit_price"), (int, float)):
-        unit_rate = unit_rate_node(state)
-        if unit_rate.get("status") != "done":
-            return unit_rate
-        state["unit_price"] = unit_rate["unit_price"]
-        breakdown += unit_rate.get("breakdown", [])
-        steps.append("unit_rate")
-    if target == "unit_rate":
-        return {"node": "compute", "target": target, "status": "done", "unit_price": state.get("unit_price"), "breakdown": breakdown, "steps": steps}
-
-    # 层 1：清单合价
-    line_total = line_total_node(state)
-    if line_total.get("status") != "done":
-        return line_total
-    breakdown += line_total.get("breakdown", [])
-    steps.append("line_total")
-    return {
-        "node": "compute",
-        "target": "line_total",
-        "status": "done",
-        "unit_price": line_total["unit_price"],
-        "quantity": line_total["quantity"],
-        "total_price": line_total["amount"],
-        "breakdown": breakdown,
-        "steps": steps,
-    }
+    return calc_dispatch(payload)
 
 
 def _components_from_quotas(quotas: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -830,87 +656,6 @@ def _components_from_quotas(quotas: list[dict[str, Any]]) -> list[dict[str, Any]
                     }
                 )
     return components
-
-
-def rollup_node(payload: dict[str, Any]) -> dict[str, Any]:
-    items = payload.get("items")
-    if not isinstance(items, list):
-        return {"node": "rollup", "status": "awaiting_input", "required_fields": ["items"]}
-    total = 0.0
-    rows: list[dict[str, Any]] = []
-    for item in items:
-        if not isinstance(item, dict):
-            continue
-        value = item.get("amount", item.get("total"))
-        if not isinstance(value, (int, float)):
-            rows.append({"item": item, "status": "skipped", "reason": "missing numeric amount"})
-            continue
-        total += float(value)
-        rows.append({"item": item, "status": "included", "amount": float(value)})
-    return {"node": "rollup", "status": "done", "amount": total, "rows": rows}
-
-
-def check_node(payload: dict[str, Any]) -> dict[str, Any]:
-    items = payload.get("items") or payload.get("boq") or []
-    if not isinstance(items, list):
-        return {"node": "check", "status": "awaiting_input", "required_fields": ["items"]}
-
-    issues: list[dict[str, Any]] = []
-    for index, item in enumerate(items):
-        if not isinstance(item, dict):
-            issues.append({"index": index, "severity": "error", "message": "item must be an object"})
-            continue
-        code = item.get("code")
-        if not isinstance(code, str) or len(code.strip()) not in {9, 12}:
-            issues.append({"index": index, "severity": "error", "message": "missing or invalid bill code"})
-        if not item.get("name"):
-            issues.append({"index": index, "severity": "warn", "message": "missing item name"})
-        if not item.get("unit"):
-            issues.append({"index": index, "severity": "warn", "message": "missing unit"})
-    return {
-        "node": "check",
-        "status": "done",
-        "verdict": "reject" if any(issue["severity"] == "error" for issue in issues) else "pass",
-        "issues": issues,
-    }
-
-
-def calc_tool_node(payload: dict[str, Any]) -> dict[str, Any]:
-    """Tool-backed calculation entry point.
-
-    The calc business step is intentionally split from the concrete calculation
-    operation so future agent/LLM strategies can target one stable entry point.
-    """
-    # target-driven 计算引擎：带 target 则按依赖链算到目标层（unit_rate/line_total），产沿途 breakdown
-    if payload.get("target"):
-        return compute_cost(payload)
-
-    operation = payload.get("operation") or payload.get("subnode") or payload.get("node")
-    if not isinstance(operation, str) or not operation.strip():
-        return {
-            "node": "calc",
-            "status": "awaiting_input",
-            "required_fields": ["operation"],
-            "supported_operations": ["unit_price", "unit_rate", "line_total", "rollup", "check"],
-        }
-
-    normalized_operation = operation.strip()
-    if normalized_operation not in {"unit_price", "unit_rate", "line_total", "rollup", "check"}:
-        # 落在已实现确定性公式之外（如"整体项目成本"无对应公式）→ 停下交人工确认口径/规则，
-        # 而非静默返回不支持（capability_gap 型 HITL）。
-        return {
-            "node": "calc",
-            "status": "awaiting_input",
-            "operation": normalized_operation,
-            "interrupt": _capability_gate(
-                "calc",
-                f"当前 calc 仅内置 unit_price / unit_rate / line_total / rollup / check 五类确定性公式，无「{normalized_operation}」对应公式；"
-                "这类超出计算范围的场景需人工确认口径或提供计算规则。",
-                detail={"requested_operation": normalized_operation, "supported_operations": ["unit_price", "unit_rate", "line_total", "rollup", "check"]},
-            ),
-            "supported_operations": ["unit_price", "unit_rate", "line_total", "rollup", "check"],
-        }
-    return run_node(normalized_operation, payload)
 
 
 def calc_agent_node(payload: dict[str, Any]) -> dict[str, Any]:

@@ -96,6 +96,13 @@ def cost_workflow_state(task_id: str) -> dict[str, Any]:
 def cost_calc(
     target: str | None = None,
     operation: str | None = None,
+    components: list[dict[str, Any]] | None = None,
+    unit_price: float | None = None,
+    quantity: float | None = None,
+    items: list[dict[str, Any]] | None = None,
+    management_rate: float | None = None,
+    profit_rate: float | None = None,
+    risk_rate: float | None = None,
     payload: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Run a single deterministic construction-cost calculation (LLM never does math).
@@ -104,7 +111,8 @@ def cost_calc(
     such as 综合单价 (unit rate), 清单合价 (line total), 汇总 (rollup), or a
     完整性检查 (check) — without starting the stateful workflow. Formulas come
     from built-in calculation rules; unsupported targets pause for human rules
-    instead of guessing.
+    instead of guessing. When no fee rates are given the result is flagged
+    rates_missing (综合单价 degenerates to 人材机费) — relay that caveat.
 
     Args:
         target: Calculation target for chained computation, unit_rate (综合单价)
@@ -112,18 +120,32 @@ def cost_calc(
             automatically and returns a step-by-step breakdown.
         operation: Single-step operation, one of unit_price, unit_rate,
             line_total, rollup, check. Ignored when target is given.
-        payload: Input data object. unit_rate 需要 components（工料机行，每行
-            category/consumption/unit_price）与费率（management_rate/profit_rate/
-            risk_rate，或打包成 rates 块）；line_total 需要 unit_price 与 quantity
-            （unit_price 缺省时由 components 先算）；rollup 需要 items（每行含
-            amount）；check 需要 items（待校验清单行）。
+        components: 工料机行 for unit_rate/unit_price, each with category
+            (人工/材料/机械), consumption (or quantity), and unit_price (or price).
+        unit_price: 综合单价 for line_total. Omit to compute it from components first.
+        quantity: 工程量 for line_total.
+        items: Rows for rollup (each with amount) or check (bill items to validate).
+        management_rate: 企业管理费率 as a decimal, e.g. 0.1. Should come from
+            fee_rate_lookup or the user, never invented.
+        profit_rate: 利润率 as a decimal.
+        risk_rate: 风险费率 as a decimal.
+        payload: Extra input fields not covered by the explicit args (merged in,
+            explicit args win).
     """
     merged = dict(payload or {})
-    if target:
-        merged["target"] = target
-    if operation:
-        merged["operation"] = operation
-    # 兼容 rates 块写法（与 verify_cost 入参同形）：展平到顶层供 unit_rate_node 读取，已有顶层键不覆盖。
+    explicit = {
+        "target": target,
+        "operation": operation,
+        "components": components,
+        "unit_price": unit_price,
+        "quantity": quantity,
+        "items": items,
+        "management_rate": management_rate,
+        "profit_rate": profit_rate,
+        "risk_rate": risk_rate,
+    }
+    merged.update({k: v for k, v in explicit.items() if v is not None})
+    # 兼容 rates 块写法（与 verify_cost 入参同形）：展平到顶层供 unit_rate 读取，已有顶层键不覆盖。
     rates = merged.pop("rates", None)
     if isinstance(rates, dict):
         for key, value in rates.items():

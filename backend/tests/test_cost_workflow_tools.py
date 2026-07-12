@@ -190,7 +190,12 @@ def test_workflow_routes_business_steps_through_registry(monkeypatch):
     assert result["items"][0]["price_compose"]["node"] == "price_compose"
     assert calls[1][0] == "quota_compose"
 
-    # 单方案自动降级后新增 price_review 步（无 no_source 料 → 直接 done，不调 MCP）
+    # select_quota 显式一步（workflow 打薄后 post 旁路已删）：无多方案 → 节点自动 done，不落闸
+    result = workflow_module._workflow_step(result)
+    assert result["items"][0]["quota_selection"]["status"] == "done"
+    assert result["items"][0]["quota_selection"]["selection_source"] == "auto_single_scheme"
+
+    # price_review 步（无 no_source 料 → 直接 done，不调 MCP）
     result = workflow_module._workflow_step(result)
     assert result["items"][0]["price_review"]["status"] == "done"
 

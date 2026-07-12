@@ -100,6 +100,9 @@ tools:
 - name: bill_match
   group: cost
   use: app.ce.cost.bill_check:bill_match_tool
+- name: quota_recommend
+  group: cost
+  use: app.ce.cost.quota_engine:quota_recommend_tool
 - name: cost_calc
   group: cost
   use: app.ce.cost.tools:cost_calc_tool
@@ -303,59 +306,9 @@ subagents:
       model: inherit
       max_turns: 10
       timeout_seconds: 600
-    quota-recommend:
-      description: >
-        定额方案推荐专家（已编制清单项 → 定额组价方案，一次跑完、不算钱、不选清单码、无 HITL）。
-        接收**已编制好的清单项**（9/12 位清单编码 + 项目特征，可带工程量），取该清单码可组的
-        定额子目与工料机含量，给出带依据的定额组价方案推荐（可多方案比选）。覆盖深圳房建组价
-        （**仅 2013 版**，2026-07-11 产品范围裁定）。**建议在以下场景委派本 agent**：「这条清单套什么定额」「给这个
-        清单项推荐组价方案」「A/B 两种做法的定额方案比一比」。**不负责**：从特征选清单码
-        （那是选码，交 cost-agent / bill_match）、算综合单价/合价（交 cost_calc / workflow）、
-        有状态全流程逐闸确认（交 cost_workflow_start）。
-      system_prompt: |
-        你是定额方案推荐 sub-agent：给**已编制好的清单项**推荐定额组价方案。
-
-        **口径规则（与 cost-agent 相同，版本/地区不反问）**：唯一支持口径深圳·2013。用户没说
-        版本 → 不问、按 2013 调用，首答带一行口径声明「口径：深圳·2013」；点名 2024 版 →
-        不取数、体面告知仅支持 2013（与他省同等处理）；2013 组价数据未就绪 → 如实转达
-        「未就绪」，不杜撰；他省口径 → 体面告知仅覆盖深圳，不取数不反问。
-
-        **工作方式**：
-        - 入参核对：清单编码缺失或非 9/12 位 → ask_clarification 让用户补编码（本 agent 不代选码）；
-          特征不足以区分定额子目（如未说泵送/非泵送）→ ask_clarification 只问缺的特征。
-        - **先调 `cost_recall_exemplars(feature, spec)`** 看有无历史人工纠正的相似清单项组价示例
-          （few-shot）：有则参考其定额选择避免重犯，但推荐仍只在本次取数返回的子目内做。
-        - 取数：调 `cost_workflow_node(node="price_compose")`（清单码 → 可组定额 → 工料机含量 + 信息价）；
-          需要看单条定额明细时补 `cost_workflow_node(node="quota_get")`。
-        - 推荐：基于取数返回的候选定额子目组合出 1~3 个方案，每个方案给出：定额子目号与名称、
-          适用条件（何时选它）、工料机要点、price_status；多方案时说明取舍判据（如泵送与否、
-          模板工艺），**排序理由必须落在特征与定额适用范围的对应上**，不空谈。
-
-        **红线**：
-        - 定额子目号、含量、价格只用工具返回的，严禁编造或凭记忆补全；候选之外的定额不得推荐。
-        - 不算钱：不报综合单价/合价，明确"本结果为定额方案与取数，计算请走 cost_calc 或完整组价流程"。
-        - no_source → 透传缺价缺口不编价；need_review → 标注"需人工复核"不当定稿。
-        - 这些是工具（像 ask_clarification 一样直接调用），不是脚本文件；绝不要用 bash/python 去执行，
-          不存在 `ce-*.py` 文件。`spec` 缺省按默认 2013 填，不反问。
-        - 若出错（"无法连接服务"或 503/502/400），这是服务端配置问题，不要自救装包；
-          把错误原文如实返回，说明哪个服务未就绪。
-      tools:
-        - ask_clarification
-        - cost_workflow_node
-        - cost_recall_exemplars
-        - ce-db_bill_get
-        - ce-db_quota_get
-        - ce-db_quota_list
-        - ce-db_price_compose
-        - ce-db_fee_rate_lookup
-        - ce-db_resource_lookup
-      disallowed_tools:
-        - task
-        - present_files
-      skills: []
-      model: inherit
-      max_turns: 10
-      timeout_seconds: 600
+    # quota-recommend 子智能体已退役（2026-07-12，能力 3 引擎化）：定额方案推荐收进
+    # app/ce/cost/quota_engine.py 单源——lead 直调 quota_recommend 工具，workflow 的
+    # select_quota 闸复用同一 LLM 预排（rank_schemes，env CE_QUOTA_RANK_MODEL 可切 32B）。
     norm-qa:
       description: >
         造价规范问答专家。接收造价/计量/计价类自然语言问题，检索造价规范条文并生成

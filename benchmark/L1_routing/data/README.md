@@ -81,7 +81,7 @@
 ### `expect_route` — 是否应调能力（布尔）
 
 判定口径：agent 的工具调用序列命中 `ROUTE_TOOL_NAMES`（`cost_workflow_start/node/resume/state`、
-`bill_match`、`cost_calc`、`task`，见 `../run_routing_experiment.py`）即 `did_route=true`。
+`bill_match`、`quota_recommend`、`cost_calc`、`task`，见 `../run_routing_experiment.py`）即 `did_route=true`。
 `out_of_scope`/`out_of_domain` 用例为 `false`（正确行为是拒答/告知，调了取数工具反而违规）。
 
 ### `expect_clarify` — 是否应先反问（布尔）

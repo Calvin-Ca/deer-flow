@@ -9,10 +9,11 @@ from typing import Any, Literal
 from .bill_match_engine import AUTO_SELECT_MARGIN, AUTO_SELECT_THRESHOLD
 from .bill_match_engine import as_candidates as _as_candidates
 from .bill_match_engine import candidate_code as _candidate_code
-from .bill_match_engine import candidate_score as _score
 from .bill_match_engine import feature_gap_report, recall_candidates, select_from_candidates
 from .bill_match_engine import top_candidates as _top_candidates
 from .mcp import call_mcp_tool
+from .quota_engine import extract_quota_schemes, fetch_quota_compose, rank_schemes
+from .quota_engine import scheme_id as _scheme_id
 from .state import CostNodeName, normalize_region, normalize_spec, unsupported_spec_error
 
 CostExecutionStrategy = Literal["agent", "tool", "llm"]
@@ -89,38 +90,8 @@ def _capability_gate(node: str, question: str, *, detail: dict[str, Any] | None 
     return gate
 
 
-def _scheme_id(scheme: dict[str, Any]) -> str | None:
-    """从定额方案候选里取稳定标识（scheme_id / id / code 任一）。
-
-    功能：为 select_quota 的方案候选提供可回传的选择键。
-    参数：scheme 单个定额方案候选 dict。
-    返回：方案标识字符串；无则 None。
-    """
-    for key in ("scheme_id", "id", "code"):
-        value = scheme.get(key)
-        if isinstance(value, str) and value.strip():
-            return value.strip()
-    return None
-
-
-def extract_quota_schemes(price_compose_result: dict[str, Any]) -> list[dict[str, Any]]:
-    """从 price_compose 返回里提取可替代定额方案列表（供 select_quota 选一套）。
-
-    功能：适配服务端 ce-db_price_compose 的多方案返回；未返回多方案时给空列表，
-        触发单方案降级（不 HITL）。
-    参数：price_compose_result price_compose_node 的返回 dict。
-    返回：方案候选 dict 列表；无多方案时为空列表。
-    """
-    if not isinstance(price_compose_result, dict):
-        return []
-    inner = price_compose_result.get("result")
-    if not isinstance(inner, dict):
-        return []
-    for key in ("schemes", "options", "plans", "alternatives"):
-        raw = inner.get(key)
-        if isinstance(raw, list):
-            return [scheme for scheme in raw if isinstance(scheme, dict)]
-    return []
+# _scheme_id / extract_quota_schemes 已单源迁至 quota_engine（2026-07-12，能力 3 引擎化）；
+# 本模块顶部 import 并保留原名供 workflow.py 继续从 nodes 导入（契约不变）。
 
 
 def bill_match_node(payload: dict[str, Any]) -> dict[str, Any]:
@@ -301,35 +272,28 @@ def select_quota_node(payload: dict[str, Any]) -> dict[str, Any]:
             "selection_source": "auto_single_scheme",
         }
 
-    threshold = float(payload.get("auto_select_threshold") or AUTO_SELECT_THRESHOLD)
-    margin = float(payload.get("auto_select_margin") or AUTO_SELECT_MARGIN)
-    sorted_schemes = sorted(schemes, key=lambda scheme: _score(scheme) or -1.0, reverse=True)
-    top = sorted_schemes[0]
-    top_score = _score(top)
-    second_score = _score(sorted_schemes[1]) if len(sorted_schemes) > 1 else None
-    enough_margin = second_score is None or (top_score is not None and top_score - second_score >= margin)
-
-    if top_score is not None and top_score >= threshold and enough_margin:
-        return {
-            "node": "select_quota",
-            "status": "done",
-            "selected_scheme": top,
-            "selected_scheme_id": _scheme_id(top),
-            "selection_source": "auto_confident_scheme",
-            "confidence": top_score,
-        }
-
-    return {
+    # 多方案一律落 review 闸（方案取舍是审批级动作，不做门限自动选——此前的相似度门限对
+    # schemes 无 score 时恒不生效，2026-07-12 写实删除）。引擎的 LLM 预排（能力 3 单源，
+    # 与 lead 的 quota_recommend 工具同一 rank_schemes）结果附进闸载荷当「系统建议」，
+    # fail-open：模型不可用则裸候选照常落闸。
+    recommendation = rank_schemes(str(payload.get("feature") or payload.get("description") or ""), schemes)
+    gate = _review_gate(
+        "select_quota",
+        _top_candidates(schemes),
+        "该清单码存在多套可替代定额方案，请选择一套，或自行输入方案（可选填理由）。",
+        required_fields=["selected_scheme"],
+    )
+    if recommendation:
+        gate["recommendation"] = recommendation
+    result = {
         "node": "select_quota",
         "status": "awaiting_input",
-        "candidates": _top_candidates(sorted_schemes),
-        "interrupt": _review_gate(
-            "select_quota",
-            _top_candidates(sorted_schemes),
-            "该清单码存在多套可替代定额方案，请选择一套，或自行输入方案（可选填理由）。",
-            required_fields=["selected_scheme"],
-        ),
+        "candidates": _top_candidates(schemes),
+        "interrupt": gate,
     }
+    if recommendation:
+        result["recommendation"] = recommendation
+    return result
 
 
 def price_compose_node(payload: dict[str, Any]) -> dict[str, Any]:
@@ -346,28 +310,29 @@ def price_compose_node(payload: dict[str, Any]) -> dict[str, Any]:
             },
         }
 
-    arguments = _payload_without_none(
-        {
-            "code": code.strip(),
-            "spec": normalize_spec(payload.get("spec")),
-            "region": normalize_region(payload.get("region")),
-            "on_date": payload.get("on_date"),
-        }
+    # 取数走能力 3 引擎（spec 口径闸内置：2024 → unsupported_spec 直接透传）。
+    fetched = fetch_quota_compose(
+        code.strip(),
+        spec=payload.get("spec"),
+        region=payload.get("region"),
+        on_date=payload.get("on_date"),
+        call_tool=call_mcp_tool,
     )
-    tool_result = call_mcp_tool("ce-db_price_compose", arguments)
-    if tool_result.get("status") != "ok":
+    if fetched["status"] == "unsupported_spec":
+        return {"node": "price_compose", **fetched}
+    if fetched["status"] != "ok":
         return {
             "node": "price_compose",
             "status": "blocked",
-            "error": tool_result,
+            "error": fetched.get("error"),
         }
     return {
         "node": "price_compose",
         "status": "done",
-        "result": tool_result.get("result"),
+        "result": fetched.get("result"),
         "provenance": {
             "source": "ce-db_price_compose",
-            "arguments": arguments,
+            "arguments": fetched.get("arguments"),
         },
     }
 
@@ -390,6 +355,9 @@ def quota_compose_llm_node(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def bill_get_node(payload: dict[str, Any]) -> dict[str, Any]:
+    spec_err = unsupported_spec_error(payload.get("spec"))
+    if spec_err:
+        return {"node": "bill_get", **spec_err}
     code = payload.get("code") or payload.get("selected_code")
     if not isinstance(code, str) or not code.strip():
         return {"node": "bill_get", "status": "awaiting_input", "required_fields": ["code"]}

@@ -16,7 +16,7 @@
 
 判法（`run_routing_experiment.py`，进程内嵌入式 DeerFlowClient）：agent 跑完后翻它的**工具调用
 序列**——调用里有没有出现 `ROUTE_TOOL_NAMES` 集合内的名字（`cost_workflow_start/node/resume/state`、
-`bill_match`、`cost_calc`、`task`）→ 得出 `did_route`；有没有调 `ask_clarification` →
+`bill_match`、`quota_recommend`、`cost_calc`、`task`）→ 得出 `did_route`；有没有调 `ask_clarification` →
 得出 `did_clarify`。两个观测值对金标的 `expect_route`/`expect_clarify` 逐条判分（本地 Python
 判官，Langfuse 只当账本）。**不关心模型心里把意图分成哪类，只看手最终伸向了哪个工具。**
 

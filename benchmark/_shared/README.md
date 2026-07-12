@@ -36,7 +36,7 @@ uv run --project backend python benchmark/L1_routing/run_routing_experiment.py -
 
 自动算两率并把每条结果 + 分数挂到 Langfuse 的 dataset run：
 - `clarify_correct`：该反问就反问（命中 `ask_clarification`）——红线主判据；
-- `route_correct`：该调脚本就调（工具名命中 `ROUTE_TOOL_NAMES`：`cost_workflow_*` / `bill_match` / `cost_calc` / `task`）。
+- `route_correct`：该调脚本就调（工具名命中 `ROUTE_TOOL_NAMES`：`cost_workflow_*` / `bill_match` / `quota_recommend` / `cost_calc` / `task`）。
 
 > **判定是外部观测启发式**：路由是否发生靠匹配 agent 实际调的工具名是否在 `ROUTE_TOOL_NAMES`（**精确名集合、不用前缀**；见 `run_routing_experiment.py` 顶部常量）。跑首轮后照真实 trace 里 agent 的实际工具名回校该常量，再上量。
 >

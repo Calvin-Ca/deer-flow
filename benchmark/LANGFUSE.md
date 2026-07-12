@@ -84,7 +84,7 @@ trace_id = Langfuse.create_trace_id(seed=run_id)
 - `run_toolcall_experiment.py`：**工具调用**评测——逐条跑 agent，按 `arg_match`（exact/subset）比完整 tool_calls 与 `expected_call`，挂 `tool_correct` / `call_correct`。需四服务起齐。
 
 **判定口径**（对标 `L1_routing/README` 两率）：
-- `route_correct`：该调能力就调——按**工具名**判（`ROUTE_TOOL_NAMES`：`cost_workflow_*` / `bill_match` / `cost_calc` / `task`），bash/read_file 瞎折腾不算。
+- `route_correct`：该调能力就调——按**工具名**判（`ROUTE_TOOL_NAMES`：`cost_workflow_*` / `bill_match` / `quota_recommend` / `cost_calc` / `task`），bash/read_file 瞎折腾不算。
 - `clarify_correct`：该反问就反问——命中 `ask_clarification` 工具。
 
 ---

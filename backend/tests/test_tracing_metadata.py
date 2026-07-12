@@ -196,9 +196,19 @@ def test_resolve_active_prompt_variant_default_when_path_unset():
 def test_resolve_active_prompt_variant_uses_file_stem():
     from types import SimpleNamespace
 
-    config = SimpleNamespace(lead_agent=SimpleNamespace(system_prompt_path="prompts/v2_runbook_saturated.txt"))
+    # 变体标签 = 真实可解析文件的 stem（2026-07-11 起解析不到如实降级 default，不再冒充文件名）；
+    # 用版本库现役文件验证，路径解析与 cwd 无关（project_root→backend→仓库根 依次探测）。
+    config = SimpleNamespace(lead_agent=SimpleNamespace(system_prompt_path="benchmark/prompts/lead_agent_v2.md"))
 
-    assert tracing_metadata.resolve_active_prompt_variant(config) == "v2_runbook_saturated"
+    assert tracing_metadata.resolve_active_prompt_variant(config) == "lead_agent_v2"
+
+
+def test_resolve_active_prompt_variant_default_when_file_missing():
+    from types import SimpleNamespace
+
+    config = SimpleNamespace(lead_agent=SimpleNamespace(system_prompt_path="prompts/no_such_file.md"))
+
+    assert tracing_metadata.resolve_active_prompt_variant(config) == "default"
 
 
 def test_resolve_active_prompt_variant_default_when_global_config_unavailable(monkeypatch):

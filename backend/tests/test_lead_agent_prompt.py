@@ -38,8 +38,10 @@ def test_apply_prompt_template_uses_magent_as_default_identity(monkeypatch):
 
     prompt = prompt_module.apply_prompt_template()
 
-    assert "你是MAgent，建设工程造价领域的入口 agent" in prompt
-    assert "核心能力只有两类" in prompt
+    # 内置模板已恢复上游通用版（2026-07-11）：无 system_prompt_path 时默认身份是上游 MAgent，
+    # CE 内容一律走 config 指向的 benchmark/prompts/ 版本库，不在内置模板里。
+    assert "You are MAgent" in prompt
+    assert "组价" not in prompt and "造价" not in prompt
     assert "DeerFlow 2.0" not in prompt
 
 

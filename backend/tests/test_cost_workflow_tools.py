@@ -54,18 +54,26 @@ def test_bill_match_node_invokes_ce_rag_mcp(monkeypatch):
 
     monkeypatch.setattr(nodes, "call_mcp_tool", fake_call_mcp_tool)
 
-    result = nodes.bill_match_node({"description": "C30现浇钢筋混凝土矩形柱", "spec": "2024", "top_k": 3})
+    result = nodes.bill_match_node({"description": "C30现浇钢筋混凝土矩形柱", "spec": "2013", "top_k": 3})
 
     assert captured == {
         "name": "ce-rag_match_bill_item",
         "arguments": {
             "description": "C30现浇钢筋混凝土矩形柱",
-            "spec": "2024",
+            "spec": "2013",
             "top_k": 3,
         },
     }
     assert result["status"] == "done"
     assert result["candidates"][0]["code"] == "010502001"
+
+
+def test_bill_match_node_rejects_unsupported_spec(monkeypatch):
+    # 2024 已裁出产品范围（2026-07-12）：节点入口过 agent 面口径闸，不再透传给服务端。
+    monkeypatch.delenv("CE_COST_AGENT_SPECS", raising=False)
+    result = nodes.bill_match_node({"description": "矩形柱", "spec": "2024"})
+    assert result["status"] == "unsupported_spec"
+    assert "2013" in result["message"]
 
 
 def test_business_step_interfaces_expose_agent_tool_llm_slots():
@@ -150,7 +158,10 @@ def test_workflow_routes_business_steps_through_registry(monkeypatch):
             return {"node": "price_compose", "status": "done", "result": {"code": payload["code"]}}
         raise AssertionError(f"unexpected step: {step}")
 
-    monkeypatch.setattr(workflow_module, "run_business_step", fake_run_business_step)
+    # run_business_step 已随 workflow 打薄迁至 stages（2026-07-12）——正向 run 的业务在 stages 层。
+    from app.ce.cost import stages as stages_module
+
+    monkeypatch.setattr(stages_module, "run_business_step", fake_run_business_step)
 
     state = {
         "task_id": "cost-test",
@@ -403,6 +414,9 @@ def test_start_workflow_settle_capability_gap_resumes_with_model_estimate(monkey
     def fake_call_mcp_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
         if name == "ce-rag_match_bill_item":
             return {"status": "ok", "result": {"candidates": [{"code": "010502001", "name": "矩形柱", "score": 0.95}]}}
+        if name == "ce-db_bill_get":
+            # 自动选码后的特征缺口检查（best-effort）会查真值 schema
+            return {"status": "ok", "result": {"code": "010502001", "name": "矩形柱", "features": []}}
         if name == "ce-db_price_compose":
             return {
                 "status": "ok",
@@ -586,6 +600,8 @@ def test_start_workflow_pauses_for_price_review_and_resumes(monkeypatch):
     def fake_call_mcp_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
         if name == "ce-rag_match_bill_item":
             return {"status": "ok", "result": {"candidates": [{"code": "010502001", "name": "矩形柱", "score": 0.95}]}}
+        if name == "ce-db_bill_get":
+            return {"status": "ok", "result": {"code": "010502001", "name": "矩形柱", "features": []}}
         if name == "ce-db_price_compose":
             # 单方案（无 schemes）+ 一条 no_source 工料机 → 组价后停在询价
             return {
@@ -630,6 +646,8 @@ def test_start_workflow_pauses_for_quota_scheme_and_resumes(monkeypatch):
         if name == "ce-rag_match_bill_item":
             # 高置信单候选 → 自动选码，跳过 bill 复核，直达 quota 方案复核
             return {"status": "ok", "result": {"candidates": [{"code": "010502001", "name": "矩形柱", "score": 0.95}]}}
+        if name == "ce-db_bill_get":
+            return {"status": "ok", "result": {"code": "010502001", "name": "矩形柱", "features": []}}
         if name == "ce-db_price_compose":
             return {
                 "status": "ok",
@@ -644,6 +662,8 @@ def test_start_workflow_pauses_for_quota_scheme_and_resumes(monkeypatch):
         raise AssertionError(f"unexpected tool call: {name}")
 
     monkeypatch.setattr(nodes, "call_mcp_tool", fake_call_mcp_tool)
+    # 多方案闸的 LLM 预排打桩（fail-open 语义单测在 test_quota_engine；此处保持 e2e 密封无网络）
+    monkeypatch.setattr(nodes, "rank_schemes", lambda feature, schemes: None)
 
     started = start_workflow(feature="C30现浇钢筋混凝土矩形柱", spec=None, region="深圳")
 

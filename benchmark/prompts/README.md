@@ -14,7 +14,7 @@ config.yaml 指向本目录某文件
 
 | 文件 | variant 标签 | 设计要点 | 状态 |
 |---|---|---|---|
-| `lead_agent_v1.md` | `lead_agent_v1` | capability 预分类（norm/cost/both）两跳路由；单点匹配/定额推荐直调 `bill_match`/`quota_recommend`，其余单点派 cost-agent 子智能体；详尽 subagent_dispatch 并行调度指南 | 线上现役基线 |
+| `lead_agent_v1.md` | `lead_agent_v1` | capability 预分类（norm/cost/both）两跳路由；单点四能力全部直调（`bill_match`/`quota_recommend`/`price_query`/`cost_calc`），批量循环直调；子智能体仅 norm-qa（隔离派）+ cost-critic（复核）；need_clarification 上抛转问 | 线上现役基线 |
 | `lead_agent_v2.md` | `lead_agent_v2` | 查表式单跳路由（诉求特征→动作）；单点匹配/定额推荐/计算直调 `bill_match`/`quota_recommend`/`cost_calc`；能力清单为旧五能力（待 v3 对齐现行六能力）；clarify/discipline 红线单列 | 评测 variant |
 | （无文件 / 解析失败） | `default` | harness 内置英文通用模板（`prompt.py:SYSTEM_PROMPT_TEMPLATE`，已恢复上游原版），无 CE 路由 | 回退兜底 |
 

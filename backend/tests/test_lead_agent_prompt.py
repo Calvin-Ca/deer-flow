@@ -524,14 +524,13 @@ def test_ce_override_renders_and_carries_subagent_dispatch(monkeypatch, tmp_path
     # 足以暴露本文件里的坏占位符 / 未转义花括号（subagent 大段本身的花括号安全是 harness 的事，非本 override）。
     prompt = prompt_module.apply_prompt_template(app_config=config, agent_name="CostBot")
 
-    assert "你是CostBot，建设工程造价领域的入口 agent" in prompt
+    assert "你是CostBot，深圳市房建专业智能组价助手" in prompt
     assert "<subagent_dispatch" in prompt
-    # 三类场景判据各留一处锚点，防回归被删。
-    assert "复合诉求并行拆分" in prompt
-    assert "批量独立构件" in prompt
+    # 场景判据各留一处锚点，防回归被删（2026-07-12 单点直调化后：隔离派 norm-qa + 直调工具面）。
     assert "上下文隔离" in prompt
-    # 边界红线：cost-agent 不发起有状态全流程。
-    assert "无 `cost_workflow_start` 权限" in prompt
+    assert "bill_match" in prompt and "quota_recommend" in prompt and "price_query" in prompt
+    # 断链修复锚点：子智能体缺信息走 need_clarification 上抛，lead 转问。
+    assert "need_clarification" in prompt
 
 
 def test_ce_v2_override_renders_with_routing_table(monkeypatch):

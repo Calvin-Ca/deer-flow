@@ -101,8 +101,8 @@
   裁定移除（2026-07-11）。
 - **生成**：`python data/gen_bill_match_routing.py`（幂等覆盖；金标增补后重跑扩容，勿与已跑基线混比）。
 - **分组**：`no_version` 60（默认深圳·2013 口径，反问=违例）/ `with_version` 18（问法带 2013）/
-  `code_check` 12（带真实金码问「对不对/特征有漏吗」，期望 `bill_match` 核实模式或 task 派
-  cost-agent）。全部 `expect_route=true`、`expect_clarify=false`。
+  `code_check` 12（带真实金码问「对不对/特征有漏吗」，期望 `bill_match` 核实模式）。
+  全部 `expect_route=true`、`expect_clarify=false`。
 - **与 `clist-match-eval` 的分工**：那边量**检索召回**（描述→金码命中率，L3 知识层）；这边只量
   **路由**（该调工具时真调了没，L1 编排层）——同一批真实特征，两层各测各的。
 

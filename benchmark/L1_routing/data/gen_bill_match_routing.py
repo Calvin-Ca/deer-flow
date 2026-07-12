@@ -17,7 +17,7 @@
 - 角色轮转（每 15 条：10 无版本选码 / 3 带版本选码 / 2 编码核实）：
   - 选码（agent=cost-agent）：group=no_version（默认深圳·2013 口径）/ with_version（问法带 2013）；
   - 核实（agent=cost-check，group=code_check）：问法带该行**真实金码**问「对不对/特征有漏吗」，
-    期望走 bill_match 核实模式（或 task 派 cost-agent，均计路由命中）。
+    期望走 bill_match 核实模式（把编码传 code 参数）。
 
 再生成：``python benchmark/L1_routing/data/gen_bill_match_routing.py``（幂等覆盖输出文件；
 金标增补后重跑即扩容，id 顺次后移，勿与已跑基线混比）。
@@ -109,7 +109,7 @@ def build_cases() -> list[dict]:
         else:
             query = _T_CODE_CHECK[k % len(_T_CODE_CHECK)].format(q=q, code=gold[0])
             agent, group = "cost-check", "code_check"
-            note = _note("match_gold_2013.jsonl", lineno_2013[q], gold, r.get("note", "")) + "；问句带真实金码，期望 bill_match 核实模式（或 task 派 cost-agent）"
+            note = _note("match_gold_2013.jsonl", lineno_2013[q], gold, r.get("note", "")) + "；问句带真实金码，期望 bill_match 核实模式"
         cases.append({"agent": agent, "group": group, "query": query, "note": note})
 
     out = []

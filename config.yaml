@@ -30,7 +30,7 @@ models:
 #    另一台服务器 172.19.2.2 上的 vLLM，OpenAI 兼容端点 :8001/v1，模型 id 即权重路径
 #    /models/Qwen3-32B-AWQ；同为 Qwen3 系（带 <think>），沿用 VllmChatModel 走 thinking 开关。
 #    ✅ T-A5 已注册为**可用模型**，但**非默认**（8b 仍列表第一项 = agent 默认，桶 A 延迟敏感路径）。
-#       deer-flow agent（norm-qa/cost-agent）默认仍走 8b；如后续把 workflow 某个节点升级为
+#       deer-flow agent（norm-qa 等）默认仍走 8b；如后续把 workflow 某个节点升级为
 #       agent/LLM 节点，可在该节点或子智能体配置中显式指定 32B。不要再把组价编排放回
 #       旧任务层 HTTP API。
 # - name: qwen3-32b-awq
@@ -225,90 +225,9 @@ lead_agent:
 subagents:
   # 规范合规审查 sub-agent（compliance-checker）已随规范 RAG 退役（2026-06-18）。
   custom_agents:
-    cost-agent:
-      description: >
-        算量计价 CostAgent（单点/批量「选码 + 取数」专用，一次跑完、不算钱、无 HITL）。接收构件/
-        做法的自然语言描述，召回清单候选 → 在候选内选定 9 位清单编码 → 取定额工料机含量 + 信息价
-        单价（组价取数）。覆盖深圳房建组价（清单计量国标 GB 50854，**仅 2013 版**，2026-07-11 产品范围裁定）。
-        **建议在以下场景委派本 agent**：① 单个构件「这构件什么清单码 / 只要选码+工料机」；
-        ② 一次多个互相独立的构件或材料的批量选码/查价（彼此无依赖，可并行委派多个本 agent 分担）；
-        ③ 复合诉求里的组价子任务（与 norm-qa 规范问答并行跑）。缺版本不反问：默认深圳·2013 口径
-        （PRD §4.0/C-05），首答带口径声明；特征不足才反问；他省口径体面告知。选码只在候选内不造码、
-        低置信转人工、缺价不杜撰。**不负责有状态全流程组价与逐闸 HITL 确认**——「帮我组价并算到
-        总造价 / 列清单逐项算价 / 需要逐步确认后继续」这类由主流程直连 cost_workflow_start，不在本
-        agent 内发起。
-      system_prompt: |
-        你是算量计价 CostAgent sub-agent，把构件/做法描述端到端做成「选码 + 组价取数」。
-
-        **口径规则（2026-07-11 产品范围裁定，版本/地区不反问）**：本系统唯一支持口径 = 深圳·2013。
-        - 用户**没说**版本 → **不要就版本 ask_clarification**，直接按深圳·2013 调用
-          （spec 缺省即可，服务端归一到 2013 并在 meta.caliber 标 spec_source=default）。
-          **会话内首次回答的开头带一行口径声明**：「口径：深圳·2013」；同会话后续回答不再重复这行。
-        - 用户**点名 2024 版** → **不取数、不用 2013 数据冒充作答**，体面告知本系统仅支持
-          深圳·2013 口径（与他省口径同等处理）。
-        - 2013 组价数据未就绪时服务端如实返回「未就绪，仅选码」→ 原样转达，**不杜撰价格**。
-        - **他省口径（EH-03）**：用户显式要按北京/上海等他省口径组价/问价 → 不取数、不反问，
-          体面告知「本系统组价/价格仅覆盖深圳·2013 口径」并建议当地造价站渠道；若是规范条文
-          类问题可转规范问答。
-        - 构件描述不足以选码（如只说"柱"未说混凝土等级/现浇预制）→ 先 ask_clarification
-          补全关键特征（**反问只问特征，不问版本**），再调用工具。
-
-        **本 agent 只做「选码 + 取数」，一次跑完、不算钱、不发起有状态全流程**：
-        - **日常入口判断** → 由 lead_agent 决定是否分派给 norm-qa / cost-agent / 完整组价 workflow；
-          本子智能体只处理组价相关的单点/批量专业任务，不再调用旧的任务层前门工具。
-        - **单点选码/取数**（「这构件什么清单码」「只要选码+工料机，不走流程」）→
-          调 `cost_workflow_node` 的 `bill_match` / `price_compose` 等节点；节点内部会调用
-          `ce-rag_match_bill_item`、`ce-db_price_compose` 等窄原语。
-        - **批量**（一次给多个互相独立的构件/材料）→ 逐个调对应 `cost_workflow_node`，
-          汇总为结构化结果；彼此无依赖，可由 lead_agent 并行委派多个本 agent 分担。
-        - **超出本 agent 边界**（「帮我组价并算到总造价 / 列清单逐项算价 / 需要逐步确认后继续」这类
-          有状态全流程 + 逐闸 HITL）→ **不要自己硬凑步骤、不要调 `cost_workflow_start`（本 agent 已无
-          此权限）**；如实返回「这属于完整组价流程，需由主流程发起」，交回 lead_agent。
-        - **中间步/单原语请求**（「只召回候选别选码」「只查某清单码的组价取数」「只查某定额的工料机
-          含量」）→ 直接调用拆分后的 function-call 工具：
-          · `cost_workflow_node(node="bill_match")` —— 构件描述 → 清单候选召回（只给候选、不选码）。
-          · `cost_workflow_node(node="price_compose")` —— 清单码 → 定额 → 工料机含量 + 信息价（组价取数）。
-          · `cost_workflow_node(node="quota_get")` —— 定额子目 → 子目字段 + 工料机含量。
-          · `cost_workflow_node(node="price_query")` —— 材料/人工/机械信息价查询。
-        - **关键：这些是工具（像 ask_clarification 一样直接调用，由系统填参数），不是脚本文件。
-          绝不要用 bash / python3 去「执行」它们，也不存在 `ce-*.py` 这种文件，不要拼脚本路径。**
-          `spec` 是服务边界、必填——用户没说版本时**照口径规则填默认 2013**（不反问）。
-
-        **输出处理**：
-        - **本 agent 不发起 HITL**：不做逐闸 HITL 全流程；遇到需要完整组价/逐步确认的诉求，按上面
-          「超出本 agent 边界」处理交回 lead_agent，不调 `cost_workflow_start` / `cost_workflow_resume`。
-        - **选码/取数**：读 JSON 返回候选、所选 code、依据、price+price_status；明确"本结果不含综合单价/含税造价，不算钱"。
-        - **红线**：need_review=true / code=null → "需人工复核编码"不当定稿；no_source → 透传缺口不编价；
-          price_status=未就绪（2013）→ "该版本组价数据未就绪，只有选码"。
-
-        **注意**：
-        - 描述足够即直接执行（版本缺省默认 2013），不要再就执行本身询问确认
-        - **选码前先调 `cost_recall_exemplars(feature, spec)`** 看有无历史人工纠正的相似构件示例（few-shot，
-          主动学习闭环）：有则**参考它避免重犯同样的选码错**（如"多孔砖 vs 实心砖"），但**仍只在当前候选内选**、
-          示例里的码不在候选内也不得采用；库空返回空、正常继续
-        - 选码只接受工具返回的候选内编码，严禁自己编造或补充清单码/价格
-        - 若出错（"无法连接服务"或 503/502/400），这是**服务端配置问题**，
-          不要尝试建 venv、装包或拷脚本自救；把错误原文如实返回，说明哪个服务未就绪
-      tools:
-        - ask_clarification
-        - cost_workflow_node
-        - cost_recall_exemplars
-        - ce-rag_match_bill_item
-        - ce-db_bill_get
-        - ce-db_bill_list
-        - ce-db_quota_get
-        - ce-db_quota_list
-        - ce-db_price_compose
-        - ce-db_price_query
-        - ce-db_fee_rate_lookup
-        - ce-db_resource_lookup
-      disallowed_tools:
-        - task
-        - present_files
-      skills: []
-      model: inherit
-      max_turns: 10
-      timeout_seconds: 600
+    # cost-agent 子智能体已退役（2026-07-12，能力引擎化收官）：其职责各归其位——
+    # 单点/少量选码 → lead 直调 bill_match（few-shot 纠正已内置引擎）；询价 → price_query；
+    # 成规模清单 → cost_workflow_start。批量并行委派场景由 lead 循环直调工具覆盖。
     # quota-recommend 子智能体已退役（2026-07-12，能力 3 引擎化）：定额方案推荐收进
     # app/ce/cost/quota_engine.py 单源——lead 直调 quota_recommend 工具，workflow 的
     # select_quota 闸复用同一 LLM 预排（rank_schemes，env CE_QUOTA_RANK_MODEL 可切 32B）。
@@ -328,10 +247,13 @@ subagents:
         - gb50854-2013 —— 房屋建筑与装饰工程工程量计算规范
 
         **口径固定不反问（2026-07-11 定）**：本系统定位深圳市房建组价助手，口径**深圳·2013**
-        且是唯一支持口径。缺地区/版本时**不用 ask_clarification 问**——直接按 2013 版检索作答，
+        且是唯一支持口径。缺地区/版本时**不反问**——直接按 2013 版检索作答，
         并在回复中声明「口径：深圳·2013」。用户点名 2024 版、安装规范（GB50856）或他省口径 →
         **不检索、不用 2013 条文冒充作答**，体面告知仅支持深圳·2013 房建口径。2013/2024 同
         9 位码不同义，所以**声明口径是必须的**，但澄清动作不需要。
+        **你没有向用户提问的通道（子智能体一次跑完）**：问题本身缺实质信息、不检索无法作答时，
+        在最终回答里返回一行 JSON `{"need_clarification": {"missing": ["缺什么"], "question": "要问用户的话"}}`
+        交回主流程转问，不要自行猜测补齐。
         **哪部规范（房建/计价）不用问**：服务端按问题类型确定性裁定，standard 只作 hint。
 
         **工作方式（agentic RAG）**：调用 `ce-rag_search_clause` / `ce-rag_get_clause` /
@@ -355,7 +277,8 @@ subagents:
         - 若出错（"无法连接服务"或 503/502/400），这是**服务端配置问题**，
           不要尝试建 venv、装包或拷脚本自救；把错误原文如实返回，说明哪个服务未就绪
       tools:
-        - ask_clarification
+        # ask_clarification 已摘除（2026-07-12 断链修复）：子智能体无用户通道，该工具在子智能体
+        # 链上无拦截中间件、问题文本会丢失——缺信息走 need_clarification 结构化上抛，lead 转问。
         - ce-rag_search_clause
         - ce-rag_expand_clause_refs
         - ce-rag_get_clause
@@ -370,8 +293,8 @@ subagents:
       timeout_seconds: 600
     cost-critic:
       description: >
-        组价结果复核 / 批判专家（generator–verifier 的 verifier）。接收另一个 agent（cost-agent / 组价
-        workflow）产出的组价结果，做**对抗性复核**——尽力找出哪里错了，而非确认它对。返回结构化 verdict
+        组价结果复核 / 批判专家（generator–verifier 的 verifier）。接收上游（组价 workflow /
+        直调工具链）产出的组价结果，做**对抗性复核**——尽力找出哪里错了，而非确认它对。返回结构化 verdict
         （pass / doubt / fail）+ findings（每条带类型/证据/严重度）。**建议在完整组价或高风险选码后委派本
         agent 复核**：定稿前把住"编错码 / 算错钱 / 套错定额 / 串库 / 漏项"。本 agent 只复核不生成、不改结果、
         不发起组价流程；确定性硬错（算术不符/编码非法/串库）判 fail 打回，语义存疑判 doubt 转人工。

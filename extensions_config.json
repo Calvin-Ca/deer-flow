@@ -52,9 +52,6 @@
     }
   },
   "skills": {
-    "cost-agent": {
-      "enabled": true
-    },
     "academic-paper-review": {
       "enabled": false
     },
@@ -117,6 +114,9 @@
     },
     "web-design-guidelines": {
       "enabled": false
+    },
+    "cost-workflow-guide": {
+      "enabled": true
     }
   }
 }

@@ -12,6 +12,7 @@ from .bill_match_engine import candidate_code as _candidate_code
 from .bill_match_engine import feature_gap_report, recall_candidates, select_from_candidates
 from .bill_match_engine import top_candidates as _top_candidates
 from .mcp import call_mcp_tool
+from .price_engine import query_price, query_with_fallback
 from .quota_engine import fetch_quota_compose, rank_schemes
 from .quota_engine import scheme_id as _scheme_id
 from .state import CostNodeName, normalize_region, normalize_spec, unsupported_spec_error
@@ -377,21 +378,21 @@ def price_query_node(payload: dict[str, Any]) -> dict[str, Any]:
     name = payload.get("name") or payload.get("material") or payload.get("query")
     if not isinstance(name, str) or not name.strip():
         return {"node": "price_query", "status": "awaiting_input", "required_fields": ["name"]}
-    tool_result = call_mcp_tool(
-        "ce-db_price_query",
-        _payload_without_none(
-            {
-                "name": name.strip(),
-                "region": normalize_region(payload.get("region")),
-                "period": payload.get("period"),
-                "category": payload.get("category"),
-                "top_k": int(payload.get("top_k") or 10),
-            }
-        ),
+    # 取数走能力 4 引擎（region 口径闸内置：他省 → unsupported_region 直接透传）。
+    queried = query_price(
+        name.strip(),
+        region=payload.get("region"),
+        period=payload.get("period"),
+        category=payload.get("category"),
+        top_k=int(payload.get("top_k") or 10),
+        call_tool=call_mcp_tool,
     )
-    if tool_result.get("status") != "ok":
-        return {"node": "price_query", "status": "blocked", "result": tool_result}
-    candidates = _as_candidates(tool_result.get("result"))
+    if queried["status"] == "unsupported_region":
+        return {"node": "price_query", **queried}
+    if queried["status"] == "blocked":
+        return {"node": "price_query", "status": "blocked", "result": queried.get("error")}
+    candidates = queried.get("candidates") or []
+    tool_result = {"result": queried.get("result")}
     # 多条价格候选 → 返回结构化 review 候选，由对话层/前端让用户选材料规格或自行输入。
     # 单步语义：不进 checkpoint、不可 resume（作用域：HITL 仅完整流程闭环）。
     if len(candidates) > 1:
@@ -450,26 +451,8 @@ def _collect_no_source_resources(quotas: list[dict[str, Any]]) -> list[dict[str,
     return missing
 
 
-def _heuristic_price_candidates(name: str | None, *, region: str | None, period: str | None, category: str | None = None) -> list[dict[str, Any]]:
-    """启发式询价：先精确/子串查价，miss 则近似料召回（和清单套定额同构的启发式）。
-
-    功能：对信息价未登录的料——① 先 ce-db_price_query 按名子串查（库里有近名料时直接命中）；
-        ② 子串 miss 时回退 ce-db_price_suggest 近似料召回（名称 n-gram 覆盖率 + 同类打分，
-        召回同类近似料的价做推荐）。两层都是「先做一个启发式」的询价方式；仍空则交人工干输。
-    参数：name —— 资源名；region/period —— 询价地区与期段；category —— 人材机类别（近似召回同类过滤）。
-    返回：候选价 dict 列表；两层都召回失败或无名返回空列表。
-    """
-    if not name:
-        return []
-    exact = call_mcp_tool("ce-db_price_query", _payload_without_none({"name": name, "region": region, "period": period, "top_k": 5}))
-    candidates = _as_candidates(exact.get("result")) if exact.get("status") == "ok" else []
-    if candidates:
-        return candidates
-    # 子串未命中 → 近似料启发式召回（信息价库无精确料时的推荐机制）
-    suggest = call_mcp_tool("ce-db_price_suggest", _payload_without_none({"name": name, "region": region, "category": category, "top_k": 5}))
-    if suggest.get("status") != "ok":
-        return []
-    return _as_candidates(suggest.get("result"))
+# 启发式询价（精确子串 miss → 近似料召回）已单源迁至 price_engine.query_with_fallback
+# （2026-07-12，能力 4 引擎化）；price_review_node 直接消费。
 
 
 def refine_price_candidates_reserved(missing: list[dict[str, Any]], *, region: str | None = None, period: str | None = None) -> list[dict[str, Any]]:
@@ -574,10 +557,10 @@ def price_review_node(payload: dict[str, Any]) -> dict[str, Any]:
         _apply_prices_to_quotas(quotas, priced)
         return {"node": "price_review", "status": "done", "priced": priced, "still_missing": remaining, "missing_count": len(remaining)}
 
-    # 初次：为每个缺价料启发式召回候选价（先精确查、miss 则近似料召回），停下询价
+    # 初次：为每个缺价料启发式召回候选价（先精确查、miss 则近似料召回，能力 4 引擎），停下询价
     for item in missing:
-        item["candidates"] = _heuristic_price_candidates(
-            item.get("name"), region=payload.get("region"), period=payload.get("period"), category=item.get("category")
+        item["candidates"] = query_with_fallback(
+            str(item.get("name") or ""), region=payload.get("region"), period=payload.get("period"), category=item.get("category"), top_k=5, call_tool=call_mcp_tool
         )
     return {
         "node": "price_review",

@@ -27,7 +27,7 @@ import httpx
 from dotenv import load_dotenv
 
 # 与 run_routing_experiment.py 同口径（lead 可见路由工具面）。
-ROUTE_TOOL_NAMES = {"cost_workflow_start", "cost_workflow_node", "cost_workflow_resume", "cost_workflow_state", "bill_match", "quota_recommend", "cost_calc", "task"}
+ROUTE_TOOL_NAMES = {"cost_workflow_start", "cost_workflow_node", "cost_workflow_resume", "cost_workflow_state", "bill_match", "quota_recommend", "price_query", "cost_calc", "task"}
 CLARIFY_TOOL = "ask_clarification"
 
 

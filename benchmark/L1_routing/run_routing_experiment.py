@@ -44,6 +44,7 @@ DATASET_NAME = "user-requests-routing"  # 路由主池（78 条，仅深圳·201
 #   · norm 路由 = task 分派 norm-qa（无顶层 norm 路由工具，norm 唯一入口就是 task）
 #   · 单点能力直调 = bill_match（选码⇄核实双模，2026-07-12 由 verify_bill_code 合并更名）/
 #     quota_recommend（定额方案推荐，2026-07-12 引擎化、原 quota-recommend 子智能体退役）/
+#     price_query（信息价/走势，2026-07-12 引擎化提升为 lead 直调）/
 #     cost_calc（单点计算）——lead_agent_v2
 #     的直调工具面（v1 提示词不引用但工具全局可见，调了同样算路由）
 # 刻意不收：① ce-rag_*/ce-db_* 是 deferred 工具、被 DeferredToolFilterMiddleware 对 lead 模型
@@ -57,6 +58,7 @@ ROUTE_TOOL_NAMES = {
     "cost_workflow_state",
     "bill_match",
     "quota_recommend",
+    "price_query",
     "cost_calc",
     "task",
 }

@@ -103,6 +103,9 @@ tools:
 - name: quota_recommend
   group: cost
   use: app.ce.cost.quota_engine:quota_recommend_tool
+- name: price_query
+  group: cost
+  use: app.ce.cost.price_engine:price_query_tool
 - name: cost_calc
   group: cost
   use: app.ce.cost.tools:cost_calc_tool

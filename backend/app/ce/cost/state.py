@@ -33,6 +33,29 @@ def unsupported_spec_error(spec: str | None) -> dict[str, Any] | None:
         "message": f"不支持的清单口径版本 {normalized!r}——本系统仅支持深圳·2013 版规范，不提供该版本的选码/组价数据",
     }
 
+
+# ── Agent 面 region 口径闸（同款纵深：信息价/定额/费率严格锁深圳，EH-03 他省不取数）──
+_AGENT_REGIONS_ENV = "CE_COST_AGENT_REGIONS"
+_AGENT_REGIONS_DEFAULT = DEFAULT_REGION
+
+
+def agent_allowed_regions() -> set[str]:
+    """Agent 面允许的地区集合（env ``CE_COST_AGENT_REGIONS`` 覆盖，默认仅深圳）。"""
+    raw = os.environ.get(_AGENT_REGIONS_ENV) or _AGENT_REGIONS_DEFAULT
+    return {s.strip() for s in raw.split(",") if s.strip()}
+
+
+def unsupported_region_error(region: str | None) -> dict[str, Any] | None:
+    """region 归一后不在允许清单 → 统一错误载荷（他省口径服务层硬拒，防拿深圳数据冒充）；支持则 None。"""
+    normalized = normalize_region(region)
+    if normalized in agent_allowed_regions():
+        return None
+    return {
+        "status": "unsupported_region",
+        "region": normalized,
+        "message": f"不支持的地区口径 {normalized!r}——本系统信息价/定额/费率仅覆盖深圳，建议咨询当地造价站渠道",
+    }
+
 CostNodeName = Literal[
     "bill_match",
     "select_bill",

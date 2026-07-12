@@ -272,22 +272,27 @@ def test_select_quota_single_scheme_auto_selects():
     assert result["selection_source"] == "auto_single_scheme"
 
 
-def test_select_quota_multi_scheme_low_confidence_reviews():
+def test_select_quota_multi_scheme_always_gates(monkeypatch):
+    # 多方案一律落 review 闸（2026-07-12 定案：方案取舍是审批级动作，不做门限自动选）；
+    # 引擎 LLM 预排 fail-open——此处显式关掉，验证裸候选照常落闸。
+    monkeypatch.setenv("CE_QUOTA_RANK_ENABLED", "0")
     result = nodes.select_quota_node(
-        {"schemes": [{"scheme_id": "S1", "score": 0.6}, {"scheme_id": "S2", "score": 0.58}]}
+        {"schemes": [{"scheme_id": "S1", "score": 0.95}, {"scheme_id": "S2", "score": 0.40}]}
     )
     assert result["status"] == "awaiting_input"
     assert result["interrupt"]["gate_type"] == "review"
     assert result["interrupt"]["node"] == "select_quota"
+    assert "recommendation" not in result
 
 
-def test_select_quota_multi_scheme_high_confidence_auto_selects():
+def test_select_quota_multi_scheme_gate_carries_llm_recommendation(monkeypatch):
+    # LLM 预排可用时，建议附进闸载荷当「系统建议」——选定仍归人（闸不撤）。
+    monkeypatch.setattr(nodes, "rank_schemes", lambda feature, schemes: {"recommended_scheme_id": "S1", "rationale": "泵送匹配"})
     result = nodes.select_quota_node(
-        {"schemes": [{"scheme_id": "S1", "score": 0.95}, {"scheme_id": "S2", "score": 0.40}]}
+        {"schemes": [{"scheme_id": "S1", "score": 0.6}, {"scheme_id": "S2", "score": 0.58}]}
     )
-    assert result["status"] == "done"
-    assert result["selection_source"] == "auto_confident_scheme"
-    assert result["selected_scheme_id"] == "S1"
+    assert result["status"] == "awaiting_input"
+    assert result["interrupt"]["recommendation"]["recommended_scheme_id"] == "S1"
 
 
 def test_unit_rate_computes_comprehensive_price_with_breakdown():

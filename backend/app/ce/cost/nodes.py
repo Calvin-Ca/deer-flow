@@ -12,7 +12,7 @@ from .bill_match_engine import candidate_code as _candidate_code
 from .bill_match_engine import feature_gap_report, recall_candidates, select_from_candidates
 from .bill_match_engine import top_candidates as _top_candidates
 from .mcp import call_mcp_tool
-from .quota_engine import extract_quota_schemes, fetch_quota_compose, rank_schemes
+from .quota_engine import fetch_quota_compose, rank_schemes
 from .quota_engine import scheme_id as _scheme_id
 from .state import CostNodeName, normalize_region, normalize_spec, unsupported_spec_error
 
@@ -91,7 +91,7 @@ def _capability_gate(node: str, question: str, *, detail: dict[str, Any] | None 
 
 
 # _scheme_id / extract_quota_schemes 已单源迁至 quota_engine（2026-07-12，能力 3 引擎化）；
-# 本模块顶部 import 并保留原名供 workflow.py 继续从 nodes 导入（契约不变）。
+# 流水线侧的消费方在 stages.py（workflow 打薄后 nodes 不再作转口）。
 
 
 def bill_match_node(payload: dict[str, Any]) -> dict[str, Any]:

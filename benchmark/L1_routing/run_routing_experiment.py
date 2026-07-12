@@ -146,7 +146,10 @@ def main() -> int:
     # 整轮共用一个客户端：agent/MCP 会话只建一次，会话收尾只发生在进程退出（见 _drive_agent 注释）。
     from deerflow.client import DeerFlowClient
 
-    agent_client = DeerFlowClient(model_name=args.model)
+    # subagent_enabled 必须显式开：DeerFlowClient 默认 False → task 不绑定 → norm 路由全线
+    # 假阴性（8B 会幻觉调用 'norm-qa' 工具名 / tool_search 摸 ce-rag 直调——F11 实锤）。
+    # 与 debug.py 的同款修复对齐（CLAUDE.md §3.3「缺了 task 不绑定、子智能体路由假阴性」）。
+    agent_client = DeerFlowClient(model_name=args.model, subagent_enabled=True)
 
     rows: list[dict] = []
     for i, item in enumerate(dataset.items):

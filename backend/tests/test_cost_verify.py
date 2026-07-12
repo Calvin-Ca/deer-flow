@@ -13,7 +13,7 @@ _RATES = {"management_rate": 0.10, "profit_rate": 0.05, "risk_rate": 0.0}
 
 
 def _result(**over):
-    base = {"code": "010502001", "region": "深圳", "spec": "2024",
+    base = {"code": "010502001", "region": "深圳", "spec": "2013",
             "components": _COMPONENTS, "rates": _RATES, "claimed_unit_price": 115.0}
     base.update(over)
     return base
@@ -55,7 +55,7 @@ def test_arith_within_tolerance_passes():
 
 
 def test_claimed_without_components_is_doubt():
-    out = verify_cost_result({"code": "010502001", "region": "深圳", "spec": "2024", "claimed_unit_price": 200.0})
+    out = verify_cost_result({"code": "010502001", "region": "深圳", "spec": "2013", "claimed_unit_price": 200.0})
     assert out["verdict"] == "doubt"
     assert any(f["type"] == "uncheckable_price" for f in out["findings"])
 
@@ -82,6 +82,17 @@ def test_region_leak_is_critical():
 def test_spec_invalid_is_critical():
     out = verify_cost_result(_result(spec="2020"))
     assert any(f["type"] == "spec_invalid" for f in out["findings"])
+
+
+def test_spec_2024_rejected_by_default_allowlist(monkeypatch):
+    # 2024 已裁出产品范围（2026-07-12）：默认允许清单仅 2013，声明 2024 的结果复核不放行；
+    # 评测 env 放开时自动跟随（闸单源 state.agent_allowed_specs）。
+    monkeypatch.delenv("CE_COST_AGENT_SPECS", raising=False)
+    out = verify_cost_result(_result(spec="2024"))
+    assert any(f["type"] == "spec_invalid" and f["severity"] == "critical" for f in out["findings"])
+    monkeypatch.setenv("CE_COST_AGENT_SPECS", "2013,2024")
+    out2 = verify_cost_result(_result(spec="2024"))
+    assert not any(f["type"] == "spec_invalid" for f in out2["findings"])
 
 
 # ── 完整性 / 价格覆盖 ──

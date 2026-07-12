@@ -6,7 +6,8 @@
 
 **算术独立重算**是核心：按 GB 50500 口径（人材机费 + 管理费 + 利润 + 风险）**从 components 重算**综合单价，
 与组价结果里 agent 报出来的数逐分比对——抓弱模型在「工具算对了、写到答案里写错了」这类转写/幻觉误差
-（口径与 ``app/ce/cost/nodes.py:unit_rate_node`` 一致，独立实现以起交叉校验作用）。
+（口径与 ``calc_engine.calc_unit_rate`` 一致，但**刻意独立实现、禁止复用其代码**——复用会让公式 bug
+同时骗过生成与复核，自己验自己恒真；两套独立算术才是「独立重算」的实质）。
 """
 from __future__ import annotations
 
@@ -14,6 +15,8 @@ import re
 from typing import Any
 
 from langchain.tools import tool
+
+from .state import agent_allowed_specs
 
 _CODE_RE = re.compile(r"^(\d{9})(?:\d{3})?$")  # 9 位全国码，或 12 位含顺序号（取前 9）
 _CATEGORIES = ("人工", "材料", "机械", "其他")
@@ -100,8 +103,10 @@ def verify_cost_result(result: dict[str, Any]) -> dict[str, Any]:
     if region is not None and str(region).strip() not in ("深圳", "shenzhen", "Shenzhen"):
         findings.append(_finding("region_leak", "critical", f"地域 {region!r} 非深圳（组价/价格锁深圳口径，串库红线）"))
     spec = result.get("spec")
-    if spec is not None and str(spec).strip() not in ("2013", "2024"):
-        findings.append(_finding("spec_invalid", "critical", f"版本 {spec!r} 不在 {{2013,2024}}"))
+    if spec is not None and str(spec).strip() not in agent_allowed_specs():
+        # 允许清单复用 agent 面口径闸（默认仅 2013，评测 env 放开时自动跟随）——声明 2024 的
+        # 组价结果本身即产品范围外产物（2026-07-12 裁定），复核不放行。
+        findings.append(_finding("spec_invalid", "critical", f"版本 {spec!r} 不在允许口径 {sorted(agent_allowed_specs())}"))
 
     # 3) 算术独立重算：有 components + claimed_unit_price 才算；重算值 vs 报出值须逐分一致。
     recomputed = None

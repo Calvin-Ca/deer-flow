@@ -114,7 +114,8 @@
 
 ### 4.2 本阶段已定/已修
 
-- **提示词加载根治 cwd 依赖（2026-07-11）**：CE 提示词版本库迁至 `benchmark/prompts/`（`lead_agent_v1.md` 现役 / `lead_agent_v2.md` 评测 variant，映射表见其 README.md）；`resolve_system_prompt_file()` 多基座解析（project_root→backend→仓库根），任意 cwd 都能加载；文件解析不到时 variant 标签如实降级 `default`（此前静默回退内置模板还照打文件名，尺子说谎）。切 variant=改 `config.yaml` 的 `lead_agent.system_prompt_path` 一行（热加载）。**Docker 生产态靠 compose 挂载 `../benchmark/prompts:/app/benchmark/prompts:ro`**（benchmark 不在镜像里）。`_paths.py` 的 `DEER_FLOW_PROJECT_ROOT=backend` 仍保留（`import app` + `.deer-flow` 状态目录对齐用）。
+- **v3 提示词落盘（2026-07-12，基准评测 variant）**：`lead_agent_v3.md` = v2 查表骨架 × 现行六能力全对齐——11 行路由表每行带参数语义（bill_match 的 code 双模 / price_query 的 periods 走势 / 批量循环直调 vs 整单 workflow 分界），审计薄弱点全部闭合（resume 红线「无用户新输入严禁调」/ recommendation 连理由转述 / rates_missing 必须转述 / missing_features 转追问 / need_clarification 上抛重派）。**能力覆盖已对账**：六能力正向+信息不足+异常态全有条款，与 `ROUTE_TOOL_NAMES` 零测量缝隙。评测假设：单跳查表比 v1 两跳预分类更稳（8B）。
+- **提示词加载根治 cwd 依赖（2026-07-11）**：CE 提示词版本库迁至 `benchmark/prompts/`（v1 现役 / v2 历史 / **v3 基准评测 variant**，映射表见其 README.md）；`resolve_system_prompt_file()` 多基座解析（project_root→backend→仓库根），任意 cwd 都能加载；文件解析不到时 variant 标签如实降级 `default`（此前静默回退内置模板还照打文件名，尺子说谎）。切 variant=改 `config.yaml` 的 `lead_agent.system_prompt_path` 一行（热加载）。**Docker 生产态靠 compose 挂载 `../benchmark/prompts:/app/benchmark/prompts:ro`**（benchmark 不在镜像里）。`_paths.py` 的 `DEER_FLOW_PROJECT_ROOT=backend` 仍保留（`import app` + `.deer-flow` 状态目录对齐用）。
 - **路由判定常量（config-grounded）**：`ROUTE_TOOL_NAMES = {cost_workflow_start/node/resume/state, bill_match, quota_recommend, price_query, cost_calc, task}`，已删 prefix 与死名 `qa.py`/`cost.py`。依据 lead 可见工具面：`ce-rag_*`/`ce-db_*` 因 `DeferredToolFilterMiddleware` 对 lead 隐藏故不收；`verify_norm`/`verify_cost` 非路由入口（`cost_recall_exemplars` 工具注册已注销，few-shot 注入引擎内置）。
 - **定额推荐引擎化（2026-07-12，能力 3）**：`quota_engine.py` 单源——取数确定性（price_compose）+ 多方案 LLM 预排（`rank_schemes` 单次结构化调用，fail-open，env `CE_QUOTA_RANK_MODEL` 可切 32B）。lead 直调 `quota_recommend` 工具；workflow 的 `select_quota` 闸复用同一预排（建议附闸载荷，选定归人）——「workflow 直接装配能力件」架构定案的首个落地。quota-recommend 子智能体退役。**多方案一律落闸**（原相似度假门限对无 score 的 schemes 恒不生效，已写实删除）。
 - **智能询价引擎化（2026-07-12，能力 4）**：`price_engine.py` 单源——单期取价（`query_price`，多规格 need_review/零命中 no_source 诚实缺口）、两层启发式（`query_with_fallback`：子串 miss→近似料召回，price_review 询价候选复用）、多期走势（`price_trend`：显式期号逐期取数 + 确定性环比，按名称+规格分组不跨规格比价，C-04 差价不入 LLM）。lead 直调 `price_query` 工具（periods≥2 自动走势模式）。**region 口径闸**（`CE_COST_AGENT_REGIONS` 默认仅深圳，他省服务层硬拒——EH-03 纵深）。
@@ -126,10 +127,13 @@
 - **clarify 单列红线**：`ask_clarification` 触发 HITL（`ClarificationMiddleware`→`Command(goto=END)` 中断等人），门 0.95，**不并入路由分**（红线独立计分）。
 - **已删过时机制**：`CE_ROUTE_CONTEXT_URL`/RouteContextMiddleware（早在 `3691cbd4` 移除，本次清文档残留）。
 
-### 4.3 下一步（按序）
+### 4.3 下一步：v3 基准测试（续测直接从这里开始）
 
-1. **复跑路由**确认新常量修对（`route_correct` 应回升）；`[tool]` 若冒出集合外的真实名 → 补进 `ROUTE_TOOL_NAMES`。
-2. **归因失败用例**（翻 trace）：分「测量错/服务没起/agent 真错」三类，别对着坏尺子调提示词。
-3. （深化，可选）`task` 光看名字分不清 cost/norm → 收 `task` 的 `subagent_type`，把「路由**对不对**」也量起来（现只量「有没有路由」）。
-4. **两态 base_url**：dev gateway 调本地 qwen3-8b 须 `config.yaml` base_url=`localhost:8099`（Docker 态才 `host.docker.internal:8099`）。
-5. 路由稳后**铺开** toolcall/cost_task/norm_faithful——同样先对齐各自判定常量的真实工具名。
+**验收已完成（2026-07-12）**：服务器全量 pytest 3768 全绿；ce-rag 口径闸真机三验通过（2024 硬拒 / 2013 放行 / 缺省推断 `standard_source:inferred`）；两数据集已重灌（主池 78 条 item id 带 `ur-` 前缀防项目级撞号 + 专项 90 条）。**注意**：Langfuse 的 `bill-match-routing` 若仍有 100 条 item，UI 手动 archive M91~M100（2024 旧金标残留，会污染基线 10 条）。
+
+1. **切 v3 跑基准**（服务器，单行）：`sed -i 's|lead_agent_v1.md|lead_agent_v3.md|' config.yaml`（热加载）→ F5 四条快验（矩形柱组价→bill_match / 套定额→quota_recommend / 信息价→price_query / 按2024组价→零工具拒答）→ `uv run --project backend python benchmark/L1_routing/run_routing_experiment.py --run-name v3_engines_base` + `--dataset bill-match-routing --run-name v3_engines_base`。跑前可 `export CE_QUOTA_RANK_ENABLED=0` 排除预排变量。
+2. **对照 v1**（可选但推荐）：sed 切回 v1 → `--run-name v1_engines_base` 两集各一轮 → Langfuse `Datasets→Runs→Compare` 验「单跳查表 vs 两跳预分类」假设。
+3. **归因失败用例**（翻 trace comment）：分「测量错/服务没起/agent 真错」三类。重点盯三处：norm 侧不反问压住没有（行为刚翻转）、`code_check` 组 12 条（双模会不会忘传 `code` 退化成重新选码）、`out_of_scope` 组（2024/他省拒答，另 trend 用例看 8B 会不会把「近三个月」换算错成 `periods`）。
+4. **两态 base_url**：嵌入式 runner 在宿主机跑须 `config.yaml` base_url=`localhost:8099`（Docker 态才 `host.docker.internal:8099`）。
+5. （深化，可选）收 `task` 的 `subagent_type` 把「路由对不对」量起来；路由稳后**铺开** toolcall/cost_task/norm_faithful。
+6. **金标缺口**（择期）：c5 纯计算用例 10~20 条（cost_calc 有类型化参数后正好考）、c6 多行清单整单问法 5~10 条、c3「清单项→定额推荐」变体——照 bill_match_routing 模板锚定真实数据。

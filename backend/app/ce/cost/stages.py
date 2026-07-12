@@ -147,7 +147,7 @@ def resume_select_bill(state: dict[str, Any], item: dict[str, Any], decision: di
     # 主动学习闭环·采集端：人工在闸上给的正确码入库，供未来相似构件检索作 few-shot。
     # 采集失败绝不拖垮组价——整段吞异常。
     try:
-        from .exemplars import record_bill_correction
+        from .bill_match_engine import record_bill_correction
 
         record_bill_correction(
             item.get("description"),

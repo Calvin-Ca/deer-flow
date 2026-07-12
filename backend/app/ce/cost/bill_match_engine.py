@@ -14,8 +14,8 @@ CLAUDE.md §1 能力 2 的正反两面本质是同一个匹配问题：
 - ``nodes.py`` 其余节点复用候选归一/取分等纯函数。
 
 选码模式内置 few-shot 纠正示例（2026-07-12）：``_match_select`` 自动检索历史人工纠正
-（``exemplars.cost_recall_exemplars``，best-effort），附在返回的 ``exemplar_hints``——
-主动学习闭环的注入端从「提示词求着调」变为引擎硬内置。
+（本模块「主动学习闭环」段，best-effort），附在返回的 ``exemplar_hints``——
+注入端引擎硬内置；采集端 ``record_bill_correction`` 由 stages 的选码闸 resume 调用。
 
 规则能定死的（格式/存在性/特征 diff/门限/rank）在此判；语义贴切度不判——那是
 cost-agent / cost-critic 的 LLM 那半。verdict 口径与 ``verify.py`` 一致：任一 critical → fail；
@@ -26,8 +26,12 @@ MCP 依赖注入：取数函数带 ``call_tool`` 参数（``None`` 时回落本�
 """
 from __future__ import annotations
 
+import json
+import os
 import re
 from collections.abc import Callable
+from dataclasses import asdict, dataclass, field
+from pathlib import Path
 from typing import Any
 
 from langchain.tools import tool
@@ -286,9 +290,7 @@ def match_bill(
 def _exemplar_hints(feature: str, spec: str | None) -> list[dict[str, Any]]:
     """检索历史人工选码纠正作 few-shot 提示（best-effort：库空/异常一律返回空,绝不拖垮选码）。"""
     try:
-        from .exemplars import cost_recall_exemplars
-
-        result = cost_recall_exemplars(str(feature or ""), spec=spec, k=3)
+        result = recall_exemplars(str(feature or ""), spec=spec, k=3)
         hints = result.get("exemplars") if isinstance(result, dict) else None
         return hints if isinstance(hints, list) else []
     except Exception:  # noqa: BLE001 —— few-shot 是增强不是依赖
@@ -417,6 +419,160 @@ def _match_select(feature: str, spec: str | None, provided_features: list[str] |
     }
 
 
+# ═══ 选码主动学习闭环（few-shot 版，2026-07-12 自 exemplars.py 并入：学习环节归能力）═══
+# 核心洞察：置信门本就是 active-learning 采样器（低置信选码路由给人）。本段做"闭环"那半：
+# **采集**（record_bill_correction，stages 的选码闸 resume 时调）→ **存储**（append-only JSONL，
+# env CE_CORRECTIONS_PATH 可配）→ **检索**（retrieve_exemplars，按 spec 隔离 + 相似度下限）→
+# **注入**（_match_select 内置调用，选码返回自动附 exemplar_hints）。同样的错不再犯，不重训不要 GPU。
+# 生产可把检索换成 ce-rag/embedding（此处字符二元组 Jaccard，零依赖可单测；相似度接口不变）。
+# 任何回灌须过 benchmark 门禁防退化。原独立工具注册 cost_recall_exemplars 已注销（消费方
+# cost-agent/quota-recommend 子智能体均退役，注入端引擎内置后无模型主动调用场景）。
+
+_CORRECTIONS_DEFAULT_PATH = Path(__file__).resolve().parents[3] / ".deer-flow" / "ce_corrections.jsonl"
+_SIM_FLOOR = 0.12  # 相似度下限：太不像的历史纠正不当示例（避免注入噪声）
+
+
+@dataclass
+class Correction:
+    """一条人工纠正（选码 active-learning 样本）。
+
+    字段：feature 构件/做法描述；correct_code 人工最终确认的 9 位清单码；model_code 模型原本会选的码
+      （用于区分"纠正"vs"确认"，可空）；region/spec 口径（检索按 spec 隔离）；verified 是否经复核
+      （cost-critic 复核过的纠正更可信，检索优先）；source 来源标记。
+    """
+
+    feature: str
+    correct_code: str
+    model_code: str | None = None
+    region: str | None = None
+    spec: str | None = None
+    verified: bool = True          # 人工 override 即视为可信真值；critic 复核过的也置 True
+    source: str = "hitl"
+    candidates: list[str] = field(default_factory=list)
+
+    @property
+    def was_correction(self) -> bool:
+        """人工最终码 != 模型原选码 = 真纠正（模型确实错了）；相等 = 确认。"""
+        return bool(self.model_code) and self.model_code != self.correct_code
+
+
+def _norm_text(s: str | None) -> str:
+    return re.sub(r"\s", "", str(s or ""))
+
+
+def _bigrams(s: str) -> set[str]:
+    s = _norm_text(s)
+    return {s[i:i + 2] for i in range(len(s) - 1)} if len(s) >= 2 else ({s} if s else set())
+
+
+def similarity(a: str, b: str) -> float:
+    """构件描述相似度（字符二元组 Jaccard，中文友好、无依赖）。0~1。"""
+    A, B = _bigrams(a), _bigrams(b)
+    return len(A & B) / len(A | B) if (A or B) else 0.0
+
+
+class CorrectionStore:
+    """纠正样本存储（append-only JSONL）。"""
+
+    def __init__(self, path: str | os.PathLike | None = None) -> None:
+        self.path = Path(path or os.environ.get("CE_CORRECTIONS_PATH", _CORRECTIONS_DEFAULT_PATH))
+
+    def add(self, c: Correction) -> None:
+        """追加一条纠正（建目录、原子追加一行 JSON）。"""
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        with self.path.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(asdict(c), ensure_ascii=False) + "\n")
+
+    def load(self) -> list[Correction]:
+        """读全部纠正（文件不存在 → 空）；坏行跳过、不炸。"""
+        if not self.path.exists():
+            return []
+        out: list[Correction] = []
+        for line in self.path.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                out.append(Correction(**json.loads(line)))
+            except (json.JSONDecodeError, TypeError):
+                continue
+        return out
+
+
+def retrieve_exemplars(feature: str, *, spec: str | None = None, k: int = 3,
+                       store: CorrectionStore | None = None,
+                       corrections: list[Correction] | None = None) -> list[Correction]:
+    """检索与 feature 最相似的 top-k 历史纠正（**按 spec 版本隔离**，相似度过下限）。
+
+    参数：feature 当前构件描述；spec 版本（给定则只取同 spec 的纠正，防 2013/2024 串味）；k 返回条数；
+      store/corrections 二选一（测试可直接传 corrections 免落盘）。
+    返回：按相似度降序的 Correction 列表（verified 优先、相似度次之），只保留相似度≥下限的。
+    """
+    pool = corrections if corrections is not None else (store or CorrectionStore()).load()
+    if spec is not None:
+        pool = [c for c in pool if c.spec is None or str(c.spec) == str(spec)]
+    scored = [(similarity(feature, c.feature), c) for c in pool]
+    scored = [(s, c) for s, c in scored if s >= _SIM_FLOOR]
+    # verified 优先、相似度次之（复核过的纠正更该被当示例）
+    scored.sort(key=lambda t: (t[1].verified, t[0]), reverse=True)
+    return [c for _, c in scored[:k]]
+
+
+def format_fewshot(exemplars: list[Correction]) -> str:
+    """把纠正渲染成可塞进选码 prompt 的 few-shot 示例块；空则返回空串。"""
+    if not exemplars:
+        return ""
+    lines = ["【历史人工选码示例（同口径，供参考，仍以当前候选为准）】"]
+    for c in exemplars:
+        tail = f"（曾误选 {c.model_code}）" if c.was_correction else ""
+        lines.append(f"- 构件「{c.feature}」→ 正确清单码 {c.correct_code}{tail}")
+    return "\n".join(lines)
+
+
+def _correction_candidate_codes(candidates: list[dict[str, Any]]) -> list[str]:
+    out = []
+    for cand in candidates or []:
+        if isinstance(cand, dict):
+            code = cand.get("code") or cand.get("bill_code") or (cand.get("bill") or {}).get("code")
+            if code:
+                out.append(str(code))
+    return out
+
+
+def record_bill_correction(feature: str | None, correct_code: str | None, *,
+                           candidates: list[dict[str, Any]] | None = None,
+                           model_code: str | None = None, region: str | None = None,
+                           spec: str | None = None, verified: bool = True,
+                           store: CorrectionStore | None = None) -> Correction | None:
+    """采集一条 HITL 选码纠正入库（缺 feature/correct_code → 不记，返回 None）。
+
+    在 select_bill 闸 resume（用户给了 selected_code）时调用。model_code 未给则从 candidates 推（top-1）。
+    调用方须自行 try/except：采集失败绝不能拖垮组价流程。
+    """
+    if not feature or not correct_code:
+        return None
+    codes = _correction_candidate_codes(candidates or [])
+    c = Correction(
+        feature=str(feature), correct_code=str(correct_code).strip(),
+        model_code=model_code or (codes[0] if codes else None),
+        region=region, spec=spec, verified=verified,
+        candidates=codes,
+    )
+    (store or CorrectionStore()).add(c)
+    return c
+
+
+def recall_exemplars(feature: str, spec: str | None = None, k: int = 3) -> dict[str, Any]:
+    """检索历史人工选码纠正里与本构件最相似的示例（同 spec 口径），供选码注入 few-shot。
+
+    仅供参考、仍须在当前候选内选码，不得据此编造候选外的码。库为空时返回空示例。
+    """
+    ex = retrieve_exemplars(feature, spec=spec, k=k)
+    return {"count": len(ex), "fewshot": format_fewshot(ex),
+            "exemplars": [{"feature": c.feature, "correct_code": c.correct_code,
+                           "was_correction": c.was_correction} for c in ex]}
+
+
 # ---- lead 直调工具壳（2026-07-12 自 bill_check.py 并入：引擎自带工具面，与 quota/price 同款）----
 def bill_match(
     feature: str,
@@ -458,9 +614,11 @@ bill_match_tool = tool("bill_match", parse_docstring=True)(bill_match)
 
 __all__ = [
     "AUTO_SELECT_MARGIN", "AUTO_SELECT_THRESHOLD", "CODE_RE",
+    "Correction", "CorrectionStore",
     "as_candidates", "bill_match", "bill_match_tool",
     "candidate_code", "candidate_code9", "candidate_score", "code9_of",
     "diff_features", "extract_feature_names", "feature_gap_report", "fetch_bill_truth",
-    "finding", "match_bill", "normalize_provided", "recall_candidates",
-    "select_from_candidates", "top_candidates", "unwrap_bill", "verdict_from",
+    "finding", "format_fewshot", "match_bill", "normalize_provided",
+    "recall_candidates", "recall_exemplars", "record_bill_correction", "retrieve_exemplars",
+    "select_from_candidates", "similarity", "top_candidates", "unwrap_bill", "verdict_from",
 ]

@@ -112,9 +112,6 @@ tools:
 - name: verify_cost
   group: cost
   use: app.ce.cost.verify:verify_cost_tool
-- name: cost_recall_exemplars
-  group: cost
-  use: app.ce.cost.exemplars:cost_recall_exemplars_tool
 - name: verify_norm
   group: norm
   use: app.ce.norm.faithfulness:verify_norm_tool

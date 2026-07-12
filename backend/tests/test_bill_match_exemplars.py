@@ -1,10 +1,10 @@
-"""选码主动学习闭环（few-shot）单测——store 落盘 + 相似检索 + spec 隔离 + 采集 + 工具。"""
+"""选码主动学习闭环（few-shot）单测——已并入 bill_match_engine（2026-07-12）：store 落盘 + 相似检索 + spec 隔离 + 采集 + 注入。"""
 from __future__ import annotations
 
-from app.ce.cost.exemplars import (
+from app.ce.cost.bill_match_engine import (
     Correction,
     CorrectionStore,
-    cost_recall_exemplars_tool,
+    recall_exemplars,
     format_fewshot,
     record_bill_correction,
     retrieve_exemplars,
@@ -96,8 +96,8 @@ def test_format_fewshot_marks_correction():
     assert format_fewshot([]) == ""
 
 
-# ── 工具封装（读默认 store；库空返回空示例，不炸） ──
-def test_tool_wrapper_empty_store(monkeypatch, tmp_path):
+# ── 注入入口（读默认 store；库空返回空示例，不炸；原独立工具注册已注销） ──
+def test_recall_exemplars_empty_store(monkeypatch, tmp_path):
     monkeypatch.setenv("CE_CORRECTIONS_PATH", str(tmp_path / "empty.jsonl"))
-    out = cost_recall_exemplars_tool.invoke({"feature": "C30矩形柱", "spec": "2024"})
+    out = recall_exemplars("C30矩形柱", spec="2024")
     assert out["count"] == 0 and out["fewshot"] == ""

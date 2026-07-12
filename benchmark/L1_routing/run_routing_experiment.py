@@ -49,7 +49,7 @@ DATASET_NAME = "user-requests-routing"  # 路由主池（78 条，仅深圳·201
 #     的直调工具面（v1 提示词不引用但工具全局可见，调了同样算路由）
 # 刻意不收：① ce-rag_*/ce-db_* 是 deferred 工具、被 DeferredToolFilterMiddleware 对 lead 模型
 #   默认隐藏（是 cost_workflow 节点/子智能体内部的窄原语，lead 不直接调）；② verify_norm 是
-#   引用忠实度回查、③ verify_cost/cost_recall_exemplars 是组价内部辅助——三者皆非路由入口。
+#   引用忠实度回查、③ verify_cost 是复核内部辅助——均非路由入口。
 # task 只表示「分派了某子智能体」，光看名字分不清路由到 cost 还是 norm（要区分得读 subagent_type）。
 ROUTE_TOOL_NAMES = {
     "cost_workflow_start",

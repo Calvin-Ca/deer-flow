@@ -135,8 +135,9 @@ evidence,severity}]}`；多视角（单位镜/语义镜/漏项镜各查一遍）
   > 框架外离线 ML，deer-flow 只让"换上练好的模型"trivial）。面试选前者：是系统/agent 工程、能真跑能 demo。
   > **依赖关系**：没有 eval① 不能安全做闭环——任何回灌须过 benchmark 门禁防退化，故 ① 是 ⑥ 的前置。
 
-  **[✓ 已实现] few-shot 完整闭环**（纯函数 + 现成件接线，`test_cost_exemplars.py` 13 例单测通过）：
-  - `backend/app/ce/cost/exemplars.py`：`CorrectionStore`(append-only JSONL) + `similarity`(字符二元组
+  **[✓ 已实现] few-shot 完整闭环**（纯函数 + 现成件接线，`test_bill_match_exemplars.py` 13 例单测通过；
+  2026-07-12 已并入 `bill_match_engine.py`——学习环节归能力，注入端引擎内置）：
+  - 原 `backend/app/ce/cost/exemplars.py`：`CorrectionStore`(append-only JSONL) + `similarity`(字符二元组
     Jaccard，中文友好无依赖) + `retrieve_exemplars`(**按 spec 版本隔离** top-k，相似度过下限防噪) +
     `format_fewshot` + `record_bill_correction`(采集) + `cost_recall_exemplars` 工具；
   - **采集端**：`workflow.py` 的 select_bill 闸 resume 处接 `record_bill_correction`（try/except 兜底，

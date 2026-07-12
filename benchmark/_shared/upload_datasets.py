@@ -99,11 +99,14 @@ def _read_jsonl(path: Path) -> list[dict]:
     return rows
 
 
-def _upload_routing_file(client, jsonl, dataset_name: str, description: str) -> int:
+def _upload_routing_file(client, jsonl, dataset_name: str, description: str, id_prefix: str = "") -> int:
     """上传一份路由 schema 的 jsonl 到指定 Langfuse Dataset（主池与 bill_match 专项集共用）。
 
     功能：映射 query→input、{route,clarify}→expected_output、其余字段进 metadata。
-    参数：client —— Langfuse 客户端；jsonl —— 金标文件路径；dataset_name/description —— 目标 dataset。
+    参数：client —— Langfuse 客户端；jsonl —— 金标文件路径；dataset_name/description —— 目标 dataset；
+        id_prefix —— item id 命名空间前缀。**Langfuse 的 dataset item id 是项目级唯一**（非 dataset 级）：
+        同一用例号若曾上传到旧 dataset（如已停用的 agent-routing-eval 里的 A1/B1...），在新 dataset 里
+        复用裸 id 会被服务端按「更新他集 item」处理而 404——迁移到新 dataset 时必须换命名空间。
     返回：写入的 item 条数。
     """
     if not jsonl.exists():
@@ -119,13 +122,14 @@ def _upload_routing_file(client, jsonl, dataset_name: str, description: str) -> 
     for r in rows:
         client.create_dataset_item(
             dataset_name=dataset_name,
-            id=str(r["id"]),  # 以用例号作 item id → 重复上传幂等覆盖
+            id=f"{id_prefix}{r['id']}",  # 用例号作 item id（同集重复上传幂等覆盖）；前缀防跨集项目级撞号
             input={"query": r["query"]},
             expected_output={
                 "expect_route": r.get("expect_route"),
                 "expect_clarify": r.get("expect_clarify"),
             },
             metadata={
+                "case_id": str(r["id"]),  # 原始用例号（item id 带命名空间前缀时据此对回金标）
                 "agent": r.get("agent"),
                 "capability": r.get("capability"),  # CLAUDE.md §1 六能力标签（c1~c6 / out_of_domain）
                 "group": r.get("group"),
@@ -151,6 +155,8 @@ def upload_user_requests(client) -> int:
         USER_REQUESTS_DATASET,
         "路由评测主池（78 条，仅深圳·2013 口径）：真实请求问法，capability 对齐 CLAUDE.md 六能力，"
         "difficulty=strong/colloquial。判官=run_routing_experiment.py 本地判定（route/clarify 两率）。",
+        # A*/B*/C* 等用例号曾占用旧 dataset agent-routing-eval 的项目级 item id，换命名空间避撞。
+        id_prefix="ur-",
     )
 
 

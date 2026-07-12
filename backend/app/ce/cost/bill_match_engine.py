@@ -8,9 +8,14 @@ CLAUDE.md §1 能力 2 的正反两面本质是同一个匹配问题：
 
 此前两半各写一套（``bill_check.py`` / ``nodes.py``），候选归一、取码、召回调用、verdict 口径
 重复实现。本模块单源沉淀，消费面全部薄壳化且契约不变：
-- ``bill_check.verify_bill_code`` —— lead 直调核实工具（核实模式）；
+- ``bill_check.bill_match`` —— lead 直调的双模工具（code 缺省=选码 / 给定=核实，2026-07-12 合并，
+  原 ``verify_bill_code`` 单核实工具随之退役）；
 - ``nodes.bill_match_node`` / ``nodes.select_bill_node`` —— workflow 节点（选码模式，HITL 契约不变）；
 - ``nodes.py`` 其余节点复用候选归一/取分等纯函数。
+
+选码模式内置 few-shot 纠正示例（2026-07-12）：``_match_select`` 自动检索历史人工纠正
+（``exemplars.cost_recall_exemplars``，best-effort），附在返回的 ``exemplar_hints``——
+主动学习闭环的注入端从「提示词求着调」变为引擎硬内置。
 
 规则能定死的（格式/存在性/特征 diff/门限/rank）在此判；语义贴切度不判——那是
 cost-agent / cost-critic 的 LLM 那半。verdict 口径与 ``verify.py`` 一致：任一 critical → fail；
@@ -26,7 +31,7 @@ from collections.abc import Callable
 from typing import Any
 
 from .mcp import call_mcp_tool
-from .state import normalize_spec
+from .state import normalize_spec, unsupported_spec_error
 
 CODE_RE = re.compile(r"^(\d{9})(?:\d{3})?$")  # 9 位全国码，或 12 位含顺序号（取前 9）
 AUTO_SELECT_THRESHOLD = 0.86  # 选码模式：top1 分数达标才自动选定
@@ -262,13 +267,30 @@ def match_bill(
 ) -> dict[str, Any]:
     """「特征 ↔ 清单项」匹配统一入口：``code`` 给定 = 核实模式，缺省 = 选码模式。
 
-    核实模式返回与 ``verify_bill_code`` 工具契约一致（status/verdict/findings/recall/...），
+    核实模式返回 ``{mode, status, verdict, findings, recall, ...}``，
     选码模式返回 ``{mode, status: done|need_review|blocked, selected_code?, candidates, ...}``。
     两模式共享同一召回、真值、特征 diff 与 verdict 口径。
+    spec 过 agent 面口径闸（默认仅 2013，见 ``state.unsupported_spec_error``）。
     """
+    mode = "verify" if code is not None else "select"
+    spec_err = unsupported_spec_error(spec)
+    if spec_err:
+        return {"mode": mode, **spec_err}
     if code is not None:
         return _match_verify(feature, spec, code, provided_features, top_k, call_tool=call_tool)
     return _match_select(feature, spec, provided_features, top_k, auto_select_threshold, auto_select_margin, call_tool=call_tool)
+
+
+def _exemplar_hints(feature: str, spec: str | None) -> list[dict[str, Any]]:
+    """检索历史人工选码纠正作 few-shot 提示（best-effort：库空/异常一律返回空,绝不拖垮选码）。"""
+    try:
+        from .exemplars import cost_recall_exemplars
+
+        result = cost_recall_exemplars(str(feature or ""), spec=spec, k=3)
+        hints = result.get("exemplars") if isinstance(result, dict) else None
+        return hints if isinstance(hints, list) else []
+    except Exception:  # noqa: BLE001 —— few-shot 是增强不是依赖
+        return []
 
 
 def _match_verify(feature: str, spec: str | None, code: str, provided_features: list[str] | None, top_k: int, *, call_tool: _McpCall | None) -> dict[str, Any]:
@@ -368,14 +390,17 @@ def _match_select(feature: str, spec: str | None, provided_features: list[str] |
             "candidates": ranked,
             "count": len(candidates),
             "findings": [finding("low_confidence", "warn", "候选置信度不足或分差不够，不自动选码，需人工复核")],
+            "exemplar_hints": _exemplar_hints(feature, normalized_spec),
             "provenance": {"recall": "ce-rag_match_bill_item"},
         }
 
     gap = feature_gap_report(decision["selected_code"], normalized_spec, feature, provided_features, call_tool=call_tool)
     findings = [finding("missing_feature", "warn", f"特征项「{name}」未填写（规范要求）") for name in gap["missing_features"]]
+    hints = _exemplar_hints(feature, normalized_spec)
     return {
         "mode": "select",
         "status": "done",
+        "exemplar_hints": hints,
         "verdict": verdict_from(findings),
         "findings": findings,
         "spec": normalized_spec,

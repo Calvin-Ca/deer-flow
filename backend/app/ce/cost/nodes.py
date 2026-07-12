@@ -6,13 +6,14 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, Literal
 
+from .bill_match_engine import AUTO_SELECT_MARGIN, AUTO_SELECT_THRESHOLD
 from .bill_match_engine import as_candidates as _as_candidates
 from .bill_match_engine import candidate_code as _candidate_code
 from .bill_match_engine import candidate_score as _score
 from .bill_match_engine import feature_gap_report, recall_candidates, select_from_candidates
 from .bill_match_engine import top_candidates as _top_candidates
 from .mcp import call_mcp_tool
-from .state import CostNodeName, normalize_region, normalize_spec
+from .state import CostNodeName, normalize_region, normalize_spec, unsupported_spec_error
 
 CostExecutionStrategy = Literal["agent", "tool", "llm"]
 CostBusinessStep = Literal["bill_match", "quota_compose", "price_query", "calc"]
@@ -123,6 +124,9 @@ def extract_quota_schemes(price_compose_result: dict[str, Any]) -> list[dict[str
 
 
 def bill_match_node(payload: dict[str, Any]) -> dict[str, Any]:
+    spec_err = unsupported_spec_error(payload.get("spec"))
+    if spec_err:
+        return {"node": "bill_match", **spec_err}
     description = payload.get("description") or payload.get("feature") or payload.get("query")
     if not description:
         return {
@@ -208,8 +212,8 @@ def select_bill_node(payload: dict[str, Any]) -> dict[str, Any]:
             },
         }
 
-    threshold = float(payload.get("auto_select_threshold") or 0.86)
-    margin = float(payload.get("auto_select_margin") or 0.08)
+    threshold = float(payload.get("auto_select_threshold") or AUTO_SELECT_THRESHOLD)
+    margin = float(payload.get("auto_select_margin") or AUTO_SELECT_MARGIN)
     decision = select_from_candidates(candidates, threshold=threshold, margin=margin)
 
     if decision["decided"]:
@@ -297,8 +301,8 @@ def select_quota_node(payload: dict[str, Any]) -> dict[str, Any]:
             "selection_source": "auto_single_scheme",
         }
 
-    threshold = float(payload.get("auto_select_threshold") or 0.86)
-    margin = float(payload.get("auto_select_margin") or 0.08)
+    threshold = float(payload.get("auto_select_threshold") or AUTO_SELECT_THRESHOLD)
+    margin = float(payload.get("auto_select_margin") or AUTO_SELECT_MARGIN)
     sorted_schemes = sorted(schemes, key=lambda scheme: _score(scheme) or -1.0, reverse=True)
     top = sorted_schemes[0]
     top_score = _score(top)

@@ -16,7 +16,7 @@
 
 判法（`run_routing_experiment.py`，进程内嵌入式 DeerFlowClient）：agent 跑完后翻它的**工具调用
 序列**——调用里有没有出现 `ROUTE_TOOL_NAMES` 集合内的名字（`cost_workflow_start/node/resume/state`、
-`verify_bill_code`、`cost_calc`、`task`）→ 得出 `did_route`；有没有调 `ask_clarification` →
+`bill_match`、`cost_calc`、`task`）→ 得出 `did_route`；有没有调 `ask_clarification` →
 得出 `did_clarify`。两个观测值对金标的 `expect_route`/`expect_clarify` 逐条判分（本地 Python
 判官，Langfuse 只当账本）。**不关心模型心里把意图分成哪类，只看手最终伸向了哪个工具。**
 
@@ -101,7 +101,7 @@
   裁定移除（2026-07-11）。
 - **生成**：`python data/gen_bill_match_routing.py`（幂等覆盖；金标增补后重跑扩容，勿与已跑基线混比）。
 - **分组**：`no_version` 60（默认深圳·2013 口径，反问=违例）/ `with_version` 18（问法带 2013）/
-  `code_check` 12（带真实金码问「对不对/特征有漏吗」，期望 `verify_bill_code` 或 task 派
+  `code_check` 12（带真实金码问「对不对/特征有漏吗」，期望 `bill_match` 核实模式或 task 派
   cost-agent）。全部 `expect_route=true`、`expect_clarify=false`。
 - **与 `clist-match-eval` 的分工**：那边量**检索召回**（描述→金码命中率，L3 知识层）；这边只量
   **路由**（该调工具时真调了没，L1 编排层）——同一批真实特征，两层各测各的。

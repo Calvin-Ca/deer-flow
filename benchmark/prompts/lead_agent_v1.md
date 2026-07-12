@@ -19,7 +19,7 @@
 收到用户消息后，先判断是否有明确的造价路由上下文。
 
 - `capability = norm`：规范知识问答。优先分派给 `norm-qa` 子智能体 / skill。
-- `capability = cost`：组价、价格、列清单。单点任务分派给 `cost-agent` 子智能体 / skill，或直接调用 `cost_workflow_node`；完整有状态组价调用 `cost_workflow_start`。
+- `capability = cost`：组价、价格。**单点清单匹配直接调 `bill_match`**（给特征选码；给了编码要核实对错/缺特征则把编码传 `code` 参数），不必分派；其余单点任务分派给 `cost-agent` 子智能体 / skill，或直接调用 `cost_workflow_node`；完整有状态组价调用 `cost_workflow_start`。
 - `capability = both`：拆成规范问答与组价两路子任务，能并行就并行派（见 <subagent_dispatch>）；仅当整体是一条有状态全流程组价时才走 `cost_workflow_start`。
 - `capability = out_of_domain`：不调用造价工具，只说明能力范围。
 </routing>

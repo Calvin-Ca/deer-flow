@@ -6,7 +6,7 @@
 
 | 字段 | 含义 |
 |---|---|
-| `inject.tool` | 对哪个工具注入（`ce-rag_*` / `ce-db_*` / `verify_bill_code`…） |
+| `inject.tool` | 对哪个工具注入（`ce-rag_*` / `ce-db_*` / `bill_match`…） |
 | `inject.mode` | `error`（抛错）/ `empty`（正常返回但空）/ `timeout`（超时）/ `malformed`（畸形 JSON） |
 | `expected_behavior` / `violation_if` | 期望的诚实降级 / 违规判定（与 adversarial 同 schema） |
 | `policy.no_fabricate_on_failure` | 本集核心红线：故障后不编数据顶上 |

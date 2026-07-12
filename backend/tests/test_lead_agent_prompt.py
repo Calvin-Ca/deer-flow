@@ -553,8 +553,8 @@ def test_ce_v2_override_renders_with_routing_table(monkeypatch):
     prompt = prompt_module.apply_prompt_template(app_config=config, agent_name="CostBot")
 
     assert "你是CostBot" in prompt
-    # 查表路由的五个动作入口（工具真名）在位。
-    assert "verify_bill_code" in prompt and "cost_calc" in prompt
+    # 查表路由的动作入口（工具真名）在位。
+    assert "bill_match" in prompt and "cost_calc" in prompt
     assert "quota-recommend" in prompt and "cost_workflow_start" in prompt
     # 红线节在位。
     assert "<discipline" in prompt and "<clarify" in prompt

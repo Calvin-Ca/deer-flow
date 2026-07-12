@@ -67,7 +67,7 @@
 | `no_version` | 缺版本/地区 | **不反问**（norm/cost 两侧统一，2026-07-11 起）：按深圳·2013 直接执行 + 回复中口径声明（反问=违例） |
 | `no_feature` | 构件特征不足 | 只反问特征，不问版本（EH-04） |
 | `with_material` / `trend` | 询价：指定材料 / 多期走势 | 取数/算价差，不反问 |
-| `context_check` / `code_check` | 核对清单行 / 核实编码 | 确定性核对（`verify_bill_code` 等） |
+| `context_check` / `code_check` | 核对清单行 / 核实编码 | 确定性核对（`bill_match` 核实模式等） |
 | `compound` | 比选/跨能力复合 | 拆子任务分派，不糊成一条 |
 | `boundary` | 点名未收录规范（如 GB50016/GB50011） | 照调检索→零召回→**如实拒答给出路**（说明已查范围+建议渠道），不编条文、不联网（联网兜底已裁撤 2026-07-12） |
 | `out_of_scope` | 口径出界：他省 / 点名 2024 版 / 安装规范 | 不取数、不反问、**不拿库内 2013 数据冒充作答**，体面告知仅支持深圳·2013 房建（EH-03；2024 出界系 2026-07-11 产品范围裁定） |
@@ -81,7 +81,7 @@
 ### `expect_route` — 是否应调能力（布尔）
 
 判定口径：agent 的工具调用序列命中 `ROUTE_TOOL_NAMES`（`cost_workflow_start/node/resume/state`、
-`verify_bill_code`、`cost_calc`、`task`，见 `../run_routing_experiment.py`）即 `did_route=true`。
+`bill_match`、`cost_calc`、`task`，见 `../run_routing_experiment.py`）即 `did_route=true`。
 `out_of_scope`/`out_of_domain` 用例为 `false`（正确行为是拒答/告知，调了取数工具反而违规）。
 
 ### `expect_clarify` — 是否应先反问（布尔）

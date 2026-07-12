@@ -42,7 +42,8 @@ DATASET_NAME = "user-requests-routing"  # 路由主池（78 条，仅深圳·201
 # 集合由 config.yaml + benchmark/prompts/lead_agent_v*.md 的「lead 可见工具面」确定（统一精确名、不用前缀）：
 #   · cost 路由 = cost_workflow_start/node/resume/state（group=cost，lead 可见）
 #   · norm 路由 = task 分派 norm-qa（无顶层 norm 路由工具，norm 唯一入口就是 task）
-#   · 单点确定性路由 = verify_bill_code（选码核实）/ cost_calc（单点计算）——lead_agent_v2
+#   · 单点确定性路由 = bill_match（选码⇄核实双模，2026-07-12 由 verify_bill_code 合并更名）/
+#     cost_calc（单点计算）——lead_agent_v2
 #     的直调工具面（v1 提示词不引用但工具全局可见，调了同样算路由）
 # 刻意不收：① ce-rag_*/ce-db_* 是 deferred 工具、被 DeferredToolFilterMiddleware 对 lead 模型
 #   默认隐藏（是 cost_workflow 节点/子智能体内部的窄原语，lead 不直接调）；② verify_norm 是
@@ -53,7 +54,7 @@ ROUTE_TOOL_NAMES = {
     "cost_workflow_node",
     "cost_workflow_resume",
     "cost_workflow_state",
-    "verify_bill_code",
+    "bill_match",
     "cost_calc",
     "task",
 }

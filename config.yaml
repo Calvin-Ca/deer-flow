@@ -97,9 +97,9 @@ tools:
 - name: cost_workflow_state
   group: cost
   use: app.ce.cost.tools:cost_workflow_state_tool
-- name: verify_bill_code
+- name: bill_match
   group: cost
-  use: app.ce.cost.bill_check:verify_bill_code_tool
+  use: app.ce.cost.bill_check:bill_match_tool
 - name: cost_calc
   group: cost
   use: app.ce.cost.tools:cost_calc_tool
@@ -310,7 +310,7 @@ subagents:
         定额子目与工料机含量，给出带依据的定额组价方案推荐（可多方案比选）。覆盖深圳房建组价
         （**仅 2013 版**，2026-07-11 产品范围裁定）。**建议在以下场景委派本 agent**：「这条清单套什么定额」「给这个
         清单项推荐组价方案」「A/B 两种做法的定额方案比一比」。**不负责**：从特征选清单码
-        （那是选码，交 cost-agent / verify_bill_code）、算综合单价/合价（交 cost_calc / workflow）、
+        （那是选码，交 cost-agent / bill_match）、算综合单价/合价（交 cost_calc / workflow）、
         有状态全流程逐闸确认（交 cost_workflow_start）。
       system_prompt: |
         你是定额方案推荐 sub-agent：给**已编制好的清单项**推荐定额组价方案。

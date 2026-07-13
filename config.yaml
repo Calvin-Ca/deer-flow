@@ -287,7 +287,7 @@ subagents:
         - present_files
       skills: []
       model: inherit
-      max_turns: 10
+      max_turns: 25   # recursion_limit=max_turns（executor.py）；agentic RAG 多轮检索+verify_norm，10 太紧会 GraphRecursionError（2026-07-13）
       timeout_seconds: 600
     cost-critic:
       description: >
@@ -330,7 +330,7 @@ subagents:
         - present_files
       skills: []
       model: inherit
-      max_turns: 8
+      max_turns: 20   # 复核要 verify_cost + ce-db/ce-rag 交叉核 + LLM 裁定多轮，8 太紧同样会撞递归上限（2026-07-13）
       timeout_seconds: 600
 agents_api:
   enabled: true

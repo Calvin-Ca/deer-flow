@@ -26,8 +26,10 @@ import sys
 import httpx
 from dotenv import load_dotenv
 
-# 与 run_routing_experiment.py 同口径（lead 可见路由工具面）。
-ROUTE_TOOL_NAMES = {"cost_workflow_start", "cost_workflow_node", "cost_workflow_resume", "cost_workflow_state", "bill_match", "quota_recommend", "price_query", "cost_calc", "task"}
+# 与 run_routing_experiment.py 同口径（lead 可见路由工具面）：cost 编排 + 单点引擎化直调
+# (bill_match/quota_recommend/price_query/cost_calc) + task 分派 +（tool_search 关闭态）lead
+# 直调 ce-rag 规范检索。详见 run_routing_experiment.py 顶部 ROUTE_TOOL_NAMES 的 2026-07-13 校正说明。
+ROUTE_TOOL_NAMES = {"cost_workflow_start", "cost_workflow_node", "cost_workflow_resume", "cost_workflow_state", "bill_match", "quota_recommend", "price_query", "cost_calc", "task", "ce-rag_search_clause"}
 CLARIFY_TOOL = "ask_clarification"
 
 

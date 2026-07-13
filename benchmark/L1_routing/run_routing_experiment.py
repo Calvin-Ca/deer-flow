@@ -41,15 +41,23 @@ DATASET_NAME = "user-requests-routing"  # 路由主池（78 条，仅深圳·201
 # cost_workflow_* 工作流节点或 task 分派子智能体；bash/read_file 自己瞎折腾不算。
 # 集合由 config.yaml + benchmark/prompts/lead_agent_v*.md 的「lead 可见工具面」确定（统一精确名、不用前缀）：
 #   · cost 路由 = cost_workflow_start/node/resume/state（group=cost，lead 可见）
-#   · norm 路由 = task 分派 norm-qa（无顶层 norm 路由工具，norm 唯一入口就是 task）
+#   · norm 路由 = task 分派 norm-qa（顶层无 norm 编排工具，委派入口是 task）；**外加**当前 tool_search
+#     关闭态下 lead 直调 ce-rag_search_clause 检索规范（见下方 2026-07-13 校正），亦计 norm 路由达成
 #   · 单点能力直调 = bill_match（选码⇄核实双模，2026-07-12 由 verify_bill_code 合并更名）/
 #     quota_recommend（定额方案推荐，2026-07-12 引擎化、原 quota-recommend 子智能体退役）/
 #     price_query（信息价/走势，2026-07-12 引擎化提升为 lead 直调）/
 #     cost_calc（单点计算）——lead_agent_v2
 #     的直调工具面（v1 提示词不引用但工具全局可见，调了同样算路由）
-# 刻意不收：① ce-rag_*/ce-db_* 是 deferred 工具、被 DeferredToolFilterMiddleware 对 lead 模型
-#   默认隐藏（是 cost_workflow 节点/子智能体内部的窄原语，lead 不直接调）；② verify_norm 是
-#   引用忠实度回查、③ verify_cost 是复核内部辅助——均非路由入口。
+# 2026-07-13 校正：原判据「刻意不收 ce-rag_*」的理由是它被 DeferredToolFilterMiddleware 对 lead 隐藏——
+#   但该中间件仅在 config.yaml `tool_search.enabled=true` 时才入链（见 lead_agent/agent.py 的 if 分支）；
+#   当前 tool_search.enabled=false → 中间件未启用 → ce-rag_* 原样绑给 lead、lead 直接调（F5 实测 tools
+#   含 ce-rag_search_clause）。norm 侧无引擎化直调工具（不同于 cost/price 已有 bill_match/price_query），
+#   故直调 ce-rag_search_clause 就是 lead 唯一的 norm 直达路径 → 收进本集：expect_route=True（A 簇规范
+#   问答）算路由达成、expect_route=False（域外，如 B11）算违规取数，两侧对称成立。待「摘 ce-rag 出 lead +
+#   norm-qa 子 agent 委派」架构落地后此条应收回，改由 task+subagent_type=norm 判 norm 路由。集合待按真实
+#   trace 校准（§3.3-1）：目前只见 ce-rag_search_clause，如冒出其他 norm 检索原语再补。
+# 仍不收：① ce-db_* 结构化真值原语（cost/price 已由 bill_match/price_query 引擎化直调覆盖，lead 不直调裸原语）；
+#   ② verify_norm 是引用忠实度回查、③ verify_cost 是复核内部辅助——均非路由入口。
 # task 只表示「分派了某子智能体」，光看名字分不清路由到 cost 还是 norm（要区分得读 subagent_type）。
 ROUTE_TOOL_NAMES = {
     "cost_workflow_start",
@@ -61,6 +69,7 @@ ROUTE_TOOL_NAMES = {
     "price_query",
     "cost_calc",
     "task",
+    "ce-rag_search_clause",  # 2026-07-13 收：tool_search 关闭态 lead 直调的 norm 规范检索（见上校正）
 }
 CLARIFY_TOOL = "ask_clarification"
 

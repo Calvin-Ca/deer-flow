@@ -14,6 +14,7 @@ config.yaml 指向本目录某文件
 
 | 文件 | variant 标签 | 设计要点 | 状态 |
 |---|---|---|---|
+| `lead_agent_v0.md` | `lead_agent_v0` | **harness 内置默认模板逐字复刻**（= `prompt.py:SYSTEM_PROMPT_TEMPLATE`，无任何 CE 定制/路由/红线）。保留全部运行时占位符（`{skills_section}`/`{subagent_section}`/… 运行时注入，与 v1/v3 同条件），故与下方 `default` 回退行为**完全等价**，仅多打一个显式 `lead_agent_v0` 标签——用作对照基线，量「CE 定制相对原版净收益」 | 对照基线 |
 | `lead_agent_v1.md` | `lead_agent_v1` | capability 预分类（norm/cost/both）两跳路由；单点四能力全部直调（`bill_match`/`quota_recommend`/`price_query`/`cost_calc`），批量循环直调；子智能体仅 norm-qa（隔离派）+ cost-critic（复核）；need_clarification 上抛转问 | 现役 |
 | `lead_agent_v2.md` | `lead_agent_v2` | 查表式单跳路由（诉求特征→动作）；单点匹配/定额推荐/计算直调；能力清单为旧五能力 | 历史 variant（被 v3 取代） |
 | `lead_agent_v3.md` | `lead_agent_v3` | **v2 查表骨架 × 现行六能力全对齐**（2026-07-12）：11 行路由表每行带参数语义（bill_match 的 code 双模 / price_query 的 periods 走势 / 批量循环直调分界）；resume 红线（无用户新输入禁调）+ recommendation/rates_missing/missing_features 转述条款 + need_clarification 上抛——审计发现的全部薄弱点闭合。**评测假设：单跳查表比 v1 两跳预分类路由更稳（8B）** | 基准评测 variant |

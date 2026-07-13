@@ -104,6 +104,17 @@ def _drive_agent(agent_client, query: str, thread_id: str) -> dict:
     answer_parts: list[str] = []
 
     for ev in agent_client.stream(query, thread_id=thread_id):
+        if ev.type == "values":
+            # values 快照带**完整** tool_calls args；messages 流式分片只到 task 的 name、抓不到
+            # subagent_type（实测 工具=['task'] 但 subagent_ok=False），从这里补齐（§3.3-3）。
+            for m in ev.data.get("messages", []) or []:
+                if m.get("type") == "ai":
+                    for tc in m.get("tool_calls", []) or []:
+                        if tc.get("name") == "task":
+                            st = (tc.get("args") or {}).get("subagent_type")
+                            if st:
+                                subagent_types.append(st)
+            continue
         if ev.type != "messages-tuple":
             continue
         d = ev.data

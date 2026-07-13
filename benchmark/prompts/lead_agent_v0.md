@@ -187,25 +187,109 @@ combined with a FastAPI gateway for REST API access [citation:FastAPI](https://f
 </critical_reminders>
 
 <!-- ============================================================
-占位符 deerflow 原始渲染值参考（非提示词正文；benchmark 态：默认 lead agent +
-subagent_enabled=True + tool_search=false + vanilla 子智能体面 general-purpose/bash）
-apply_prompt_template 会把上文 9 个占位符替换成下列值。占位符名此处转义写作 {{name}}。
-============================================================
+占位符装配值参考（源码逐个追溯，非提示词正文）。占位符名此处转义写作 {{name}}。
 
-【{{agent_name}}】= MAgent          （默认 lead 无名 → 兜底 "MAgent"）
-【{{soul}}】= （空）                 （默认 lead 无 SOUL.md）
-【{{self_update_section}}】= （空）   （仅自定义 agent，agent_name 非空时才有）
-【{{skills_section}}】= （运行时注入；vanilla deerflow 无启用技能且 skill_evolution 关 → 空。启用技能后为 <skill_system>…</skill_system> 块）
-【{{deferred_tools_section}}】= （空）（仅 tool_search.enabled=true 才有 <available-deferred-tools> 名单）
-【{{acp_section}}】= （空）           （仅配置了 ACP agents 或 sandbox mounts 才有）
+■ 一、deerflow 出厂默认装配值
+  默认参数：apply_prompt_template(agent_name=None, subagent_enabled=False)；
+  config.example.yaml：tool_search.enabled=false（:533）、skill_evolution.enabled=false（:876）；
+  extensions_config.example.json：skills 节为空对象（无启用技能）。逐行源码追溯：
 
-【{{subagent_reminder}}】=
+  {{agent_name}}             = "MAgent"   ← prompt.py:848 `agent_name or "MAgent"`（agent_name=None）
+  {{soul}}                   = ""         ← get_agent_soul(None)→load_agent_soul(None) 读 base_dir/SOUL.md，
+                                             默认不存在→None→""（prompt.py:657-662；agents_config.py:143-151）
+  {{self_update_section}}    = ""         ← _build_self_update_section(None) `if not agent_name: return ""`（prompt.py:666-668）
+  {{skills_section}}         = ""         ← get_skills_prompt_section 无启用技能且 skill_evolution 关→`return ""`（prompt.py:643-644）
+  {{deferred_tools_section}} = ""         ← get_deferred_tools_prompt_section `if not tool_search.enabled: return ""`（prompt.py:704）
+  {{subagent_section}}       = ""         ← `_build_subagent_section(n) if subagent_enabled else ""`，默认 False（prompt.py:820）
+  {{subagent_reminder}}      = ""         ← 同上 subagent_enabled 默认 False（prompt.py:823-825）
+  {{subagent_thinking}}      = ""         ← 同上 subagent_enabled 默认 False（prompt.py:828-830）
+  {{acp_section}}            = ""         ← _build_acp_section(None) `if not agents: return ""`（prompt.py:727-728）
+
+  ⇒ 出厂默认下 9 个占位符仅 {{agent_name}}="MAgent" 非空，其余 8 个均装配为空字符串（git 已核实模板出自
+    最早 commit 7dc063ba，MAgent 兜底见 prompt.py:848）。
+
+■ 二、各占位符对应功能开启后的实际渲染值（源码函数逐字产出；动态内容标注取值来源）
+
+──【{{agent_name}}】= MAgent   （默认即非空；自定义 agent 则为其名）
+
+──【{{soul}}】启用=该 agent 存在 SOUL.md（get_agent_soul）→ 渲染为：
+<soul>
+（此处逐字放入该 agent 的 SOUL.md 全文——人格/风格设定）
+</soul>
+
+──【{{self_update_section}}】启用=agent_name 非空的自定义 agent（示例名 MAgent）→ 渲染为：
+<self_update>
+You are running as the custom agent **MAgent** with a persisted SOUL.md and config.yaml.
+
+When the user asks you to update your own description, personality, behaviour, skill set, tool groups, or default model,
+you MUST persist the change with the `update_agent` tool. Do NOT use `bash`, `write_file`, or any sandbox tool to edit
+SOUL.md or config.yaml — those write into a temporary sandbox/tool workspace and the changes will be lost on the next turn.
+
+Rules:
+- Always pass the FULL replacement text for `soul` (no patch semantics). Start from your current SOUL above and apply the user's edits.
+- Only pass the fields that should change. Omit the others to preserve them.
+- Pass `skills=[]` to disable all skills, or omit `skills` to keep the existing whitelist.
+- After `update_agent` returns successfully, tell the user the change is persisted and will take effect on the next turn.
+</self_update>
+
+──【{{skills_section}}】启用=skill_evolution 开 且 ≥1 启用技能（示例一个内置技能）→ 渲染为：
+<skill_system>
+你拥有一组「技能(skills)」，为特定任务提供经过优化的工作流。每个技能内含最佳实践、方法框架，以及指向额外资源的引用。
+
+**渐进式加载方式：**
+1. 当用户的问题匹配某个技能的适用场景时，立即用下方技能标签里的 location 路径对该技能主文件调用 `read_file`
+2. 读懂该技能的工作流与指令
+3. 技能文件中会引用同一目录下的其他资源
+4. 仅在执行过程中确有需要时，再加载被引用的资源
+5. 严格按照该技能的指令执行
+
+**技能位置：** /mnt/skills
+
+## Skill Self-Evolution
+After completing a task, consider creating or updating a skill when:
+- The task required 5+ tool calls to resolve
+- You overcame non-obvious errors or pitfalls
+- The user corrected your approach and the corrected version worked
+- You discovered a non-trivial, recurring workflow
+If you used a skill and encountered issues not covered by it, patch it immediately.
+Prefer patch over edit. Before creating a new skill, confirm with the user first.
+Skip simple one-off tasks.
+
+<available_skills>
+    <skill>
+        <name>deep-research</name>
+        <description>（该技能 SKILL.md frontmatter 的 description 字段）[内置]</description>
+        <location>/mnt/skills/public/deep-research/SKILL.md</location>
+    </skill>
+</available_skills>
+（说明：<available_skills> 内每个已启用技能对应一个 <skill>，name/description/category/location
+ 四字段取自该技能 SKILL.md（prompt.py:603 的行模板）；上面以真实内置技能 deep-research 为例，
+ skills/public 实际 ship 的还有 norm-qa / cost-workflow-guide / data-analysis 等 20+ 个）
+
+</skill_system>
+
+──【{{deferred_tools_section}}】启用=tool_search.enabled=true 且有延迟工具 → 渲染为（工具名逐行，示例）：
+<available-deferred-tools>
+ce-rag_search_clause
+ce-db_price_query
+（…每个已注册的延迟工具名占一行…）
+</available-deferred-tools>
+
+──【{{subagent_reminder}}】启用=subagent_enabled=True（n=max_concurrent_subagents=3）→ 渲染为：
 - **编排者模式**：你是任务编排者——把复杂任务拆成并行子任务。**硬上限：每轮回复最多 3 个 `task` 调用。**超过 3 个子任务时按每批 ≤3 个分轮派出，全部批次完成后再汇总。
 
-【{{subagent_thinking}}】=
+──【{{subagent_thinking}}】启用=subagent_enabled=True → 渲染为：
 - **拆解自查：这个任务能拆成 2 个以上并行子任务吗？能就数清数量。超过 3 个必须按每批 ≤3 个排批、本轮只派第一批。任何一轮都绝不派超过 3 个 `task`。**
 
-【{{subagent_section}}】=
+──【{{acp_section}}】启用=config.yaml 配置了 ACP agents → 渲染为：
+
+**ACP Agent Tasks (invoke_acp_agent):**
+- ACP agents (e.g. codex, claude_code) run in their own independent workspace — NOT in `/mnt/user-data/`
+- When writing prompts for ACP agents, describe the task only — do NOT reference `/mnt/user-data` paths
+- ACP agent results are accessible at `/mnt/acp-workspace/` (read-only) — use `ls`, `read_file`, or `bash cp` to retrieve output files
+- To deliver ACP output to the user: copy from `/mnt/acp-workspace/<file>` to `/mnt/user-data/outputs/<file>`, then use `present_files`
+
+──【{{subagent_section}}】启用=subagent_enabled=True（n=3）→ 渲染为（代码围栏以（python）示意，避免嵌套）：
 <subagent_system>
 **🚀 子智能体模式已启用——拆解、委派、汇总**
 
@@ -295,38 +379,25 @@ apply_prompt_template 会把上文 9 个占位符替换成下列值。占位符�
 （python）
 # 用户问："腾讯股价为什么跌？"
 # 思考：3 个子任务 → 1 批装得下
-
-# 第 1 轮：并行派 3 个子智能体
 task(description="腾讯财务数据", prompt="...", subagent_type="general-purpose")
 task(description="腾讯新闻与监管", prompt="...", subagent_type="general-purpose")
 task(description="行业与市场趋势", prompt="...", subagent_type="general-purpose")
-# 3 个并行跑 → 汇总结果
 
 **用法示例 2——多批（子任务 > 3 个）：**
 
 （python）
-# 用户问："对比 AWS、Azure、GCP、阿里云、Oracle 云"
-# 思考：5 个子任务 → 要分批（每批最多 3 个）
-
+# 用户问："对比 AWS、Azure、GCP、阿里云、Oracle 云"（5 个 → 分批）
 # 第 1 轮：派第一批 3 个
 task(description="AWS 分析", prompt="...", subagent_type="general-purpose")
 task(description="Azure 分析", prompt="...", subagent_type="general-purpose")
 task(description="GCP 分析", prompt="...", subagent_type="general-purpose")
-
-# 第 2 轮：第一批完成后派剩余批次
-task(description="阿里云分析", prompt="...", subagent_type="general-purpose")
-task(description="Oracle 云分析", prompt="...", subagent_type="general-purpose")
-
-# 第 3 轮：汇总两批全部结果
+# 第 2 轮：派剩余 2 个 → 第 3 轮汇总
 
 **反例——直接执行（不派子智能体）：**
 
 （python）
-# 用户问："跑一下测试"
-# 思考：无法拆成并行子任务
-# → 直接执行
-
-bash("npm test")  # 直接执行，不用 task()
+# 用户问："跑一下测试" → 拆不开 → 直接执行
+bash("npm test")  # 不用 task()
 
 **要点**：
 - **每轮最多 3 个 `task`**——系统强制执行，超出即丢
@@ -335,4 +406,3 @@ bash("npm test")  # 直接执行，不用 task()
 - 子任务 > 3 个时，按每批 3 个跨多轮分批
 </subagent_system>
 ============================================================ -->
-

@@ -73,6 +73,12 @@ ROUTE_TOOL_NAMES = {
 }
 CLARIFY_TOOL = "ask_clarification"
 
+# 「路由对不对」判据（§3.3-3）：金标 metadata.agent 属于**子智能体**落点的，检查 task 的 subagent_type 是否命中。
+# 当前架构下只有 norm-qa 是清晰的子智能体路由落点（v3：规范问答 → task(norm-qa)，17 条 expect_route）；
+# cost-agent/price 已引擎化为 lead 直调工具、cost-check 多走 cost_calc(check) 或定稿前复核——它们的
+# 「对不对」归 toolcall 评测，不在此判。key 须与金标 agent 字段取值一致（见 user_requests.jsonl）。
+AGENT_TO_SUBAGENT = {"norm-qa": "norm-qa"}
+
 
 def _is_route_tool(name: str) -> bool:
     """工具名是否属于「正经路由工具」（精确名命中）。"""
@@ -94,6 +100,7 @@ def _drive_agent(agent_client, query: str, thread_id: str) -> dict:
     返回：dict —— answer 最终文本、tool_names 工具名列表、did_clarify/did_route 两判定。
     """
     tool_names: list[str] = []  # 只收非空工具名（流式后续分片 name 为空，跳过）
+    subagent_types: list[str] = []  # task 调用的 subagent_type（判「路由到对的子智能体」§3.3-3）
     answer_parts: list[str] = []
 
     for ev in agent_client.stream(query, thread_id=thread_id):
@@ -105,6 +112,10 @@ def _drive_agent(agent_client, query: str, thread_id: str) -> dict:
                 name = tc.get("name") or ""
                 if name:
                     tool_names.append(name)
+                if name == "task":  # 收 task 的 subagent_type：判委派到 norm 还是别处（§3.3-3）
+                    st = (tc.get("args") or {}).get("subagent_type")
+                    if st:
+                        subagent_types.append(st)
             if isinstance(d.get("content"), str):
                 answer_parts.append(d["content"])
         elif d.get("type") == "tool" and d.get("name"):
@@ -121,6 +132,7 @@ def _drive_agent(agent_client, query: str, thread_id: str) -> dict:
         "did_clarify": CLARIFY_TOOL in tool_names,
         "did_route": any(_is_route_tool(n) for n in tool_names),
         "did_fetch": any(_is_fetch_tool(n) for n in tool_names),
+        "subagent_types": list(dict.fromkeys(subagent_types)),
     }
 
 
@@ -181,6 +193,13 @@ def main() -> int:
         if exp.get("expect_clarify") and exp.get("expect_route") and out["did_clarify"] and not out["did_route"]:
             route_ok = None
 
+        # 「路由对不对」（§3.3-3）：仅金标期望路由到子智能体的用例才判——task 的 subagent_type 是否命中。
+        gold_agent = (item.metadata or {}).get("agent")
+        expected_sub = AGENT_TO_SUBAGENT.get(gold_agent) if exp.get("expect_route") else None
+        subagent_ok = (expected_sub in out["subagent_types"]) if expected_sub else None
+        if subagent_ok is not None and route_ok is None:  # 正确止步于反问（路由未到环节）→ 同 route_ok，不判委派对不对
+            subagent_ok = None
+
         # 读回本条 trace，关联进 dataset run 并挂分
         traces = wait_for_traces(client, session_id=thread_id, expected=1)
         trace_id = getattr(traces[0], "id", None) if traces else None
@@ -190,9 +209,11 @@ def main() -> int:
                 client.create_score(name="route_correct", value=1.0 if route_ok else 0.0, trace_id=trace_id, data_type="NUMERIC", comment=f"期望调脚本={bool(exp.get('expect_route'))} 实际={actual_route} 工具={out['tool_names']}")
             if clarify_ok is not None:
                 client.create_score(name="clarify_correct", value=1.0 if clarify_ok else 0.0, trace_id=trace_id, data_type="NUMERIC", comment=f"期望反问={bool(exp.get('expect_clarify'))} 实际={out['did_clarify']}")
+            if subagent_ok is not None:
+                client.create_score(name="subagent_route_correct", value=1.0 if subagent_ok else 0.0, trace_id=trace_id, data_type="NUMERIC", comment=f"期望子智能体={expected_sub} 实际 subagent_type={out['subagent_types']} 工具={out['tool_names']}")
 
-        rows.append({"id": item.id, "group": (item.metadata or {}).get("group"), "exp": exp, "out": out, "route_ok": route_ok, "clarify_ok": clarify_ok, "trace_id": trace_id})
-        print(f"[{i + 1}/{len(dataset.items)}] {item.id} route_ok={route_ok} clarify_ok={clarify_ok} 工具={out['tool_names']}")
+        rows.append({"id": item.id, "group": (item.metadata or {}).get("group"), "exp": exp, "out": out, "route_ok": route_ok, "clarify_ok": clarify_ok, "subagent_ok": subagent_ok, "trace_id": trace_id})
+        print(f"[{i + 1}/{len(dataset.items)}] {item.id} route_ok={route_ok} clarify_ok={clarify_ok} subagent_ok={subagent_ok} 工具={out['tool_names']}")
 
     client.flush()
 
@@ -204,11 +225,15 @@ def main() -> int:
     n_halted = sum(1 for r in rows if r["exp"].get("expect_route") is True and r["route_ok"] is None)
     route_rate = sum(r["out"]["did_route"] for r in route_set) / len(route_set) if route_set else float("nan")
     clarify_rate = sum(r["out"]["did_clarify"] for r in clarify_set) / len(clarify_set) if clarify_set else float("nan")
+    # 「路由对不对」子率（§3.3-3）：仅金标落点为子智能体（norm-qa）的用例，subagent_type 命中比例
+    subagent_set = [r for r in rows if r.get("subagent_ok") is not None]
+    subagent_rate = sum(1 for r in subagent_set if r["subagent_ok"]) / len(subagent_set) if subagent_set else float("nan")
 
     print("\n========== 聚合 ==========")
     print(f"run_name        = {run_name}   model = {args.model or '默认'}")
     print(f"路由率           = {route_rate:.2%}  ( {sum(r['out']['did_route'] for r in route_set)}/{len(route_set)} ，另 {n_halted} 条正确止步于反问不计，建议门 ≥0.8 )")
     print(f"红线遵守率(反问) = {clarify_rate:.2%}  ( {sum(r['out']['did_clarify'] for r in clarify_set)}/{len(clarify_set)} ，建议门 ≥0.95 )")
+    print(f"路由对不对(norm) = {subagent_rate:.2%}  ( {sum(1 for r in subagent_set if r['subagent_ok'])}/{len(subagent_set)} ，期望 task(norm-qa) 命中率 )")
     print(f"逐条分数已挂到 Langfuse：Datasets → {args.dataset} → Runs → " + run_name)
     return 0
 

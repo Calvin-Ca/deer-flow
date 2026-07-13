@@ -18,6 +18,7 @@ config.yaml 指向本目录某文件
 | `lead_agent_v1.md` | `lead_agent_v1` | capability 预分类（norm/cost/both）两跳路由；单点四能力全部直调（`bill_match`/`quota_recommend`/`price_query`/`cost_calc`），批量循环直调；子智能体仅 norm-qa（隔离派）+ cost-critic（复核）；need_clarification 上抛转问 | 现役 |
 | `lead_agent_v2.md` | `lead_agent_v2` | 查表式单跳路由（诉求特征→动作）；单点匹配/定额推荐/计算直调；能力清单为旧五能力 | 历史 variant（被 v3 取代） |
 | `lead_agent_v3.md` | `lead_agent_v3` | **v2 查表骨架 × 现行六能力全对齐**（2026-07-12）：11 行路由表每行带参数语义（bill_match 的 code 双模 / price_query 的 periods 走势 / 批量循环直调分界）；resume 红线（无用户新输入禁调）+ recommendation/rates_missing/missing_features 转述条款 + need_clarification 上抛——审计发现的全部薄弱点闭合。**评测假设：单跳查表比 v1 两跳预分类路由更稳（8B）** | 基准评测 variant |
+| `lead_agent_v4.md` | `lead_agent_v4` | **v3 瘦身版（2026-07-13）**：lead 收敛为纯「意图识别→路由」。路由表当骨架（norm/复核的 task 分派并入表内），红线压到 4 条；workflow 闸机制下沉 `cost-workflow-guide` skill、复核 verdict 下沉 `cost-critic` 子agent、转述话术下沉工具 description——砍掉能力清单与业务细节，105→57 行。**评测假设：更瘦的路由器让 8B 少受业务噪声干扰、路由/委派更准**（对照 v3 验证 subagent_route_correct 是否回升） | 精简评测 variant |
 | （无文件 / 解析失败） | `default` | harness 内置英文通用模板（`prompt.py:SYSTEM_PROMPT_TEMPLATE`，已恢复上游原版），无 CE 路由 | 回退兜底 |
 
 > v1/v2 均含 `<safety_redline>`（串库红线 + 禁编造，2026-07-11 自旧 CE 内置模板移植——该红线是 agent 自补 `010504001`/`E.4.1` 事故换来的，任何新 variant 都应保留）。

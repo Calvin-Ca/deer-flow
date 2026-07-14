@@ -97,7 +97,7 @@
 
 ---
 
-## 4. Benchmark 测试进度与续测入口（2026-07-10）
+## 4. Benchmark 测试进度与续测入口（2026-07-14）
 
 > 当前阶段：**路由层（L1）评测调试中**。规范/门线见 `benchmark/AGENT_BENCHMARK.md`，目录地图（层↔目录 + 命令速查）见 `benchmark/README.md`，runner 操作见 `benchmark/_shared/README.md`。**2026-07-11 起 benchmark 按层分目录**（`L1_routing/`…`L7_nfr/` + `_shared/` 基建 + `component_eval/` 零件级）。
 
@@ -127,13 +127,20 @@
 - **clarify 单列红线**：`ask_clarification` 触发 HITL（`ClarificationMiddleware`→`Command(goto=END)` 中断等人），门 0.95，**不并入路由分**（红线独立计分）。
 - **已删过时机制**：`CE_ROUTE_CONTEXT_URL`/RouteContextMiddleware（早在 `3691cbd4` 移除，本次清文档残留）。
 
-### 4.3 下一步：v3 基准测试（续测直接从这里开始）
+### 4.3 v4 路由器版评测结果 + 待修 bug（2026-07-13/14 存档，续测从这里开始）
 
-**验收已完成（2026-07-12）**：服务器全量 pytest 3768 全绿；ce-rag 口径闸真机三验通过（2024 硬拒 / 2013 放行 / 缺省推断 `standard_source:inferred`）；两数据集已重灌（主池 78 条 item id 带 `ur-` 前缀防项目级撞号 + 专项 90 条）。**注意**：Langfuse 的 `bill-match-routing` 若仍有 100 条 item，UI 手动 archive M91~M100（2024 旧金标残留，会污染基线 10 条）。
+**本轮结论：agent 路由/委派能力已达标，分数被基础设施 bug 系统性压低约 20pp。** 三个 variant 迭代（v3→v4→修 bug）后，**扣除 MCP 崩溃/token 溢出的测量污染**，真实指标：**路由率 ≈90% / clarify ≈83% / 路由对不对(norm) ≈84.6%（11/13）**。报告原始值 route 86.7% / clarify 83.3% / norm 64.7%(11/17) —— norm 的 6 条失败里 4 条是 MCP 跨 loop 崩溃/A25 token 溢出跑空（`工具=[]`，测量污染，剔除），仅 2 条 A7/CC9 是 8B 真误判。
 
-1. **切 v3 跑基准**（服务器，单行）：`sed -i 's|lead_agent_v1.md|lead_agent_v3.md|' config.yaml`（热加载）→ F5 四条快验（矩形柱组价→bill_match / 套定额→quota_recommend / 信息价→price_query / 按2024组价→零工具拒答）→ `uv run --project backend python benchmark/L1_routing/run_routing_experiment.py --run-name v3_engines_base` + `--dataset bill-match-routing --run-name v3_engines_base`。跑前可 `export CE_QUOTA_RANK_ENABLED=0` 排除预排变量。
-2. **对照 v1**（可选但推荐）：sed 切回 v1 → `--run-name v1_engines_base` 两集各一轮 → Langfuse `Datasets→Runs→Compare` 验「单跳查表 vs 两跳预分类」假设。
-3. **归因失败用例**（翻 trace comment）：分「测量错/服务没起/agent 真错」三类。重点盯三处：norm 侧不反问压住没有（行为刚翻转）、`code_check` 组 12 条（双模会不会忘传 `code` 退化成重新选码）、`out_of_scope` 组（2024/他省拒答，另 trend 用例看 8B 会不会把「近三个月」换算错成 `periods`）。
-4. **两态 base_url**：嵌入式 runner 在宿主机跑须 `config.yaml` base_url=`localhost:8099`（Docker 态才 `host.docker.internal:8099`）。
-5. （深化，可选）收 `task` 的 `subagent_type` 把「路由对不对」量起来；路由稳后**铺开** toolcall/cost_task/norm_faithful。
-6. **金标缺口**（择期）：c5 纯计算用例 10~20 条（cost_calc 有类型化参数后正好考）、c6 多行清单整单问法 5~10 条、c3「清单项→定额推荐」变体——照 bill_match_routing 模板锚定真实数据。
+**已做的关键修复（均已 commit/push）**：
+- **提示词收敛为纯路由器**：`lead_agent_v4.md`（105→59 行）—— lead 只做「意图识别→路由」，workflow 闸机制下沉 `cost-workflow-guide` skill、复核 verdict 下沉 `cost-critic` 子agent、转述话术下沉工具 description。**瘦身让 route 65→87%、clarify 50→89%**（v3→v4 单步跃升，方向验证）。clarify 收敛为**意图/对象不明专用**（业务缺料改走 route→工具返回 missing→lead 转述 reactive），不再让 lead 主动判业务缺料。config 默认仍 v3，v4 靠 sed 切换测。
+- **「路由对不对」指标 `subagent_route_correct`（§3.3-3 落地）**：runner 收 `task` 的 `subagent_type`，对金标 `metadata.agent` 落点为子智能体的用例判委派是否派对（`AGENT_TO_SUBAGENT={norm-qa:norm-qa}`，17 条）。**捕获修**：subagent_type 要从 `type=values` 状态快照的完整 messages 读（流式分片抓不全 task args，实测 `工具=['task']` 但 subagent_ok=False 的假阴性）。
+- **子智能体递归上限**：`recursion_limit=max_turns`（executor.py:487）。norm-qa 10→25、cost-critic 8→20（10 步≈4 轮，agentic RAG 多轮检索+verify 跑不完会 GraphRecursionError）。**但这只是缓解，根因是下面的 MCP bug**。
+
+**⚠️ 三个待修 bug（拖垮 benchmark，都是 backend 真 bug，非路由/提示词问题）**：
+1. **MCP 会话跨 event loop 崩溃（最高优先，`[backend]`）**：`RuntimeError: Attempted to exit cancel scope in a different task`。根因 —— MCP 会话池 key=`(server_name, thread_id)`（`scope_key=thread_id`，`mcp/tools.py:134`），子 agent 与 lead **共用 thread_id 但跑在不同 loop**（子 agent 走 `_isolated_subagent_loop`，`subagents/executor.py:139`）；子 agent 调 ce-rag/ce-db MCP 时 `loop is current_loop` 为 False（`mcp/session_pool.py:70`）→ evict 分支 `await cm.__aexit__`（:90）在异于创建它的 task 里退出 anyio cancel scope → 崩 → 8B 重试风暴撞递归上限。**只有子 agent 碰 MCP 触发；lead 直调工具同 loop 不崩**。**修复方案 A（已设计待实现）**：池 key 掺 loop 身份 → `(server_name, thread_id, id(current_loop))`，每 loop 持独立会话、永不跨 loop evict；删 :70-77 跨 loop evict 分支；`close_scope`/`close_server` 的 key 过滤适配三元组。备选 B（run_coroutine_threadsafe 回原 loop 关）治标不选、C（norm 检索引擎化退役 norm-qa）丢隔离不选。要 TDD：同 loop 复用/跨 loop 隔离互不 evict/回归不抛 RuntimeError。
+2. **`verify_cost` 数据结构崩（`[backend]`）**：`AttributeError: 'int' object has no attribute 'get'`（`backend/app/ce/cost/verify.py:141`）—— `(m.get("price") or {}).get("value")` 假设 price 是 dict，实际传进来是 int。cost-critic 复核链上的真代码错，与 MCP 无关。
+3. **A25 上下文溢出**：cost 侧某条 37560 token 撞 qwen3-8b 32k 上限（400 BadRequest）。可能 workflow 装配了整单数据进 lead 上下文，需查是哪步没隔离。
+
+**下一步顺序**：① 修 MCP 跨 loop（方案 A）+ verify_cost `int.get` → benchmark 分数会自然跳上来（预计 norm 逼近满、route 90%+）；② 修好后复跑确认 `GraphRecursionError`/cancel-scope 消失；③ 定 config 默认切 v4；④（可选）金标重标：那 ~12 条业务缺料 clarify 用例改判 expect_route（clarify 切片将只剩意图二义）；⑤ 铺开 toolcall/cost_task/norm_faithful。
+
+**环境备忘**：嵌入式 runner 在宿主机跑须 `config.yaml` base_url=`localhost:8099`（Docker 态才 `host.docker.internal:8099`）；本地改 config 后 pull 用 `git stash / pull / stash pop` 保住 v4+localhost 本地差异。

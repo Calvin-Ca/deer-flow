@@ -12,11 +12,16 @@ run（UI 里 Datasets→Runs 可横向比 prompt variant），并 ``create_score
 生命周期一打架就崩（cancel scope / Task destroyed）。本脚本改为**主线程、逐条、
 不另起 loop**，与冒烟测试完全同构——那条路已验证干净退出。
 
-判定信号是「外部观测启发式」：路由是否发生靠匹配 agent 实际调用的工具名是否在
+判定信号是「外部观测启发式」：路由是否发生靠匹配 agent **第一次决策**里调用的工具名是否在
 ROUTE_TOOL_NAMES 里（统一精确名，不用前缀）。跑一轮后照真实 trace 里 agent 的实际
 工具名回校本常量。
 
-运行（服务器上，需四服务起齐使 agent 真能调脚本）：
+**只测第一次工具决策**（2026-07-14 改）：路由对错在第一个带 tool_calls 的 AI 消息就定，
+``_drive_agent`` 捕获它即 break、不执行工具、不往下跑。副产品：不再需要 ce-rag/ce-db 等工具
+服务起齐（工具不执行）；也不会因后续多轮累积撑爆上下文（400）/打转撞递归——那些「路由已决
+之后」的噪声整片消除。端到端跑通（工具真执行、整单闭环）属 L3/L7 的活，不在本路由基准里。
+
+运行（服务器上；模型端点 :8099 需在，工具服务可不起）：
     uv run --project backend python benchmark/L1_routing/run_routing_experiment.py \
         --run-name v2_runbook --model qwen-plus
 退出码 0=完成。两率聚合见终端 + Langfuse UI 的 dataset run。
@@ -98,53 +103,65 @@ def _is_fetch_tool(name: str) -> bool:
     return _is_route_tool(name)
 
 
-def _drive_agent(agent_client, query: str, thread_id: str) -> dict:
-    """把一条 query 喂给默认 lead agent，收集其工具调用与最终回复（主线程同步）。
+def _first_ai_message(messages: list[dict]) -> dict | None:
+    """取消息列表里第一条 AI 消息（= agent 的第一次决策）；没有则 None。"""
+    return next((m for m in messages if isinstance(m, dict) and m.get("type") == "ai"), None)
 
-    功能：评测的核心动作——只观测，不改 agent 行为；与冒烟测试同一调用路径。
-    参数：agent_client 整轮复用的 DeerFlowClient（每条新建会让上一条的持久 MCP 会话在
-        下一条的事件循环里被 GC 收尾 → anyio cancel scope 跨 task 的 RuntimeError 噪音）；
-        query 用户问法；thread_id 本条会话 id（即 langfuse session_id，跑完据此读回 trace）。
-    返回：dict —— answer 最终文本、tool_names 工具名列表、did_clarify/did_route 两判定。
+
+def _drive_agent(agent_client, query: str, thread_id: str) -> dict:
+    """把一条 query 喂给默认 lead agent，**只观测第一次工具决策就收工**（主线程同步）。
+
+    为什么只看第一次决策：路由对不对在 agent 的**第一个带 tool_calls 的 AI 消息**就定了；
+    后续的工具执行、多轮往返与路由判定无关，却会 ① 累积上下文撑爆 32k（400）、② 打转撞递归、
+    ③ 依赖 ce-rag/ce-db 起服务、④ 触发工具业务错误——全是「路由已决之后」的噪声。故一见到首个
+    带 tool_calls 的 ``values`` 快照就 break：该快照在**工具节点执行之前**发出（本 thread 的 MCP
+    会话尚未建立），break 干净、无跨 loop 关闭风险，也不需要工具服务起齐。
+
+    只读 ``values`` 快照（`client.py` 每个状态快照都 emit 完整 messages，含 tool_calls 的完整
+    args）——首个 AI 消息的 tool_calls 即路由决策，``task`` 的 ``subagent_type`` 也在其中（§3.3-3，
+    不再受流式分片抓不全 args 的困扰）。首个 AI 消息若是纯文本（无 tool_calls）= agent 直接答复未
+    路由（如 8B 在边界问题上自答），如实记为「未路由」。
+
+    参数：agent_client 整轮复用的 DeerFlowClient；query 用户问法；thread_id 本条会话 id
+        （即 langfuse session_id，跑完据此读回 trace）。
+    返回：dict —— answer 首个 AI 文本、tool_names 首次决策的工具名、did_clarify/did_route/did_fetch
+        三判定（口径收敛到**第一次决策**）、subagent_types 首次 task 的委派目标。
     """
-    tool_names: list[str] = []  # 只收非空工具名（流式后续分片 name 为空，跳过）
-    subagent_types: list[str] = []  # task 调用的 subagent_type（判「路由到对的子智能体」§3.3-3）
+    tool_names: list[str] = []
+    subagent_types: list[str] = []
     answer_parts: list[str] = []
 
-    for ev in agent_client.stream(query, thread_id=thread_id):
-        if ev.type == "values":
-            # values 快照带**完整** tool_calls args；messages 流式分片只到 task 的 name、抓不到
-            # subagent_type（实测 工具=['task'] 但 subagent_ok=False），从这里补齐（§3.3-3）。
-            for m in ev.data.get("messages", []) or []:
-                if m.get("type") == "ai":
-                    for tc in m.get("tool_calls", []) or []:
-                        if tc.get("name") == "task":
-                            st = (tc.get("args") or {}).get("subagent_type")
-                            if st:
-                                subagent_types.append(st)
-            continue
-        if ev.type != "messages-tuple":
-            continue
-        d = ev.data
-        if d.get("type") == "ai":
-            for tc in d.get("tool_calls", []) or []:
+    gen = agent_client.stream(query, thread_id=thread_id)
+    try:
+        for ev in gen:
+            if ev.type != "values":
+                continue
+            first_ai = _first_ai_message(ev.data.get("messages", []) or [])
+            if first_ai is None:
+                continue  # 模型还没回复，继续等下一个快照
+            # 拿到 agent 第一次决策：读其 tool_calls（路由决策）+ 文本，然后立刻收工。
+            for tc in first_ai.get("tool_calls", []) or []:
                 name = tc.get("name") or ""
                 if name:
                     tool_names.append(name)
-                if name == "task":  # 收 task 的 subagent_type：判委派到 norm 还是别处（§3.3-3）
+                if name == "task":  # task 的 subagent_type：判委派到 norm 还是别处（§3.3-3）
                     st = (tc.get("args") or {}).get("subagent_type")
                     if st:
                         subagent_types.append(st)
-            if isinstance(d.get("content"), str):
-                answer_parts.append(d["content"])
-        elif d.get("type") == "tool" and d.get("name"):
-            # 工具结果侧也计名（去重保序兜掉正常路径的重影）：保险口径——凡**中间件代发**的
-            # 工具调用（不经模型流式 tool_calls、只有 ToolMessage 可观测）都靠这行兜住。
-            # 历史动机是哑火收编（after_model 把纯文本反问转 ask_clarification，E6 冤案），该机制
-            # 随 RouteContextMiddleware 删除已不存在（3691cbd4，其实从未接线）；保留此行作保险。
-            tool_names.append(d["name"])
+            content = first_ai.get("content")
+            if isinstance(content, str) and content:
+                answer_parts.append(content)
+            break  # 第一次决策已捕获，不再往下跑（工具节点未执行 → 无累积/打转/服务依赖）
+    finally:
+        # 确定性关闭生成器（LangGraph 同步流按 GeneratorExit 收尾），不留悬挂。break 发生在
+        # 工具执行前、本 thread 无 MCP 会话，清理不该触发跨 loop 关闭；万一清理抛异常也吞掉，
+        # 不让它冒泡把本条误判成「跑挂了」。
+        try:
+            gen.close()
+        except Exception:
+            pass
 
-    tool_names = list(dict.fromkeys(tool_names))  # 去重保序（tool_call 与其结果各计一次的重影）
+    tool_names = list(dict.fromkeys(tool_names))  # 去重保序（并行 tool_calls 里的重名）
     return {
         "answer": "".join(answer_parts)[:500],
         "tool_names": tool_names,

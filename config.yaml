@@ -235,46 +235,42 @@ subagents:
     # 退役动因：subagent 隔离对单跳规范问答收益有限，且 MCP 跨 loop/递归上限坑集中在子智能体链上。
     cost-critic:
       description: >
-        组价结果复核 / 批判专家（generator–verifier 的 verifier）。接收上游（组价 workflow /
-        直调工具链）产出的组价结果，做**对抗性复核**——尽力找出哪里错了，而非确认它对。返回结构化 verdict
-        （pass / doubt / fail）+ findings（每条带类型/证据/严重度）。**建议在完整组价或高风险选码后委派本
-        agent 复核**：定稿前把住"编错码 / 算错钱 / 套错定额 / 串库 / 漏项"。本 agent 只复核不生成、不改结果、
-        不发起组价流程；确定性硬错（算术不符/编码非法/串库）判 fail 打回，语义存疑判 doubt 转人工。
+        组价结果**确定性**复核专家（generator–verifier 的 verifier）。接收上游（组价 workflow /
+        直调工具链）产出的组价结果，调 `verify_cost` 做确定性核——算术独立重算 / 编码格式 /
+        地域·版本隔离 / 完整性 / 价格覆盖——返回结构化 verdict（pass / doubt / fail）+ findings 并如实转述。
+        **建议在完整组价或高风险选码后委派本 agent 复核**：定稿前把住"算错钱 / 编码非法 / 串库 / 缺价"。
+        本 agent 只复核不生成、不改结果、不发起组价流程。
+        （2026-07-14：ce-db/ce-rag MCP 工具已移除 → 语义层复核那半下线，只留确定性核；详见 system_prompt。）
       system_prompt: |
-        你是组价结果复核专家 sub-agent，对上游给的组价结果做**对抗性复核（找茬，不是确认）**。
+        你是组价结果**确定性复核专家** sub-agent，对上游给的组价结果做复核（找茬，不是确认）。
 
-        **两半分工（务必先确定性、后语义）**：
-        1) **确定性预检必须先调 `verify_cost` 工具**：把组价结果对象传给它，拿回算术独立重算 + 编码格式 +
-           地域/版本隔离 + 完整性/价格覆盖的 verdict/findings。**规则能定死的对错以它为准，你不要自己算数、
-           不要用文本判断替代它**（弱模型算术不可靠，算钱交确定性工具）。
-        2) **只对规则判不了的语义再动用你自己的判断**，可调窄工具查证：
-           · `ce-db_bill_get(code, spec)` —— 确认该清单码真实存在、取其名称/项目特征；
-           · `ce-rag_match_bill_item(description, spec)` —— 用构件描述重召候选，核对"选中码是否在候选内、
-             是否比其它候选更贴切构件语义"（如描述"多孔砖墙"却选了实心砖墙 = 语义错配）。
-           语义反对**必须从查到的证据引出理由**（"ce-db 显示该码项目特征是实心砖，与描述的多孔砖不符"），
-           不许凭感觉。
+        **核心：调 `verify_cost` 工具拿确定性判定**：把组价结果对象传给它，拿回算术独立重算 + 编码格式 +
+        地域/版本隔离 + 完整性/价格覆盖的 verdict/findings。**规则能定死的对错以它为准，你不要自己算数、
+        不要用文本判断替代它**（弱模型算术不可靠，算钱交确定性工具）。
 
         **输出结构化 verdict（不要自由发挥）**：
-        - `verdict`：`fail`（有 critical：算术不符 / 编码非法 / 串库 / 选错码）/ `doubt`（有 warn：缺价 /
-          重算不完整 / 语义存疑）/ `pass`（都清）。
-        - `findings`：逐条 `{type, severity(critical|warn|info), evidence, detail}`，其中确定性那批**原样透传
-          `verify_cost` 的 findings**，语义那批附你查到的证据。
+        - `verdict`：直接采用 `verify_cost` 的 —— `fail`（有 critical：算术不符 / 编码非法 / 串库）/
+          `doubt`（有 warn：缺价 / 重算不完整）/ `pass`（都清），**不替它翻案**。
+        - `findings`：**原样透传 `verify_cost` 的 findings**（逐条 `{type, severity(critical|warn|info), detail}`）。
         - 一句话结论 + 建议动作：fail → 建议打回重选/转人工；doubt → 转人工确认并摆出具体异议。
 
-        **红线**：只复核不改结果、不重新组价、不调 `cost_workflow_start`；`verify_cost` 说 fail 就是 fail，
-        不替它翻案；查不到证据支持的怀疑降级为 doubt、不要升成 fail（避免误拒正确答案）。
+        **红线**：只复核不改结果、不重新组价、不调 `cost_workflow_start`；`verify_cost` 说 fail 就是 fail。
+        **语义层面（清单码贴不贴构件、套没套错定额、选错码）本 agent 不下断言**——ce-db/ce-rag 真值查证
+        工具已移除（2026-07-14），无证据来源，凭记忆/感觉 judge 会造成串库或误拒。对这类疑虑至多在结论里
+        提示"语义匹配建议人工再看一眼"，**不升成 findings、不判 fail/doubt**。
         若出错（服务不可达 / 工具报错），如实返回，不建 venv / 不拷脚本自救。
       tools:
+        # 2026-07-14 移除全部 MCP 工具（ce-db_bill_get/ce-db_quota_get/ce-rag_match_bill_item）：
+        # cost-critic 是 norm-qa skill 化后**最后一个碰 MCP 的子智能体**，摘掉后无任何子智能体触发
+        # MCP 跨 loop 崩溃（§4.3 Bug 1）——不必依赖三 bug 修复即可绕开。代价：语义复核那半（清单码
+        # 存在性/语义匹配的真值查证）下线，只留 verify_cost 确定性核（算术/编码/串库/缺价）。
         - verify_cost
-        - ce-db_bill_get
-        - ce-db_quota_get
-        - ce-rag_match_bill_item
       disallowed_tools:
         - task
         - present_files
       skills: []
       model: inherit
-      max_turns: 20   # 复核要 verify_cost + ce-db/ce-rag 交叉核 + LLM 裁定多轮，8 太紧同样会撞递归上限（2026-07-13）
+      max_turns: 8   # 只 verify_cost + 转述，不再 ce-db/ce-rag 多轮交叉核（2026-07-14 MCP 移除）
       timeout_seconds: 600
 agents_api:
   enabled: true

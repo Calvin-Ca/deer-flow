@@ -41,24 +41,25 @@ DATASET_NAME = "user-requests-routing"  # 路由主池（78 条，仅深圳·201
 # cost_workflow_* 工作流节点或 task 分派子智能体；bash/read_file 自己瞎折腾不算。
 # 集合由 config.yaml + benchmark/prompts/lead_agent_v*.md 的「lead 可见工具面」确定（统一精确名、不用前缀）：
 #   · cost 路由 = cost_workflow_start/node/resume/state（group=cost，lead 可见）
-#   · norm 路由 = task 分派 norm-qa（顶层无 norm 编排工具，委派入口是 task）；**外加**当前 tool_search
-#     关闭态下 lead 直调 ce-rag_search_clause 检索规范（见下方 2026-07-13 校正），亦计 norm 路由达成
+#   · norm 路由（2026-07-14 skill 化后）= lead 亲自做 agentic RAG：tool_search promote ce-rag（enabled=true 态）
+#     / 直调 ce-rag_search_clause（enabled=false 态）/ 定稿 verify_norm 回查——三者任一即 norm 路由达成
+#     （不再经 task 分派 norm-qa 子智能体；旧 v3/v4 的 task(norm-qa) 路径已随子智能体删除失效）
 #   · 单点能力直调 = bill_match（选码⇄核实双模，2026-07-12 由 verify_bill_code 合并更名）/
 #     quota_recommend（定额方案推荐，2026-07-12 引擎化、原 quota-recommend 子智能体退役）/
 #     price_query（信息价/走势，2026-07-12 引擎化提升为 lead 直调）/
 #     cost_calc（单点计算）——lead_agent_v2
 #     的直调工具面（v1 提示词不引用但工具全局可见，调了同样算路由）
-# 2026-07-13 校正：原判据「刻意不收 ce-rag_*」的理由是它被 DeferredToolFilterMiddleware 对 lead 隐藏——
-#   但该中间件仅在 config.yaml `tool_search.enabled=true` 时才入链（见 lead_agent/agent.py 的 if 分支）；
-#   当前 tool_search.enabled=false → 中间件未启用 → ce-rag_* 原样绑给 lead、lead 直接调（F5 实测 tools
-#   含 ce-rag_search_clause）。norm 侧无引擎化直调工具（不同于 cost/price 已有 bill_match/price_query），
-#   故直调 ce-rag_search_clause 就是 lead 唯一的 norm 直达路径 → 收进本集：expect_route=True（A 簇规范
-#   问答）算路由达成、expect_route=False（域外，如 B11）算违规取数，两侧对称成立。待「摘 ce-rag 出 lead +
-#   norm-qa 子 agent 委派」架构落地后此条应收回，改由 task+subagent_type=norm 判 norm 路由。集合待按真实
-#   trace 校准（§3.3-1）：目前只见 ce-rag_search_clause，如冒出其他 norm 检索原语再补。
+# 2026-07-14 校正（norm-qa skill 化）：norm 不再走 task 委派子智能体，改由 lead 亲自做 agentic RAG。
+#   走 A 方案——ce-rag_* 保持 deferred（config `tool_search.enabled=true`），lead 用前经 tool_search promote：
+#   · enabled=true（现值）→ 首个动作是 tool_search，随后调 ce-rag_*、定稿 verify_norm；
+#   · enabled=false（ce-rag 直绑）→ 直调 ce-rag_search_clause；
+#   三者（tool_search / ce-rag_search_clause / verify_norm）任一命中即 norm 路由达成，对两态都稳。
+#   注：verify_norm 原被列为「非路由入口」，skill 化后它是每次 norm 定稿必调的强信号，故此番收进本集。
+#   ⚠️ 集合仍待按真实 8B trace 校准（§4.1 F5→runner→trace）：若 8B 漏 promote 直接自答、或冒出其他
+#   ce-rag 检索原语（get_clause/expand_clause_refs/retrieve_evidence），照实补进本集。
 # 仍不收：① ce-db_* 结构化真值原语（cost/price 已由 bill_match/price_query 引擎化直调覆盖，lead 不直调裸原语）；
-#   ② verify_norm 是引用忠实度回查、③ verify_cost 是复核内部辅助——均非路由入口。
-# task 只表示「分派了某子智能体」，光看名字分不清路由到 cost 还是 norm（要区分得读 subagent_type）。
+#   ② verify_cost 是 cost-critic 复核内部辅助——非路由入口。
+# task 现只表示「分派 cost-critic 复核」（norm-qa 已 skill 化退出委派），仍收作路由信号。
 ROUTE_TOOL_NAMES = {
     "cost_workflow_start",
     "cost_workflow_node",
@@ -69,15 +70,22 @@ ROUTE_TOOL_NAMES = {
     "price_query",
     "cost_calc",
     "task",
-    "ce-rag_search_clause",  # 2026-07-13 收：tool_search 关闭态 lead 直调的 norm 规范检索（见上校正）
+    # norm 路由信号（2026-07-14 norm-qa skill 化后）：lead 亲自做 agentic RAG，两种运行态都收：
+    #   · tool_search.enabled=true（config 现值，ce-rag deferred）→ 首个动作是 tool_search（promote ce-rag）
+    #   · tool_search.enabled=false（ce-rag 直绑 lead）→ 直调 ce-rag_search_clause
+    #   · verify_norm 为 skill 每次定稿必调的忠实性回查，亦作 norm 达成的强信号
+    "tool_search",
+    "ce-rag_search_clause",
+    "verify_norm",
 }
 CLARIFY_TOOL = "ask_clarification"
 
 # 「路由对不对」判据（§3.3-3）：金标 metadata.agent 属于**子智能体**落点的，检查 task 的 subagent_type 是否命中。
-# 当前架构下只有 norm-qa 是清晰的子智能体路由落点（v3：规范问答 → task(norm-qa)，17 条 expect_route）；
-# cost-agent/price 已引擎化为 lead 直调工具、cost-check 多走 cost_calc(check) 或定稿前复核——它们的
-# 「对不对」归 toolcall 评测，不在此判。key 须与金标 agent 字段取值一致（见 user_requests.jsonl）。
-AGENT_TO_SUBAGENT = {"norm-qa": "norm-qa"}
+# 2026-07-14 norm-qa skill 化后，norm 不再经 task 委派、改由 lead 亲自做 agentic RAG（信号见 ROUTE_TOOL_NAMES）
+# → 移出本表；现存子智能体只剩 cost-critic（定稿前复核），但它是 workflow 内部的复核落点、非本集金标路由靶。
+# 故本表暂空，subagent_route_correct 子率对本集无适用用例（subagent_set 空 → nan，已在汇总处兜底）。
+# cost-agent/price 已引擎化为 lead 直调工具、cost-check 多走 cost_calc(check)——它们的「对不对」归 toolcall 评测。
+AGENT_TO_SUBAGENT: dict[str, str] = {}
 
 
 def _is_route_tool(name: str) -> bool:
@@ -236,7 +244,8 @@ def main() -> int:
     n_halted = sum(1 for r in rows if r["exp"].get("expect_route") is True and r["route_ok"] is None)
     route_rate = sum(r["out"]["did_route"] for r in route_set) / len(route_set) if route_set else float("nan")
     clarify_rate = sum(r["out"]["did_clarify"] for r in clarify_set) / len(clarify_set) if clarify_set else float("nan")
-    # 「路由对不对」子率（§3.3-3）：仅金标落点为子智能体（norm-qa）的用例，subagent_type 命中比例
+    # 「路由对不对」子率（§3.3-3）：仅金标落点为子智能体的用例判 subagent_type 命中比例。
+    # 2026-07-14 norm-qa skill 化后 AGENT_TO_SUBAGENT 空 → subagent_set 空 → nan（本集暂无子智能体路由靶）。
     subagent_set = [r for r in rows if r.get("subagent_ok") is not None]
     subagent_rate = sum(1 for r in subagent_set if r["subagent_ok"]) / len(subagent_set) if subagent_set else float("nan")
 
@@ -244,7 +253,7 @@ def main() -> int:
     print(f"run_name        = {run_name}   model = {args.model or '默认'}")
     print(f"路由率           = {route_rate:.2%}  ( {sum(r['out']['did_route'] for r in route_set)}/{len(route_set)} ，另 {n_halted} 条正确止步于反问不计，建议门 ≥0.8 )")
     print(f"红线遵守率(反问) = {clarify_rate:.2%}  ( {sum(r['out']['did_clarify'] for r in clarify_set)}/{len(clarify_set)} ，建议门 ≥0.95 )")
-    print(f"路由对不对(norm) = {subagent_rate:.2%}  ( {sum(1 for r in subagent_set if r['subagent_ok'])}/{len(subagent_set)} ，期望 task(norm-qa) 命中率 )")
+    print(f"路由对不对(委派) = {subagent_rate:.2%}  ( {sum(1 for r in subagent_set if r['subagent_ok'])}/{len(subagent_set)} ，norm-qa 已 skill 化，本集暂无子智能体路由靶→nan 正常 )")
     print(f"逐条分数已挂到 Langfuse：Datasets → {args.dataset} → Runs → " + run_name)
     return 0
 

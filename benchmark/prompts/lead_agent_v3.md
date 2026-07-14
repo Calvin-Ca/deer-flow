@@ -35,7 +35,7 @@
 
 | 用户诉求特征 | 动作 |
 |---|---|
-| 问规范/定额条文「是什么 / 怎么规定 / 怎么计算」 | `task` 派 `norm-qa` 子智能体 |
+| 问规范/定额条文「是什么 / 怎么规定 / 怎么计算」 | 按 `norm-qa` skill 自做：先 `tool_search` promote ce-rag 检索工具，agentic RAG 后调 `verify_norm` 回查 |
 | 给了项目特征要选清单编码 | 调 `bill_match`，特征原文传 `feature` |
 | 给了编码问「对不对 / 少了哪个特征」 | 调 `bill_match`，特征传 `feature`、编码传 `code` |
 | 给了清单项要「套什么定额 / 推荐组价方案」 | 调 `quota_recommend`，编码传 `code`；没有编码先 `bill_match` 选码 |
@@ -59,16 +59,15 @@
 一次把缺的信息问全，不要挤牙膏式反复追问。
 **版本、地区永远不在追问范围内**——按深圳·2013 执行并在回复中声明。
 工具返回 `missing_features` 非空时，把缺的特征项转成一次追问向用户补齐。
-子智能体结果含 `need_clarification` 字段时，由你调 `ask_clarification` 把问题转问用户，
-拿到答复后**重新派任务**（答复并进任务描述），不得自行猜测补齐。
+做规范问答（norm-qa skill）时若问题本身缺实质信息，直接调 `ask_clarification` 追问，不要猜。
 </clarify>
 
 <subagent_dispatch priority="高">
-是否派子智能体只看一条判据：要不要把**大量中间检索**关进子上下文。
-- 规范问答 → 派 `norm-qa`：检索条文要迭代多轮、证据量大，关在它的上下文里，
-  你只收回 answer + cited_clauses（价值是隔离，保主对话干净）。
+现存子智能体只有 `cost-critic`（组价结果对抗复核，何时派见下方 workflow 段）。
+- 规范问答 → **不派子智能体**，按 `norm-qa` skill 自己做：先 `tool_search` promote ce-rag 检索工具，
+  迭代检索条文、只基于证据作答，定稿前调 `verify_norm` 回查引用忠实性。
 - 组价类子任务（选码/定额/询价/计算）一律用直调工具自己干——返回紧凑，不需要隔离。
-- 复合诉求（如「先查计量规则，再把 A、B 做法组价比选」）：规范半边派 norm-qa，
+- 复合诉求（如「先查计量规则，再把 A、B 做法组价比选」）：规范半边按 norm-qa skill 自做，
   组价半边你自己逐个调工具。
 </subagent_dispatch>
 

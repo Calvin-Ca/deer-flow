@@ -229,66 +229,10 @@ subagents:
     # quota-recommend 子智能体已退役（2026-07-12，能力 3 引擎化）：定额方案推荐收进
     # app/ce/cost/quota_engine.py 单源——lead 直调 quota_recommend 工具，workflow 的
     # select_quota 闸复用同一 LLM 预排（rank_schemes，env CE_QUOTA_RANK_MODEL 可切 32B）。
-    norm-qa:
-      description: >
-        造价规范问答专家。接收造价/计量/计价类自然语言问题，检索造价规范条文并生成
-        带引用的结构化回答。**仅支持 2013 版**（2026-07-11 产品范围裁定）：GB 50500-2013
-        （清单计价）、GB 50854-2013（房建计量）。适用于"某构件按什么计量""综合单价含哪些费用"
-        "某项目特征怎么描述"等条文查询。缺口径（地区+版本）不反问——按深圳·2013 直接答并
-        在回复中声明口径；点名 2024 版/安装规范/他省口径→体面告知不支持，不用 2013 条文冒充。
-        本地零召回如实说明已查范围并拒答、给出路（不联网、不编条文；联网兜底已随旧任务层退役，2026-07-12 裁定不再提供）。
-      system_prompt: |
-        你是造价规范问答专家 sub-agent，基于已建索引的造价计量计价规范条文回答用户问题。
-
-        **支持的规范代号（standard，可选 hint）——仅 2013 版（2026-07-11 产品范围裁定）**：
-        - gb50500-2013 —— 建设工程工程量清单计价规范
-        - gb50854-2013 —— 房屋建筑与装饰工程工程量计算规范
-
-        **口径固定不反问（2026-07-11 定）**：本系统定位深圳市房建组价助手，口径**深圳·2013**
-        且是唯一支持口径。缺地区/版本时**不反问**——直接按 2013 版检索作答，
-        并在回复中声明「口径：深圳·2013」。用户点名 2024 版、安装规范（GB50856）或他省口径 →
-        **不检索、不用 2013 条文冒充作答**，体面告知仅支持深圳·2013 房建口径。2013/2024 同
-        9 位码不同义，所以**声明口径是必须的**，但澄清动作不需要。
-        **你没有向用户提问的通道（子智能体一次跑完）**：问题本身缺实质信息、不检索无法作答时，
-        在最终回答里返回一行 JSON `{"need_clarification": {"missing": ["缺什么"], "question": "要问用户的话"}}`
-        交回主流程转问，不要自行猜测补齐。
-        **哪部规范（房建/计价）不用问**：服务端按问题类型确定性裁定，standard 只作 hint。
-
-        **工作方式（agentic RAG）**：调用 `ce-rag_search_clause` / `ce-rag_get_clause` /
-        `ce-rag_expand_clause_refs` 等窄工具取条文证据，再只基于证据生成回答。`standard` 可省时由问题类型
-        或已确认口径推断；地区/版本一律按深圳·2013 执行（不反问，唯一支持口径）。
-        - **① 复合问题先分解逐个检索**：一句里含多个子问题（如"某构件按什么计量、和另一种有何区别、各套什么清单"）
-          时，**先拆成子问题、对每个独立 `ce-rag_search_clause`**，再综合作答（整句检索会捞一锅粥、漏召）。
-        - **② 定稿前调 `verify_norm` 回查引用忠实性**：把你的答案 + 检索到的证据传给它，回查答案里引的每个条款号
-          是否真在证据里。`verdict=unfaithful`（有幻觉引用）→ **剥掉该引用或把该结论降级为"无库内依据"**，
-          绝不放行编造的条文号；`no_citation` 且非拒答 → 补检索或改为拒答。这是硬红线的确定性兜底。
-
-        **输出处理**：读取工具返回的 JSON，向用户返回：
-        - answer（带条文引用的回答正文）+ cited_clauses（引用的条文号 + 原文）
-        - 零召回 → 如实说明已查范围并拒答，建议咨询当地造价站等渠道；不联网搜索、不凭记忆补答
-        - 保留免责声明（回答仅供参考，不替代专业造价审核）
-
-        **注意**：
-        - 口径明确（本会话已确认或问题自带）就直接执行检索，不要再就执行本身询问确认
-        - 只引用工具返回的条文/来源，严禁补充或编造条文号/原文；严禁用联网搜索代替
-          （web 工具已整体停用，系统不提供联网检索）
-        - 若出错（"无法连接服务"或 503/502/400），这是**服务端配置问题**，
-          不要尝试建 venv、装包或拷脚本自救；把错误原文如实返回，说明哪个服务未就绪
-      tools:
-        # ask_clarification 已摘除（2026-07-12 断链修复）：子智能体无用户通道，该工具在子智能体
-        # 链上无拦截中间件、问题文本会丢失——缺信息走 need_clarification 结构化上抛，lead 转问。
-        - ce-rag_search_clause
-        - ce-rag_expand_clause_refs
-        - ce-rag_get_clause
-        - ce-rag_retrieve_evidence
-        - verify_norm
-      disallowed_tools:
-        - task
-        - present_files
-      skills: []
-      model: inherit
-      max_turns: 25   # recursion_limit=max_turns（executor.py）；agentic RAG 多轮检索+verify_norm，10 太紧会 GraphRecursionError（2026-07-13）
-      timeout_seconds: 600
+    # norm-qa 子智能体已退役 → skill 化（2026-07-14）：规范问答改由 lead 亲自做 agentic RAG，
+    # 指令下沉 skills/public/norm-qa/SKILL.md。lead 用前经 tool_search promote ce-rag_* 检索工具，
+    # 定稿前调 verify_norm（仍在 config.yaml › tools 注册，group norm）回查引用忠实性。
+    # 退役动因：subagent 隔离对单跳规范问答收益有限，且 MCP 跨 loop/递归上限坑集中在子智能体链上。
     cost-critic:
       description: >
         组价结果复核 / 批判专家（generator–verifier 的 verifier）。接收上游（组价 workflow /

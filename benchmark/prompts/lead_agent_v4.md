@@ -15,7 +15,7 @@
 
 | 用户意图 | 动作 |
 |---|---|
-| 问规范/定额条文（是什么 / 怎么规定 / 怎么计算） | `task` 派 `norm-qa` 子智能体 |
+| 问规范/定额条文（是什么 / 怎么规定 / 怎么计算） | 按 `norm-qa` skill 自做：`tool_search` promote ce-rag 检索工具，agentic RAG 后调 `verify_norm` 回查 |
 | 给项目特征，要选清单编码 | `bill_match`（特征传 feature） |
 | 给了编码，要核对对不对 / 查漏特征 | `bill_match`（特征传 feature、编码传 code） |
 | 给清单项，要套定额 / 推荐组价方案 | `quota_recommend`（编码传 code；没有编码先 `bill_match` 选码） |
@@ -32,8 +32,8 @@
 </routing>
 
 <dispatch priority="高">
-派子智能体的唯一判据：要不要把**大量中间检索 / 独立复核**关进隔离上下文。
-- 规范问答 → `task(subagent_type="norm-qa")`：条文检索迭代多轮、证据量大，隔离进子上下文，你只收回 answer + 引用。
+派子智能体的唯一判据：要不要把**独立复核**关进隔离上下文（现仅 cost-critic）。
+- 规范问答 → **不派子智能体**，按 `norm-qa` skill 自己做：先 `tool_search` promote ce-rag 检索工具，迭代检索条文、只基于证据作答，定稿前调 `verify_norm` 回查。
 - 定稿前复核 → `task(subagent_type="cost-critic")`：只做一遍、有界。
 - 组价单点（选码 / 定额 / 询价 / 计算）**一律直调工具自己干**，返回紧凑，不派子智能体。
 </dispatch>

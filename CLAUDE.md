@@ -129,7 +129,9 @@
 
 ### 4.3 v4 路由器版评测结果 + 待修 bug（2026-07-13/14 存档，续测从这里开始）
 
-**本轮结论：agent 路由/委派能力已达标，分数被基础设施 bug 系统性压低约 20pp。** 三个 variant 迭代（v3→v4→修 bug）后，**扣除 MCP 崩溃/token 溢出的测量污染**，真实指标：**路由率 ≈90% / clarify ≈83% / 路由对不对(norm) ≈84.6%（11/13）**。报告原始值 route 86.7% / clarify 83.3% / norm 64.7%(11/17) —— norm 的 6 条失败里 4 条是 MCP 跨 loop 崩溃/A25 token 溢出跑空（`工具=[]`，测量污染，剔除），仅 2 条 A7/CC9 是 8B 真误判。
+> **⚠️ 本节部分结论已被 2026-07-14 复跑证伪，见文末「2026-07-14 更新」——尤其「扣掉污染 norm 逼近满」不成立，A25 归因也错了。三个 bug 已修但被用户裁定回退（现代码=未修态），下节读完再判。**
+
+**本轮结论（部分已证伪，见文末更新）：agent 路由/委派能力已达标，分数被基础设施 bug 系统性压低约 20pp。** 三个 variant 迭代（v3→v4→修 bug）后，**扣除 MCP 崩溃/token 溢出的测量污染**，真实指标：**路由率 ≈90% / clarify ≈83% / 路由对不对(norm) ≈84.6%（11/13）**。报告原始值 route 86.7% / clarify 83.3% / norm 64.7%(11/17) —— norm 的 6 条失败里 4 条是 MCP 跨 loop 崩溃/A25 token 溢出跑空（`工具=[]`，测量污染，剔除），仅 2 条 A7/CC9 是 8B 真误判。
 
 **已做的关键修复（均已 commit/push）**：
 - **提示词收敛为纯路由器**：`lead_agent_v4.md`（105→59 行）—— lead 只做「意图识别→路由」，workflow 闸机制下沉 `cost-workflow-guide` skill、复核 verdict 下沉 `cost-critic` 子agent、转述话术下沉工具 description。**瘦身让 route 65→87%、clarify 50→89%**（v3→v4 单步跃升，方向验证）。clarify 收敛为**意图/对象不明专用**（业务缺料改走 route→工具返回 missing→lead 转述 reactive），不再让 lead 主动判业务缺料。config 默认仍 v3，v4 靠 sed 切换测。
@@ -141,6 +143,45 @@
 2. **`verify_cost` 数据结构崩（`[backend]`）**：`AttributeError: 'int' object has no attribute 'get'`（`backend/app/ce/cost/verify.py:141`）—— `(m.get("price") or {}).get("value")` 假设 price 是 dict，实际传进来是 int。cost-critic 复核链上的真代码错，与 MCP 无关。
 3. **A25 上下文溢出**：cost 侧某条 37560 token 撞 qwen3-8b 32k 上限（400 BadRequest）。可能 workflow 装配了整单数据进 lead 上下文，需查是哪步没隔离。
 
-**下一步顺序**：① 修 MCP 跨 loop（方案 A）+ verify_cost `int.get` → benchmark 分数会自然跳上来（预计 norm 逼近满、route 90%+）；② 修好后复跑确认 `GraphRecursionError`/cancel-scope 消失；③ 定 config 默认切 v4；④（可选）金标重标：那 ~12 条业务缺料 clarify 用例改判 expect_route（clarify 切片将只剩意图二义）；⑤ 铺开 toolcall/cost_task/norm_faithful。
+**下一步顺序（原计划，已被下方更新覆盖）**：① 修 MCP 跨 loop（方案 A）+ verify_cost `int.get` → benchmark 分数会自然跳上来（预计 norm 逼近满、route 90%+）；② 修好后复跑确认 `GraphRecursionError`/cancel-scope 消失；③ 定 config 默认切 v4；④（可选）金标重标：那 ~12 条业务缺料 clarify 用例改判 expect_route（clarify 切片将只剩意图二义）；⑤ 铺开 toolcall/cost_task/norm_faithful。
 
 **环境备忘**：嵌入式 runner 在宿主机跑须 `config.yaml` base_url=`localhost:8099`（Docker 态才 `host.docker.internal:8099`）；本地改 config 后 pull 用 `git stash / pull / stash pop` 保住 v4+localhost 本地差异。
+
+---
+
+### 2026-07-14 更新：三个 bug 已修·已验·**被回退**；§4.3 归因订正
+
+**代码现状**：三个 bug 全部 TDD 修复过并在服务器验证，但**用户裁定硬回退**——`git reset --hard 63ec1e52` + force-push，现 `origin/main = 63ec1e52`，**三个 bug 回到未修态**（跑整单会再撞 cancel-scope / verify_cost 崩 / 溢出）。修复完整存于**本地备份**（未 push）：分支 `backup/before-subagent-revert-20260714` + 标签 `backup-20260714-1745`，均指向 `17d66a0e`；要找回 `git cherry-pick 7e0c8b67`（三 bug + 泄漏修复）/ `17d66a0e`（benchmark 第一跳）。回退的直接动因是「撤销今天关于 subagent 的更改」，但那处（`reset_subagents_config()` + conftest fixture）与三 bug 挤在同一 commit，遂整体回退。
+
+**修复内容（备份里，供重做参考）**：① MCP 跨 loop——池 key 掺 `id(loop)` 三元组 + 全路径 loop-aware 关闭（方案 A，另修了 LRU/close_scope 跨 loop 关闭的连带同类崩溃）；② `verify_cost`——`_price_value()` 兼容标量/`{value}` dict；③ A25 溢出——workflow 工具返回过 `_lead_view` 投影（剥离整单原始 items/events）+ `full_workflow_state()` 给测试；④ 附带修了 CE 子智能体（norm-qa/cost-critic）注册泄漏进 `_subagents_config` 单例导致 `test_subagent_prompt_security` 按顺序偶挂（`reset_subagents_config` + conftest autouse，前后都重置）。本地单测全绿；全量 3775 passed（10 failed 全是 live/需模型 + 1 条陈旧 v1 断言，无关）。
+
+**⚠️ §4.3 归因订正（复跑实证，最有价值的结论）**：
+- **Bug 1（MCP 跨 loop）修复确实有效**：服务器复跑全程无 `cancel scope in a different task`，子 agent MCP 往返正常（trace 里 [4] subagent_ok=True、[23] ce-rag 业务错误能正常返回）。**这条是真崩溃，修对了。**
+- **但「扣掉污染 norm 逼近满」= 证伪**：修好后 `fix-3bugs` 复跑 **norm 仍 11/17（64.7%，与修复前逐位相同）**，route 84% / clarify 89%。如果那 6 条 norm 失败真是 MCP 崩溃污染，修好后该恢复——没恢复，**说明 §4.3 把它们误判成污染了**。
+- **Bug 3「A25 上下文溢出」归因两处错**：① **A25 是 norm-qa 项**（`按GB50011 框架抗震等级` 边界问答），**根本不走 cost workflow**，`_lead_view` 对它零影响；② 真实溢出源是 **lead 侧累积**（单条 query 自己的 agentic loop 打转 / 批量直调工具返回堆积到 35939 token），**不是「workflow 装配整单进 lead」**。A25/A26/A27 三条 `工具=[]` 的真相是 **8B 在「点名未收录规范」的边界 query 上不委派 norm-qa、直接自答**——**纯路由/提示词问题，与三个 infra bug 无关**。norm 的坑归下一步提示词侧治，不是基础设施。
+
+**新暴露的两个尾巴（独立问题，都不在三 bug 里）**：
+1. **lead 主图打转**（如 B10 `给"C30现浇混凝土独立基础"组价`，c6 整单）：8B 反复调同类工具不收敛 → 撞递归上限 100（`GraphRecursionError`）或先撞 32k token 墙（400）。是模型编排短板，治法=治打转/早停 + summarization 兜底 + 直调工具返回投影，非 infra bug。
+2. **ce-rag 口径闸不拆逗号标准**（ce-code 层）：norm-qa 把两个标准逗号拼成 `'gb50500-2013,gb50854-2013'` 传给 ce-rag，闸精确匹配只认单个 → 拒（`不支持的规范口径`）。修：ce-rag 闸支持逗号/列表逐个校验，或 norm-qa 一次传一个。
+
+**benchmark 方法论订正（重要，也在备份 `17d66a0e` 里）**：**L1 路由基准应只测「第一次工具决策」**——路由对错在 agent 第一个带 tool_calls 的 AI 消息就定，后续工具执行/多轮往返与路由判定无关却会累积溢出/打转/依赖服务。改法：`_drive_agent` 捕获首个带 tool_calls 的 `values` 快照即 break（break 在工具节点执行前、本 thread MCP 会话未建 → 无跨 loop 关闭风险）。副产品：**不需要 ce-rag/ce-db 起服务、无 400/递归/ConnectError 噪声**。`first-decision` 复跑 route 85% / clarify 78% / norm 71%（数字干净可比，但 8B 非确定需复跑 2~3 轮取稳定值；clarify 掉 2 条可能是「先动手再反问」被更严口径抓出、也可能噪声）。端到端整单闭环归 L3/L7，不塞进路由基准。
+
+**真·下一步**：① 决定是否从备份重做三 bug 修复（Bug 1 确证有效，值得留）；② norm 的坑走**提示词**（让 8B 在点名未收录规范的边界 query 上照样委派 norm-qa，而非自答）；③ 若采纳「第一跳即停」基准口径，从 `17d66a0e` 挑回并复跑 2~3 轮定基线；④ 两个新尾巴（lead 打转 / ce-rag 逗号闸）按需排。
+
+---
+
+### 2026-07-14（续）：norm-qa 子智能体 → **skill 化**（config + skill + v3/v4 + L1 benchmark，已改未复跑）
+
+**动因**：subagent 隔离对**单跳规范问答**收益有限，且 §4.3 那批 MCP 跨 loop 崩溃 / 递归上限坑**集中在子智能体链上**（只有子 agent 碰 MCP 才触发跨 loop evict）。把 norm-qa 从委派子智能体收敛为 lead 亲自做的 skill，绕开子智能体链这摊坑，也让 lead 意图→执行更直。**走 A 方案**：ce-rag_* 保持 deferred，lead 用前经 `tool_search` promote（不常驻 lead 工具面，避免 8B 工具面膨胀）。
+
+**已改（工作区，未复跑验证）**：
+- **新建 `skills/public/norm-qa/SKILL.md`**：移植原子智能体 prompt（口径固定深圳·2013 / agentic RAG 拆子问题 / 定稿调 `verify_norm` 回查 / 零召回诚实拒答）；新增「用前 `tool_search` promote ce-rag 检索工具」；缺实质信息改为**直接 `ask_clarification`**（lead 同进程内有用户通道，不再走 `need_clarification` 上抛——那是子智能体断链的补丁，skill 化后不需要）。
+- **`config.yaml`**：删 `subagents.custom_agents.norm-qa` 整块（留退役注释），现只剩 `cost-critic`。`verify_norm` **仍注册为 lead 工具**（group norm），skill 指令引用它即可。**关键红线：没给 skill 加 `allowed-tools`**——该字段是**全局收窄不是授予**，任一启用 skill 声明它会把 lead 整个工具面锁进并集、炸掉 cost_workflow_*/bill_match 等（`allowed_tool_names_for_skills` 语义）。
+- **提示词 v3（现役）+ v4 同改**：routing 表规范行 / dispatch / clarify——从「`task` 派 norm-qa 子智能体」改为「按 norm-qa skill 自做：`tool_search` promote ce-rag → agentic RAG → `verify_norm` 回查」。v0/v1/v2 历史变体未动（config 不指向，留作历史）。
+- **L1 benchmark `run_routing_experiment.py`**：① `ROUTE_TOOL_NAMES` 收 `tool_search` / `verify_norm`（保留 `ce-rag_search_clause`），对 `tool_search.enabled` 开/关两态都稳（开=首动作 tool_search、关=直调 ce-rag）；② `AGENT_TO_SUBAGENT` 清空（norm-qa 不再是委派靶，`subagent_route_correct` 对本集变 nan，汇总已兜底）；③ 注释块 + 打印标签同步。**金标数据 `user_requests.jsonl` 不动**（norm 用例 `expect_route=true` 语义不变，`agent:"norm-qa"` 仅分类标签）。
+
+**这对 §4.3「真·下一步 ②」的影响**：那条「让 8B 委派 norm-qa」的路径**已不存在**——norm 现由 lead in-context 做；norm 边界拒答坑（A25/A26/A27：点名未收录规范却自答）仍归**提示词侧**，但落点从「lead 委派条款」变为「norm-qa **skill 指令**让 lead 照样先检索再拒答」。
+
+**未做 / 待验（复跑前必过）**：
+- **8B 实测校准**：`tool_search` promote ce-rag 是**新增一跳**，弱模型可能漏 promote 直接自答 → 走 §4.1 F5→runner→trace 校准 `ROUTE_TOOL_NAMES`（若冒出 get_clause/expand_clause_refs 等其他 ce-rag 原语照实补）。dev 态验证前 config base_url 翻回 `localhost:8099`。
+- **L6 `norm_faithful` 未动** ⚠️：它也走 lead 做 norm QA（DeerFlowClient），skill 化后功能上仍能跑，但 `_observe`/`score_case` 的**证据抽取可能按旧「子智能体 trace 结构」取 evidence**，lead 亲自做后 trace 形状变了，需服务器看真实 trace 确认要不要跟着调。独立一摊，本次只做 L1。

@@ -17,22 +17,31 @@ description: "造价规范问答（清单计价 GB50500-2013 / 房建计量 GB50
 用户点名 2024 版、安装规范（GB50856）或他省口径 → **不检索、不用 2013 条文冒充**，体面告知仅支持
 深圳·2013 房建口径。2013/2024 同 9 位码不同义，所以声明口径是必须的，但澄清动作不需要。
 
-## 取检索工具（ce-rag_* 是 deferred，用前先 promote）
+## 第一步硬闸：先取检索工具，再动笔（ce-rag_* 是 deferred，用前先 promote）
 
-规范条文检索工具默认对你隐藏，第一次用前调一次 `tool_search`，query 传：
+**收到任何规范问题，你的第一个动作**必须是调 `tool_search` 把检索工具 promote 出来（它们默认对你隐藏），
+query 传：
 
 ```
 select:ce-rag_search_clause,ce-rag_get_clause,ce-rag_expand_clause_refs,ce-rag_retrieve_evidence
 ```
 
+**🚫 在拿到 `ce-rag_search_clause` 的检索结果之前，一个字都不许答——包括你自认为「显然」「记得」的，
+也包括问题点名了看似未收录的规范时。禁止跳过检索直接作答、也禁止跳过检索直接拒答。** 规范条文只能来自
+检索返回，凭记忆答 = 串库/编条文红线。
+
 promote 后这四个工具即可直接调用：
-- `ce-rag_search_clause` —— 按问题检索候选条文；
+- `ce-rag_search_clause` —— 按问题检索候选条文（**每题必调**）；
 - `ce-rag_get_clause` —— 取某条款号原文；
 - `ce-rag_expand_clause_refs` —— 展开条文里引用的其它条款；
 - `ce-rag_retrieve_evidence` —— 取证据片段。
 
 `standard`（gb50500-2013 / gb50854-2013）是可选 hint，能省则由问题类型推断；哪部规范（房建/计价）
 服务端会确定性裁定，不用纠结。
+
+**边界题（点名 GB50011/GB50010/装配式评价标准等未收录规范）也照走检索**：先 `ce-rag_search_clause`
+确认本地零召回，**再**如实拒答「已查范围内无此规范条文，建议咨询当地造价站」——不是直接凭「我知道这规范
+没收录」跳过检索硬拒，更不是凭记忆强答。（此前 8B 在这类题上直接自答/硬拒是主要失分点。）
 
 ## 工作方式（agentic RAG）
 

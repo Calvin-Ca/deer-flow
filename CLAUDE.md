@@ -185,3 +185,9 @@
 **未做 / 待验（复跑前必过）**：
 - **8B 实测校准**：`tool_search` promote ce-rag 是**新增一跳**，弱模型可能漏 promote 直接自答 → 走 §4.1 F5→runner→trace 校准 `ROUTE_TOOL_NAMES`（若冒出 get_clause/expand_clause_refs 等其他 ce-rag 原语照实补）。dev 态验证前 config base_url 翻回 `localhost:8099`。
 - **L6 `norm_faithful` 未动** ⚠️：它也走 lead 做 norm QA（DeerFlowClient），skill 化后功能上仍能跑，但 `_observe`/`score_case` 的**证据抽取可能按旧「子智能体 trace 结构」取 evidence**，lead 亲自做后 trace 形状变了，需服务器看真实 trace 确认要不要跟着调。独立一摊，本次只做 L1。
+
+**2026-07-14 尾声：服务器 merge 又被硬回退——当前基线 = `017ff706`**：force-push `017ff706` 后，服务器侧有人把「三 bug 修复（`7e0c8b67`）+ config 切 v4 + benchmark 第一次决策重写（`752a5032`/`17d66a0e`）」merge 回 `origin/main`（merge `366c75eb`）。用户裁定**再次硬回退**：Mac + 服务器均 `git reset --hard 017ff706` + force-push，现 **`origin/main` = Mac = 服务器 = `017ff706`**。故**当前真实基线**：
+- config 默认 **v3**（不是 v4——v4 切换随 merge 被丢；但 v3/v4 两份提示词都已含 norm→skill 改动）；
+- **三个 infra bug 修复又回到「未修态」**（`session_pool.py` 无 `loop_id`）——但 **norm-qa skill 化本身规避了 Bug 1 对 norm 的影响**（lead 同 loop 调 ce-rag，跨 loop 崩溃只在子智能体链；现仅 `cost-critic` 子智能体碰 MCP 仍暴露）；
+- **L1 runner = 老全执行版**（第一次决策重写随 `17d66a0e` 被丢）——跑时真执行工具、需 ce-rag/ce-db 起齐、仍有 overflow/递归噪声；我的 norm 信号（`tool_search`/`verify_norm`/`AGENT_TO_SUBAGENT={}`）在。
+- 三 bug 修复 + 第一次决策口径完整存于备份分支 **`backup/before-subagent-revert-20260714`**（标签 `backup-20260714-1745`，指向 `17d66a0e`）：要重做 `git cherry-pick 7e0c8b67`（三 bug）/ `17d66a0e`（first-decision）。**注意 §4.3 复跑实证 Bug 1 修复真有效**——整单/cost-critic 碰 MCP 会再撞 cancel-scope，重做与否需权衡。

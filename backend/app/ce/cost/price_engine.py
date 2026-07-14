@@ -160,20 +160,17 @@ def price_query(
 ) -> dict[str, Any]:
     """查深圳信息价：按材料/规格/期号取价，或给多个期号做走势对比（确定性算价差）。
 
-    Shenzhen info-price lookup. Single mode fetches published prices for a
-    material (fuzzy name match; multiple specs come back as candidates for the
-    user to pick; zero hits return no_source honestly — never fabricate a
-    price). Trend mode activates when ``periods`` lists two or more months and
-    returns the per-period series plus deterministic month-over-month deltas.
-    Region is locked to Shenzhen. Not for composing quota prices of a bill item
-    (use quota_recommend or the cost workflow).
+    深圳信息价查询。单期模式取某材料的发布价（名称模糊匹配；多个规格时作为候选返回交用户挑选；
+    零命中则诚实返回 no_source——绝不编造价格）。当 ``periods`` 列出两个及以上期号时进入走势模式，
+    返回逐期序列及确定性的环比差值。地区锁定深圳。不用于组价清单项的定额价（用 quota_recommend
+    或组价 workflow）。
 
     Args:
-        material: Material, labor, or machinery name, e.g. HRB400 钢筋.
-        period: Single period YYYY-MM. Omit to use the latest published period.
-        periods: Two or more periods YYYY-MM for trend comparison. Overrides period.
-        category: Optional filter, one of 人工 / 材料 / 机械.
-        top_k: Max price rows for single mode.
+        material: 材料、人工或机械名称，如 HRB400 钢筋。
+        period: 单个期号 YYYY-MM。省略则取最新发布期。
+        periods: 两个及以上期号 YYYY-MM 用于走势对比，优先级高于 period。
+        category: 可选过滤，取值 人工 / 材料 / 机械 之一。
+        top_k: 单期模式返回的最大价格行数。
     """
     if periods and len([p for p in periods if str(p).strip()]) >= 2:
         return price_trend(material, periods, category=category, call_tool=call_mcp_tool)

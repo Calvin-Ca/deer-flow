@@ -195,19 +195,15 @@ def quota_recommend(
 ) -> dict[str, Any]:
     """给已编制好的清单项推荐定额组价方案（取数确定性、多方案附 LLM 预排建议）。
 
-    Quota-scheme recommender for a confirmed bill item. It fetches composable
-    quota schemes with labor/material/machine contents and info prices from
-    ce-db, auto-adopts when there is at most one scheme, and for multiple
-    alternative schemes returns all candidates plus an advisory ranking with
-    rationale — the final choice stays with the user. Not for picking a bill
-    code from features (use bill_match) and it does not compute prices
-    (use cost_calc or the cost workflow).
+    针对已确认的清单项推荐定额组价方案。从 ce-db 取回可组价的定额方案（含人材机含量与信息价），
+    方案不超过一个时自动采用；存在多个备选方案时返回全部候选，并附带排序建议与理由——最终选择
+    仍归用户。不用于按特征选清单编码（用 bill_match），也不做价格计算（用 cost_calc 或组价 workflow）。
 
     Args:
-        code: Confirmed bill code, 9 or 12 digits.
-        feature: Optional project feature description, used to ground the ranking rationale.
-        spec: Bill standard version. Only 2013 (Shenzhen caliber) is supported; omit to use it by default.
-        region: Region for quota and price data. Defaults to Shenzhen.
+        code: 已确认的清单编码，9 位或 12 位。
+        feature: 项目特征描述，可选，用于为排序理由提供依据。
+        spec: 清单规范版本。仅支持 2013（深圳口径）；省略则默认按此执行。
+        region: 定额与价格数据的地区。默认深圳。
     """
     return recommend_quota(code=code, feature=feature, spec=spec, region=region, call_tool=call_mcp_tool)
 

@@ -24,20 +24,19 @@ def cost_workflow_start(
     quantity: float | None = None,
     top_k: int = 10,
 ) -> dict[str, Any]:
-    """Start the application-level stateful construction-cost workflow.
+    """启动应用层的有状态组价 workflow。
 
-    Use this for a complete pricing task that needs bill matching, bill selection,
-    pricing data retrieval, deterministic calculation boundaries, and possible HITL.
-    Do not call this for one-off known-key lookups.
+    用于需要清单匹配、选码、取价、确定性计算边界以及可能人工介入（HITL）的完整组价任务。
+    单次的已知键查询不要调用本工具。
 
     Args:
-        feature: Single component or construction method description.
-        features: Multiple feature objects, each with at least description/feature/name.
-        spec: Bill standard version, usually 2013 or 2024. Defaults to Shenzhen 2013.
-        region: Pricing region. Defaults to 深圳.
-        period: Optional price period such as YYYY-MM.
-        quantity: Optional quantity for the single feature.
-        top_k: Number of bill candidates to recall.
+        feature: 单个构件或施工做法的描述。
+        features: 多个特征对象，每个至少含 description/feature/name。
+        spec: 清单规范版本，通常为 2013 或 2024。默认深圳 2013。
+        region: 组价地区。默认 深圳。
+        period: 价格期号，可选，如 YYYY-MM。
+        quantity: 单个特征的工程量，可选。
+        top_k: 召回的清单候选数量。
     """
     return start_workflow(
         feature=feature,
@@ -54,18 +53,15 @@ def cost_workflow_node(
     node: CostNodeName,
     payload: dict[str, Any],
 ) -> dict[str, Any]:
-    """Run a single application-level cost-workflow node.
+    """运行应用层组价 workflow 的单个节点。
 
-    Use this for intermediate process tasks such as "only recall bill candidates",
-    "query price for this material", "fetch quota by code", or deterministic
-    rollup/check steps. The lead agent chooses the node; the node owns its own
-    narrow tool or calculation boundary.
+    用于中间过程任务，如「只召回清单候选」「查某材料的价」「按编码取定额」，或确定性的
+    汇总/检查步骤。由 lead agent 选择节点；节点各自持有自己狭窄的工具或计算边界。
 
     Args:
-        node: Node name to run. Supported values include bill_match, select_bill,
-            price_compose, bill_get, quota_get, price_query, fee_rate_lookup,
-            unit_price, rollup, and check.
-        payload: Node input object.
+        node: 要运行的节点名。支持的取值包括 bill_match、select_bill、price_compose、
+            bill_get、quota_get、price_query、fee_rate_lookup、unit_price、rollup、check。
+        payload: 节点输入对象。
     """
     return run_workflow_node(node, payload)
 
@@ -75,12 +71,12 @@ def cost_workflow_resume(
     selected_code: str | None = None,
     decision: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Resume a paused application-level cost workflow after human input.
+    """在人工输入后续跑一个暂停的应用层组价 workflow。
 
     Args:
-        task_id: Workflow task id returned by cost_workflow_start.
-        selected_code: Human-confirmed bill code when the paused node is select_bill.
-        decision: Optional normalized decision object. It may contain selected_code.
+        task_id: cost_workflow_start 返回的 workflow 任务 id。
+        selected_code: 暂停节点为 select_bill 时，人工确认的清单编码。
+        decision: 规范化的决策对象，可选，其中可含 selected_code。
     """
     normalized = dict(decision or {})
     if selected_code:
@@ -89,10 +85,10 @@ def cost_workflow_resume(
 
 
 def cost_workflow_state(task_id: str) -> dict[str, Any]:
-    """Read the current application-level cost workflow state.
+    """读取当前应用层组价 workflow 的状态。
 
     Args:
-        task_id: Workflow task id returned by cost_workflow_start.
+        task_id: cost_workflow_start 返回的 workflow 任务 id。
     """
     return get_workflow_state(task_id)
 

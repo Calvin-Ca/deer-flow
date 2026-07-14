@@ -332,32 +332,27 @@ def cost_calc(
     risk_rate: float | None = None,
     payload: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Run a single deterministic construction-cost calculation (LLM never does math).
+    """执行一次确定性的组价计算（LLM 绝不亲自做算术）。
 
-    Use this when the user asks to calculate one value in the pricing process,
-    such as 综合单价 (unit rate), 清单合价 (line total), 汇总 (rollup), or a
-    完整性检查 (check) — without starting the stateful workflow. Formulas come
-    from built-in calculation rules; unsupported targets pause for human rules
-    instead of guessing. When no fee rates are given the result is flagged
-    rates_missing (综合单价 degenerates to 人材机费) — relay that caveat.
+    当用户要求计算组价过程中的某一个值时使用，如综合单价（unit_rate）、清单合价（line_total）、
+    汇总（rollup）或完整性检查（check）——无需启动有状态的 workflow。公式来自内置计算规则；
+    不支持的目标会暂停等待人工给规则，而不是瞎猜。未提供费率时结果会标记 rates_missing
+    （综合单价退化为人材机费）——需把该注意事项转述给用户。
 
     Args:
-        target: Calculation target for chained computation, unit_rate (综合单价)
-            or line_total (清单合价). The engine computes prerequisite layers
-            automatically and returns a step-by-step breakdown.
-        operation: Single-step operation, one of unit_price, unit_rate,
-            line_total, rollup, check. Ignored when target is given.
-        components: 工料机行 for unit_rate/unit_price, each with category
-            (人工/材料/机械), consumption (or quantity), and unit_price (or price).
-        unit_price: 综合单价 for line_total. Omit to compute it from components first.
-        quantity: 工程量 for line_total.
-        items: Rows for rollup (each with amount) or check (bill items to validate).
-        management_rate: 企业管理费率 as a decimal, e.g. 0.1. Should come from
-            fee_rate_lookup or the user, never invented.
-        profit_rate: 利润率 as a decimal.
-        risk_rate: 风险费率 as a decimal.
-        payload: Extra input fields not covered by the explicit args (merged in,
-            explicit args win).
+        target: 链式计算的目标，unit_rate（综合单价）或 line_total（清单合价）。
+            引擎会自动计算前置层级并返回逐步拆解。
+        operation: 单步操作，取值 unit_price / unit_rate / line_total / rollup / check
+            之一。给了 target 时忽略此项。
+        components: unit_rate/unit_price 用的工料机行，每行含 category（人工/材料/机械）、
+            consumption（或 quantity 含量）和 unit_price（或 price 单价）。
+        unit_price: line_total 用的综合单价。省略则先从 components 算出。
+        quantity: line_total 用的工程量。
+        items: rollup 的行（每行含 amount）或 check 的清单项（待校验）。
+        management_rate: 企业管理费率，小数形式，如 0.1。应来自 fee_rate_lookup 或用户，不得编造。
+        profit_rate: 利润率，小数形式。
+        risk_rate: 风险费率，小数形式。
+        payload: 显式参数未覆盖的额外输入字段（合并进来，显式参数优先）。
     """
     merged = dict(payload or {})
     explicit = {

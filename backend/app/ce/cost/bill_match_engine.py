@@ -583,22 +583,17 @@ def bill_match(
 ) -> dict[str, Any]:
     """清单智能匹配：给项目特征选清单编码，或核实一条已选编码对不对、特征有无遗漏。
 
-    Deterministic bill-item matcher with two modes sharing one engine. Without
-    ``code`` it recalls candidates from the project feature and auto-selects when
-    confidence clears the threshold (low confidence returns candidates for human
-    review, with few-shot hints from past human corrections). With ``code`` it
-    verifies that choice: code format, existence in the bill spec truth (ce-db),
-    required-feature diff, and a recall cross-check. Use this for single or a few
-    components; for a full bill of quantities use cost_workflow_start instead.
+    确定性清单匹配器，双模共用一套引擎。不给 ``code`` 时为选码模式：按项目特征召回候选，
+    置信度过门限则自动选定（置信度低则返回候选交人工复核，并附历史人工纠正的 few-shot 提示）。
+    给 ``code`` 时为核实模式：校验该编码的格式、在清单规范真值（ce-db）中是否存在、必填特征项
+    差异（diff）以及召回交叉核对。适用于单个或少量构件；整单清单请改用 cost_workflow_start。
 
     Args:
-        feature: Project feature description of the component or construction method.
-        code: Optional bill code to verify (9 or 12 digits). Omit to select a new code.
-        spec: Bill standard version. Only 2013 (Shenzhen caliber) is supported;
-            omit to use it by default.
-        provided_features: Feature item names the user has already filled in.
-            If omitted, feature names are matched against the description text.
-        top_k: Number of recall candidates.
+        feature: 构件或施工做法的项目特征描述。
+        code: 待核实的清单编码（9 位或 12 位），可选。省略则为新选码。
+        spec: 清单规范版本。仅支持 2013（深圳口径）；省略则默认按此执行。
+        provided_features: 用户已填写的特征项名称列表。省略时按描述文本匹配特征名。
+        top_k: 召回候选数量。
     """
     return match_bill(
         feature=feature,

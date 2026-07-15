@@ -219,7 +219,7 @@ lead_agent:
   # 解析与 cwd 无关（project_root → backend → 仓库根 依次探测）。切 variant = 改这一行（热加载，
   # 下一条消息生效）；trace 自动按文件名打 variant 标（lead_agent_v1 / lead_agent_v2 / ...）。
   # Docker 生产态依赖 compose 把 ../benchmark/prompts 挂进容器（见 docker-compose.yaml gateway.volumes）。
-  system_prompt_path: benchmark/prompts/lead_agent_v4.yaml
+  system_prompt_path: benchmark/prompts/lead_agent_v5.yaml
 subagents:
   # 规范合规审查 sub-agent（compliance-checker）已随规范 RAG 退役（2026-06-18）。
   custom_agents:

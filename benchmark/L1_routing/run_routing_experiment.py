@@ -215,7 +215,7 @@ def main() -> int:
         try:
             out = _drive_agent(agent_client, query, thread_id)
         except Exception as exc:  # noqa: BLE001 —— 单条崩不拖垮整轮（v3 实测一条异常废了后续 22 条）
-            print(f"[{i + 1}/{len(dataset.items)}] {item.id} 跑挂了，跳过（不挂分）：{type(exc).__name__}: {exc}")
+            print(f"[{i + 1}/{len(dataset.items)}] {item.id} 跑挂了，跳过（不挂分）：{type(exc).__name__}: {exc} query={query!r}")
             continue
 
         exp = item.expected_output or {}
@@ -249,7 +249,7 @@ def main() -> int:
                 client.create_score(name="subagent_route_correct", value=1.0 if subagent_ok else 0.0, trace_id=trace_id, data_type="NUMERIC", comment=f"期望子智能体={expected_sub} 实际 subagent_type={out['subagent_types']} 工具={out['tool_names']}")
 
         rows.append({"id": item.id, "group": (item.metadata or {}).get("group"), "exp": exp, "out": out, "route_ok": route_ok, "clarify_ok": clarify_ok, "subagent_ok": subagent_ok, "trace_id": trace_id})
-        print(f"[{i + 1}/{len(dataset.items)}] {item.id} route_ok={route_ok} clarify_ok={clarify_ok} subagent_ok={subagent_ok} 工具={out['tool_names']}")
+        print(f"[{i + 1}/{len(dataset.items)}] {item.id} route_ok={route_ok} clarify_ok={clarify_ok} subagent_ok={subagent_ok} 工具={out['tool_names']} query={query!r}")
 
     client.flush()
 

@@ -191,3 +191,34 @@
 - **三个 infra bug 修复又回到「未修态」**（`session_pool.py` 无 `loop_id`）——但 **norm-qa skill 化本身规避了 Bug 1 对 norm 的影响**（lead 同 loop 调 ce-rag，跨 loop 崩溃只在子智能体链；现仅 `cost-critic` 子智能体碰 MCP 仍暴露）；
 - **L1 runner = 老全执行版**（第一次决策重写随 `17d66a0e` 被丢）——跑时真执行工具、需 ce-rag/ce-db 起齐、仍有 overflow/递归噪声；我的 norm 信号（`tool_search`/`verify_norm`/`AGENT_TO_SUBAGENT={}`）在。
 - 三 bug 修复 + 第一次决策口径完整存于备份分支 **`backup/before-subagent-revert-20260714`**（标签 `backup-20260714-1745`，指向 `17d66a0e`）：要重做 `git cherry-pick 7e0c8b67`（三 bug）/ `17d66a0e`（first-decision）。**注意 §4.3 复跑实证 Bug 1 修复真有效**——整单/cost-critic 碰 MCP 会再撞 cancel-scope，重做与否需权衡。
+
+---
+
+### 2026-07-15：L1 路由从 64%→98% 收口（提示词 v4→v6 + 金标校准 + 编造红线）
+
+**当前基线 = `origin/main` = `3f7cf703` 系列**：config 默认 **v6**（`benchmark/prompts/lead_agent_v6.yaml`）；提示词已全部 **md→单块 yaml**；L1 runner = **第一次决策版**（只测首个 tool_calls 决策，工具不执行，不依赖 ce-rag/ce-db 起服务、无 overflow/递归噪声）；cost-critic **摘掉全部 MCP 工具**（只留 verify_cost）→ 全系统无子智能体碰 MCP，Bug 1 绕开。金标已 revert 回原始 clarify 口径 + A27 单条改判。
+
+**分数轨迹（route / clarify，第一次决策版口径）**：`错标 64% → revert 85% → v5 89% → v6-1 95.65% → v6-2 97.78%`（clarify 全程 ~89%）。
+
+**本轮基建改动**：
+- **runner 切第一次决策版**（从被回退的 `366c75eb` 捞回该单文件 + 我的 norm 信号，未带三 bug 后端修复）：首个带 tool_calls 的 AI 消息即 break、工具不执行。`工具=[]` 从此**只剩「真自答」**，不再混「跑死了（overflow/递归/打转）」——归因不用翻 trace 剔噪声。每条打印 `query=...` 便于肉眼归因。
+- **cost-critic 摘 MCP**（ce-db_*/ce-rag_* 全删，只留 verify_cost）：语义复核那半下线，但换来「无子智能体碰 MCP」→ Bug 1 在 CE 流程彻底绕开，不必依赖三 bug 修复。
+- **提示词 md→单块 yaml**（`[backend]`）：`lead_agent_v0~v6.yaml`，顶层 `system_prompt: |` 块。加载器 `_resolve_system_prompt_template` 对 `.yaml/.yml` 取 `system_prompt` 字段、其余扩展名整段当模板；variant 标签用 `.stem` 不受扩展名影响。占位符只准 6 个白名单（多写一个 `.format` KeyError 打挂）。
+
+**金标校准两次（方法论教训）**：
+- **业务缺料重标→revert**：一度把 14 条零特征题（「帮我算算这面墙」「这个柱子套什么码」）`expect_clarify→false`（想走 route→missing→reactive）。但实测 **8B 对零特征题主动反问才对**（「这面墙」直接 route 给 bill_match 没法用），且与原始金标一致——**revert，route 64→85%**。教训：金标要贴合 8B 合理行为，别拿理论口径硬掰。
+- **A27 单条改判** `expect_route true→false`：「按2024版装配式评价标准…」点名「2024版」= 版本口径超范围，该直接拒、不必白跑检索，与 B3/A18 等 2024 用例对齐（原误标 expect_route=true → route 95.65→97.78%）。
+
+**提示词工程 v4→v6（按 query 的归因，最有复现价值）**：
+- **`<norm_qa>` 主图硬闸（v5）** 治 norm 不路由：`现浇板工程量怎么算`(A20，在库计量题) v3 走 tool_search、v4 瘦身后自答——v4 只说「按 norm-qa skill 自做」没把「先检索」立成硬步骤。v5 写死「任何规范题第一步无条件 `tool_search` 取 ce-rag、拿到结果前不答不问」→ A20/CC10/CC9 回收。**教训：给 8B 写提示词要把隐含步骤全显式化，瘦身别把关键步骤砍了。**
+- **真工具名替「norm-qa」措辞（v5）** 治工具幻觉：`独立基础和条形基础包含哪些`(F11)、A8/A20 曾去调**不存在的 `norm-qa` 工具**——提示词写「按 norm-qa skill」被 8B 当工具名。改用真名 `tool_search`/`ce-rag_search_clause`/`verify_norm`。**教训：提示词工具名必须 = config 注册名（= `ROUTE_TOOL_NAMES`），别造词。**
+- **拆分「口径超范围」vs「条文题」+ 拒答禁编（v6，最关键的安全修复）** 治**编造红线违规**：`按GB50011 抗震等级`(A25) trace 实证——8B 把「点名 GB50011」误当口径超范围（套用 v5「2024/他省→不检索直接拒」红线）→ 跳检索 → **拒答时编造** `DBJ15-9-2019`/`GB18306-2015`/甲乙丙丁类划分（全是造的！L1 的 route_ok 抓不到）。v6：① 写死「**口径超范围只指 版本(2024)/地区(他省)/专业(安装)**，点名国标问条文=条文题走 `<norm_qa>`」；② 最高红线「**拒答/超范围时禁编**」——只说超范围+建议咨询，绝不给具体条文号/标准号/数值/等级。**实测 A25 从「自拒+编造」变「`工具=['tool_search']` 先检索」。教训：① 红线措辞过宽会被弱模型泛化吃掉别的规则，边界要精确定义；② L1 两率抓不到编造，边界/拒答的真实安全风险在 L6 忠实性。**
+- **clarify 补「清晰题不反问」（v6）** 治过度反问蔓延：`水泥这阵子涨了吗`(CC8)、`这个混凝土现在贵不贵`(F6，材料已点名)、`现浇C30独立基础和预制杯形基础哪个省`(P1，构件带规格) 曾被过度反问——v4 clarify 例子「帮我算算」太宽把清晰题也带反问。v6 显式豁免「材料已点名的询价 / 构件+规格都给的比选 直接 route，不反问」。**教训：8B 靠例子做模式匹配，例子选不准会反噬。**
+
+**clarify 的结构性天花板**：卡 ~89%（16/18），门 0.95。**n=18 时 17/18=94.4% 仍 <0.95，须 18/18 才过**。2 个缺口 = F5（业务缺料没反问，噪声）+ B37（`这块现浇板套什么定额` 调了 bill_match 而非 clarify——但这是「route→missing→reactive」合法路径，**假缺口**）。业务缺料题 route/clarify **两种都对**，逼满 18/18 = 跟合法灵活性死磕。故 clarify ~89% 可能是现实上限，除非松门或接受「业务缺料 route 也算对」。
+
+**未做 / 下一步**：
+- **A25 编造终审未做** ⚠️：第一次决策版在 `tool_search` 就 break，只证明 A25「走上检索路」，**没跑到 ce-rag 零召回后的终答**——要 F5 全执行 或 L6 norm_faithful 看拒答正文是否真不编 DBJ 假号。
+- **v6 稳定性**：v6-2 才 2 轮，需 v6-3 复稳（8B 非确定，单轮 ±噪声）。剩 1 条 route 失败大概率是 F5 噪声。
+- **cost-critic 语义复核下线的代价**：选错码/语义错配它不再抓（只剩 verify_cost 算术/编码/串库/缺价），若要补回需换非子智能体方式（避免 Bug 1）。
+- **L6 `norm_faithful` 仍未动**：edge/边界题的真实风险（编造）在这层量，L1 收口后应转 L6。

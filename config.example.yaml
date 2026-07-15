@@ -771,7 +771,7 @@ lead_agent:
   # Variants live in benchmark/prompts/ (see its README.md for the mapping);
   # resolution is cwd-independent (project_root → backend/ → repo root).
   # Docker prod relies on the compose volume mount of ../benchmark/prompts.
-  system_prompt_path: benchmark/prompts/lead_agent_v1.md
+  system_prompt_path: benchmark/prompts/lead_agent_v1.yaml
 
 # ============================================================================
 # Title Generation Configuration

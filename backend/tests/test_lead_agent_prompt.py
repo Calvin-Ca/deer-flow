@@ -426,6 +426,41 @@ def test_resolve_system_prompt_template_falls_back_on_missing_file(tmp_path, cap
     assert "not found under any base" in caplog.text
 
 
+# ── 单块 yaml 提示词变体（.yaml/.yml）：取顶层 system_prompt 字段作模板 ──
+
+
+def test_resolve_system_prompt_template_reads_yaml_system_prompt(tmp_path):
+    override = tmp_path / "variant.yaml"
+    override.write_text("system_prompt: |\n  VARIANT for {agent_name}\n  第二行\n", encoding="utf-8")
+    config = SimpleNamespace(lead_agent=SimpleNamespace(system_prompt_path=str(override)))
+
+    # 占位符与多行结构原样保留（.format 仍在下游执行）
+    assert prompt_module._resolve_system_prompt_template(config) == "VARIANT for {agent_name}\n第二行\n"
+
+
+def test_resolve_system_prompt_template_yaml_missing_field_falls_back(tmp_path, caplog):
+    override = tmp_path / "variant.yaml"
+    override.write_text("other_key: hi\n", encoding="utf-8")
+    config = SimpleNamespace(lead_agent=SimpleNamespace(system_prompt_path=str(override)))
+
+    with caplog.at_level("WARNING"):
+        result = prompt_module._resolve_system_prompt_template(config)
+
+    assert result is prompt_module.SYSTEM_PROMPT_TEMPLATE
+    assert "system_prompt" in caplog.text
+
+
+def test_resolve_system_prompt_template_yaml_malformed_falls_back(tmp_path, caplog):
+    override = tmp_path / "variant.yaml"
+    override.write_text("system_prompt: [unclosed flow seq\n", encoding="utf-8")  # 未闭合 flow → YAMLError
+    config = SimpleNamespace(lead_agent=SimpleNamespace(system_prompt_path=str(override)))
+
+    with caplog.at_level("WARNING"):
+        result = prompt_module._resolve_system_prompt_template(config)
+
+    assert result is prompt_module.SYSTEM_PROMPT_TEMPLATE
+
+
 # ── resolve_system_prompt_file：多基座、cwd 无关解析（历史坑：cwd 依赖导致静默回退+打标说谎）──
 
 
@@ -443,9 +478,9 @@ def test_resolve_system_prompt_file_relative_resolves_against_repo_root_regardle
 
     monkeypatch.chdir(tmp_path)  # 故意换到无关目录
     monkeypatch.delenv("DEER_FLOW_PROJECT_ROOT", raising=False)
-    resolved = resolve_system_prompt_file("benchmark/prompts/lead_agent_v1.md")
+    resolved = resolve_system_prompt_file("benchmark/prompts/lead_agent_v1.yaml")
     assert resolved is not None and resolved.is_file()
-    assert resolved.parts[-3:] == ("benchmark", "prompts", "lead_agent_v1.md")
+    assert resolved.parts[-3:] == ("benchmark", "prompts", "lead_agent_v1.yaml")
 
 
 def test_resolve_system_prompt_file_returns_none_when_nowhere(monkeypatch, tmp_path):
@@ -469,7 +504,7 @@ def test_variant_label_degrades_to_default_when_file_missing(monkeypatch, tmp_pa
 def test_variant_label_uses_stem_when_file_exists():
     from deerflow.tracing.metadata import resolve_active_prompt_variant
 
-    config = SimpleNamespace(lead_agent=SimpleNamespace(system_prompt_path="benchmark/prompts/lead_agent_v2.md"))
+    config = SimpleNamespace(lead_agent=SimpleNamespace(system_prompt_path="benchmark/prompts/lead_agent_v2.yaml"))
     assert resolve_active_prompt_variant(config) == "lead_agent_v2"
 
 
@@ -497,11 +532,14 @@ def test_apply_prompt_template_uses_override_template(monkeypatch, tmp_path):
 def test_project_config_points_lead_agent_to_ce_prompt():
     config = AppConfig.from_file("../config.yaml")
 
-    assert config.lead_agent.system_prompt_path == "benchmark/prompts/lead_agent_v1.md"
+    # 指向某个 CE 提示词 variant（单块 yaml）；不硬编具体 v 号，切 variant 不该打挂本测试。
+    path = config.lead_agent.system_prompt_path
+    assert path.startswith("benchmark/prompts/lead_agent_v")
+    assert path.endswith(".yaml")
 
 
 def test_ce_override_renders_and_carries_subagent_dispatch(monkeypatch, tmp_path):
-    """真·CE override（benchmark/prompts/lead_agent_v1.md）能过 .format 渲染且含三类 subagent 调度指南。
+    """真·CE override（benchmark/prompts/lead_agent_v1.yaml）能过 .format 渲染且含三类 subagent 调度指南。
 
     这条同时守两件事：① override 里只用合法占位符、字面花括号已转义——否则 apply_prompt_template
     的 .format 会在运行时 KeyError/ValueError 直接打挂 prompt（_resolve 只吞 OSError，.format 在其外）；
@@ -509,7 +547,7 @@ def test_ce_override_renders_and_carries_subagent_dispatch(monkeypatch, tmp_path
     """
     from pathlib import Path
 
-    ce_prompt = Path(__file__).resolve().parent.parent.parent / "benchmark" / "prompts" / "lead_agent_v1.md"
+    ce_prompt = Path(__file__).resolve().parent.parent.parent / "benchmark" / "prompts" / "lead_agent_v1.yaml"
     config = SimpleNamespace(
         sandbox=SimpleNamespace(mounts=[]),
         skills=SimpleNamespace(container_path="/mnt/skills"),
@@ -536,10 +574,10 @@ def test_ce_override_renders_and_carries_subagent_dispatch(monkeypatch, tmp_path
 
 
 def test_ce_v2_override_renders_with_routing_table(monkeypatch):
-    """v2 variant（benchmark/prompts/lead_agent_v2.md）能过 .format 渲染，查表路由与红线锚点在位。"""
+    """v2 variant（benchmark/prompts/lead_agent_v2.yaml）能过 .format 渲染，查表路由与红线锚点在位。"""
     from pathlib import Path
 
-    ce_prompt = Path(__file__).resolve().parent.parent.parent / "benchmark" / "prompts" / "lead_agent_v2.md"
+    ce_prompt = Path(__file__).resolve().parent.parent.parent / "benchmark" / "prompts" / "lead_agent_v2.yaml"
     config = SimpleNamespace(
         sandbox=SimpleNamespace(mounts=[]),
         skills=SimpleNamespace(container_path="/mnt/skills"),

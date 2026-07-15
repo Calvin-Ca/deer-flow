@@ -198,7 +198,7 @@ def test_resolve_active_prompt_variant_uses_file_stem():
 
     # 变体标签 = 真实可解析文件的 stem（2026-07-11 起解析不到如实降级 default，不再冒充文件名）；
     # 用版本库现役文件验证，路径解析与 cwd 无关（project_root→backend→仓库根 依次探测）。
-    config = SimpleNamespace(lead_agent=SimpleNamespace(system_prompt_path="benchmark/prompts/lead_agent_v2.md"))
+    config = SimpleNamespace(lead_agent=SimpleNamespace(system_prompt_path="benchmark/prompts/lead_agent_v2.yaml"))
 
     assert tracing_metadata.resolve_active_prompt_variant(config) == "lead_agent_v2"
 

@@ -801,10 +801,26 @@ def _resolve_system_prompt_template(app_config: AppConfig | None) -> str:
         logger.warning("Lead-agent system prompt override %s not found under any base (cwd-independent lookup); falling back to built-in template", template_path)
         return SYSTEM_PROMPT_TEMPLATE
     try:
-        return resolved.read_text(encoding="utf-8")
+        raw = resolved.read_text(encoding="utf-8")
     except OSError:
         logger.warning("Failed to read lead-agent system prompt override at %s; falling back to built-in template", resolved, exc_info=True)
         return SYSTEM_PROMPT_TEMPLATE
+    # yaml 变体（.yaml/.yml）：取顶层 ``system_prompt`` 字段作模板；.md/.txt 等仍把整段文件当模板。
+    # 单块 yaml 让人直接编辑 ``system_prompt: |`` 缩进块，内容与 .md 逐字等价（round-trip 校验见测试）。
+    if resolved.suffix.lower() in (".yaml", ".yml"):
+        import yaml
+
+        try:
+            data = yaml.safe_load(raw)
+        except yaml.YAMLError:
+            logger.warning("Failed to parse yaml system prompt override at %s; falling back to built-in template", resolved, exc_info=True)
+            return SYSTEM_PROMPT_TEMPLATE
+        prompt = data.get("system_prompt") if isinstance(data, dict) else None
+        if not isinstance(prompt, str) or not prompt.strip():
+            logger.warning("Yaml system prompt override at %s lacks a non-empty top-level 'system_prompt'; falling back to built-in template", resolved)
+            return SYSTEM_PROMPT_TEMPLATE
+        return prompt
+    return raw
 
 
 def apply_prompt_template(

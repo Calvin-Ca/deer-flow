@@ -21,7 +21,10 @@ from typing import Any
 from langchain.tools import tool
 
 # 条款号：至少含一个小数点（5.3.4 / 4.1），从而不误吞年份(2024)/标准号(50854)/纯数字。
-_CLAUSE_RE = re.compile(r"\b\d+(?:\.\d+)+\b")
+# 边界用「前后不是数字或点」的 lookaround，**不用 `\b` 词边界**——Python 把中文也算 \w，
+# 「第5.2.2条」里 第/5、2/条 之间无词边界，`\b` 会漏抓最常见的中文紧贴格式（A25 编造漏检根因）。
+# lookaround 对中文包裹（第5.2.2条）、空格分隔（第 5.3.4 条）都成立，且不误吞标准号/年份（50011-2010）。
+_CLAUSE_RE = re.compile(r"(?<![\d.])\d+(?:\.\d+)+(?![\d.])")
 
 
 def faithfulness_enabled() -> bool:
@@ -78,6 +81,14 @@ def verify_norm(answer: str, evidence: list[dict[str, Any]]) -> dict[str, Any]:
 
     agentic RAG 的诚实闸：定稿前自查——``verdict=unfaithful`` 说明有幻觉引用（引了没检索到的条款号），
     应**剥掉该引用或降级为"无库内依据"**，绝不放行编造的条文号。``no_citation`` + 非拒答答案也可疑。
+
+    ⚠️ **信任边界（未闭合，2026-07-16）**：本函数只校验「answer 引的条款号 ∈ evidence 的条款号」，
+    **不校验 evidence 本身是否真来自检索**。当**模型自己**调本工具时，``answer`` 和 ``evidence`` 两个参数
+    **都由模型构造**——它可以「编答案 + 编匹配的证据」让本校验假通过（A25 全执行 trace 实证：模型对
+    未收录的 GB50011 编了「第5.2.2条」+ 假 evidence）。因此：
+    - **eval 侧（L6）用法可信**：evidence 从 trace 里真实的 ce-rag ToolMessage 抽取，非模型构造；
+    - **模型自查用法不可信**：模型自证，能被绕过。要把它做实，evidence 必须由**运行时确定性回填**
+      （middleware 捕获真实 ce-rag 返回），不能取模型传入的参数——此项待做。
 
     Args:
         answer: 生成的答案文本（含条款号引用，如 "依据 GB 50854-2013 第 5.3.4 条…"）。

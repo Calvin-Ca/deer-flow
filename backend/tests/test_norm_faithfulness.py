@@ -22,6 +22,20 @@ def test_extract_clauses_only_dotted():
     assert "2024" not in cited and "50854" not in cited  # 年份/标准号无内部小数点，不算条款号
 
 
+def test_extract_clauses_chinese_glued():
+    # 回归：中文紧贴数字「第5.2.2条」（无空格）——旧的 \b 词边界会漏抓（A25 编造漏检根因）。
+    cited = extract_cited_clauses("依据GB50011-2010《建筑抗震设计规范》第5.2.2条，另见第3.3.1条")
+    assert "5.2.2" in cited and "3.3.1" in cited
+    assert "50011" not in cited and "2010" not in cited  # 标准号/年份不误吞
+
+
+def test_unfaithful_flags_chinese_glued_hallucination():
+    # 端到端：编造「第5.2.2条」（GB50011，库里没有）+ 只给真证据 → 必须判 unfaithful，不能漏成 no_citation。
+    out = check_faithfulness("依据GB50011第5.2.2条，抗震等级如下…", _EVIDENCE)  # _EVIDENCE 只含 5.3.4/5.3.5
+    assert out["verdict"] == "unfaithful"
+    assert "5.2.2" in out["unfaithful"]
+
+
 def test_extract_dedup_preserves_order():
     assert extract_cited_clauses("5.3.4 ... 5.3.4 ... 5.3.5") == ["5.3.4", "5.3.5"]
 

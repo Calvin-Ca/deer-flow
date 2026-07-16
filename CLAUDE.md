@@ -220,7 +220,7 @@
 **未做 / 下一步**：
 - **A25 编造终审未做** ⚠️：第一次决策版在 `tool_search` 就 break，只证明 A25「走上检索路」，**没跑到 ce-rag 零召回后的终答**——要 F5 全执行 或 L6 norm_faithful 看拒答正文是否真不编 DBJ 假号。
 - **v6 稳定性**：v6-2 才 2 轮，需 v6-3 复稳（8B 非确定，单轮 ±噪声）。剩 1 条 route 失败大概率是 F5 噪声。
-- **cost-critic 语义复核下线的代价**：选错码/语义错配它不再抓（只剩 verify_cost 算术/编码/串库/缺价），若要补回需换非子智能体方式（避免 Bug 1）。
+- **cost-critic 语义复核下线——已澄清非真缺口（2026-07-16）**：摘 MCP 后 cost-critic 只剩 verify_cost（算术/编码/串库/缺价）；但「选错码/语义错配」的语义查证能力**其实现成于 `bill_match` 核实模式**（`code` 给定 → `ce-db_bill_get` 真值 + 特征 diff + `ce-rag_match_bill_item` 交叉核，走 `call_mcp_tool` 同 loop、不碰 Bug 1）。两个 MCP 工具**未游离**，`bill_match` 引擎 + workflow `bill_get_node` 仍在调。故不用「重造能力」；若要在定稿链补回，只需让 lead 复核前对选中码调一次 `bill_match(核实)` 或 workflow 加核实闸——**待办已关闭，降级为「按需接线」**。
 - **L6 `norm_faithful` 仍未动**：edge/边界题的真实风险（编造）在这层量，L1 收口后应转 L6。
 
 ---

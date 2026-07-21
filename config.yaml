@@ -18,7 +18,7 @@ models:
   display_name: Qwen3-32B (阿里云百炼)
   use: deerflow.models.vllm_provider:VllmChatModel
   model: qwen3-32b
-  api_key: $DASHSCOPE_API_KEY
+  api_key: sk-1e865ed7e785494db11138d0e905bed0
   base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
   # ⚠️ DashScope 兼容端点的 thinking 开关约定与自托管 vLLM 不同：认**顶层** enable_thinking，
   #    不认 chat_template_kwargs 嵌套（嵌套写法被忽略→thinking 默认开→非流式调用 400）。且

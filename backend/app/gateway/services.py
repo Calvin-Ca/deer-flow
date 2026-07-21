@@ -313,6 +313,17 @@ async def start_run(
             multitask_strategy=body.multitask_strategy,
             model_name=model_name,
         )
+# ┌──────────────┬────────────────────────────────────────────────────────┬──────────────────────────────────────────┐
+# │      组      │                          字段                          │                   作用                   │
+# ├──────────────┼────────────────────────────────────────────────────────┼──────────────────────────────────────────┤
+# │ 身份         │ run_id / thread_id / assistant_id / model_name         │ 这是谁的、哪条会话、哪个 agent、什么模型 │
+# ├──────────────┼────────────────────────────────────────────────────────┼──────────────────────────────────────────┤
+# │ 执行参数     │ kwargs(input+config)                                   │ 跑 agent 要喂的输入和配置                │
+# ├──────────────┼────────────────────────────────────────────────────────┼──────────────────────────────────────────┤
+# │ 生命周期状态 │ status / error / created_at / updated_at               │ 现在跑到哪步、成没成、什么时候建的       │
+# ├──────────────┼────────────────────────────────────────────────────────┼──────────────────────────────────────────┤
+# │ 并发/控制    │ task / abort_event / abort_action / multitask_strategy │ 后台任务句柄、中止开关、并发怎么处理     │
+# └──────────────┴────────────────────────────────────────────────────────┴──────────────────────────────────────────┘
     except ConflictError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     except UnsupportedStrategyError as exc:
@@ -362,6 +373,7 @@ async def start_run(
             interrupt_after=body.interrupt_after,
         )
     )
+    # run_agent是 create_task 早就排进事件循环的另一条任务,当 start_run 返回、控制权交回循环,循环就去跑它了
     record.task = task
 
     # Title sync is handled by worker.py's finally block which reads the

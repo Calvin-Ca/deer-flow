@@ -11,6 +11,22 @@ AIMessage that made the tool calls, ensuring correct message ordering.
 Note: Uses wrap_model_call instead of before_model to ensure patches are inserted
 at the correct positions (immediately after each dangling AIMessage), not appended
 to the end of the message list as before_model + add_messages reducer would do.
+
+用于修复消息历史中悬空工具调用的中间件。
+
+当一条 AIMessage 中包含 tool_calls，但消息历史中没有对应的
+ToolMessage 时，就会出现悬空工具调用。例如，用户中断请求或请求
+被取消时，可能发生这种情况。由于消息格式不完整，这会导致大模型报错。
+
+该中间件会拦截模型调用，检测并修复此类缺口：在发起工具调用的
+AIMessage 后面立即插入带有错误标记的合成 ToolMessage，
+从而确保消息顺序正确。
+
+注意：这里使用 wrap_model_call，而不是 before_model，是为了确保
+修复消息能够插入正确的位置，即紧跟在每条存在悬空工具调用的
+AIMessage 后面，而不是像 before_model 配合 add_messages reducer
+那样，将修复消息追加到消息列表末尾。
+
 """
 
 import json

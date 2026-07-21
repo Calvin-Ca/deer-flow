@@ -85,7 +85,7 @@ async def main():
 
     # Initialize MCP tools at startup
     try:
-        await initialize_mcp_tools()
+        await initialize_mcp_tools() # 将 “有哪些工具?每个工具叫什么、干嘛的、要什么参数” 常驻缓存，暴露给 lead_agent
     except Exception as e:
         print(f"Warning: Failed to initialize MCP tools: {e}")
 

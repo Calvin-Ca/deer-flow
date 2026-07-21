@@ -18,17 +18,23 @@ models:
   display_name: Qwen3-32B (阿里云百炼)
   use: deerflow.models.vllm_provider:VllmChatModel
   model: qwen3-32b
-  api_key: sk-1e865ed7e785494db11138d0e905bed0
+  api_key: $DASHSCOPE_API_KEY
   base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
   # ⚠️ DashScope 兼容端点的 thinking 开关约定与自托管 vLLM 不同：认**顶层** enable_thinking，
-  #    不认 chat_template_kwargs 嵌套（嵌套写法被忽略→thinking 默认开→非流式调用 400）。且
-  #    **非流式调用必须 enable_thinking=false**（title/摘要/rank_schemes 等结构化非流式会踩坑）。
-  #    故此处默认关思考（路由器不依赖思考链，也规避非流式 400）。将来切自托管 32B-AWQ 需换回
-  #    chat_template_kwargs 嵌套写法（见下方 qwen3-8b 段 / 原 172.19.2.2 注释段）。
+  #    不认 chat_template_kwargs 嵌套（嵌套写法被忽略）。核心约束：**非流式调用必须
+  #    enable_thinking=false，否则 400**（"must be set to false for non-streaming calls"）；
+  #    流式调用可 true。据此分两态：
+  #    · when_thinking_enabled=true —— lead 路由走 DeerFlowClient/gateway 流式（stream_mode 含
+  #      messages），流式允许 thinking，让 32B 路由/边界判断吃到思考链（2026-07-21 开，排除
+  #      "关思考的 32B vs 开思考的 8B" 混淆）。
+  #    · when_thinking_disabled=false —— title/suggestions 硬传 thinking_enabled=False 走此支，
+  #      非流式安全。⚠️ summarization 用运行时 thinking_enabled（可能=True）且非流式 → 会 400，
+  #      故下方 summarization.model_name 指回 8b 规避（顺带省钱）。
+  #    将来切自托管 32B-AWQ：vLLM 无此约束，换回 chat_template_kwargs 嵌套写法（见下方 qwen3-8b 段）。
   supports_thinking: true
   when_thinking_enabled:
     extra_body:
-      enable_thinking: false
+      enable_thinking: true
   when_thinking_disabled:
     extra_body:
       enable_thinking: false
@@ -205,7 +211,9 @@ title:
   model_name: null
 summarization:
   enabled: true
-  model_name: null
+  # 指回 8b（默认模型=云端 32B）：① summarization 用运行时 thinking_enabled（路由态=True）且走
+  # 非流式 .invoke → 32B+thinking 在 dashscope 会 400；② 摘要是杂活，不必用 32B，省钱。
+  model_name: qwen3-8b
   trigger:
   - type: tokens
     value: 15564

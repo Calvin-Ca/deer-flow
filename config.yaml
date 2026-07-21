@@ -8,9 +8,33 @@ log_level: info
 token_usage:
   enabled: true
 models:
-# ── 服务器 vLLM Qwen3-8B（当前 agent 默认模型，列表第一项即默认）────────
-#    ⚠️ 本地 Qwen3-8B 的 function-calling/调 skill 不如 qwen-plus 稳，agent 多轮反问/工具调用
-#    可能不可靠（当初换 qwen-plus 即因此）。需服务器 :8099 vLLM 在跑。
+# ── 阿里云百炼 云端 Qwen3-32B（lead_agent 过渡期默认模型，列表第一项即默认）────────
+#    定案（2026-07-21）：lead_agent 用 32B——路由/function-calling 可靠性远胜 8B，也是将来
+#    40G 卡自托管 Qwen3-32B-AWQ 的同家族预演（现云端跑，将来切自托管，提示词几乎直接沿用）。
+#    api_key 用 $DASHSCOPE_API_KEY 引用（真值在 gitignore 的 .env，config.yaml 不落明文，可安全 commit）。
+#    云端百炼模型名即 qwen3-32b（无 AWQ 后缀，AWQ 是自托管量化格式）。走 dashscope 兼容端点，
+#    URL 固定、无 Docker/dev 两态 base_url 切换问题。同为 Qwen3 系（带 <think>），沿用 thinking 开关。
+- name: qwen3-32b
+  display_name: Qwen3-32B (阿里云百炼)
+  use: deerflow.models.vllm_provider:VllmChatModel
+  model: qwen3-32b
+  api_key: $DASHSCOPE_API_KEY
+  base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
+  # ⚠️ DashScope 兼容端点的 thinking 开关约定与自托管 vLLM 不同：认**顶层** enable_thinking，
+  #    不认 chat_template_kwargs 嵌套（嵌套写法被忽略→thinking 默认开→非流式调用 400）。且
+  #    **非流式调用必须 enable_thinking=false**（title/摘要/rank_schemes 等结构化非流式会踩坑）。
+  #    故此处默认关思考（路由器不依赖思考链，也规避非流式 400）。将来切自托管 32B-AWQ 需换回
+  #    chat_template_kwargs 嵌套写法（见下方 qwen3-8b 段 / 原 172.19.2.2 注释段）。
+  supports_thinking: true
+  when_thinking_enabled:
+    extra_body:
+      enable_thinking: false
+  when_thinking_disabled:
+    extra_body:
+      enable_thinking: false
+# ── 服务器 vLLM Qwen3-8B（备选，非默认；桶 A 延迟敏感/离线场景）────────
+#    ⚠️ 本地 Qwen3-8B 的 function-calling/调 skill 不如 32B/qwen-plus 稳，agent 多轮反问/工具调用
+#    可能不可靠。需服务器 :8099 vLLM 在跑。base_url 有 Docker(host.docker.internal)/dev(localhost) 两态。
 - name: qwen3-8b
   display_name: Qwen3-8B (172.19.3.136)
   use: deerflow.models.vllm_provider:VllmChatModel

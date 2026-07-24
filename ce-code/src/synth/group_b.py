@@ -96,7 +96,7 @@ def _process_clause(clause: dict, seed: int = 42) -> list[dict] | None:
         raw = llm_call(
             prompt,
             system=_SYSTEM,
-            model="Qwen3-32B-AWQ",
+            model="/models/Qwen3-32B-AWQ",
             max_tokens=3000,
             temperature=0.8,
             seed=seed,

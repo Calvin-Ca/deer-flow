@@ -27,7 +27,8 @@ _PRICE_PER_1K: dict[str, dict[str, float]] = {
     "qwen-max-2025-01-25":  {"input": 0.04, "output": 0.12},
     "qwen-plus":            {"input": 0.008, "output": 0.024},
     # 本地 vLLM 服务，无 API 费用
-    "Qwen3-32B-AWQ":        {"input": 0.0, "output": 0.0},
+    "Qwen3-32B-AWQ":           {"input": 0.0, "output": 0.0},
+    "/models/Qwen3-32B-AWQ":   {"input": 0.0, "output": 0.0},
 }
 _DEFAULT_MODEL = "qwen-max"
 

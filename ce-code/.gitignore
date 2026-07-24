@@ -2,6 +2,7 @@
 data/raw/*
 !data/raw/.gitkeep
 !data/raw/manifest.md
+!data/raw/*.pdf
 
 # ===== 解析产物（MinerU）：入 git 同步（2026-06-16 起，省服务器重跑解析） =====
 # data/parsed/  随 git 同步

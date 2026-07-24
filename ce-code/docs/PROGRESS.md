@@ -9,16 +9,16 @@
 
 | # | 任务 | 状态 | 产出 | 备注 |
 |---|---|---|---|---|
-| 0.1 | 目录骨架 + .gitignore（data/ 必须忽略） | ⬜ | | 版权要求，见 PRD §4 |
-| 0.2 | requirements.txt + 环境验证 | ⬜ | | |
-| 0.3 | LLM API 封装（重试、限流、成本统计、失败留痕） | ⬜ | `src/utils/llm.py` | 成本统计必须有 |
-| 0.4 | wandb 初始化 | ⬜ | | |
+| 0.1 | 目录骨架 + .gitignore（data/ 必须忽略） | ✅ | `src/` `configs/` `results/` `reports/` `data/interim/` `data/processed/` `data/eval/` | .gitignore 追加 norm-ft 规则 |
+| 0.2 | requirements.txt + 环境验证 | ✅ | `requirements.txt` | 待服务器 pip install 验证 |
+| 0.3 | LLM API 封装（重试、限流、成本统计、失败留痕） | ✅ | `src/utils/llm.py` | DashScope OpenAI-compatible；RPM 令牌桶；tenacity 3 次退避；失败写 data/interim/failed/ |
+| 0.4 | wandb 初始化 | ✅ | configs/group_*.yaml `report_to: wandb` | run_name 已绑定各组；wandb.init 在训练启动时由 LLaMA-Factory 调 |
 
 ## 阶段 1：条文库构建（2–3 天）
 
 | # | 任务 | 状态 | 产出 | 备注 |
 |---|---|---|---|---|
-| 1.1 | 规范 PDF 收集与清单确认 | ⬜ | `data/raw/` | **需我确认细分方向后定清单** |
+| 1.1 | 规范 PDF 收集与清单确认 | ✅ | `data/raw/` | GB50010/GB50011/GB50007/GB50009/JGJ3，共 5 本，已归 data/raw/ |
 | 1.2 | MinerU 解析，产出结构化中间件 | ⬜ | `data/interim/parsed/` | 禁用 PyPDF2 |
 | 1.3 | 条款分块（章-节-条层级还原） | ⬜ | | |
 | 1.4 | 表格抽取与绑定 | ⬜ | | 关键数值都在表里 |
@@ -53,8 +53,8 @@
 
 | # | 任务 | 状态 | 产出 | 备注 |
 |---|---|---|---|---|
-| 4.1 | LLaMA-Factory yaml × 4 + DeepSpeed 配置 | ⬜ | `configs/` | 四份除 dataset 外必须逐字相同 |
-| 4.2 | 配置一致性自动校验脚本 | ⬜ | `src/utils/check_configs.py` | 防人为失误 |
+| 4.1 | LLaMA-Factory yaml × 4 + DeepSpeed 配置 | ✅ | `configs/group_{a,b,c,d}.yaml` `configs/ds_zero2_offload.json` | 数据路径待 PDF 解析完后填入 |
+| 4.2 | 配置一致性自动校验脚本 | ✅ | `src/utils/check_configs.py` | `python -m src.utils.check_configs` |
 | 4.3 | 四组训练 | ⬜ | `checkpoints/` | 记录时长/显存/loss 曲线 |
 
 ## 阶段 5：评测（1 天）
@@ -62,7 +62,7 @@
 | # | 任务 | 状态 | 产出 | 备注 |
 |---|---|---|---|---|
 | 5.1 | vLLM 多 adapter 批量推理（6 个模型 × 400） | ⬜ | `results/{run_id}/raw/` | 参数见铁律 4 |
-| 5.2 | 条款号抽取 + 归一化 | ⬜ | `src/eval/clause.py` | 多种书写形式 |
+| 5.2 | 条款号抽取 + 归一化 | ✅ | `src/eval/clause.py` | 支持带标准号/中文简称/纯条款号三种形式；含 clause_f1 和 is_hallucinated |
 | 5.3 | 条款引用 F1 + 硬幻觉率 | ⬜ | | 全自动 |
 | 5.4 | 数值精确匹配判分 | ⬜ | | |
 | 5.5 | LLM judge（盲评+乱序） | ⬜ | | judge 模型 ≠ 合成模型 |
@@ -83,7 +83,7 @@
 
 ## 待我确认的决策点（不要自行拍板）
 
-- [ ] 土木细分方向 → 决定规范清单（阶段 1.1）
+- [x] 土木细分方向 → **结构方向**（GB50010/GB50011/GB50007/GB50009/JGJ3，2026-07-24 确认）
 - [ ] 合成 prompt 措辞（阶段 2.2）
 - [ ] 质量分阈值 / 多样性去重阈值（阶段 2.6）
 - [ ] 评测集 400 题的最终类别配额

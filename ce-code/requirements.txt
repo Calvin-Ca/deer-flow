@@ -1,0 +1,25 @@
+# [norm-ft] 规范问答 LLM 微调研究 — Python 3.10
+# 训练框架 LLaMA-Factory 单独安装，不在此列
+
+# LLM API
+openai>=1.30.0          # DashScope / Qwen-Max OpenAI-compatible endpoint
+tenacity>=8.3.0         # 重试 + 指数退避
+
+# 数据处理
+jsonlines>=4.0.0
+tqdm>=4.66.0
+
+# 嵌入 & 相似度（C 组多样性去重 + 泄漏检查）
+sentence-transformers>=3.0.0
+numpy>=1.26.0
+scikit-learn>=1.4.0
+
+# 实验跟踪
+wandb>=0.17.0
+
+# 评测 & 统计
+scipy>=1.13.0           # Cohen's Kappa
+pandas>=2.2.0
+
+# 条款号归一化（正则 + 中文处理）
+regex>=2024.4.16

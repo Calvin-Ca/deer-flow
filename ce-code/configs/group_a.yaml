@@ -1,0 +1,46 @@
+# LLaMA-Factory 训练配置 — group_a（条文原文切分基线）
+# 注意：除 dataset / output_dir 外，四份配置必须逐字相同（见 EXPERIMENT.md §1）
+
+### ── 模型 ─────────────────────────────────────────────────────────────────
+model_name_or_path: Qwen/Qwen2.5-7B-Instruct
+
+### ── LoRA ──────────────────────────────────────────────────────────────────
+finetuning_type: lora
+lora_rank: 32
+lora_alpha: 64
+lora_dropout: 0.05
+lora_target: q_proj,k_proj,v_proj,o_proj,gate_proj,up_proj,down_proj
+
+### ── 数据（各组唯一变量）────────────────────────────────────────────────
+dataset: group_a
+dataset_dir: data/processed/group_a
+
+### ── 训练超参 ────────────────────────────────────────────────────────────
+stage: sft
+do_train: true
+max_steps: 1500
+per_device_train_batch_size: 2
+gradient_accumulation_steps: 8
+learning_rate: 1.0e-4
+lr_scheduler_type: cosine
+warmup_ratio: 0.03
+cutoff_len: 2048
+bf16: true
+seed: 42
+
+### ── 显存优化 ────────────────────────────────────────────────────────────
+deepspeed: configs/ds_zero2_offload.json
+gradient_checkpointing: true
+
+### ── 推理参数（固定，五个模型一致；见铁律 4）────────────────────────────
+# temperature: 0 / top_p: 1 / seed: 42 / max_new_tokens: 1024
+# （推理时在 vLLM 侧配置，此处仅记录备查）
+
+### ── 输出 ─────────────────────────────────────────────────────────────────
+output_dir: checkpoints/group_a
+logging_steps: 50
+save_steps: 500
+
+### ── 实验跟踪 ────────────────────────────────────────────────────────────
+report_to: wandb
+run_name: group_a

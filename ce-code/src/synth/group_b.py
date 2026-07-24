@@ -1,13 +1,13 @@
 """
 阶段 2.3：Group B — LLM 反向生成问答（无过滤）
 
-每条条文调用 qwen-max 一次，生成 4 个问答对（施工员/设计师/监理/甲方视角）。
+每条条文调用本地 vLLM 一次，生成 4 个问答对（施工员/设计师/监理/甲方视角）。
 失败条文写入 data/interim/failed/，统计失败率后汇报。
 
 运行：
-  python -m src.synth.group_b --smoke       # 仅前 50 条，用于验证质量
-  python -m src.synth.group_b               # 全量 1751 条
-  python -m src.synth.group_b --resume      # 跳过已生成的条文（断点续跑）
+  python -m src.synth.group_b --smoke             # 仅前 50 条，用于验证质量
+  python -m src.synth.group_b --workers 8         # 全量，8 线程并发
+  python -m src.synth.group_b --workers 8 --resume  # 断点续跑
 """
 from __future__ import annotations
 
@@ -16,6 +16,8 @@ import hashlib
 import json
 import re
 import sys
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
 
@@ -161,6 +163,7 @@ def build_group_b(
     smoke: bool = False,
     resume: bool = False,
     seed: int = 42,
+    workers: int = 1,
 ) -> None:
     _OUT_DIR.mkdir(parents=True, exist_ok=True)
     out_file = _OUT_DIR / "train.jsonl"
@@ -187,30 +190,40 @@ def build_group_b(
                     pass
         print(f"[group_b] resume 模式：已跳过 {len(already_done)} 条条文（已生成）")
 
+    pending = [c for c in clauses if c["clause_id"] not in already_done]
+
     total_ok = 0
     total_fail = 0
+    write_lock = threading.Lock()
     write_mode = "a" if (resume and out_file.exists()) else "w"
 
     try:
         from tqdm import tqdm
-        iterator = tqdm(clauses, desc="group_b synth")
+        pbar = tqdm(total=len(pending), desc="group_b synth")
     except ImportError:
-        iterator = clauses  # type: ignore
+        pbar = None
+
+    def _handle(clause: dict) -> tuple[list[dict] | None, str]:
+        return _process_clause(clause, seed=seed), clause["clause_id"]
 
     with open(out_file, write_mode, encoding="utf-8") as fout:
-        for clause in iterator:
-            cid = clause["clause_id"]
-            if cid in already_done:
-                continue
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            futures = {pool.submit(_handle, c): c for c in pending}
+            for fut in as_completed(futures):
+                samples, cid = fut.result()
+                if pbar:
+                    pbar.update(1)
+                if samples is None:
+                    with write_lock:
+                        total_fail += 1
+                    continue
+                with write_lock:
+                    for s in samples:
+                        fout.write(json.dumps(s, ensure_ascii=False) + "\n")
+                    total_ok += len(samples)
 
-            samples = _process_clause(clause, seed=seed)
-            if samples is None:
-                total_fail += 1
-                continue
-
-            for s in samples:
-                fout.write(json.dumps(s, ensure_ascii=False) + "\n")
-            total_ok += len(samples)
+    if pbar:
+        pbar.close()
 
     # 统计
     total_clauses = len(clauses) - len(already_done)
@@ -246,5 +259,6 @@ if __name__ == "__main__":
     parser.add_argument("--smoke", action="store_true", help="仅处理前 50 条")
     parser.add_argument("--resume", action="store_true", help="跳过已生成条文（断点续跑）")
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--workers", type=int, default=1, help="并发线程数（本地 vLLM 建议 4-8）")
     args = parser.parse_args()
-    build_group_b(smoke=args.smoke, resume=args.resume, seed=args.seed)
+    build_group_b(smoke=args.smoke, resume=args.resume, seed=args.seed, workers=args.workers)

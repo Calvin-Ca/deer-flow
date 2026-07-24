@@ -55,11 +55,12 @@ _PERSPECTIVES = ["施工员", "设计师", "监理", "甲方"]
 
 def _build_prompt(clause: dict) -> str:
     clause_text = convert_text_tables(clause["text"])
-    return _USER_TEMPLATE.format(
-        standard_name=clause["standard_name"],
-        standard_code=clause["standard_code"],
-        clause_no=clause["clause_no"],
-        clause_text=clause_text,
+    return (
+        _USER_TEMPLATE
+        .replace("{standard_name}", clause["standard_name"])
+        .replace("{standard_code}", clause["standard_code"])
+        .replace("{clause_no}", clause["clause_no"])
+        .replace("{clause_text}", clause_text)
     )
 
 

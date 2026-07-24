@@ -5,9 +5,12 @@ data/raw/*
 !data/raw/*.pdf
 
 # ===== 解析产物（MinerU）：入 git 同步（2026-06-16 起，省服务器重跑解析） =====
-# data/parsed/  随 git 同步
+# data/parsed/ 与 data/interim/parsed/ 随 git 同步（md + content_list[_v2]）
 # 但每份产物下的 images/（MinerU 切出的位图，大体积、可由原 PDF 重生）不入 git
 data/parsed/**/images/
+data/interim/parsed/**/images/
+# _middle.json：MinerU 底层版面细节（bbox/span），单本可达 20M、可重跑再生，不入 git
+data/interim/parsed/**/*_middle.json
 
 # ===== 结构化产物（chunk 树 / bill_spec.jsonl 等）：入 git 同步（2026-06-16 起） =====
 # data/structured/  随 git 同步

@@ -26,6 +26,8 @@ _PRICE_PER_1K: dict[str, dict[str, float]] = {
     "qwen-max":             {"input": 0.04, "output": 0.12},
     "qwen-max-2025-01-25":  {"input": 0.04, "output": 0.12},
     "qwen-plus":            {"input": 0.008, "output": 0.024},
+    # 本地 vLLM 服务，无 API 费用
+    "Qwen3-32B-AWQ":        {"input": 0.0, "output": 0.0},
 }
 _DEFAULT_MODEL = "qwen-max"
 
@@ -135,6 +137,7 @@ def _call_once(
     max_tokens: int,
     temperature: float,
     seed: int,
+    extra_body: dict | None = None,
 ) -> tuple[str, int, int]:
     _rate_limiter.acquire()
     resp = client.chat.completions.create(
@@ -143,6 +146,7 @@ def _call_once(
         max_tokens=max_tokens,
         temperature=temperature,
         seed=seed,
+        extra_body=extra_body,
     )
     content = resp.choices[0].message.content or ""
     in_tok = resp.usage.prompt_tokens if resp.usage else 0
@@ -160,6 +164,7 @@ def call(
     seed: int = 42,
     sample_id: str = "",
     extra_meta: dict | None = None,
+    extra_body: dict | None = None,
 ) -> str:
     """
     单次 LLM 调用。失败超过重试上限时记录到 data/interim/failed/ 并抛出异常。
@@ -172,7 +177,7 @@ def call(
     client = _get_client()
     try:
         text, in_tok, out_tok = _call_once(
-            client, model, messages, max_tokens, temperature, seed
+            client, model, messages, max_tokens, temperature, seed, extra_body
         )
         cost_tracker.add(model, in_tok, out_tok)
         return text

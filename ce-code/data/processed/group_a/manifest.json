@@ -1,0 +1,11 @@
+{
+  "group": "a",
+  "version": "v1",
+  "total": 8755,
+  "clauses_source": "D:\\CaiC\\project\\deer-flow\\ce-code\\data\\interim\\clauses.jsonl",
+  "built_at": "2026-07-25T02:15:44",
+  "template_count": 5,
+  "template_hash": "0d3fb1a0963f",
+  "seed": null,
+  "smoke": false
+}

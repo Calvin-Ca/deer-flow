@@ -29,12 +29,12 @@
 
 | # | 任务 | 状态 | 产出 | 备注 |
 |---|---|---|---|---|
-| 2.1 | A 组：模板化切分 | ⬜ | `data/processed/group_a/` | |
-| 2.2 | 合成 prompt 设计 + 50 条小批验证 | ⬜ | `configs/prompts/synth_qa.txt` | **需我确认后冻结** |
-| 2.3 | B 组：全量反向生成 | ⬜ | `data/processed/group_b/` | 先报预估费用 |
-| 2.4 | 过滤器 1：可答性 | ⬜ | `src/filter/answerable.py` | |
-| 2.5 | 过滤器 2：条款准确性（核心） | ⬜ | `src/filter/clause_check.py` | 需条款号归一化 |
-| 2.6 | 过滤器 3：多样性去重 | ⬜ | `src/filter/dedup.py` | 阈值需我确认 |
+| 2.1 | A 组：模板化切分 | ✅ | `data/processed/group_a/train.jsonl`（8755 条） | 5 模板×1751 条；含 HTML→Markdown 表格转换；manifest 已写 |
+| 2.2 | 合成 prompt 设计 + 50 条小批验证 | 🔄 | `configs/prompts/synth_qa.txt` | prompt 已冻结（2026-07-25）；**50 条验证待在服务器执行** |
+| 2.3 | B 组：全量反向生成 | ⬜ | `data/processed/group_b/` | 待 2.2 验证通过后执行；预估 ¥196，50 条验证约 ¥5.6 |
+| 2.4 | 过滤器 1：可答性 | ✅ | `src/filter/answerable.py` | LLM 判定 INSUFFICIENT → 淘汰；API 失败保守保留 |
+| 2.5 | 过滤器 2：条款准确性（核心） | ✅ | `src/filter/clause_check.py` | 幻觉条款号 + 数值冲突双检（>2 个杂散数值才淘汰，保守） |
+| 2.6 | 过滤器 3：多样性去重 | ✅ | `src/filter/dedup.py` | bge-small-zh cosine>0.85 去重；**阈值待你确认是否调整** |
 | 2.7 | C 组产出 + 淘汰率统计 | ⬜ | `data/processed/group_c/` | 淘汰率异常需停下 |
 | 2.8 | D1：跨条文样本（基于 refs） | ⬜ | | 含"单条可答则淘汰"校验 |
 | 2.9 | D2：拒答样本 | ⬜ | | 三类配额 5:3:2 |

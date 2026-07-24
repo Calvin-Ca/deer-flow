@@ -51,7 +51,6 @@ tmp*/
 
 # ===== [norm-ft] 训练数据（jsonl 体量大，不入 git；manifest.json 入 git） =====
 data/processed/group_*/train.jsonl
-data/processed/group_*/manifest.json
 
 # ===== [norm-ft] 中间产物：失败样本、过滤淘汰样本（调试用，不入 git） =====
 data/interim/failed/*

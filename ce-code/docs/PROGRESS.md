@@ -20,10 +20,10 @@
 |---|---|---|---|---|
 | 1.1 | 规范 PDF 收集与清单确认 | ✅ | `data/raw/` | GB50010/GB50011/GB50007/GB50009/JGJ3，共 5 本，已归 data/raw/ |
 | 1.2 | MinerU 解析，产出结构化中间件 | ✅ | `data/interim/parsed/<规范>/hybrid_auto/` | 5 本全解析；HTTP 服务 172.19.2.2:8000，**backend=hybrid-auto-engine 转正**（表格完整率 GB50009 82.8%→100%、GB50007 99%→100%，段落还原更整；抽查数值无幻觉；表格为 HTML `<table>` 含 rowspan，1.4 按此解析）；驱动 `src/parse/run_mineru.py`。产出 md+content_list[_v2]（入 git），middle_json 不入 git（20M/本、可重跑再生），无位图（return_images=false）。**待 1.6 核**：GB50011 hybrid 完整率 80.1%（略低于 pipeline 82.3%），空 body 表抽查 |
-| 1.3 | 条款分块（章-节-条层级还原） | ⬜ | | |
-| 1.4 | 表格抽取与绑定 | ⬜ | | 关键数值都在表里 |
-| 1.5 | `refs` 交叉引用抽取 | ⬜ | | D 组跨条文样本的基础 |
-| 1.6 | 条文库质检（连续性/表格完整率/refs 召回） | ⬜ | `data/interim/parse_report.md` | 不达标不得进入阶段 2 |
+| 1.3 | 条款分块（章-节-条层级还原） | ✅ | `data/interim/clauses.jsonl` | 1751 条（GB50010:401/GB50011:439/GB50007:308/GB50009:100/JGJ3:503）；三段式条款号过滤两段式节号；去重2015修订版双公告 |
+| 1.4 | 表格抽取与绑定 | ✅ | 内嵌于 1.3 产物 | 249 张表（含续表双向 caption 查找）；HTML 全部完整（无截断）|
+| 1.5 | `refs` 交叉引用抽取 | ✅ | 内嵌于 1.3 产物 | 214 条款有引用；复用 src/eval/clause.py 归一化 |
+| 1.6 | 条文库质检（连续性/表格完整率/refs 召回） | ✅ | `data/interim/parse_report.md` | 五本全通过；门限：强制性>0 + 表格HTML完整；caption率参考（续表无caption属正常）|
 
 ## 阶段 2：数据构造（3 天）
 

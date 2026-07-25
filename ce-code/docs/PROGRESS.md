@@ -35,10 +35,10 @@
 | 2.4 | 过滤器 1：可答性 | ✅ | `src/filter/answerable.py` | LLM 判定 INSUFFICIENT → 淘汰；API 失败保守保留 |
 | 2.5 | 过滤器 2：条款准确性（核心） | ✅ | `src/filter/clause_check.py` | 幻觉条款号 + 数值冲突双检（>2 个杂散数值才淘汰，保守） |
 | 2.6 | 过滤器 3：多样性去重 | ✅ | `src/filter/dedup.py` | bge-small-zh cosine>0.85 去重；**阈值待你确认是否调整** |
-| 2.7 | C 组产出 + 淘汰率统计 | ⬜ | `data/processed/group_c/` | 淘汰率异常需停下 |
-| 2.8 | D1：跨条文样本（基于 refs） | ⬜ | | 含"单条可答则淘汰"校验 |
-| 2.9 | D2：拒答样本 | ⬜ | | 三类配额 5:3:2 |
-| 2.10 | D 组合并 | ⬜ | `data/processed/group_d/` | |
+| 2.7 | C 组产出 + 淘汰率统计 | ✅ | `src/synth/group_c.py` | 串联三过滤器；支持 --workers 并发；**待 B 组完成后执行** |
+| 2.8 | D1：跨条文样本（基于 refs） | ✅ | `src/synth/group_d1.py` | 214 条引用对；含单条可答则淘汰校验；**待执行** |
+| 2.9 | D2：拒答样本 | ✅ | `src/synth/group_d2.py` | 三类配额 750:450:300；**待执行** |
+| 2.10 | D 组合并 | ✅ | `src/synth/group_d_merge.py` | C+D1+D2 合并；**待执行** |
 
 ## 阶段 3：评测集建设（2 天）
 

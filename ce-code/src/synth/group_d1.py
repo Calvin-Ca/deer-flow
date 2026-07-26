@@ -82,6 +82,7 @@ def _build_pairs(clauses: dict[str, dict]) -> list[tuple[dict, dict]]:
     pairs: list[tuple[dict, dict]] = []
     for cid, clause in clauses.items():
         for ref_id in clause.get("refs", []):
+            ref_id = ref_id.replace("-_", "_")  # 修正 refs 多余连字符：GB50010-2010-_x → GB50010-2010_x
             if ref_id not in clauses:
                 continue
             key = frozenset([cid, ref_id])

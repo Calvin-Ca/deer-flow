@@ -25,11 +25,44 @@ sys.path.insert(0, str(_ROOT))
 _EMBED_MODEL: object | None = None  # 懒加载
 
 
-def _get_embed_model():
+class _RemoteEmbedder:
+    """通过 OpenAI-compatible /v1/embeddings 接口做 embedding（不依赖本地模型）。"""
+
+    def __init__(self, base_url: str, model: str = "/model", batch_size: int = 64):
+        self.base_url = base_url.rstrip("/")
+        self.model = model
+        self.batch_size = batch_size
+
+    def encode(self, texts: list[str], normalize_embeddings: bool = True):
+        import numpy as np, urllib.request, json as _json
+        vecs = []
+        for i in range(0, len(texts), self.batch_size):
+            batch = texts[i: i + self.batch_size]
+            body = _json.dumps({"model": self.model, "input": batch}).encode()
+            req = urllib.request.Request(
+                f"{self.base_url}/v1/embeddings",
+                data=body,
+                headers={"Content-Type": "application/json"},
+            )
+            with urllib.request.urlopen(req, timeout=60) as resp:
+                data = _json.loads(resp.read())
+            for item in sorted(data["data"], key=lambda x: x["index"]):
+                vecs.append(item["embedding"])
+        arr = np.array(vecs, dtype=np.float32)
+        if normalize_embeddings:
+            norms = np.linalg.norm(arr, axis=1, keepdims=True)
+            arr = arr / np.clip(norms, 1e-9, None)
+        return arr
+
+
+def _get_embed_model(embed_url: str | None = None):
     global _EMBED_MODEL
     if _EMBED_MODEL is None:
-        from sentence_transformers import SentenceTransformer
-        _EMBED_MODEL = SentenceTransformer("BAAI/bge-small-zh-v1.5")
+        if embed_url:
+            _EMBED_MODEL = _RemoteEmbedder(embed_url)
+        else:
+            from sentence_transformers import SentenceTransformer
+            _EMBED_MODEL = SentenceTransformer("BAAI/bge-small-zh-v1.5")
     return _EMBED_MODEL
 
 
@@ -48,6 +81,7 @@ def filter_dedup(
     rejected_path: Path,
     threshold: float = 0.85,
     batch_size: int = 256,
+    embed_url: str | None = None,
 ) -> tuple[int, int]:
     """
     返回 (kept, rejected)。
@@ -64,7 +98,7 @@ def filter_dedup(
         key = "_".join(s["meta"].get("source_clauses", ["unknown"]))
         groups.setdefault(key, []).append(s)
 
-    model = _get_embed_model()
+    model = _get_embed_model(embed_url)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     rejected_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -133,6 +167,7 @@ if __name__ == "__main__":
     parser.add_argument("--output", required=True)
     parser.add_argument("--rejected", default=None)
     parser.add_argument("--threshold", type=float, default=0.85)
+    parser.add_argument("--embed-url", default=None, help="远程 embedding API base_url（如 http://localhost:8097）")
     args = parser.parse_args()
 
     out = Path(args.output)
@@ -142,4 +177,5 @@ if __name__ == "__main__":
         output_path=out,
         rejected_path=rej,
         threshold=args.threshold,
+        embed_url=args.embed_url,
     )

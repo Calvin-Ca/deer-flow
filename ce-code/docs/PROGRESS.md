@@ -31,14 +31,14 @@
 |---|---|---|---|---|
 | 2.1 | A 组：模板化切分 | ✅ | `data/processed/group_a/train.jsonl`（8755 条） | 5 模板×1751 条；含 HTML→Markdown 表格转换；manifest 已写 |
 | 2.2 | 合成 prompt 设计 + 50 条小批验证 | ✅ | `configs/prompts/synth_qa.txt` | prompt 已冻结；50 条验证通过（质量确认 2026-07-25） |
-| 2.3 | B 组：全量反向生成 | 🔄 | `data/processed/group_b/` | 服务器运行中（Qwen3-32B-AWQ @172.19.2.2:8001，零 API 费用）；--workers 8 并发；预计 15-20h |
-| 2.4 | 过滤器 1：可答性 | ✅ | `src/filter/answerable.py` | LLM 判定 INSUFFICIENT → 淘汰；API 失败保守保留 |
-| 2.5 | 过滤器 2：条款准确性（核心） | ✅ | `src/filter/clause_check.py` | 幻觉条款号 + 数值冲突双检（>2 个杂散数值才淘汰，保守） |
-| 2.6 | 过滤器 3：多样性去重 | ✅ | `src/filter/dedup.py` | bge-small-zh cosine>0.85 去重；**阈值待你确认是否调整** |
-| 2.7 | C 组产出 + 淘汰率统计 | ✅ | `src/synth/group_c.py` | 串联三过滤器；支持 --workers 并发；**待 B 组完成后执行** |
-| 2.8 | D1：跨条文样本（基于 refs） | ✅ | `src/synth/group_d1.py` | 214 条引用对；含单条可答则淘汰校验；**待执行** |
-| 2.9 | D2：拒答样本 | ✅ | `src/synth/group_d2.py` | 三类配额 750:450:300；**待执行** |
-| 2.10 | D 组合并 | ✅ | `src/synth/group_d_merge.py` | C+D1+D2 合并；**待执行** |
+| 2.3 | B 组：全量反向生成 | ✅ | `data/processed/group_b/train.jsonl`（6760 条） | 2026-07-26 完成；失败率 0.6%（11/1701条）；零费用（本地 Qwen3-32B-AWQ） |
+| 2.4 | 过滤器 1：可答性 | ✅ | `src/filter/answerable.py` | LLM 判定；淘汰率 61.8%（4300/6960）；耗时 24h（设计缺陷：模型顺带生成完整答案，已留改进记录） |
+| 2.5 | 过滤器 2：条款准确性（核心） | ✅ | `src/filter/clause_check.py` | 淘汰率 3.0%（80/2660）；幻觉条款号+数值冲突双检 |
+| 2.6 | 过滤器 3：多样性去重 | ✅ | `src/filter/dedup.py` | 淘汰率 0.3%（7/2580）；改用远程 BGE API（vllm-bge-large:8097），绕过本地模型下载 |
+| 2.7 | C 组产出 + 淘汰率统计 | ✅ | `data/processed/group_c/train.jsonl`（2573 条） | 2026-07-27 完成；总淘汰率 63%（6760→2573），主要由可答性过滤主导 |
+| 2.8 | D1：跨条文样本（基于 refs） | 🔄 | `data/processed/group_d1/` | 服务器运行中；修复 refs 多余连字符 bug（`-_`→`_`）后识别出 319 对（原报 0 对）；--workers 8 |
+| 2.9 | D2：拒答样本 | ⬜ | `src/synth/group_d2.py` | 待 D1 完成后执行 |
+| 2.10 | D 组合并 | ⬜ | `src/synth/group_d_merge.py` | 待 D1+D2 完成后执行 |
 
 ## 阶段 3：评测集建设（2 天）
 
@@ -94,4 +94,6 @@
 
 | 日期 | 问题 | 影响 | 状态 |
 |---|---|---|---|
-| | | | |
+| 2026-07-26 | 可答性过滤耗时 24h（设计缺陷：让模型「顺带回答」而非判 YES/NO） | B→C 过滤周期过长 | 已记录，下次改 max_tokens=10+YES/NO prompt |
+| 2026-07-27 | group_d1 refs 格式 bug（`GB50010-2010-_x` 多一个 `-`） | D1 识别 0 对 | 已修复（`-_`→`_`），319 对已识别 |
+| 2026-07-27 | 服务器无法下载 bge-small-zh-v1.5 | dedup 步骤阻塞 | 已改用本地 vllm-bge-large:8097 HTTP API |

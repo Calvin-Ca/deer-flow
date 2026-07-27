@@ -34,9 +34,19 @@ def _load(path: Path) -> list[dict]:
         return [json.loads(l) for l in f if l.strip()]
 
 
-def _parse_no(clause_no: str) -> tuple[int, ...]:
-    """把 '3.1.7' 拆成 (3, 1, 7)."""
-    return tuple(int(x) for x in clause_no.split("."))
+def _parse_no(clause_no: str) -> tuple[int, ...] | None:
+    """把 '3.1.7' 拆成 (3, 1, 7)。
+
+    Args:
+        clause_no: 条款号，如 "3.1.7"；附录条款为字母开头（"A.0.1"）
+
+    Returns:
+        各段整数元组；字母编号（附录）返回 None——附录不参与正文连续性检查
+    """
+    try:
+        return tuple(int(x) for x in clause_no.split("."))
+    except ValueError:
+        return None
 
 
 def check_continuity(clauses: list[dict]) -> list[str]:
@@ -49,7 +59,7 @@ def check_continuity(clauses: list[dict]) -> list[str]:
     groups: dict[tuple, list[tuple]] = defaultdict(list)
     for c in clauses:
         parts = _parse_no(c["clause_no"])
-        if len(parts) >= 3:
+        if parts and len(parts) >= 3:
             key = parts[:2]          # (章, 节)
             groups[key].append((parts, c["clause_no"]))
 
@@ -108,6 +118,64 @@ def check_commentary(clauses: list[dict]) -> int:
     return sum(1 for c in clauses if _RE_COMMENTARY_TELL.search(c["text"][:120]))
 
 
+_RE_EMBEDDED_CLAUSE = re.compile(
+    r'^#{0,3}\s*((?:[A-Z]\.\d+(?:\.\d+)*|\d+\.\d+\.\d+(?:\.\d+)?))\s*\S',
+    re.MULTILINE,
+)
+
+
+def check_leak(clauses: list[dict]) -> int:
+    """统计正文里混入了**其他条款**的条款数（切分渗漏）。
+
+    比「char_len 超阈值」精确得多：附录里合法存在数万字的大表（如附加应力系数表、
+    全国城镇烈度表），单纯按长度报警会误伤；而正文中出现另一个条款号独占一行，
+    只可能是没切开。历史案例：附录整体灌进每本的末条（GB50009_10.3.3 达 17.5 万字）、
+    E.5 整节灌进 E.4.3。
+
+    Args:
+        clauses: 单本规范的条款记录列表
+
+    Returns:
+        正文含其他条款号的条款数（正常应为 0）
+    """
+    bad = 0
+    for c in clauses:
+        # 首行是自身编号，从第二行起找
+        body = c["text"].split("\n", 1)[1] if "\n" in c["text"] else ""
+        for m in _RE_EMBEDDED_CLAUSE.finditer(body):
+            if m.group(1) != c["clause_no"]:
+                bad += 1
+                break
+    return bad
+
+
+def check_table_capture(clauses: list[dict], std_code: str) -> tuple[int, int]:
+    """比对源 md 与条文库的表格数，量化切分过程中的内容丢失。
+
+    这是最直接的「内容有没有丢」断言：条款数、字数都可能因切分策略变化而波动，
+    但源文档里的 <table> 数量是客观不变的，捕获率必须 100%。
+    历史案例：让章节标题关闭当前条款后，附录标题直下、没有编号的表格无处安放，
+    静默丢失 23 张（GB50009 附录A「常用材料和构件的自重」整章只有表、无条款号）。
+
+    Args:
+        clauses:  单本规范的条款记录列表
+        std_code: 标准号，用于定位源 md
+
+    Returns:
+        (源 md 正文中的表格数, 条文库中捕获的表格数)；源文件缺失时返回 (0, 0)
+    """
+    from src.parse.clause_splitter import STANDARDS, _find_md, _find_commentary_start
+
+    meta = STANDARDS.get(std_code)
+    parsed_root = CLAUSES_FILE.parent / "parsed"
+    md = _find_md(parsed_root, meta["file_kw"]) if meta and parsed_root.exists() else None
+    if not md:
+        return 0, 0
+    lines = md.read_text(encoding="utf-8").split("\n")
+    body = "\n".join(lines[:_find_commentary_start(lines)])
+    return len(re.findall(r"<table", body, re.I)), sum(len(c["tables"]) for c in clauses)
+
+
 def check_chapter_path(clauses: list[dict]) -> int:
     """统计 chapter_path 首层章号与条款号章号不一致的条款数。
 
@@ -123,7 +191,13 @@ def check_chapter_path(clauses: list[dict]) -> int:
         if not path:
             bad += 1
             continue
-        if path[0].split()[0].split(".")[0] != c["clause_no"].split(".")[0]:
+        head = c["clause_no"].split(".")[0]
+        if not head.isdigit():
+            # 附录条款：路径应为「附录X …」且字母与编号一致
+            if not path[0].startswith(f"附录{head}"):
+                bad += 1
+            continue
+        if path[0].split()[0].split(".")[0] != head:
             bad += 1
     return bad
 
@@ -146,6 +220,8 @@ def check_per_standard(all_clauses: list[dict]) -> list[dict]:
 
         commentary_n = check_commentary(clauses)
         path_bad_n = check_chapter_path(clauses)
+        leak_n = check_leak(clauses)
+        src_tables, got_tables = check_table_capture(clauses, std_code)
 
         # 硬门限：
         #   1. 强制性条文非零
@@ -154,11 +230,18 @@ def check_per_standard(all_clauses: list[dict]) -> list[dict]:
         #      文末的条文说明附录整体覆盖正文，条文库退化为解释性文字、限值表全丢，
         #      而当时的门限（1+2）全部通过。此断言专为拦截该类回归。
         #   4. chapter_path 章号与条款号章号一致率 100%
+        #   5. 切分渗漏 = 0    —— 历史 bug：附录用字母编号（A.0.1）、正文条款被 MinerU
+        #      排成标题（## 3.5.3），两者都匹配不上原条款正则，其内容一路灌进上一条，
+        #      使每本末条膨胀到十几万字（GB50009_10.3.3 达 17.5 万字，占全库 43% 文本）。
+        #   6. 表格捕获率 = 100%  —— 最直接的「内容有没有丢」断言：条款数与字数会随
+        #      切分策略波动，但源 md 的 <table> 数是客观不变量。
         ok = (
             mandatory_n > 0
             and table_stat["complete_rate"] >= 1.0
             and commentary_n == 0
             and path_bad_n == 0
+            and leak_n == 0
+            and (src_tables == 0 or got_tables >= src_tables)
         )
 
         results.append({
@@ -175,6 +258,9 @@ def check_per_standard(all_clauses: list[dict]) -> list[dict]:
             "continuity_warns":   continuity_warns,
             "commentary_count":   commentary_n,
             "path_bad_count":     path_bad_n,
+            "leak_count":         leak_n,
+            "src_tables":         src_tables,
+            "got_tables":         got_tables,
             "pass":               ok,
         })
     return results
@@ -185,7 +271,7 @@ def _fmt_rate(r: float) -> str:
 
 
 def print_summary(results: list[dict]) -> None:
-    print(f"{'规范':<18} {'条款':>5} {'强制':>4} {'极短':>4} {'表格/完整':>9} {'caption率':>9} {'公式':>5} {'引用':>5} {'说明混入':>8} {'路径错':>6} {'结论':>5}")
+    print(f"{'规范':<18} {'条款':>5} {'强制':>4} {'极短':>4} {'表格/完整':>9} {'caption率':>9} {'公式':>5} {'引用':>5} {'说明混入':>8} {'路径错':>6} {'渗漏':>5} {'表捕获':>8} {'结论':>5}")
     print("-" * 96)
     all_pass = True
     for r in results:
@@ -197,7 +283,8 @@ def print_summary(results: list[dict]) -> None:
             f"{r['std_code']:<18} {r['clause_count']:>5} {r['mandatory_count']:>4} "
             f"{r['tiny_count']:>4} {tbl:>9} {_fmt_rate(r['table_caption_rate']):>9} "
             f"{r['formula_clauses']:>5} {r['ref_clauses']:>5} "
-            f"{r['commentary_count']:>8} {r['path_bad_count']:>6} {status:>5}"
+            f"{r['commentary_count']:>8} {r['path_bad_count']:>6} {r['leak_count']:>5} "
+            f"{r['got_tables']}/{r['src_tables']:<6} {status:>5}"
         )
     print("-" * 96)
     total = sum(r["clause_count"] for r in results)
@@ -218,7 +305,8 @@ def write_report(results: list[dict], out_path: Path) -> None:
             f"| {r['clause_count']} | {r['mandatory_count']} | {r['tiny_count']} "
             f"| {r['table_complete']}/{r['table_total']} | {_fmt_rate(r['table_caption_rate'])} "
             f"| {r['formula_clauses']} | {r['ref_clauses']} "
-            f"| {r['commentary_count']} | {r['path_bad_count']} | {pass_mark} |"
+            f"| {r['commentary_count']} | {r['path_bad_count']} | {r['leak_count']} "
+            f"| {r['got_tables']}/{r['src_tables']} | {pass_mark} |"
         )
 
     lines += ["", "## 连续性警告"]
@@ -234,7 +322,7 @@ def write_report(results: list[dict], out_path: Path) -> None:
     lines += [
         "",
         "> **门限说明**：① 强制性条文数 > 0；② 表格 HTML 全部完整（complete = total）；",
-        "> ③ **说明混入 = 0**；④ **路径错 = 0**。",
+        "> ③ **说明混入 = 0**；④ **路径错 = 0**；⑤ **切分渗漏 = 0**；⑥ **表格捕获率 = 100%**。",
         "> caption 率仅供参考——续表（续表 X.X.X）无独立 caption 属正常设计，不纳入门限。",
         ">",
         "> ③④ 为 2026-07-27 新增，拦截历史 bug 的回归：分块器原按「同条款号保留最后出现的」去重，",

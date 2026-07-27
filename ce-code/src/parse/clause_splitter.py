@@ -32,11 +32,23 @@ _RE_HEADING = re.compile(
 )
 _RE_TOC_SUFFIX = re.compile(r'\s+\d{1,4}\s*$')   # 目录页码后缀
 
-# 条款号：行首 X.X.X 或 X.X.X.X（不含 ## 前缀）
-# 两段式 X.X 是节标题，由 _RE_HEADING 处理，不当条款
+# 条款起始行。三类都要认（实测五本规范都混用）：
+#   1. 裸编号      `4.1.4 混凝土轴心抗压强度…`
+#   2. 带 ## 前缀  `## 3.5.3 设计使用年限为50年的…`  —— MinerU 常把完整条款排成标题，
+#                  也包括术语 `## 2.1.1 混凝土结构` 与符号 `## 2.2.1 材料性能`
+#   3. 附录字母编号 `A.0.1 岩石坚硬程度…` / `## A.0.2 岩体完整程度…`
+# 两段式 X.X 是节标题，由 _RE_HEADING 处理，不当条款。
+# 字母编号允许两段式（`E.1 基本雪压`）：附录里的「节」常直接承载表格内容，
+# 当标题处理会让其正文无处安放、被前一条款吸收（实测 GB50009 的 E.5
+# 全国城镇雪压表 11.5 万字全部灌进了 E.4.3）。当条款处理则不丢数据。
 _RE_CLAUSE_START = re.compile(
-    r'^(\d+\.\d+\.\d+(?:\.\d+)?)\s+(\S)'
+    r'^#{0,3}\s*'
+    r'([A-Z]\.\d+(?:\.\d+)*|\d+\.\d+\.\d+(?:\.\d+)?)'
+    r'\s*(\S)'
 )
+
+# 附录标题：`## 附录A 名称` / `# 附 录 C 名称`
+_RE_APPENDIX = re.compile(r'^#{0,3}\s*附\s*录\s*([A-Z])\s*(.*)$')
 
 # 表格 caption：`表 X.X.X-X 名称` 或 `续表 X.X.X-X`
 _RE_TABLE_CAPTION = re.compile(r'^(?:续\s*)?表\s+\S')
@@ -112,7 +124,10 @@ def _is_structural_heading(no_str: str, cur_chapter: int) -> bool:
     Returns:
         True 表示应更新 chapter_path，False 表示忽略该标题
     """
-    head = int(no_str.split('.')[0])
+    first = no_str.split('.')[0]
+    if not first.isdigit():          # 附录的字母编号不参与章号单调性判定
+        return False
+    head = int(first)
     if '.' not in no_str:
         return head == cur_chapter + 1   # 单段编号：只认下一章，杜绝条内分项标题夺章
     return head == cur_chapter           # 多段编号：必须属于当前章
@@ -195,9 +210,14 @@ def _extract_refs(body: str, std_code: str) -> list[str]:
     return list({r.clause_id for r in refs})
 
 
+_RE_MD_HEADING_PREFIX = re.compile(r'^#{1,6}\s*', re.MULTILINE)
+
+
 def _finalize(c: _Clause, std_code: str, std_name: str,
               mandatory: set[str]) -> dict:
-    body = '\n'.join(c.lines).strip()
+    # 剥掉行首的 markdown 标题标记：条文内的分项小标题会被原样并入正文，
+    # 保留 `##` 会让训练样本里混进 markdown 语法。
+    body = _RE_MD_HEADING_PREFIX.sub('', '\n'.join(c.lines)).strip()
     return {
         'clause_id':     f'{std_code}_{c.clause_no}',
         'standard_code': std_code,
@@ -258,6 +278,42 @@ def split_clauses(md_path: Path, std_code: str, std_name: str) -> list[dict]:
     cur_chapter = 0
 
     for line in lines[content_start:]:
+        # ── 附录标题 ──────────────────────────────────────────
+        # 必须先于章节标题判定：`附录A` 不含数字编号，_RE_HEADING 认不出。
+        m_a = _RE_APPENDIX.match(line.strip())
+        if m_a and not _RE_TOC_SUFFIX.search(line):
+            if current:
+                clauses.append(_finalize(current, std_code, std_name, mandatory))
+            letter, name_str = m_a.group(1), m_a.group(2).strip()
+            chapter_path = [f'附录{letter} {name_str}'.strip()]
+            cur_chapter = 0             # 附录不参与章号单调性
+            # 开一条承接条款 `X.0`：部分附录标题下直接就是表格、没有编号条款
+            # （如 GB50009 附录A「常用材料和构件的自重」整章只有表），
+            # 若此处置空，这些内容会无处安放而丢失（实测丢 23 张表）。
+            # 后面若出现 A.0.1 之类编号条款，本条自然收束，只留前置内容。
+            current = _Clause(
+                clause_no=f'{letter}.0',
+                chapter_path=list(chapter_path),
+                lines=[],
+            )
+            continue
+
+        # ── 条款起始 ──────────────────────────────────────────
+        # 必须先于章节标题判定：`## 3.5.3 …` 两个正则都匹配，
+        # 而它实为条款（MinerU 常把完整条款排成标题），按标题处理会整条丢失。
+        m_c = _RE_CLAUSE_START.match(line)
+        if m_c:
+            clause_no = m_c.group(1)
+            if current:
+                clauses.append(_finalize(current, std_code, std_name, mandatory))
+            # 去掉行首的 ## 前缀再入正文，避免 markdown 标记混进条文
+            current = _Clause(
+                clause_no=clause_no,
+                chapter_path=list(chapter_path),
+                lines=[line.lstrip('#').strip()],
+            )
+            continue
+
         # ── 章节标题 ──────────────────────────────────────────
         m_h = _RE_HEADING.match(line)
         if m_h and _is_real_heading(line, m_h):
@@ -267,25 +323,14 @@ def split_clauses(md_path: Path, std_code: str, std_name: str) -> list[dict]:
                 if current:
                     current.lines.append(line)
                 continue
+            if current:
+                clauses.append(_finalize(current, std_code, std_name, mandatory))
+                current = None          # 关闭当前条款，阻断跨章渗漏
             cur_chapter = int(no_str.split('.')[0])
             name_str = m_h.group(3).strip()
             title = f'{no_str} {name_str}'
             _update_path(chapter_path, no_str, title)
             # 章节标题不追加进条款正文（只更新路径）
-            continue
-
-        # ── 条款起始 ──────────────────────────────────────────
-        m_c = _RE_CLAUSE_START.match(line)
-        if m_c:
-            # 过滤：条款号第一段必须 ≥ 1（排除 0.x.x 前言附则格式）
-            clause_no = m_c.group(1)
-            if current:
-                clauses.append(_finalize(current, std_code, std_name, mandatory))
-            current = _Clause(
-                clause_no=clause_no,
-                chapter_path=list(chapter_path),
-                lines=[line],
-            )
             continue
 
         # ── 条款正文续行 ──────────────────────────────────────
@@ -295,11 +340,20 @@ def split_clauses(md_path: Path, std_code: str, std_name: str) -> list[dict]:
     if current:
         clauses.append(_finalize(current, std_code, std_name, mandatory))
 
-    # 去重：同一 clause_no 保留最后出现的（2015版修订条文会重复）
+    # 去重：同一 clause_no 保留正文最长的一条。
+    # 不能"保留最后出现的"——MinerU 会把句子残段误排成标题，
+    # 例如 `## 4.2.6 -2采用。`（原文是"…应按表4.2.6-2采用。"），
+    # 它与真条款 4.2.6 同号且出现在其后，保留最后会用残段覆盖真条文。
+    # 取最长在两种重号场景下都正确：残段必短于真条文；2015 修订版的重复条文
+    # 也以内容更全的那份为准。
     seen: dict[str, dict] = {}
     for c in clauses:
-        seen[c['clause_no']] = c
-    return list(seen.values())
+        prev = seen.get(c['clause_no'])
+        if prev is None or c['char_len'] > prev['char_len']:
+            seen[c['clause_no']] = c
+    # 丢弃空条款：附录承接条 `X.0` 在该附录直接以编号条款开头时不会接到任何内容，
+    # 空壳对下游（模板改写、问答合成）无意义，且会污染条款计数。
+    return [c for c in seen.values() if c['char_len'] > 0]
 
 
 # ── 批量入口 ─────────────────────────────────────────────────────────────

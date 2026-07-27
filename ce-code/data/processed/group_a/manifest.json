@@ -1,11 +1,11 @@
 {
   "group": "a",
   "version": "v1",
-  "total": 8265,
-  "clauses_source": "/mnt/nvme/calvin/code/deer-flow/ce-code/data/interim/clauses.jsonl",
-  "built_at": "2026-07-27T16:56:55",
+  "total": 11785,
+  "clauses_source": "/Users/caiche/code/deer-flow/ce-code/data/interim/clauses.jsonl",
+  "built_at": "2026-07-27T19:47:00",
   "template_count": 5,
-  "template_hash": "11285cf971e6",
+  "template_hash": "7273cf262720",
   "seed": null,
   "smoke": false
 }

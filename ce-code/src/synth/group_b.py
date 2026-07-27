@@ -26,6 +26,10 @@ _ROOT = Path(__file__).parents[2]
 _CLAUSES = _ROOT / "data/interim/clauses.jsonl"
 _OUT_DIR = _ROOT / "data/processed/group_b"
 _FAILED_DIR = _ROOT / "data/interim/failed"
+
+# 单条条文进 prompt 的字数上限。vLLM max_model_len=32768 token，
+# 中文约 1 字/token，留出 prompt 模板与输出的余量后取 2 万字。
+_MAX_CLAUSE_CHARS = 20000
 _PROMPT_FILE = _ROOT / "configs/prompts/synth_qa.txt"
 
 sys.path.insert(0, str(_ROOT))
@@ -190,6 +194,24 @@ def build_group_b(
         print(f"[group_b] resume 模式：已跳过 {len(already_done)} 条条文（已生成）")
 
     pending = [c for c in clauses if c["clause_id"] not in already_done]
+
+    # 超长条款闸：附录里存在纯查表型的巨表（GB50009 附录E 全国城镇雪压风压表约
+    # 11.5 万字、GB50007 附录K 附加应力系数表约 4 万字），整段塞进 prompt 会超出
+    # vLLM 的 max_model_len（32768），请求直接失败。这类条款本身也不适合生成问答。
+    # 按 CLAUDE.md §6.6 留痕，不静默丢弃。
+    oversized = [c for c in pending if c["char_len"] > _MAX_CLAUSE_CHARS]
+    if oversized:
+        skip_path = _FAILED_DIR / "group_b_oversized.jsonl"
+        with open(skip_path, "w", encoding="utf-8") as f:
+            for c in oversized:
+                f.write(json.dumps(
+                    {"clause_id": c["clause_id"], "char_len": c["char_len"],
+                     "tables": len(c["tables"]), "reason": "oversized_skip"},
+                    ensure_ascii=False) + "\n")
+        print(f"[group_b] 跳过超长条款 {len(oversized)} 条（>{_MAX_CLAUSE_CHARS} 字）→ {skip_path}")
+        for c in oversized:
+            print(f"           {c['clause_id']}  {c['char_len']} 字")
+        pending = [c for c in pending if c["char_len"] <= _MAX_CLAUSE_CHARS]
 
     total_ok = 0
     total_fail = 0

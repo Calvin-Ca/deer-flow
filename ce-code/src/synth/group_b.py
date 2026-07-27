@@ -34,15 +34,14 @@ _FAILED_DIR = _ROOT / "data/interim/failed"
 # 全部记错了合成模型——数据看着正常，溯源信息却是假的。用常量消除漂移可能。
 _SYNTH_MODEL = "/models/Qwen3-32B-AWQ"
 
-# 单条条文进 prompt 的字数上限。vLLM max_model_len=32768 token，
-# 中文约 1 字/token，留出 prompt 模板与输出的余量后取 2 万字。
-_MAX_CLAUSE_CHARS = 20000
 _PROMPT_FILE = _ROOT / "configs/prompts/synth_qa.txt"
 
 sys.path.insert(0, str(_ROOT))
 from src.utils.llm import call as llm_call, cost_tracker, print_cost_summary
 from src.utils import jsonx
-from src.synth.group_a import convert_text_tables  # HTML→Markdown 复用
+# 超长条款上限从 group_a 引入而非各自定义：两组必须同口径，否则那 3 条巨表
+# 只进 A 不进 B，会制造出不属于设计变量的组间差异（详见 group_a.MAX_CLAUSE_CHARS）。
+from src.synth.group_a import convert_text_tables, MAX_CLAUSE_CHARS as _MAX_CLAUSE_CHARS
 
 # ── Prompt 加载（冻结文件）────────────────────────────────────────────────
 

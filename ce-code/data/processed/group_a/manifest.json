@@ -1,11 +1,26 @@
 {
   "group": "a",
   "version": "v1",
-  "total": 11785,
-  "clauses_source": "/Users/caiche/code/deer-flow/ce-code/data/interim/clauses.jsonl",
-  "built_at": "2026-07-27T19:47:00",
+  "total": 11770,
+  "clauses_source": "data/interim/clauses.jsonl",
+  "built_at": "2026-07-28T01:06:04",
   "template_count": 5,
-  "template_hash": "7273cf262720",
+  "template_hash": "fceb6aec7ec9",
+  "oversized_skipped": [
+    {
+      "clause_id": "GB50007-2011_K.0.4",
+      "char_len": 39987
+    },
+    {
+      "clause_id": "GB50009-2012_A.0",
+      "char_len": 23597
+    },
+    {
+      "clause_id": "GB50009-2012_E.5",
+      "char_len": 114959
+    }
+  ],
+  "max_clause_chars": 20000,
   "seed": null,
   "smoke": false
 }

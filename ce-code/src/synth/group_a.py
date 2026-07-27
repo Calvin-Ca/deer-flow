@@ -174,9 +174,54 @@ def _make_answer(clause: dict, prefix: str) -> str:
 
 # ─── 主逻辑 ───────────────────────────────────────────────────────────────
 
+# 单条条文的字数上限——A/B 两组共用同一口径（group_b 从这里 import）。
+#
+# B 组因 vLLM max_model_len=32768 必须设闸，A 组不调 LLM 本可不设。但两组若口径不同，
+# 那 3 条纯查表型巨表（GB50009 附录E 全国雪压风压表 11.5 万字 / GB50007 附录K 4 万字 /
+# GB50009 附录A 2.4 万字）就只进 A 组不进 B 组，制造出一个**不属于设计变量的差异**：
+# 消融要测的是"模板复制 vs LLM 反向生成"这一策略差异，不是"谁有上下文限制"。
+#
+# 且那些样本本身是坏的：E.5 生成的答案 61,704 字，训练 cutoff_len=2048 只吃得下前 5%，
+# 砍在表格某行的数字中间，模型学到的是"列一张表然后戛然而止"。
+# 故 A 组同样设闸——既对齐口径，又顺带去掉 15 条注定被截断的样本。
+MAX_CLAUSE_CHARS = 20000
+
+
 def _sample_id(group: str, clause_id: str, tpl_idx: int) -> str:
     h = hashlib.md5(f"{clause_id}_{tpl_idx}".encode()).hexdigest()[:8]
     return f"{group}_{h}"
+
+
+# 模板渲染出来的固定样张——_template_hash 的输入。
+_HASH_FIXTURE = {
+    "standard_code": "GB50010-2010",
+    "standard_name": "混凝土结构设计规范",
+    "clause_no": "8.2.1",
+    "chapter_path": ["8 构造规定", "8.2 混凝土保护层"],
+}
+
+
+def _template_hash() -> str:
+    """对模板**渲染结果**取 hash，作为 A 组的可溯源指纹。
+
+    不能用 `md5(repr(_TEMPLATES))`：模板是 lambda，repr 出来是
+    `<function <lambda> at 0x1023f8cc0>`——内存地址。实测同一份代码连跑三次得到
+    三个不同的 hash，既检测不出模板措辞的改动，又在什么都没改时天天变，
+    对「四组是否用了同一套模板」这个溯源目的完全无效。
+
+    改为用固定样张渲染全部模板并 hash 其输出：措辞一改 hash 就变，
+    不改则跨进程、跨机器恒定。
+
+    Args:
+        无
+
+    Returns:
+        12 位十六进制指纹
+    """
+    rendered = "\n".join(
+        "|".join(tpl_fn(_HASH_FIXTURE)) for tpl_fn in _TEMPLATES
+    )
+    return hashlib.md5(rendered.encode()).hexdigest()[:12]
 
 
 def build_group_a(
@@ -193,6 +238,23 @@ def build_group_a(
             clauses.append(json.loads(line))
     if smoke:
         clauses = clauses[:20]
+
+    # 超长条款闸：与 B 组同口径（理由见 MAX_CLAUSE_CHARS）。
+    # 按 CLAUDE.md §6.6 留痕，不静默丢弃。
+    oversized = [c for c in clauses if len(c["text"]) > MAX_CLAUSE_CHARS]
+    if oversized:
+        failed_dir = output_dir.parents[1] / "interim/failed"
+        failed_dir.mkdir(parents=True, exist_ok=True)
+        skip_path = failed_dir / "group_a_oversized.jsonl"
+        with open(skip_path, "w", encoding="utf-8") as f:
+            for c in oversized:
+                f.write(json.dumps(
+                    {"clause_id": c["clause_id"], "char_len": len(c["text"]),
+                     "reason": "oversized_skip"}, ensure_ascii=False) + "\n")
+        print(f"[group_a] 跳过超长条款 {len(oversized)} 条（>{MAX_CLAUSE_CHARS} 字）→ {skip_path}")
+        for c in oversized:
+            print(f"           {c['clause_id']}  {len(c['text'])} 字")
+        clauses = [c for c in clauses if len(c["text"]) <= MAX_CLAUSE_CHARS]
 
     samples: list[dict] = []
     for clause in clauses:
@@ -223,16 +285,19 @@ def build_group_a(
             f.write(json.dumps(s, ensure_ascii=False) + "\n")
 
     # manifest
-    import hashlib as _hlib
-    prompt_hash = _hlib.md5(repr(_TEMPLATES).encode()).hexdigest()[:12]
     manifest = {
         "group": "a",
         "version": "v1",
         "total": len(samples),
-        "clauses_source": str(clauses_path),
+        # 存相对路径：绝对路径在 Mac 与服务器上不同，会让两边的 manifest 无法比对
+        "clauses_source": str(clauses_path.relative_to(clauses_path.parents[2])),
         "built_at": __import__("datetime").datetime.now().isoformat(timespec="seconds"),
         "template_count": len(_TEMPLATES),
-        "template_hash": prompt_hash,
+        "template_hash": _template_hash(),
+        "oversized_skipped": [
+            {"clause_id": c["clause_id"], "char_len": len(c["text"])} for c in oversized
+        ],
+        "max_clause_chars": MAX_CLAUSE_CHARS,
         "seed": None,
         "smoke": smoke,
     }

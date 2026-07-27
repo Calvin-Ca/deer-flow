@@ -42,32 +42,55 @@ def main() -> None:
     rows = [json.loads(l) for l in open(path, encoding="utf-8")]
     print(f"日志: {path.name}   失败 {len(rows)} 条\n")
 
-    # ⚠️ 只有当日志存的是**完整** raw 时，「截断」这一类才可信。
-    # group_b 早先存 raw[:1000]，任何超长输出都会被误判为截断，
-    # 把排查引向「调大 max_tokens」这个错误方向——实测失败样本平均输出 590 token、
-    # 上限 3000，根本不存在截断。故此处先探测日志是否被裁剪，被裁剪时不下截断结论。
-    clipped = sum(1 for r in rows if r.get("raw_len") is None and len(r.get("raw", "")) >= 1000)
-    log_is_clipped = clipped > len(rows) * 0.2
+    # 日志按日期命名且**追加**写入，一天内多次跑（全量 + 若干次 resume）会堆在同一文件里，
+    # 新旧混杂。且早先的 raw 被裁成 1000 字符——裁剪后的片段本就不是完整 JSON，
+    # 拿它判「能否解析」必然高估失败。故先按有无 raw_len 分开：
+    # 只有完整那批的结论可信，裁剪那批仅作历史存量报出、不参与判断。
+    full = [r for r in rows if r.get("raw_len") is not None]
+    clipped = [r for r in rows if r.get("raw_len") is None]
 
-    recovered = unparseable = 0
-    for r in rows:
-        raw = r.get("raw", "")
-        if jsonx.extract(raw, kind="array") is not None or \
-           jsonx.extract(raw, kind="object") is not None:
-            recovered += 1
-        else:
-            unparseable += 1
+    def _split(rs: list[dict]) -> tuple[list, list]:
+        """按 jsonx 能否解析把失败样本分成可捞回与不可捞回两组。
 
-    n = len(rows) or 1
-    print(f"  ✅ 转义修复可捞回 : {recovered:>4}  ({recovered/n:.0%})")
-    print(f"  ❌ 仍解析不了     : {unparseable:>4}  ({unparseable/n:.0%})")
-    print()
-    if log_is_clipped:
-        print("  ⚠️ 本日志的 raw 被裁剪过（无 raw_len 字段且多数正好 1000 字符）。")
-        print("     裁剪后的片段本就不是完整 JSON，「仍解析不了」这一栏严重高估，")
-        print("     实际可捞回比例只能靠补跑实测。请先重跑一次以产出完整日志。")
-    elif recovered:
-        print(f"→ 补跑这 {len(rows)} 条条文可回收约 {recovered * 4} 条样本（每条文 4 视角）")
+        Args:
+            rs: 失败日志行
+
+        Returns:
+            (可捞回, 不可捞回) 两个列表
+        """
+        ok, bad = [], []
+        for r in rs:
+            raw = r.get("raw", "")
+            hit = (jsonx.extract(raw, kind="array") is not None
+                   or jsonx.extract(raw, kind="object") is not None)
+            (ok if hit else bad).append(r)
+        return ok, bad
+
+    if clipped:
+        print(f"[历史存量] {len(clipped)} 条 raw 被裁剪过（旧版留痕，只存前 1000 字符）")
+        print("           片段本就不完整，无法据此判断可否捞回——已排除，不参与下面的统计。")
+        print("           这些条文若仍缺样本，用 --resume 重跑即可产出完整日志。\n")
+
+    if not full:
+        print("本日志无完整留痕记录，无可分析项。")
+        return
+
+    ok, bad = _split(full)
+    n = len(full)
+    print(f"[可分析] {n} 条完整留痕")
+    print(f"  ✅ 转义修复可捞回 : {len(ok):>4}  ({len(ok)/n:.0%})")
+    print(f"  ❌ 仍解析不了     : {len(bad):>4}  ({len(bad)/n:.0%})")
+    if ok:
+        print(f"\n→ 补跑可回收约 {len(ok) * 4} 条样本（每条文 4 视角）")
+    if bad:
+        print("\n仍解析不了的样本（逐条列出，供人工判因）：")
+        for r in bad[:10]:
+            raw = r.get("raw", "")
+            print(f"  ─ {r.get('clause_id','?')}   输出 {r.get('raw_len')} 字")
+            print(f"    开头: {raw[:70]!r}")
+            print(f"    结尾: {raw[-70:]!r}")
+        if len(bad) > 10:
+            print(f"  …另有 {len(bad) - 10} 条")
 
 
 if __name__ == "__main__":

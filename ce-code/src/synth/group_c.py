@@ -24,7 +24,16 @@ _TMP_DIR = _ROOT / "data/interim/filter_tmp"
 _REJECTED_DIR = _ROOT / "data/interim/filtered_out"
 
 
-def run(workers: int = 1) -> None:
+def run(workers: int = 1, seed: int = 42) -> None:
+    """串联三道过滤器，由 B 组产出 C 组。
+
+    Args:
+        workers: 可答性过滤的并发线程数（LLM 调用）
+        seed:    去重的组内洗牌种子（铁律 7，记入 manifest）
+
+    Returns:
+        None（结果写入 data/processed/group_c/）
+    """
     _OUT_DIR.mkdir(parents=True, exist_ok=True)
     _TMP_DIR.mkdir(parents=True, exist_ok=True)
     _REJECTED_DIR.mkdir(parents=True, exist_ok=True)
@@ -83,6 +92,7 @@ def run(workers: int = 1) -> None:
         input_path=tmp_clause,
         output_path=out_file,
         rejected_path=rej_dedup,
+        seed=seed,
     )
 
     kept_3 = sum(1 for _ in open(out_file, encoding="utf-8"))
@@ -114,6 +124,7 @@ def run(workers: int = 1) -> None:
         "total": kept_3,
         "source": str(_GROUP_B),
         "built_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "dedup_seed": seed,
         "filter_stats": {
             "input": total_in,
             "rejected_answerable": rej_1,
@@ -136,5 +147,6 @@ def run(workers: int = 1) -> None:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--workers", type=int, default=1, help="可答性过滤并发线程数")
+    parser.add_argument("--seed", type=int, default=42, help="去重洗牌种子（铁律 7）")
     args = parser.parse_args()
-    run(workers=args.workers)
+    run(workers=args.workers, seed=args.seed)

@@ -1,11 +1,22 @@
 """
 过滤器 3：多样性去重
 
-同一条文下的 4 个问题两两计算 embedding 余弦相似度。
-cosine > 0.85 的对中，保留质量分最高的（quality_score），其余淘汰。
+同一条文下的 4 个问题两两计算 embedding 余弦相似度，cosine > 0.85 判为重复，
+每对只留一条。
 
-注意：本过滤器在可答性/条款准确性之后运行，quality_score 由 LLM 打分或默认取 None。
-若 quality_score 为 None，则优先保留 perspective 顺序靠前的。
+取舍规则（2026-07-28 修正）——**组内先按固定种子洗牌再做贪心去重**：
+
+  原实现写的是"保留 quality_score 最高的，分相同则保留靠前者"。但 quality_score
+  从未实装：group_b 写死 None，前两道过滤也不打分，于是 `0.0 >= 0.0` 恒真，
+  规则实际退化为"永远保留组内靠前者"。而组内顺序 = LLM 输出顺序 =
+  施工员 → 设计师 → 监理 → 甲方，于是**甲方、监理被系统性淘汰**。
+
+  去重本身没做错（重复确实被去掉了），错在"留谁"是系统性偏的：C/D 组的视角分布
+  因此相对 B 组偏移，而消融要比的是"过滤 vs 不过滤"的质量差异，不是"甲方问题变少了"。
+
+  改为按固定种子洗牌后再贪心，取舍无偏且可复现（铁律 7：seed 显式传入并记入
+  manifest）。诚实边界：这不假装有质量信号，只保证取舍不带视角偏向——
+  留下的那条不保证比被淘汰的更好。要真正按质量取舍需另加一轮 LLM 打分。
 
 运行：
   python -m src.filter.dedup --input data/interim/filtered_clause.jsonl --output data/interim/filtered_dedup.jsonl
@@ -14,6 +25,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import random
 import sys
 from pathlib import Path
 
@@ -82,10 +94,21 @@ def filter_dedup(
     threshold: float = 0.85,
     batch_size: int = 256,
     embed_url: str | None = None,
+    seed: int = 42,
 ) -> tuple[int, int]:
-    """
-    返回 (kept, rejected)。
-    threshold：余弦相似度超过此值视为重复。
+    """按问题相似度对同一条文下的样本去重。
+
+    Args:
+        input_path:    待去重的 jsonl
+        output_path:   保留样本输出路径
+        rejected_path: 淘汰样本输出路径（留痕，§6.6）
+        threshold:     余弦相似度超过此值视为重复
+        batch_size:    embedding 批大小
+        embed_url:     远程 embedding API base_url，为空则用本地 sentence-transformers
+        seed:          组内洗牌种子（铁律 7：显式传入并由调用方记入 manifest）
+
+    Returns:
+        (保留条数, 淘汰条数)
     """
     samples: list[dict] = []
     with open(input_path, encoding="utf-8") as f:
@@ -126,24 +149,32 @@ def filter_dedup(
             questions = [s["conversations"][0]["value"] for s in group]
             embeddings = model.encode(questions, normalize_embeddings=True)
 
+            # 遍历顺序按固定种子打乱，消除"永远淘汰靠后视角"的系统性偏向（见模块 docstring）。
+            # 种子掺 clause_key：每组独立播种，结果不依赖组间迭代顺序，
+            # 增删条文或改并发都不会扰动其余组的取舍。字符串种子经 sha512 转换，
+            # 不走 hash()，故跨进程稳定（PYTHONHASHSEED 无影响）。
+            order = list(range(len(group)))
+            random.Random(f"{seed}:{clause_key}").shuffle(order)
+
             # 贪心去重：逐一检查，若与已保留的任一问题相似度 > threshold 则淘汰
             keep_flags = [True] * len(group)
             quality_scores = [s["meta"].get("quality_score") or 0.0 for s in group]
 
-            for i in range(len(group)):
+            for pos, i in enumerate(order):
                 if not keep_flags[i]:
                     continue
-                for j in range(i + 1, len(group)):
+                for j in order[pos + 1:]:
                     if not keep_flags[j]:
                         continue
                     sim = _cosine(embeddings[i], embeddings[j])
                     if sim > threshold:
-                        # 淘汰质量分低的；分相同则淘汰后者（i 靠前）
+                        # 质量分若已实装则淘汰低分者；未实装时两者皆 0.0，
+                        # 淘汰洗牌后靠后的那条（即随机取舍）
                         if quality_scores[i] >= quality_scores[j]:
                             keep_flags[j] = False
                         else:
                             keep_flags[i] = False
-                            break  # i 被淘汰，外层 i 移到下一个
+                            break  # i 被淘汰，外层移到下一个
 
             for idx, (s, keep) in enumerate(zip(group, keep_flags)):
                 if keep:
@@ -157,7 +188,7 @@ def filter_dedup(
 
     total = kept_total + rejected_total
     rate = rejected_total / total if total else 0
-    print(f"[dedup] 保留 {kept_total} / 淘汰 {rejected_total}（淘汰率 {rate:.1%}，阈值 {threshold}）")
+    print(f"[dedup] 保留 {kept_total} / 淘汰 {rejected_total}（淘汰率 {rate:.1%}，阈值 {threshold}，seed {seed}）")
     return kept_total, rejected_total
 
 
@@ -167,6 +198,7 @@ if __name__ == "__main__":
     parser.add_argument("--output", required=True)
     parser.add_argument("--rejected", default=None)
     parser.add_argument("--threshold", type=float, default=0.85)
+    parser.add_argument("--seed", type=int, default=42, help="组内洗牌种子（铁律 7）")
     parser.add_argument("--embed-url", default=None, help="远程 embedding API base_url（如 http://localhost:8097）")
     args = parser.parse_args()
 
@@ -178,4 +210,5 @@ if __name__ == "__main__":
         rejected_path=rej,
         threshold=args.threshold,
         embed_url=args.embed_url,
+        seed=args.seed,
     )

@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import glob
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -19,6 +20,36 @@ _ROOT = Path(__file__).parents[1]
 sys.path.insert(0, str(_ROOT))
 
 from src.utils import jsonx
+
+
+def _locate(raw: str) -> str:
+    """定位 JSON 解析失败的具体字符位置并给出上下文。
+
+    只报「开头/结尾」不足以判因：完整且首尾正确的输出照样可能坏在中间
+    （最常见是正文里的中文引号未转义）。故直接取 JSONDecodeError 的 pos
+    并把该处前后文打出来，让人一眼看到是哪个字符导致的。
+
+    Args:
+        raw: 模型原始输出
+
+    Returns:
+        单行诊断字符串（含错因与出错处上下文）
+    """
+    cleaned = re.sub(r"```(?:json)?\s*", "", raw).strip().rstrip("`").strip()
+    m = re.search(r"\[[\s\S]*\]|\{[\s\S]*\}", cleaned)
+    if not m:
+        return "截不到 JSON 片段（模型可能整段没按格式输出）"
+    frag = m.group(0)
+    for label, text in (("原样", frag), ("修转义后", jsonx.repair_escapes(frag))):
+        try:
+            json.loads(text)
+            return f"{label}可解析（jsonx 判定与此不符，需查 extract 逻辑）"
+        except json.JSONDecodeError as e:
+            last = (label, e, text)
+    label, e, text = last
+    lo, hi = max(0, e.pos - 40), min(len(text), e.pos + 40)
+    return (f"{e.msg} @ pos {e.pos}（{label}仍失败）\n"
+            f"      …{text[lo:e.pos]}⟪{text[e.pos:e.pos+1]}⟫{text[e.pos+1:hi]}…")
 
 
 def main() -> None:
@@ -83,12 +114,10 @@ def main() -> None:
     if ok:
         print(f"\n→ 补跑可回收约 {len(ok) * 4} 条样本（每条文 4 视角）")
     if bad:
-        print("\n仍解析不了的样本（逐条列出，供人工判因）：")
+        print("\n仍解析不了的样本（定位到出错字符，供人工判因）：")
         for r in bad[:10]:
-            raw = r.get("raw", "")
             print(f"  ─ {r.get('clause_id','?')}   输出 {r.get('raw_len')} 字")
-            print(f"    开头: {raw[:70]!r}")
-            print(f"    结尾: {raw[-70:]!r}")
+            print(f"    {_locate(r.get('raw', ''))}")
         if len(bad) > 10:
             print(f"  …另有 {len(bad) - 10} 条")
 

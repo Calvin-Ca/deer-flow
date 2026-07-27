@@ -11,6 +11,10 @@
 #                           从 2×8=16 变成 2×8×4=64。
 #   NCCL_P2P_DISABLE=1      RTX 40 系消费卡被 NVIDIA 关闭了 P2P，
 #   NCCL_IB_DISABLE=1       不设则 accelerate 抛 NotImplementedError 直接启动失败。
+#   FORCE_TORCHRUN=1        yaml 里配了 deepspeed 时 LLaMA-Factory 强制要求经
+#                           torchrun 启动，不设则报 ValueError 拒绝运行。
+#                           因上面只暴露 1 张卡，torchrun 会以 nproc_per_node=1
+#                           起单进程，有效 batch 仍为 16。
 #
 # 用法：
 #   ./scripts/train.sh a          # 训练 group_a
@@ -36,12 +40,14 @@ fi
 export CUDA_VISIBLE_DEVICES=0
 export NCCL_P2P_DISABLE=1
 export NCCL_IB_DISABLE=1
+export FORCE_TORCHRUN=1
 
 echo "=========================================================="
 echo "  训练 group_${GROUP}"
 echo "  配置        : ${CONFIG}"
 echo "  可见 GPU    : ${CUDA_VISIBLE_DEVICES}（单卡，有效 batch = 2×8 = 16）"
 echo "  NCCL P2P/IB : 已禁用（RTX 40 系不支持）"
+echo "  启动方式    : torchrun（DeepSpeed 要求），nproc_per_node 应为 1"
 echo "  启动时间    : $(date '+%Y-%m-%d %H:%M:%S')"
 echo "=========================================================="
 

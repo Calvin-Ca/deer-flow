@@ -1,8 +1,11 @@
 # ===== PDF 原始数据：不入 git（可能含版权内容、文件大）；清单入 git 作溯源 =====
+# 2026-07-27：删掉了 `!data/raw/*.pdf` 这条反忽略——它与本节标题和根 CLAUDE.md
+# 「data/raw/（PDF 原件，版权敏感）不进 git」正好相反，导致 PDF 一直被跟踪。
+# 后果：造价项目 9 本 PDF（共约 437MB，单本最大 119MB）被提交后推送遭 GitHub
+# 拒绝（单文件上限 100MB）。PDF 一律只留服务器本地。
 data/raw/*
 !data/raw/.gitkeep
 !data/raw/manifest.md
-!data/raw/*.pdf
 
 # ===== 解析产物（MinerU）：入 git 同步（2026-06-16 起，省服务器重跑解析） =====
 # data/interim/parsed/ 全部随 git 同步（md + content_list[_v2] + middle_json + images）

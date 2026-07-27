@@ -19,6 +19,12 @@ dataset: group_a
 dataset_dir: data/processed/group_a
 
 ### ── 训练超参 ────────────────────────────────────────────────────────────
+# ⚠️ 铁律 1：必须单卡启动，务必带 CUDA_VISIBLE_DEVICES=0
+#     CUDA_VISIBLE_DEVICES=0 uv run llamafactory-cli train configs/group_X.yaml
+# 不带则 LLaMA-Factory 自动拉满 4 卡（torchrun --nproc_per_node 4），
+# 有效 batch 从 2×8=16 变成 2×8×4=64 —— 超参被悄悄改掉且不报错。
+# 四组必须用同样的卡数，改卡数须同步调 gradient_accumulation_steps 并记入
+# EXPERIMENT.md §6 变更日志。
 stage: sft
 do_train: true
 max_steps: 1500

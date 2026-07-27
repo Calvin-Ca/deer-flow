@@ -10,6 +10,10 @@ dependencies = [
     # ===== 阶段 0：PDF 解析 =====
     "torch==2.5.1",          # cu121 wheel 由 [tool.uv.sources] 指定；见 [tool.uv] override-dependencies
     "torchvision==0.20.1",
+    # torchaudio 必须与 torch 同源同版：llamafactory 的 data/mm_plugin.py 模块级无条件
+    # import torchaudio，若它从默认源装到通用构建，会与 cu121 的 torch 撞 libstdc++ ABI
+    # （libtorchaudio.so: undefined symbol _ZNSt15__exception_ptr...），训练一启动即崩。
+    "torchaudio==2.5.1",
     "numpy>=1.26",
     "mineru[all,pipeline]",      # 版面分析 + OCR（包含 six 等传递依赖）
     "six>=1.16",             # mineru OCR 组件显式依赖
@@ -42,7 +46,10 @@ dependencies = [
     # LLaMA-Factory 自带 peft / trl / accelerate / transformers 的兼容版本，
     # 故此处不单独声明那几个，避免与它的 pin 打架（见 CLAUDE.md §2：走 yaml 配置，
     # 不手写训练循环）。deepspeed extra 提供 ZeRO 支持。
-    "llamafactory[metrics,deepspeed]>=0.9.2",
+    # deepspeed 直接声明，不走 llamafactory 的 extra——uv 对不存在的 extra 静默忽略，
+    # 实测 `llamafactory[...,deepspeed]` 装完 import deepspeed 仍报 ModuleNotFoundError。
+    "llamafactory[metrics]>=0.9.2",
+    "deepspeed>=0.15.0",
     # ===== [norm-ft] 实验跟踪与评测判分 =====
     "wandb>=0.17.0",
     "scipy>=1.13.0",         # Cohen's Kappa
@@ -65,11 +72,13 @@ dev = [
 override-dependencies = [
     "torch==2.5.1",
     "torchvision==0.20.1",
+    "torchaudio==2.5.1",
 ]
 
 [tool.uv.sources]
 torch = { index = "pytorch-cu121" }
 torchvision = { index = "pytorch-cu121" }
+torchaudio = { index = "pytorch-cu121" }
 
 [[tool.uv.index]]
 name = "tsinghua"

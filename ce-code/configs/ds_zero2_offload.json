@@ -1,10 +1,7 @@
 {
+  "_comment": "ZeRO-2。offload_optimizer 已移除（2026-07-27）：服务器无 nvcc、CUDA_HOME 为空，DeepSpeed 的 cpu_adam 算子无法编译。LoRA 下可卸载的仅优化器状态约 1GB（可训练参数约 8000 万），为此装整套 CUDA toolkit 不划算。日后若装了 toolkit 可加回：\"offload_optimizer\": {\"device\": \"cpu\", \"pin_memory\": true}",
   "zero_optimization": {
     "stage": 2,
-    "offload_optimizer": {
-      "device": "cpu",
-      "pin_memory": true
-    },
     "allgather_partitions": true,
     "allgather_bucket_size": 2e8,
     "overlap_comm": true,

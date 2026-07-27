@@ -28,7 +28,7 @@
 | PDF 解析 | MinerU 优先，PaddleOCR-Structure 备选 | **禁止用 PyPDF2/pdfplumber 硬啃**，规范里表格公式极多 |
 | 打分/合成 LLM | Qwen-Max（API） | 记录每次调用的 model 版本号，写进 metadata |
 | 评判 LLM | GPT-4o 或 Qwen-Max，与合成用的模型**必须不同** | 避免自评偏袒 |
-| Python | 3.10 | 依赖锁 `requirements.txt` |
+| Python | 3.12 | 包管理 **uv**，依赖声明 `pyproject.toml`、锁 `uv.lock`（2026-07-27 变更：原定 3.10 + requirements.txt，改为复用 ce-code 既有 uv 项目——其 `torch==2.5.1+cu121` 正是训练栈所需版本，且 torchvision 0.20.x 无 cp313 wheel 故上限 3.13）|
 | 实验跟踪 | wandb（离线模式亦可） | 每个 run 必须有 run_id |
 
 ---

@@ -1,8 +1,10 @@
 [project]
 name = "ce-code"
 version = "0.0.1"
-description = "建筑规范 RAG 项目的技术 POC（PDF 解析、检索、合规判定）"
-requires-python = ">=3.12,<3.13"  # torchvision 0.20.x 尚无 cp313 wheel
+description = "规范问答 LLM 微调研究（norm-ft）+ 建筑规范 RAG 技术 POC"
+# 注：ce-code/CLAUDE.md §2 原记 Python 3.10，实际沿用本文件既有的 3.12
+# （torchvision 0.20.x 尚无 cp313 wheel；且 torch 2.5.1+cu121 正是训练栈所需版本）
+requires-python = ">=3.12,<3.13"
 
 dependencies = [
     # ===== 阶段 0：PDF 解析 =====
@@ -28,6 +30,24 @@ dependencies = [
     "tqdm>=4.66",
     "pydantic>=2.7",         # 条款树 schema 校验
     "psycopg[binary]>=3.3.4",
+
+    # ===== [norm-ft] LLM 调用与数据合成（原 requirements.txt）=====
+    "openai>=1.30.0",        # DashScope / 本地 vLLM 的 OpenAI-compatible endpoint
+    "tenacity>=8.3.0",       # 重试 + 指数退避
+    "jsonlines>=4.0.0",
+    # ===== [norm-ft] 嵌入与相似度（C 组多样性去重 + 评测集泄漏检查）=====
+    "sentence-transformers>=3.0.0",
+    "scikit-learn>=1.4.0",
+    # ===== [norm-ft] 训练框架 =====
+    # LLaMA-Factory 自带 peft / trl / accelerate / transformers 的兼容版本，
+    # 故此处不单独声明那几个，避免与它的 pin 打架（见 CLAUDE.md §2：走 yaml 配置，
+    # 不手写训练循环）。deepspeed extra 提供 ZeRO 支持。
+    "llamafactory[metrics,deepspeed]>=0.9.2",
+    # ===== [norm-ft] 实验跟踪与评测判分 =====
+    "wandb>=0.17.0",
+    "scipy>=1.13.0",         # Cohen's Kappa
+    "pandas>=2.2.0",
+    "regex>=2024.4.16",      # 条款号归一化
 ]
 
 [project.optional-dependencies]

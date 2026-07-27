@@ -104,7 +104,6 @@ def _process_clause(clause: dict, seed: int = 42) -> list[dict] | None:
             seed=seed,
             sample_id=clause["clause_id"],
             extra_meta={"clause_id": clause["clause_id"]},
-            extra_body={"enable_thinking": False},
         )
     except Exception:
         return None

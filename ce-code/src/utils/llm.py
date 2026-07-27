@@ -148,6 +148,36 @@ def _log_failure(
         f.write(json.dumps(record, ensure_ascii=False) + "\n")
 
 
+# ── 思考模式开关 ─────────────────────────────────────────────────────────
+def _build_extra_body(extra_body: dict | None, thinking: bool) -> dict:
+    """构造请求的 extra_body，正确关闭 Qwen3 的思考模式。
+
+    Qwen3 系列默认开启 thinking，会先输出 `<think>…</think>` 推理段再给答案。
+    关闭它的正确写法是 **chat_template_kwargs**，而非顶层 enable_thinking——
+    后者会被 vLLM 静默忽略。实测（qwen3-8b @ :8099，max_tokens=10）：
+
+      {"enable_thinking": false}                          → "<think>\\n嗯，用户问…"  finish=length
+      {"chat_template_kwargs": {"enable_thinking": false}} → "NO"                    finish=stop
+
+    错误写法对短输出是致命的：token 预算全被思考段吃掉，正文一个字都出不来；
+    对长输出则表现为大量 token 浪费在推理段上，拖慢整体吞吐。
+
+    Args:
+        extra_body: 调用方额外指定的字段，None 视为空
+        thinking:   True 保留思考模式，False（默认）关闭
+
+    Returns:
+        合并后的 extra_body
+    """
+    body = dict(extra_body or {})
+    body.pop("enable_thinking", None)      # 清掉不生效的顶层写法，避免误导
+    if not thinking:
+        kwargs = dict(body.get("chat_template_kwargs") or {})
+        kwargs["enable_thinking"] = False
+        body["chat_template_kwargs"] = kwargs
+    return body
+
+
 # ── 单次调用（带重试）────────────────────────────────────────────────────
 @retry(
     retry=retry_if_exception_type(Exception),
@@ -191,13 +221,16 @@ def call(
     extra_meta: dict | None = None,
     extra_body: dict | None = None,
     base_url: str | None = None,
+    thinking: bool = False,
 ) -> str:
     """
     单次 LLM 调用。失败超过重试上限时记录到 data/interim/failed/ 并抛出异常。
 
     Args:
         base_url: 覆盖本次调用的 endpoint（判官与合成模型可能不同机不同端口）。
-                  为 None 时走 LLM_BASE_URL 环境变量。其余参数见签名。
+                  为 None 时走 LLM_BASE_URL 环境变量。
+        thinking: 是否允许 Qwen3 的思考模式，默认关闭。见 _build_extra_body。
+                  其余参数见签名。
 
     Returns:
         模型输出文本
@@ -206,6 +239,7 @@ def call(
         {"role": "system", "content": system},
         {"role": "user", "content": prompt},
     ]
+    extra_body = _build_extra_body(extra_body, thinking)
     client = _get_client(base_url)
     try:
         text, in_tok, out_tok = _call_once(

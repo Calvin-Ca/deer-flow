@@ -118,7 +118,6 @@ def _process_pair(
             prompt, system=_SYSTEM, model="/models/Qwen3-32B-AWQ",
             max_tokens=1500, temperature=0.8, seed=seed,
             sample_id=f"{clause_a['clause_id']}+{clause_b['clause_id']}",
-            extra_body={"enable_thinking": False},
         )
     except Exception:
         return None
@@ -149,7 +148,6 @@ def _process_pair(
                 model="/models/Qwen3-32B-AWQ",
                 max_tokens=512, temperature=0.0, seed=42,
                 sample_id=f"check_{clause['clause_id']}",
-                extra_body={"enable_thinking": False},
             )
             if "INSUFFICIENT" not in resp.strip().upper():
                 return None  # 单条足够 → 不是真跨条文

@@ -55,7 +55,6 @@ def _one_call(client, model: str, max_tokens: int) -> tuple[float, int]:
         max_tokens=max_tokens,
         temperature=0.0,
         seed=42,
-        extra_body={"enable_thinking": False},
     )
     dt = time.monotonic() - t0
     out = resp.usage.completion_tokens if resp.usage else 0

@@ -36,7 +36,8 @@ from src.utils.llm import call as llm_call, print_cost_summary
 from src.synth.group_a import convert_text_tables
 
 _MODEL = "/models/Qwen3-32B-AWQ"
-_EXTRA = {"enable_thinking": False}
+# 思考模式已由 llm.call() 统一关闭（见 _build_extra_body），此处无需再传
+_EXTRA: dict = {}
 
 # ── 条文加载 ──────────────────────────────────────────────────────────────
 

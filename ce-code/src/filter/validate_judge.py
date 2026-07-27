@@ -62,7 +62,6 @@ def _judge(model: str, clause_text: str, question: str, sid: str,
             _TEMPLATE.format(clause_text=clause_text, question=question),
             system=_SYSTEM, model=model, max_tokens=10, temperature=0.0,
             seed=42, sample_id=sid, base_url=base_url,
-            extra_body={"enable_thinking": False},
         )
     except Exception as exc:
         _report_first_error(exc, model, base_url)

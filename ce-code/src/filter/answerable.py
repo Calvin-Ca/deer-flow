@@ -27,6 +27,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -111,12 +112,11 @@ def judge_answerable(clause_text: str, question: str, sample_id: str = "") -> bo
             prompt,
             system=_SYSTEM,
             model=JUDGE_MODEL,
-            max_tokens=10,          # 只需一个词；旧版 1024 是 24h 耗时的主因
+            max_tokens=20,          # 只需一个词，留点余量；旧版 1024 是 24h 耗时的主因
             temperature=0.0,        # 铁律 7：过滤是数据构造的一环，必须可复现
             seed=42,
             sample_id=sample_id,
             base_url=JUDGE_BASE_URL,
-            extra_body={"enable_thinking": False},
         )
     except Exception as exc:
         _report_first_error(exc, JUDGE_MODEL, JUDGE_BASE_URL)
@@ -124,16 +124,24 @@ def judge_answerable(clause_text: str, question: str, sample_id: str = "") -> bo
     return _parse_verdict(resp)
 
 
+_RE_THINK = re.compile(r"<think>.*?</think>", re.DOTALL | re.IGNORECASE)
+
+
 def _parse_verdict(response: str) -> bool | None:
     """解析判官输出为布尔判定。
+
+    先剥离 `<think>…</think>` 推理段：思考模式本应由 llm.call() 统一关闭，
+    此处是防御性兜底——万一某个 endpoint 的 vLLM 版本不认 chat_template_kwargs，
+    推理段里的「YES/NO」字样会污染判定（实测思考段常以「嗯，用户问…」开头，
+    过程中极易出现这两个词）。剥离后再判，比直接在全文里找子串稳。
 
     Args:
         response: 模型原始输出
 
     Returns:
-        True=YES / False=NO / None=两者都没出现（视为不可解析）
+        True=YES / False=NO / None=两者都没出现或同时出现（视为不可解析）
     """
-    r = response.strip().upper()
+    r = _RE_THINK.sub("", response).strip().upper()
     has_yes, has_no = "YES" in r, "NO" in r
     if has_yes == has_no:       # 都有或都无 → 无法判定
         return None

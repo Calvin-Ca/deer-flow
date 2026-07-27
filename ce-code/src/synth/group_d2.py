@@ -121,7 +121,6 @@ def _process_one(
             prompt, system=_SYSTEM, model="/models/Qwen3-32B-AWQ",
             max_tokens=1000, temperature=0.85, seed=seed + idx,
             sample_id=f"d2_{clause['clause_id']}_{type_key}",
-            extra_body={"enable_thinking": False},
         )
     except Exception:
         return None

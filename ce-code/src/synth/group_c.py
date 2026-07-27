@@ -199,7 +199,6 @@ def _filter_answerable_parallel(
                 prompt, system=_SYSTEM, model="/models/Qwen3-32B-AWQ",
                 max_tokens=1024, temperature=0.0, seed=42,
                 sample_id=sample["sample_id"],
-                extra_body={"enable_thinking": False},
             )
             r = resp.strip().upper()
             ok = "INSUFFICIENT" not in r and len(r) > 20

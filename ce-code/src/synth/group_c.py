@@ -13,7 +13,7 @@ from __future__ import annotations
 import argparse
 import json
 import shutil
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 _ROOT = Path(__file__).parents[2]
@@ -113,7 +113,7 @@ def run(workers: int = 1) -> None:
         "version": "v1",
         "total": kept_3,
         "source": str(_GROUP_B),
-        "built_at": datetime.utcnow().isoformat(timespec="seconds"),
+        "built_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "filter_stats": {
             "input": total_in,
             "rejected_answerable": rej_1,

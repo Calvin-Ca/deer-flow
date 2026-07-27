@@ -9,7 +9,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 _ROOT = Path(__file__).parents[2]
@@ -51,7 +51,7 @@ def merge() -> None:
         "version": "v1",
         "total": total,
         "source_counts": counts,
-        "built_at": datetime.utcnow().isoformat(timespec="seconds"),
+        "built_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
     }
     with open(_OUT_DIR / "manifest.json", "w", encoding="utf-8") as f:
         json.dump(manifest, f, ensure_ascii=False, indent=2)

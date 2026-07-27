@@ -9,7 +9,7 @@ import json
 import os
 import time
 import threading
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -134,7 +134,7 @@ def _log_failure(
     extra: dict | None = None,
 ) -> None:
     record = {
-        "ts": datetime.utcnow().isoformat(),
+        "ts": datetime.now(timezone.utc).isoformat(),
         "sample_id": sample_id,
         "model": model,
         "error": error,
@@ -142,7 +142,7 @@ def _log_failure(
         "prompt": prompt[:500],
         **(extra or {}),
     }
-    date_tag = datetime.utcnow().strftime("%Y%m%d")
+    date_tag = datetime.now(timezone.utc).strftime("%Y%m%d")
     path = _FAILED_DIR / f"{date_tag}_failed.jsonl"
     with open(path, "a", encoding="utf-8") as f:
         f.write(json.dumps(record, ensure_ascii=False) + "\n")

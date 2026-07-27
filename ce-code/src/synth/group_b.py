@@ -14,11 +14,12 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import random
 import re
 import sys
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 # ── 路径 ─────────────────────────────────────────────────────────────────
@@ -148,12 +149,12 @@ def _process_clause(clause: dict, seed: int = 42) -> list[dict] | None:
 
 def _log_parse_failure(clause_id: str, raw: str) -> None:
     _FAILED_DIR.mkdir(parents=True, exist_ok=True)
-    date_tag = datetime.utcnow().strftime("%Y%m%d")
+    date_tag = datetime.now(timezone.utc).strftime("%Y%m%d")
     path = _FAILED_DIR / f"{date_tag}_parse_failed.jsonl"
     with open(path, "a", encoding="utf-8") as f:
         f.write(
             json.dumps(
-                {"ts": datetime.utcnow().isoformat(), "clause_id": clause_id, "raw": raw[:1000]},
+                {"ts": datetime.now(timezone.utc).isoformat(), "clause_id": clause_id, "raw": raw[:1000]},
                 ensure_ascii=False,
             )
             + "\n"
@@ -167,7 +168,22 @@ def build_group_b(
     resume: bool = False,
     seed: int = 42,
     workers: int = 1,
+    sample: int = 0,
 ) -> None:
+    """按条文库生成 B 组问答样本。
+
+    Args:
+        smoke:  只跑前 50 条条文（快速验证流程是否通畅）
+        resume: 断点续跑，跳过已生成的条文
+        seed:   随机种子，同时用于 LLM 采样与 --sample 抽样（铁律 7）
+        workers: 并发线程数
+        sample: >0 时随机抽取该数量的条文（固定 seed）。与 --smoke 的区别是
+                覆盖全部五本规范与各章节，适合做判官验证等需要代表性的场景——
+                前 50 条集中在 GB50010 的总则与术语，样本形态偏窄。
+
+    Returns:
+        None（结果写入 data/processed/group_b/）
+    """
     _OUT_DIR.mkdir(parents=True, exist_ok=True)
     out_file = _OUT_DIR / "train.jsonl"
     _FAILED_DIR.mkdir(parents=True, exist_ok=True)
@@ -179,6 +195,9 @@ def build_group_b(
             clauses.append(json.loads(line))
     if smoke:
         clauses = clauses[:50]
+    elif sample > 0:
+        clauses = random.Random(seed).sample(clauses, min(sample, len(clauses)))
+        print(f"[group_b] 随机抽样 {len(clauses)} 条条文（seed={seed}）")
 
     # resume：跳过已有的 source_clauses
     already_done: set[str] = set()
@@ -267,7 +286,7 @@ def build_group_b(
         "prompt_hash": _PROMPT_HASH,
         "seed": seed,
         "smoke": smoke,
-        "built_at": datetime.utcnow().isoformat(timespec="seconds"),
+        "built_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "cost": cost_tracker.summary(),
     }
     with open(_OUT_DIR / "manifest.json", "w", encoding="utf-8") as f:
@@ -280,6 +299,9 @@ if __name__ == "__main__":
     parser.add_argument("--smoke", action="store_true", help="仅处理前 50 条")
     parser.add_argument("--resume", action="store_true", help="跳过已生成条文（断点续跑）")
     parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--workers", type=int, default=1, help="并发线程数（本地 vLLM 建议 4-8）")
+    parser.add_argument("--workers", type=int, default=1, help="并发线程数（本地 vLLM 实测 64 并发仍未饱和）")
+    parser.add_argument("--sample", type=int, default=0,
+                        help="随机抽取 N 条条文（固定 seed），覆盖面优于 --smoke 的前 N 条")
     args = parser.parse_args()
-    build_group_b(smoke=args.smoke, resume=args.resume, seed=args.seed, workers=args.workers)
+    build_group_b(smoke=args.smoke, resume=args.resume, seed=args.seed,
+                  workers=args.workers, sample=args.sample)

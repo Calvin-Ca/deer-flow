@@ -24,7 +24,7 @@ import re
 import sys
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 _ROOT = Path(__file__).parents[2]
@@ -546,7 +546,7 @@ def build_evalset(smoke: bool = False, workers: int = 1, seed: int = 42) -> None
         "type_counts": counts,
         "quota": _QUOTA,
         "synth_model": _MODEL,
-        "built_at": datetime.utcnow().isoformat(timespec="seconds"),
+        "built_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "seed": seed,
         "smoke": smoke,
     }

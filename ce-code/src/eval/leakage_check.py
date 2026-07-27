@@ -12,7 +12,7 @@ cosine > 0.9 的题目标记为泄漏，输出替换清单。
 from __future__ import annotations
 
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 _ROOT = Path(__file__).parents[2]
@@ -108,7 +108,7 @@ def _write_report(leaks: list[dict], n_eval: int, n_train: int) -> None:
     lines = [
         f"# 泄漏检查报告",
         f"",
-        f"生成时间：{datetime.utcnow().isoformat(timespec='seconds')} UTC",
+        f"生成时间：{datetime.now(timezone.utc).isoformat(timespec='seconds')} UTC",
         f"评测集：{n_eval} 题  训练集：{n_train} 条  阈值：{_THRESHOLD}",
         f"",
         f"## 结论",

@@ -3,6 +3,9 @@
 
 ### ── 模型 ─────────────────────────────────────────────────────────────────
 model_name_or_path: Qwen/Qwen2.5-7B-Instruct
+# 基座是 Instruct 版，必须显式指定对话模板，否则回落到 default 模板、
+# <|im_start|>/<|im_end|> 等特殊 token 全错，训练照跑但结果作废。
+template: qwen
 
 ### ── LoRA ──────────────────────────────────────────────────────────────────
 finetuning_type: lora

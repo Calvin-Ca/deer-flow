@@ -1,0 +1,14 @@
+{
+  "group": "d2",
+  "version": "v1",
+  "total": 1457,
+  "type_counts": {
+    "A_beyond_scope": 732,
+    "B_needs_field_data": 434,
+    "C_standard_conflict": 291
+  },
+  "synth_model": "/models/Qwen3-32B-AWQ",
+  "built_at": "2026-07-27T06:36:35",
+  "seed": 42,
+  "smoke": false
+}

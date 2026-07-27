@@ -1,0 +1,24 @@
+{
+  "group": "b",
+  "version": "v1",
+  "total_samples": 6760,
+  "total_clauses_attempted": 1701,
+  "failed_clauses": 11,
+  "fail_rate": 0.0065,
+  "synth_model": "qwen-max",
+  "prompt_hash": "c842650a251e",
+  "seed": 42,
+  "smoke": false,
+  "built_at": "2026-07-25T14:22:12",
+  "cost": {
+    "total_cny": 0.0,
+    "calls": 1698,
+    "tokens": {
+      "input": 1232992,
+      "output": 1451298
+    },
+    "model_calls": {
+      "/models/Qwen3-32B-AWQ": 1698
+    }
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "group": "d1",
+  "version": "v1",
+  "total": 94,
+  "pairs_attempted": 319,
+  "synth_model": "/models/Qwen3-32B-AWQ",
+  "built_at": "2026-07-26T20:55:21",
+  "seed": 42,
+  "smoke": false
+}

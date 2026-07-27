@@ -35,6 +35,7 @@ _OUT_DIR = _ROOT / "data/eval"
 sys.path.insert(0, str(_ROOT))
 from src.utils.llm import call as llm_call, print_cost_summary
 from src.synth.group_a import convert_text_tables
+from src.utils import jsonx
 
 # 出题模型。默认 qwen-max（DashScope API），**刻意不同于合成模型**
 # Qwen3-32B-AWQ —— 同模型出题会导致题目与训练样本撞车（触发铁律 3 泄漏检查）
@@ -144,69 +145,12 @@ def _parse_qa(raw: str) -> dict | None:
     Returns:
         题目字典；缺 question 或 gold_answer、或 JSON 不可解析时返回 None
     """
-    m = re.search(r"\{[\s\S]*\}", raw)
-    if not m:
+    obj = jsonx.extract(raw, kind="object")
+    if not isinstance(obj, dict):
         return None
-    blob = m.group(0)
-    try:
-        obj = json.loads(blob)
-    except json.JSONDecodeError:
-        try:
-            obj = json.loads(_repair_latex_escapes(blob))
-        except json.JSONDecodeError:
-            return None
     if not obj.get("question") or not obj.get("gold_answer"):
         return None
     return obj
-
-
-# JSON 只认这几个转义字符，其余反斜杠都非法。
-_JSON_ESCAPES = '"\\/bfnrtu'
-
-
-def _repair_latex_escapes(blob: str) -> str:
-    """把 JSON 串里的裸反斜杠补成合法转义。
-
-    规范条文里公式极多，模型作答时会照写 LaTeX：
-        "$209.6 \\, \\text{kN}$"      → `\\,` 非法转义，json.loads 直接抛错
-        "$w_{\\lim} = 0.20$"          → `\\l` 同理
-    实测这是评测集生成失败的主因，且**失败率随数学密度递增**：
-    cross_clause 39% > calculation 18% > single_clause 11% > refusal 0%
-    （拒答题不含公式，零失败）。400 题里 72 题因此丢失。
-
-    不能靠 prompt 禁用 LaTeX 解决——条文本身就是 LaTeX 形式（MinerU 产出），
-    模型照抄是合理行为。故在解析层修复：把不构成合法转义的反斜杠翻倍。
-
-    实现要点——**必须按「转义对」为单位扫描，不能逐字符看后继**：
-    模型写的 `\\\\gamma`（合法 JSON 转义，表示一个字面反斜杠）若用
-    `re.sub(r'\\\\(?![合法转义]))` 处理，第一个反斜杠因后继是反斜杠而被跳过，
-    第二个却被翻倍，结果 `\\\\\\gamma` —— 把本来合法的转义对拆坏，反而制造新错误。
-
-    对 `\\n` `\\t` `\\r` 一类：LaTeX 命令 `\\frac` `\\times` `\\rho` 恰好以这些字母开头，
-    保留原义会把公式损坏成控制字符（`\\times` → 制表符 + "imes"），
-    而 `\\u` 后接非十六进制更会直接解析失败。故除 `\\"` 与 `\\\\` 外一律转义为
-    字面反斜杠：宁可让正文里真正的换行退化成字面 `\\n`，也不丢整道题。
-
-    Args:
-        blob: 模型输出中截取的 JSON 文本
-
-    Returns:
-        修复后的 JSON 文本（未必可解析，由调用方兜底）
-    """
-    out: list[str] = []
-    i = 0
-    while i < len(blob):
-        if blob[i] == "\\" and i + 1 < len(blob):
-            if blob[i + 1] in '"\\':
-                out.append(blob[i:i + 2])   # \" 和 \\ 原样保留
-                i += 2
-                continue
-            out.append("\\\\")              # 其余一律转义成字面反斜杠
-            i += 1
-            continue
-        out.append(blob[i])
-        i += 1
-    return "".join(out)
 
 
 def _dedup(items: list[dict]) -> list[dict]:

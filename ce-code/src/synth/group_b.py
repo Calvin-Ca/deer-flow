@@ -35,6 +35,7 @@ _PROMPT_FILE = _ROOT / "configs/prompts/synth_qa.txt"
 
 sys.path.insert(0, str(_ROOT))
 from src.utils.llm import call as llm_call, cost_tracker, print_cost_summary
+from src.utils import jsonx
 from src.synth.group_a import convert_text_tables  # HTML→Markdown 复用
 
 # ── Prompt 加载（冻结文件）────────────────────────────────────────────────
@@ -72,20 +73,20 @@ def _build_prompt(clause: dict) -> str:
 
 
 def _parse_json_output(raw: str) -> list[dict] | None:
-    """从 LLM 输出中提取 JSON 列表，兼容 ```json ... ``` 包裹。"""
-    # 去掉 markdown 代码块
-    cleaned = re.sub(r"```(?:json)?\s*", "", raw).strip().rstrip("`").strip()
-    # 找最外层的 [ ... ]
-    m = re.search(r"\[.*\]", cleaned, re.DOTALL)
-    if not m:
-        return None
-    try:
-        data = json.loads(m.group(0))
-        if not isinstance(data, list):
-            return None
-        return data
-    except json.JSONDecodeError:
-        return None
+    """从 LLM 输出中提取 JSON 列表，兼容 ```json ... ``` 包裹与 LaTeX 转义。
+
+    走 jsonx.extract：条文含大量 LaTeX，模型照抄 `\\leqslant`、`\\gamma` 等，
+    其中多数不是合法 JSON 转义，直接 json.loads 会抛错。
+    实测 2357 条里 174 条（7.4%）因此解析失败，超过本脚本自身 5% 的告警门线。
+
+    Args:
+        raw: 模型原始输出
+
+    Returns:
+        问答对列表；截取不到、解析失败或结果非列表时返回 None
+    """
+    data = jsonx.extract(raw, kind="array")
+    return data if isinstance(data, list) else None
 
 
 def _sample_id(clause_id: str, perspective: str) -> str:

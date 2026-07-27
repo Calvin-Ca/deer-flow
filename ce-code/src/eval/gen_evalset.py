@@ -19,6 +19,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import random
 import re
 import sys
@@ -35,9 +36,79 @@ sys.path.insert(0, str(_ROOT))
 from src.utils.llm import call as llm_call, print_cost_summary
 from src.synth.group_a import convert_text_tables
 
-_MODEL = "/models/Qwen3-32B-AWQ"
+# 出题模型。默认 qwen-max（DashScope API），**刻意不同于合成模型**
+# Qwen3-32B-AWQ —— 同模型出题会导致题目与训练样本撞车（触发铁律 3 泄漏检查）
+# 和风格耦合（题目风格贴近 B/C/D 而非 A 组模板体，系统性放大 A→B 的提升）。
+# 同厂不同代的独立性弱于跨厂，须写进 EXPERIMENT.md 的已知局限。
+_MODEL = os.getenv("CE_EVAL_MODEL", "qwen-max")
 # 思考模式已由 llm.call() 统一关闭（见 _build_extra_body），此处无需再传
 _EXTRA: dict = {}
+
+# ── 出题模型分发 ──────────────────────────────────────────────────────────
+# 评测集默认换厂商出题，理由见 src/utils/claude.py 模块 docstring：
+# B/C/D 由 Qwen3-32B 合成，同模型出题会导致题目撞车（触发铁律 3 泄漏检查）
+# 与风格耦合（题目风格贴近 B/C/D 而非 A 组模板体，系统性放大 A→B 的提升）。
+PROVIDER = os.getenv("CE_EVAL_PROVIDER", "openai_compat")
+
+
+def _gen(prompt: str, system: str, max_tokens: int, sample_id: str,
+         temperature: float = 0.5, seed: int = 42) -> str:
+    """按 PROVIDER 分发一次出题调用。
+
+    两个 provider 的参数差异被这层吸收，各生成函数不必分别处理：
+      openai_compat —— 走 llm.call 的 OpenAI 兼容端点，覆盖 DashScope 的
+                       qwen-max 与本机 vLLM 两种情形，保留 temperature/seed
+      claude        —— 走 Anthropic 官方 SDK。不接受 temperature/seed
+                       （Sonnet 5 对非默认采样参数返回 400）；思考 token 与正文
+                       共用 max_tokens 预算，故按 4 倍留余量
+
+    Args:
+        prompt:      用户轮内容
+        system:      系统提示
+        max_tokens:  正文所需的 token 上限（claude 分支自行放大）
+        sample_id:   样本 ID，用于失败留痕
+        temperature: 采样温度。**必须逐题透传**——拒答题不依赖条文，
+                     三类 prompt 各自固定，只靠 seed/temperature 拉开差异；
+                     早先在此写死 seed=42 导致同类拒答题输出完全相同，
+                     去重后 40 条只剩 29 条。
+        seed:        随机种子，同上
+
+    Returns:
+        模型输出文本
+    """
+    if PROVIDER == "claude":
+        from src.utils import claude
+        return claude.call(prompt, system=system,
+                           max_tokens=max_tokens * 4, sample_id=sample_id)
+    return llm_call(prompt, system=system, model=_MODEL,
+                    max_tokens=max_tokens, temperature=temperature, seed=seed,
+                    sample_id=sample_id, extra_body=_EXTRA)
+
+
+_FAILED_DIR = _ROOT / "data/interim/failed"
+
+
+def _log_fail(kind: str, sample_id: str, reason: str, detail: str = "") -> None:
+    """记录出题失败（CLAUDE.md §6.6：失败要留痕，不得静默丢弃）。
+
+    原实现各生成函数一律 `except Exception: return None`，400 题里失败 72 题
+    却查不出原因，只能靠事后单独复现才定位到 LaTeX 转义问题。
+
+    Args:
+        kind:      题型
+        sample_id: 样本 ID
+        reason:    失败原因代码
+        detail:    模型原始输出片段等
+
+    Returns:
+        None（追加写入 data/interim/failed/gen_evalset_failed.jsonl）
+    """
+    _FAILED_DIR.mkdir(parents=True, exist_ok=True)
+    with open(_FAILED_DIR / "gen_evalset_failed.jsonl", "a", encoding="utf-8") as f:
+        f.write(json.dumps({"kind": kind, "sample_id": sample_id,
+                            "reason": reason, "detail": detail[:400]},
+                           ensure_ascii=False) + "\n")
+
 
 # ── 条文加载 ──────────────────────────────────────────────────────────────
 
@@ -76,13 +147,107 @@ def _parse_qa(raw: str) -> dict | None:
     m = re.search(r"\{[\s\S]*\}", raw)
     if not m:
         return None
+    blob = m.group(0)
     try:
-        obj = json.loads(m.group(0))
+        obj = json.loads(blob)
     except json.JSONDecodeError:
-        return None
+        try:
+            obj = json.loads(_repair_latex_escapes(blob))
+        except json.JSONDecodeError:
+            return None
     if not obj.get("question") or not obj.get("gold_answer"):
         return None
     return obj
+
+
+# JSON 只认这几个转义字符，其余反斜杠都非法。
+_JSON_ESCAPES = '"\\/bfnrtu'
+
+
+def _repair_latex_escapes(blob: str) -> str:
+    """把 JSON 串里的裸反斜杠补成合法转义。
+
+    规范条文里公式极多，模型作答时会照写 LaTeX：
+        "$209.6 \\, \\text{kN}$"      → `\\,` 非法转义，json.loads 直接抛错
+        "$w_{\\lim} = 0.20$"          → `\\l` 同理
+    实测这是评测集生成失败的主因，且**失败率随数学密度递增**：
+    cross_clause 39% > calculation 18% > single_clause 11% > refusal 0%
+    （拒答题不含公式，零失败）。400 题里 72 题因此丢失。
+
+    不能靠 prompt 禁用 LaTeX 解决——条文本身就是 LaTeX 形式（MinerU 产出），
+    模型照抄是合理行为。故在解析层修复：把不构成合法转义的反斜杠翻倍。
+
+    实现要点——**必须按「转义对」为单位扫描，不能逐字符看后继**：
+    模型写的 `\\\\gamma`（合法 JSON 转义，表示一个字面反斜杠）若用
+    `re.sub(r'\\\\(?![合法转义]))` 处理，第一个反斜杠因后继是反斜杠而被跳过，
+    第二个却被翻倍，结果 `\\\\\\gamma` —— 把本来合法的转义对拆坏，反而制造新错误。
+
+    对 `\\n` `\\t` `\\r` 一类：LaTeX 命令 `\\frac` `\\times` `\\rho` 恰好以这些字母开头，
+    保留原义会把公式损坏成控制字符（`\\times` → 制表符 + "imes"），
+    而 `\\u` 后接非十六进制更会直接解析失败。故除 `\\"` 与 `\\\\` 外一律转义为
+    字面反斜杠：宁可让正文里真正的换行退化成字面 `\\n`，也不丢整道题。
+
+    Args:
+        blob: 模型输出中截取的 JSON 文本
+
+    Returns:
+        修复后的 JSON 文本（未必可解析，由调用方兜底）
+    """
+    out: list[str] = []
+    i = 0
+    while i < len(blob):
+        if blob[i] == "\\" and i + 1 < len(blob):
+            if blob[i + 1] in '"\\':
+                out.append(blob[i:i + 2])   # \" 和 \\ 原样保留
+                i += 2
+                continue
+            out.append("\\\\")              # 其余一律转义成字面反斜杠
+            i += 1
+            continue
+        out.append(blob[i])
+        i += 1
+    return "".join(out)
+
+
+def _dedup(items: list[dict]) -> list[dict]:
+    """落盘前去重：删掉完全相同的题，并保证 id 唯一。
+
+    选题层已改为无放回抽样，但仍需这道防线——同一条文可能被不同题型选中，
+    模型也可能对不同条文产出雷同题面。两种情形要分开处理：
+      · **题面完全相同** → 真重复题，直接丢弃（保留先到的一条）
+      · **题面不同但 id 相同** → 纯哈希碰撞（_sid 以 clause_id 为输入），
+        两题都有效，给后到者加序号后缀
+
+    id 重复的危害是隐蔽的：阶段 5 按 id 索引结果，撞 id 会让后一条静默覆盖前一条，
+    评测题数悄悄变少而指标看起来正常。
+
+    Args:
+        items: 待落盘的题目列表
+
+    Returns:
+        去重并保证 id 唯一后的列表（保持原有顺序）
+    """
+    seen_q: set[str] = set()
+    seen_id: set[str] = set()
+    out: list[dict] = []
+    dropped = renamed = 0
+    for it in items:
+        q = it["question"].strip()
+        if q in seen_q:
+            dropped += 1
+            continue
+        seen_q.add(q)
+        if it["id"] in seen_id:
+            base, k = it["id"], 2
+            while f"{base}_{k}" in seen_id:
+                k += 1
+            it["id"] = f"{base}_{k}"
+            renamed += 1
+        seen_id.add(it["id"])
+        out.append(it)
+    if dropped or renamed:
+        print(f"[gen_evalset] 去重：丢弃重复题 {dropped} 条，id 碰撞重命名 {renamed} 条")
+    return out
 
 
 def _extract_nums(text: str) -> list[str]:
@@ -113,9 +278,44 @@ def _verify_gold_values(values: list, clause_text: str) -> list[str]:
     out = []
     for v in values or []:
         s = str(v).strip()
-        if s and s in clause_text:
-            out.append(s)
+        if not s or s not in clause_text:
+            continue
+        if not _is_value_like(s):
+            continue
+        out.append(s)
     return out
+
+
+# 金标值的形态约束：阶段 5.4 是**数值精确匹配**判分，字段里必须是可比对的值
+# （"14.3" / "C30" / "0.25%" / "HRB400"），不能是描述性句子。
+# 实测 qwen-max 会把整条条文当成 gold_values 塞回来——它能通过"存在于条文中"
+# 的回锚（整句确实在条文里），却让该题在 5.4 无法判分。prompt 已明令禁止，
+# 此处是代码层兜底：prompt 靠自觉，过滤靠代码。
+_MAX_VALUE_LEN = 20
+
+
+# 规范里大量用中文数字表达分级：抗震等级「一、二、三、四」级，
+# 建筑类别「甲、乙、丙、丁」类，场地「I~IV」类。这些都是可逐字符比对的合法金标，
+# 仅要求「含阿拉伯数字」会把它们全部误伤——实测「抗震等级应为三」整条金标被剔空。
+_RE_GRADE_VALUE = re.compile(r"^[一二三四五六七八九十甲乙丙丁ⅠⅡⅢⅣIV]+\s*[级类等]?$")
+
+
+def _is_value_like(s: str) -> bool:
+    """判断字符串是否为可用于精确匹配的「值」而非描述性文字。
+
+    合格的两类：
+      1. 含阿拉伯数字且足够短 —— "14.3" / "C30" / "0.25%" / "GB50153-2008"
+      2. 中文数字或字母表示的规范分级 —— "三级" / "甲类" / "Ⅱ类"
+
+    Args:
+        s: 待判定的候选金标值
+
+    Returns:
+        True 表示形态合格
+    """
+    if len(s) > _MAX_VALUE_LEN:
+        return False
+    return any(ch.isdigit() for ch in s) or bool(_RE_GRADE_VALUE.match(s))
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -132,14 +332,17 @@ _SINGLE_PROMPT = """以下是《{std_name}》（{std_code}）第{clause_no}条�
 
 请出一道评测题，要求：
 1. 考查该条文的核心数值、限值或要求，有明确唯一正确答案
-2. 问题具体（给定工程场景和参数），不能含糊
-3. 若条文含表格，优先考查表格中的具体数值
-4. gold_answer 要包含条款号引用
+2. **必须是简答题，严禁出成选择题**——不得给出 A/B/C/D 选项，不得让答题者从候选中挑选
+3. 问题具体（给定工程场景和参数），不能含糊
+4. 若条文含表格，优先考查表格中的具体数值
+5. gold_answer 要包含条款号引用
 
 输出格式（严格JSON）：
 {{"question": "...", "gold_answer": "...", "gold_values": ["数值1", "数值2"]}}
 
-gold_values 填写问题答案中的关键数值（无则填空列表）。"""
+gold_values **只填数值本身**，如 "14.3"、"C30"、"0.25"、"55"。
+严禁填入整句话或描述性文字——该字段用于数值精确匹配判分，填句子会使该题无法判分。
+答案中没有明确数值时填空列表。"""
 
 
 def gen_single_clause(
@@ -153,18 +356,19 @@ def gen_single_clause(
         clause_no=clause["clause_no"],
         text=text,
     )
+    _KIND, _SID = "single_clause", clause["clause_id"]
     try:
-        raw = llm_call(
-            prompt, system=_SINGLE_SYSTEM, model=_MODEL,
-            max_tokens=800, temperature=0.5, seed=seed,
-            sample_id=f"eval_single_{clause['clause_id']}",
-            extra_body=_EXTRA,
+        raw = _gen(
+            prompt, _SINGLE_SYSTEM, 800,
+            f"eval_single_{clause['clause_id']}", 0.5, seed,
         )
-    except Exception:
+    except Exception as exc:
+        _log_fail(_KIND, _SID, "api_error", f"{type(exc).__name__}: {exc}")
         return None
 
     qa = _parse_qa(raw)
     if not qa:
+        _log_fail(_KIND, _SID, "parse_failed", raw)
         return None
 
     return {
@@ -197,8 +401,12 @@ _CROSS_PROMPT = """以下是两条相互关联的规范条文：
 
 请出一道评测题，要求：
 1. 问题必须同时用到两条条文才能完整作答
-2. 给定具体工程参数场景
-3. gold_answer 引用两个条款号，给出完整结论
+2. **必须是简答题，严禁出成选择题**——不得给出 A/B/C/D 选项
+3. 给定具体工程参数场景
+4. gold_answer 引用两个条款号，给出完整结论
+5. gold_values 只填**两条条文原文中出现的关键取值**（限值、设计值、系数等），
+   如 "0.25"、"C30"、"1.2"；不要填你自己算出来的结果——计算结果不在条文里，
+   无法回查校验，会被判为无效金标而丢弃。答案不依赖条文原值时填空列表。
 
 输出格式（严格JSON）：
 {{"question": "...", "gold_answer": "...", "gold_values": ["数值1"]}}"""
@@ -215,18 +423,19 @@ def gen_cross_clause(
         std_a=clause_a["standard_code"], no_a=clause_a["clause_no"], text_a=text_a,
         std_b=clause_b["standard_code"], no_b=clause_b["clause_no"], text_b=text_b,
     )
+    _KIND, _SID = "cross_clause", f"{clause_a['clause_id']}+{clause_b['clause_id']}"
     try:
-        raw = llm_call(
-            prompt, system=_CROSS_SYSTEM, model=_MODEL,
-            max_tokens=900, temperature=0.5, seed=seed,
-            sample_id=f"eval_cross_{clause_a['clause_id']}_{clause_b['clause_id']}",
-            extra_body=_EXTRA,
+        raw = _gen(
+            prompt, _CROSS_SYSTEM, 900,
+            f"eval_cross_{clause_a['clause_id']}_{clause_b['clause_id']}", 0.5, seed,
         )
-    except Exception:
+    except Exception as exc:
+        _log_fail(_KIND, _SID, "api_error", f"{type(exc).__name__}: {exc}")
         return None
 
     qa = _parse_qa(raw)
     if not qa:
+        _log_fail(_KIND, _SID, "parse_failed", raw)
         return None
 
     return {
@@ -254,9 +463,11 @@ _CALC_PROMPT = """以下是《{std_name}》（{std_code}）第{clause_no}条（�
 
 请出一道计算或查表题，要求：
 1. 给定具体工程参数（截面尺寸、材料强度、荷载值、抗震等级等）
-2. 要求查出或计算某一关键结果（限值/设计值/是否满足要求）
-3. gold_values 必须填写正确答案中的关键数值
-4. 答案步骤清晰
+2. **必须是简答题，严禁出成选择题**——不得给出 A/B/C/D 选项
+3. 要求查出或计算某一关键结果（限值/设计值/是否满足要求）
+4. gold_values 必须填写正确答案中的关键数值，**只填数值本身**（如 "14.3"、"360"），
+   严禁填入整句话——该字段用于数值精确匹配判分
+5. 答案步骤清晰
 
 输出格式（严格JSON）：
 {{"question": "...", "gold_answer": "...", "gold_values": ["具体数值"]}}"""
@@ -273,12 +484,11 @@ def gen_calculation(
         clause_no=clause["clause_no"],
         text=text,
     )
+    _KIND, _SID = "calculation", clause["clause_id"]
     try:
-        raw = llm_call(
-            prompt, system=_CALC_SYSTEM, model=_MODEL,
-            max_tokens=1000, temperature=0.4, seed=seed,
-            sample_id=f"eval_calc_{clause['clause_id']}",
-            extra_body=_EXTRA,
+        raw = _gen(
+            prompt, _CALC_SYSTEM, 1000,
+            f"eval_calc_{clause['clause_id']}", 0.4, seed,
         )
     except Exception:
         return None
@@ -335,18 +545,19 @@ def gen_clause_verify(
         text=text,
         is_trap=is_trap,
     )
+    _KIND, _SID = "clause_verify", clause["clause_id"]
     try:
-        raw = llm_call(
-            prompt, system=_VERIFY_SYSTEM, model=_MODEL,
-            max_tokens=700, temperature=0.5, seed=seed,
-            sample_id=f"eval_verify_{clause['clause_id']}_{is_trap}",
-            extra_body=_EXTRA,
+        raw = _gen(
+            prompt, _VERIFY_SYSTEM, 700,
+            f"eval_verify_{clause['clause_id']}_{is_trap}", 0.5, seed,
         )
-    except Exception:
+    except Exception as exc:
+        _log_fail(_KIND, _SID, "api_error", f"{type(exc).__name__}: {exc}")
         return None
 
     qa = _parse_qa(raw)
     if not qa:
+        _log_fail(_KIND, _SID, "parse_failed", raw)
         return None
 
     return {
@@ -403,18 +614,19 @@ def gen_refusal(
     idx: int,
     seed: int = 42,
 ) -> dict | None:
+    _KIND, _SID = "refusal", f"{cfg['type']}_{idx}"
     try:
-        raw = llm_call(
-            cfg["prompt"], system=_REFUSAL_SYSTEM, model=_MODEL,
-            max_tokens=600, temperature=0.85, seed=seed + idx,
-            sample_id=f"eval_refusal_{cfg['type']}_{idx}",
-            extra_body=_EXTRA,
+        raw = _gen(
+            cfg["prompt"], _REFUSAL_SYSTEM, 600,
+            f"eval_refusal_{cfg['type']}_{idx}", 0.85, seed + idx,
         )
-    except Exception:
+    except Exception as exc:
+        _log_fail(_KIND, _SID, "api_error", f"{type(exc).__name__}: {exc}")
         return None
 
     qa = _parse_qa(raw)
     if not qa:
+        _log_fail(_KIND, _SID, "parse_failed", raw)
         return None
 
     return {
@@ -465,13 +677,23 @@ def _select_clauses(clauses: list[dict], n: int, rng: random.Random, prefer_tabl
         if not pool:
             continue
         if prefer_tables:
-            pool = sorted(pool, key=lambda c: (len(c.get("tables", [])) > 0, c.get("is_mandatory", False)), reverse=True)
-        k = max(1, round(n * weight))
-        result.extend(rng.choices(pool, k=k))
+            # 原实现是 sorted(...) 后交给 rng.choices —— 但 choices 不带权重、
+            # 对顺序无感，排序完全没生效。改为直接把候选池收窄到含表格的条文；
+            # 数量不够时退回全池，避免某本规范因表格少而抽不满配额。
+            preferred = [c for c in pool if c.get("tables")]
+            pool = preferred or pool
+        k = min(max(1, round(n * weight)), len(pool))
+        # **无放回**抽样：原用 rng.choices（有放回），同一条文可能被抽中多次，
+        # 进而对同一条文出两道高度相似甚至完全相同的题，
+        # 且 _sid 以 clause_id 为哈希输入，会产生重复 id。
+        result.extend(rng.sample(pool, k))
 
-    # 补齐到 n（因为取整误差）
-    while len(result) < n:
-        result.append(rng.choice(clauses))
+    # 补齐到 n（各标准取整误差所致），同样不放回、不与已选重复
+    if len(result) < n:
+        chosen = {c["clause_id"] for c in result}
+        rest = [c for c in clauses if c["clause_id"] not in chosen]
+        rng.shuffle(rest)
+        result.extend(rest[: n - len(result)])
     return result[:n]
 
 
@@ -500,8 +722,13 @@ def build_evalset(smoke: bool = False, workers: int = 1, seed: int = 42) -> None
 
     quota = {k: 5 if smoke else v for k, v in _QUOTA.items()}
 
-    # ── 计算题：优先含表格且有数值的条文 ─────────────────────────────────
-    calc_pool = [c for c in clauses if c.get("tables") or re.search(r"\d+\.\d+", c["text"])]
+    # ── 含数值的条文池 ───────────────────────────────────────────────────
+    # single_clause 与 calculation 都要考数值，必须从含表格或含数值的条文里选。
+    # 早先 single_clause 在全库抽样，抽到「2.1.1 永久荷载的定义」这类术语条款——
+    # 条文里根本没有数值，模型只能凭空编，回锚后 gold_values 全空，
+    # 该题在阶段 5.4（数值精确匹配）完全无法判分。
+    numeric_pool = [c for c in clauses if c.get("tables") or re.search(r"\d+\.\d+", c["text"])]
+    calc_pool = numeric_pool
 
     # ── 条款验证：40 真 + 20 诱导（smoke 各一半）──────────────────────────
     verify_true_n = round(quota["clause_verify"] * 2 / 3)
@@ -511,7 +738,7 @@ def build_evalset(smoke: bool = False, workers: int = 1, seed: int = 42) -> None
     tasks: list[tuple[str, tuple]] = []
 
     # single_clause
-    for c in _select_clauses(clauses, quota["single_clause"], rng, prefer_tables=True):
+    for c in _select_clauses(numeric_pool, quota["single_clause"], rng, prefer_tables=True):
         tasks.append(("single", (c, seed)))
 
     # cross_clause
@@ -579,6 +806,8 @@ def build_evalset(smoke: bool = False, workers: int = 1, seed: int = 42) -> None
         pbar.close()
 
     # 写出
+    results = _dedup(results)
+
     with open(out_file, "w", encoding="utf-8") as f:
         for item in results:
             f.write(json.dumps(item, ensure_ascii=False) + "\n")
@@ -587,6 +816,20 @@ def build_evalset(smoke: bool = False, workers: int = 1, seed: int = 42) -> None
     print(f"\n[gen_evalset] 生成 {total} 题")
     for k, v in counts.items():
         print(f"  {k}: {v}/{_QUOTA[k]}")
+
+    # 金标覆盖率：阶段 5.4 是数值精确匹配判分，gold_values 为空的题在那一项
+    # 完全无法评分。覆盖率低不必然是 bug（拒答题本就无金标、跨条文题的答案
+    # 常为推导值），但必须可见——否则会在出分时才发现半数题目不可判。
+    scorable = [r for r in results if r["type"] != "refusal"]
+    with_gold = [r for r in scorable if r["gold_values"]]
+    if scorable:
+        print(f"\n[gen_evalset] 金标覆盖（非拒答题）：{len(with_gold)}/{len(scorable)}"
+              f" = {len(with_gold)/len(scorable):.0%}")
+        by_type: dict[str, list[int]] = {}
+        for r in scorable:
+            by_type.setdefault(r["type"], []).append(1 if r["gold_values"] else 0)
+        for k, v in sorted(by_type.items()):
+            print(f"    {k:<16} {sum(v)}/{len(v)}")
     print_cost_summary()
 
     manifest = {
@@ -594,7 +837,20 @@ def build_evalset(smoke: bool = False, workers: int = 1, seed: int = 42) -> None
         "total": total,
         "type_counts": counts,
         "quota": _QUOTA,
-        "synth_model": _MODEL,
+        # 出题模型必须如实记录：评测集是全实验的尺子，用哪个模型出的题
+        # 直接关系到与训练数据的相关性（见 _gen 上方说明）。
+        "provider": PROVIDER,
+        "question_model": (
+            __import__("src.utils.claude", fromlist=["x"]).DEFAULT_MODEL
+            if PROVIDER == "claude" else _MODEL
+        ),
+        "effort": (
+            __import__("src.utils.claude", fromlist=["x"]).DEFAULT_EFFORT
+            if PROVIDER == "claude" else None
+        ),
+        # Anthropic API 无 seed 参数——出题的可复现性靠 prompt + 条文固定，
+        # 而非采样种子。铁律 7 在此只能部分满足，须写入 EXPERIMENT.md 局限。
+        "seed_supported": PROVIDER != "claude",
         "built_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "seed": seed,
         "smoke": smoke,

@@ -37,6 +37,9 @@ dependencies = [
 
     # ===== [norm-ft] LLM 调用与数据合成（原 requirements.txt）=====
     "openai>=1.30.0",        # DashScope / 本地 vLLM 的 OpenAI-compatible endpoint
+    # 评测集出题换厂商（见 src/utils/claude.py）：与合成模型 Qwen3-32B 去相关，
+    # 避免题目撞车与风格耦合。仅 gen_evalset 用到，训练与过滤链路不依赖它。
+    "anthropic>=0.69.0",
     "tenacity>=8.3.0",       # 重试 + 指数退避
     "jsonlines>=4.0.0",
     # ===== [norm-ft] 嵌入与相似度（C 组多样性去重 + 评测集泄漏检查）=====

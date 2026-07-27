@@ -1,0 +1,25 @@
+{
+  "version": "v1",
+  "total": 388,
+  "type_counts": {
+    "single_clause": 116,
+    "cross_clause": 93,
+    "calculation": 79,
+    "clause_verify": 60,
+    "refusal": 40
+  },
+  "quota": {
+    "single_clause": 120,
+    "cross_clause": 100,
+    "calculation": 80,
+    "clause_verify": 60,
+    "refusal": 40
+  },
+  "provider": "openai_compat",
+  "question_model": "qwen-max",
+  "effort": null,
+  "seed_supported": true,
+  "built_at": "2026-07-27T12:56:22+00:00",
+  "seed": 42,
+  "smoke": false
+}

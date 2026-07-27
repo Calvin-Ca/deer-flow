@@ -89,6 +89,20 @@ class ClauseRef:
 
     @property
     def clause_id(self) -> str:
+        """拼装全局唯一的条款 ID，形如 GB50010-2010_8.2.1。
+
+        year 为空时**不能再插连字符**：调用方可能传入已含年份的标准号
+        （clause_splitter 就传 default_std="GB50010-2010"），此时 year 解析为空，
+        无条件拼接会得到 `GB50010-2010-_8.2.1`——多一个连字符，与条文库的
+        clause_id 对不上。实测该畸形 ID 使条文库 397 个 refs 全部失配，
+        gen_evalset 的跨条文题因此产出 0 条；group_d1 曾在消费端打
+        `replace("-_","_")` 补丁绕过，但没修这里，于是新消费方再次中招。
+
+        Returns:
+            条款 ID 字符串
+        """
+        if not self.year:
+            return f"{self.std_code}_{self.clause_no}"
         return f"{self.std_code}-{self.year}_{self.clause_no}"
 
 

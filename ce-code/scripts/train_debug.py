@@ -11,12 +11,18 @@
     与 train.sh **共用同一份 yaml**，超参、数据、DeepSpeed 配置完全一致，
     差别只在启动方式，故调试时看到的行为与生产训练一致。
 
-⚠️ 仅供调试。正式训练一律用 ./scripts/train.sh，理由见其顶部注释
-   （铁律 1 要求四组的启动环境逐字相同，脚本把三个环境变量固化了）。
+⚠️ 仅供调试，正式训练一律用 ./scripts/train.sh。
+   原因**不是**本脚本设置得不够严格（两者设的环境变量相同），而是**启动路径不同**：
+     train.sh        llamafactory-cli → torchrun → 子进程，分布式环境由 torchrun 注入
+     train_debug.py  本进程直接 run_exp()，RANK/WORLD_SIZE 等由本脚本伪造
+   两条路在 DeepSpeed 初始化与进程组建立上不保证等价。铁律 1 要求四组「除训练数据外
+   所有条件逐字相同」，因此**四组必须统一走同一条路**——混用才是问题所在。
+   实践上统一走 train.sh，因为那是生产路径。
 
 用法：
     python scripts/train_debug.py                      # 默认 configs/group_a.yaml
     python scripts/train_debug.py configs/group_c.yaml
+    CE_DEBUG_GPU=2 python scripts/train_debug.py       # 换一张卡调试
     VS Code 里选 "训练（可调试，单进程）" 配置按 F5
 """
 from __future__ import annotations
@@ -50,18 +56,26 @@ def main() -> None:
     os.environ.setdefault("MASTER_ADDR", "127.0.0.1")
     os.environ.setdefault("MASTER_PORT", "29500")
 
-    # 与 train.sh 保持一致的三项（说明见该脚本顶部）
-    os.environ.setdefault("CUDA_VISIBLE_DEVICES", "0")
-    os.environ.setdefault("NCCL_P2P_DISABLE", "1")
-    os.environ.setdefault("NCCL_IB_DISABLE", "1")
+    # 与 train.sh 保持一致的三项（说明见该脚本顶部）。
+    # 必须**无条件覆盖**，不能用 setdefault：若 shell 里已导出
+    # CUDA_VISIBLE_DEVICES=0,1,2,3，setdefault 会原样继承那 4 张卡，
+    # 有效 batch 从 2×8=16 变成 64 且全程不报错——正是 train.sh 要防的那个失效模式。
+    os.environ["CUDA_VISIBLE_DEVICES"] = os.environ.get("CE_DEBUG_GPU", "0")
+    os.environ["NCCL_P2P_DISABLE"] = "1"
+    os.environ["NCCL_IB_DISABLE"] = "1"
     # 已在本进程内，无需再经 torchrun；置位以通过 llamafactory 的启动方式校验
-    os.environ.setdefault("FORCE_TORCHRUN", "1")
+    os.environ["FORCE_TORCHRUN"] = "1"
 
     print("=" * 58)
     print("  训练调试入口（单进程，可断点）")
-    print(f"  配置      : {cfg_path}")
-    print(f"  可见 GPU  : {os.environ['CUDA_VISIBLE_DEVICES']}")
-    print("  ⚠️ 仅供调试；正式训练请用 ./scripts/train.sh")
+    print(f"  配置          : {cfg_path}")
+    print(f"  可见 GPU      : {os.environ['CUDA_VISIBLE_DEVICES']}"
+          f"（单卡，有效 batch = 2×8 = 16）")
+    print(f"  NCCL P2P/IB   : {os.environ['NCCL_P2P_DISABLE']}/{os.environ['NCCL_IB_DISABLE']}")
+    print(f"  RANK/WORLD    : {os.environ['RANK']}/{os.environ['WORLD_SIZE']}")
+    print("  ⚠️ 仅供调试。本入口与 train.sh 的**启动路径不同**"
+          "（in-process vs torchrun），")
+    print("     四组训练必须统一走 train.sh，混用会引入未受控变量（铁律 1）。")
     print("=" * 58)
 
     # llamafactory 通过 sys.argv 读取 yaml 路径

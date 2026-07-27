@@ -88,13 +88,23 @@ _rate_limiter = _RateLimiter(rpm=int(os.getenv("LLM_RPM", "60")))
 
 
 # ── OpenAI 客户端（DashScope endpoint）────────────────────────────────────
-def _get_client() -> OpenAI:
+def _get_client(base_url: str | None = None) -> OpenAI:
+    """构造 OpenAI 兼容客户端。
+
+    Args:
+        base_url: 显式指定的 endpoint。为 None 时读环境变量 LLM_BASE_URL，
+                  再回落到 DashScope 官方地址。判官模型与合成模型可能部署在
+                  不同 endpoint（如 32B 在 :8001、8B 在 :8099），故支持按次覆盖。
+
+    Returns:
+        OpenAI 客户端实例
+    """
     api_key = os.environ.get("DASHSCOPE_API_KEY") or os.environ.get("OPENAI_API_KEY")
     if not api_key:
         raise EnvironmentError("请设置环境变量 DASHSCOPE_API_KEY")
     return OpenAI(
         api_key=api_key,
-        base_url=os.getenv(
+        base_url=base_url or os.getenv(
             "LLM_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1"
         ),
     )
@@ -166,16 +176,23 @@ def call(
     sample_id: str = "",
     extra_meta: dict | None = None,
     extra_body: dict | None = None,
+    base_url: str | None = None,
 ) -> str:
     """
     单次 LLM 调用。失败超过重试上限时记录到 data/interim/failed/ 并抛出异常。
-    返回模型输出文本。
+
+    Args:
+        base_url: 覆盖本次调用的 endpoint（判官与合成模型可能不同机不同端口）。
+                  为 None 时走 LLM_BASE_URL 环境变量。其余参数见签名。
+
+    Returns:
+        模型输出文本
     """
     messages = [
         {"role": "system", "content": system},
         {"role": "user", "content": prompt},
     ]
-    client = _get_client()
+    client = _get_client(base_url)
     try:
         text, in_tok, out_tok = _call_once(
             client, model, messages, max_tokens, temperature, seed, extra_body

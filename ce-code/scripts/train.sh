@@ -16,6 +16,12 @@
 #                           因上面只暴露 1 张卡，torchrun 会以 nproc_per_node=1
 #                           起单进程，有效 batch 仍为 16。
 #
+# 前置：基座权重需预先下载到本地（configs/group_*.yaml 的 model_name_or_path 指向它）。
+#   hf-mirror 实测仅 12kB/s 且反复超时，改用 ModelScope：
+#   uv run --with modelscope modelscope download --model Qwen/Qwen2.5-7B-Instruct \
+#       --local_dir /mnt/nvme/calvin/models/Qwen2.5-7B-Instruct
+#   下完应约 15GB，含 4 个 model-0000X-of-00004.safetensors 分片。
+#
 # 用法：
 #   ./scripts/train.sh a          # 训练 group_a
 #   ./scripts/train.sh {a|b|c|d}

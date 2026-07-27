@@ -2,7 +2,12 @@
 # 注意：除 dataset / output_dir 外，四份配置必须逐字相同（见 EXPERIMENT.md §1）
 
 ### ── 模型 ─────────────────────────────────────────────────────────────────
-model_name_or_path: Qwen/Qwen2.5-7B-Instruct
+# 指向服务器本地权重目录，不走 hub 在线解析。三个理由：
+#   ① hf-mirror 实测仅 12kB/s 且反复超时，15GB 下不完；已改用 ModelScope 预下载
+#   ② 四组共用一份权重，不必各下一次，且训练期间完全不依赖网络
+#   ③ 保证四组加载的权重逐字节相同——走 hub ID 理论上存在版本漂移，属铁律 1 的隐含要求
+# 预下载命令见 scripts/train.sh 顶部注释。
+model_name_or_path: /mnt/nvme/calvin/models/Qwen2.5-7B-Instruct
 # 基座是 Instruct 版，必须显式指定对话模板，否则回落到 default 模板、
 # <|im_start|>/<|im_end|> 等特殊 token 全错，训练照跑但结果作废。
 template: qwen

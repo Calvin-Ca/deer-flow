@@ -61,6 +61,39 @@ _TEMPLATE = """【条文】
 只输出 YES 或 NO 一个词。"""
 
 
+_first_error_reported = False
+
+
+def _report_first_error(exc: Exception, model: str, base_url: str | None) -> None:
+    """首次调用异常时打印完整信息，之后静默。
+
+    存在的理由：调用异常若被无声吞掉，配置问题（endpoint 不通、模型名写错、
+    环境变量缺失）会伪装成「判官输出无法解析」，让人以为是数据或模型质量问题。
+    实测踩过一次：缺 DASHSCOPE_API_KEY 导致 50/50 全部「解析失败」而 LLM 调用数为 0。
+
+    Args:
+        exc:      捕获到的异常
+        model:    当时使用的模型名
+        base_url: 当时使用的 endpoint
+
+    Returns:
+        None
+    """
+    global _first_error_reported
+    if _first_error_reported:
+        return
+    _first_error_reported = True
+    print(
+        f"\n⚠️  判官调用失败（后续同类错误不再重复打印）\n"
+        f"    模型     : {model}\n"
+        f"    endpoint : {base_url}\n"
+        f"    错误     : {type(exc).__name__}: {exc}\n"
+        f"    排查     : 检查 endpoint 可达性与模型名，"
+        f"curl {base_url}/models\n",
+        file=sys.stderr,
+    )
+
+
 def judge_answerable(clause_text: str, question: str, sample_id: str = "") -> bool | None:
     """调用判官模型判定单条样本的可答性。
 
@@ -85,7 +118,8 @@ def judge_answerable(clause_text: str, question: str, sample_id: str = "") -> bo
             base_url=JUDGE_BASE_URL,
             extra_body={"enable_thinking": False},
         )
-    except Exception:
+    except Exception as exc:
+        _report_first_error(exc, JUDGE_MODEL, JUDGE_BASE_URL)
         return None
     return _parse_verdict(resp)
 

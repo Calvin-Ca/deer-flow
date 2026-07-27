@@ -107,9 +107,15 @@ def _get_client(base_url: str | None = None) -> OpenAI:
     Returns:
         OpenAI 客户端实例
     """
-    api_key = os.environ.get("DASHSCOPE_API_KEY") or os.environ.get("OPENAI_API_KEY")
-    if not api_key:
-        raise EnvironmentError("请设置环境变量 DASHSCOPE_API_KEY")
+    # 本地 vLLM 不校验 api_key，故缺失时回落到占位串而非抛异常。
+    # 原实现无条件 raise，导致本地 endpoint 在未设该变量的 shell 里
+    # 每次调用一进门就抛错；上层若吞异常，就会把「环境没配」伪装成「模型输出异常」。
+    # 若打的是计费 API，占位 key 会拿到明确的 401，比隐式失败好定位。
+    api_key = (
+        os.environ.get("DASHSCOPE_API_KEY")
+        or os.environ.get("OPENAI_API_KEY")
+        or "EMPTY"
+    )
     return OpenAI(
         api_key=api_key,
         base_url=base_url or os.getenv(

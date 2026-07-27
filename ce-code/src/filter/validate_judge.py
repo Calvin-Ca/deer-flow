@@ -32,7 +32,7 @@ from pathlib import Path
 _ROOT = Path(__file__).parents[2]
 sys.path.insert(0, str(_ROOT))
 
-from src.filter.answerable import _TEMPLATE, _SYSTEM, _parse_verdict
+from src.filter.answerable import _TEMPLATE, _SYSTEM, _parse_verdict, _report_first_error
 from src.utils.llm import call as llm_call, print_cost_summary
 
 _OUT_DIR = _ROOT / "data/interim/judge_validation"
@@ -64,7 +64,8 @@ def _judge(model: str, clause_text: str, question: str, sid: str,
             seed=42, sample_id=sid, base_url=base_url,
             extra_body={"enable_thinking": False},
         )
-    except Exception:
+    except Exception as exc:
+        _report_first_error(exc, model, base_url)
         return None
     return _parse_verdict(resp)
 
@@ -135,6 +136,12 @@ def validate(input_path: Path, clauses_path: Path, n: int,
             "candidate": _judge(candidate, ctext, question, s["sample_id"], JUDGE_BASE_URL),
             "baseline": _judge(baseline, ctext, question, s["sample_id"], BASELINE_BASE_URL),
         })
+
+    if rows and all(r["candidate"] is None for r in rows):
+        print("\n❌ 候选判官 50/50 全部失败——这是配置问题，不是判定结果。")
+        print("   常见原因：endpoint 不通、模型名不符、环境变量缺失。")
+        print(f"   自查：curl {JUDGE_BASE_URL}/models")
+        sys.exit(1)
 
     agree = sum(1 for r in rows if r["candidate"] == r["baseline"])
     disagree = [r for r in rows if r["candidate"] != r["baseline"]]

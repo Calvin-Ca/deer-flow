@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import random
 import sys
 from datetime import datetime
@@ -37,7 +38,9 @@ from src.utils.llm import call as llm_call, print_cost_summary
 _OUT_DIR = _ROOT / "data/interim/judge_validation"
 
 # 对照判官 = 合成模型本身。它正是要被替换掉的那个，用作基线以量化两者差异。
-BASELINE_MODEL = "/models/Qwen3-32B-AWQ"
+# 与候选判官不在同一台机器，故需各自的 base_url。
+BASELINE_MODEL = os.getenv("CE_BASELINE_MODEL", "/models/Qwen3-32B-AWQ")
+BASELINE_BASE_URL = os.getenv("CE_BASELINE_BASE_URL", "http://172.19.2.2:8001/v1")
 
 
 def _judge(model: str, clause_text: str, question: str, sid: str,
@@ -108,7 +111,7 @@ def validate(input_path: Path, clauses_path: Path, n: int,
     picked = rng.sample(samples, min(n, len(samples)))
     print(f"[validate_judge] 从 {len(samples)} 条中抽样 {len(picked)} 条（seed={seed}）")
     print(f"[validate_judge] 候选判官：{candidate}  (base_url={JUDGE_BASE_URL})")
-    print(f"[validate_judge] 对照判官：{baseline}")
+    print(f"[validate_judge] 对照判官：{baseline}  (base_url={BASELINE_BASE_URL})")
 
     try:
         from tqdm import tqdm
@@ -130,7 +133,7 @@ def validate(input_path: Path, clauses_path: Path, n: int,
             "answer": s["conversations"][1]["value"],
             "clause_text": ctext,
             "candidate": _judge(candidate, ctext, question, s["sample_id"], JUDGE_BASE_URL),
-            "baseline": _judge(baseline, ctext, question, s["sample_id"]),
+            "baseline": _judge(baseline, ctext, question, s["sample_id"], BASELINE_BASE_URL),
         })
 
     agree = sum(1 for r in rows if r["candidate"] == r["baseline"])

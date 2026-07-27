@@ -26,9 +26,12 @@ _PRICE_PER_1K: dict[str, dict[str, float]] = {
     "qwen-max":             {"input": 0.04, "output": 0.12},
     "qwen-max-2025-01-25":  {"input": 0.04, "output": 0.12},
     "qwen-plus":            {"input": 0.008, "output": 0.024},
-    # 本地 vLLM 服务，无 API 费用
+    # 本地 vLLM 服务，无 API 费用。
+    # 注意：未登记的模型名会落到 .get() 的默认价（按 qwen-max 计），
+    # 本地模型漏登记会凭空报出假费用，新增本地模型务必在此登记。
     "Qwen3-32B-AWQ":           {"input": 0.0, "output": 0.0},
-    "/models/Qwen3-32B-AWQ":   {"input": 0.0, "output": 0.0},
+    "/models/Qwen3-32B-AWQ":   {"input": 0.0, "output": 0.0},  # 172.19.2.2:8001，合成用
+    "qwen3-8b":                {"input": 0.0, "output": 0.0},  # localhost:8099，判官用
 }
 _DEFAULT_MODEL = "qwen-max"
 

@@ -38,8 +38,10 @@ from src.utils.llm import call as llm_call, print_cost_summary
 # ── 判官配置 ──────────────────────────────────────────────────────────────
 # 判官必须与合成模型（/models/Qwen3-32B-AWQ）不同，理由见模块 docstring。
 # 服务器上 endpoint 与模型名可能变动，故均可用环境变量覆盖。
-JUDGE_MODEL = os.getenv("CE_JUDGE_MODEL", "/models/Qwen3-8B")
-JUDGE_BASE_URL = os.getenv("CE_JUDGE_BASE_URL") or os.getenv("LLM_BASE_URL")
+# 实测：vllm-qwen3-8b 容器注册名为 qwen3-8b，暴露在本机 :8099（与 deer-flow 后端共用）。
+# 合成模型 /models/Qwen3-32B-AWQ 在另一台 172.19.2.2:8001，故判官需独立 base_url。
+JUDGE_MODEL = os.getenv("CE_JUDGE_MODEL", "qwen3-8b")
+JUDGE_BASE_URL = os.getenv("CE_JUDGE_BASE_URL", "http://localhost:8099/v1")
 
 _SYSTEM = (
     "你是建筑结构工程规范审核员。你的唯一任务是判断给定条文是否足以完整回答问题。"

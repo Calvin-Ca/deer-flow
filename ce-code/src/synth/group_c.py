@@ -45,18 +45,14 @@ def run(workers: int = 1) -> None:
     import sys
     sys.path.insert(0, str(_ROOT))
 
-    if workers > 1:
-        _filter_answerable_parallel(
-            _GROUP_B, tmp_answerable, rej_answerable, _CLAUSES, workers
-        )
-    else:
-        from src.filter.answerable import filter_answerable
-        filter_answerable(
-            input_path=_GROUP_B,
-            output_path=tmp_answerable,
-            rejected_path=rej_answerable,
-            clauses_path=_CLAUSES,
-        )
+    from src.filter.answerable import filter_answerable
+    filter_answerable(
+        input_path=_GROUP_B,
+        output_path=tmp_answerable,
+        rejected_path=rej_answerable,
+        clauses_path=_CLAUSES,
+        workers=workers,
+    )
 
     kept_1 = sum(1 for _ in open(tmp_answerable, encoding="utf-8"))
     rej_1 = total_in - kept_1
@@ -135,98 +131,6 @@ def run(workers: int = 1) -> None:
 
     # 清理临时文件
     shutil.rmtree(_TMP_DIR, ignore_errors=True)
-
-
-def _filter_answerable_parallel(
-    input_path: Path,
-    output_path: Path,
-    rejected_path: Path,
-    clauses_path: Path,
-    workers: int,
-) -> None:
-    """可答性过滤的并发版本（多线程调用 LLM）。"""
-    import sys, threading
-    from concurrent.futures import ThreadPoolExecutor, as_completed
-    sys.path.insert(0, str(_ROOT))
-    from src.utils.llm import call as llm_call
-
-    _SYSTEM = "你是一位建筑结构工程专家，请严格依据所给条文内容回答问题，不得补充条文之外的信息。"
-    _TEMPLATE = """以下是规范条文原文：
-
-【条文】
-{clause_text}
-
-请判断：仅凭上述条文，能否完整回答以下问题？
-
-【问题】
-{question}
-
-若能回答，请直接作答；若条文信息不足以回答该问题，请仅输出：INSUFFICIENT"""
-
-    clause_map: dict[str, str] = {}
-    with open(clauses_path, encoding="utf-8") as f:
-        for line in f:
-            c = json.loads(line)
-            clause_map[c["clause_id"]] = c["text"]
-
-    samples: list[dict] = []
-    with open(input_path, encoding="utf-8") as f:
-        for line in f:
-            samples.append(json.loads(line))
-
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    write_lock = threading.Lock()
-    kept = 0
-    rejected = 0
-
-    try:
-        from tqdm import tqdm
-        pbar = tqdm(total=len(samples), desc="answerable (parallel)")
-    except ImportError:
-        pbar = None
-
-    def _check(sample: dict):
-        question = sample["conversations"][0]["value"]
-        clause_ids = sample["meta"].get("source_clauses", [])
-        clause_text = "\n\n".join(
-            clause_map.get(cid, "") for cid in clause_ids if cid in clause_map
-        ).strip()
-        if not clause_text:
-            return sample, False, "clause_not_found"
-        prompt = _TEMPLATE.format(clause_text=clause_text, question=question)
-        try:
-            resp = llm_call(
-                prompt, system=_SYSTEM, model="/models/Qwen3-32B-AWQ",
-                max_tokens=1024, temperature=0.0, seed=42,
-                sample_id=sample["sample_id"],
-            )
-            r = resp.strip().upper()
-            ok = "INSUFFICIENT" not in r and len(r) > 20
-            return sample, ok, "not_answerable" if not ok else ""
-        except Exception:
-            return sample, True, ""  # API 失败保守保留
-
-    with open(output_path, "w", encoding="utf-8") as fout, \
-         open(rejected_path, "w", encoding="utf-8") as frej:
-        with ThreadPoolExecutor(max_workers=workers) as pool:
-            futures = [pool.submit(_check, s) for s in samples]
-            for fut in as_completed(futures):
-                sample, ok, reason = fut.result()
-                if pbar:
-                    pbar.update(1)
-                with write_lock:
-                    if ok:
-                        sample["meta"]["filters_passed"] = sample["meta"].get("filters_passed", []) + ["answerable"]
-                        fout.write(json.dumps(sample, ensure_ascii=False) + "\n")
-                        kept += 1
-                    else:
-                        sample["meta"]["reject_reason"] = reason
-                        frej.write(json.dumps(sample, ensure_ascii=False) + "\n")
-                        rejected += 1
-
-    if pbar:
-        pbar.close()
-    print(f"[answerable] 保留 {kept} / 淘汰 {rejected}（淘汰率 {rejected/(kept+rejected):.1%}）")
 
 
 if __name__ == "__main__":

@@ -30,6 +30,7 @@ _FAILED_DIR = _ROOT / "data/interim/failed"
 
 sys.path.insert(0, str(_ROOT))
 from src.utils.llm import call as llm_call, print_cost_summary
+from src.filter.answerable import judge_answerable
 from src.synth.group_a import convert_text_tables
 
 # ── Prompt ────────────────────────────────────────────────────────────────
@@ -55,14 +56,9 @@ _SYNTH_TEMPLATE = """以下是两条相互关联的规范条文（条文B被条�
 输出格式（严格JSON，不要输出其他内容）：
 {{"question": "...", "answer": "..."}}"""
 
-_CHECK_TEMPLATE = """以下是规范条文：
-
-【条文】{std}第{no}条
-{text}
-
-问题：{question}
-
-仅凭上述单条条文，能否完整回答该问题？若能请直接作答；若信息不足请仅输出：INSUFFICIENT"""
+# 单条可答性校验复用过滤器①的判官（8B + 强制 YES/NO），不再自带一份。
+# 理由同 answerable.filter_answerable 的说明：judge 逻辑一旦有副本就会偏离，
+# 实测 group_c 的并发副本在判官换代后仍在用 32B 与旧 prompt。
 
 
 # ── 构建条文对 ────────────────────────────────────────────────────────────
@@ -95,6 +91,31 @@ def _build_pairs(clauses: dict[str, dict]) -> list[tuple[dict, dict]]:
 
 # ── 单对处理 ─────────────────────────────────────────────────────────────
 
+def _log_reject(clause_a: dict, clause_b: dict, reason: str, detail: str = "") -> None:
+    """记录被淘汰的条文对及原因（CLAUDE.md §6.6：失败要留痕，不得静默丢弃）。
+
+    历史教训：上一轮 D1 的 319 对里淘汰了 225 对（70.5%），但 JSON 解析失败与
+    「单条即可答」两类都走同一个 `return None`，_FAILED_DIR 建了却从未写入，
+    事后完全无法归因是格式问题还是校验判严了。
+
+    Args:
+        clause_a: 条文对中的 A
+        clause_b: 条文对中的 B
+        reason:   淘汰原因代码
+        detail:   补充信息（模型原始输出片段等）
+
+    Returns:
+        None（追加写入 data/interim/failed/group_d1_rejected.jsonl）
+    """
+    _FAILED_DIR.mkdir(parents=True, exist_ok=True)
+    with open(_FAILED_DIR / "group_d1_rejected.jsonl", "a", encoding="utf-8") as f:
+        f.write(json.dumps({
+            "pair": [clause_a["clause_id"], clause_b["clause_id"]],
+            "reason": reason,
+            "detail": detail,
+        }, ensure_ascii=False) + "\n")
+
+
 def _sample_id(id_a: str, id_b: str) -> str:
     h = hashlib.md5(f"{id_a}|{id_b}".encode()).hexdigest()[:8]
     return f"d1_{h}"
@@ -119,40 +140,39 @@ def _process_pair(
             max_tokens=1500, temperature=0.8, seed=seed,
             sample_id=f"{clause_a['clause_id']}+{clause_b['clause_id']}",
         )
-    except Exception:
+    except Exception as exc:
+        _log_reject(clause_a, clause_b, "synth_api_error", str(exc)[:200])
         return None
 
     # 解析 JSON
     m = re.search(r"\{[\s\S]*\}", raw)
     if not m:
+        _log_reject(clause_a, clause_b, "no_json_in_output", raw[:200])
         return None
     try:
         qa = json.loads(m.group(0))
     except json.JSONDecodeError:
+        _log_reject(clause_a, clause_b, "json_decode_error", raw[:200])
         return None
 
     question = str(qa.get("question", "")).strip()
     answer = str(qa.get("answer", "")).strip()
     if not question or not answer:
+        _log_reject(clause_a, clause_b, "empty_question_or_answer", raw[:200])
         return None
 
     # ② 单条可答性校验（任一条单独能答 → 淘汰）
+    # 复用过滤器①的判官（8B + 强制 YES/NO），语义相同的判断不应有两份实现。
     for clause in (clause_a, clause_b):
-        check_prompt = _CHECK_TEMPLATE.format(
-            std=clause["standard_code"], no=clause["clause_no"],
-            text=convert_text_tables(clause["text"]), question=question,
+        verdict = judge_answerable(
+            convert_text_tables(clause["text"]), question,
+            sample_id=f"check_{clause['clause_id']}",
         )
-        try:
-            resp = llm_call(
-                check_prompt, system="你是结构工程专家，严格依据给定条文内容判断。",
-                model="/models/Qwen3-32B-AWQ",
-                max_tokens=512, temperature=0.0, seed=42,
-                sample_id=f"check_{clause['clause_id']}",
-            )
-            if "INSUFFICIENT" not in resp.strip().upper():
-                return None  # 单条足够 → 不是真跨条文
-        except Exception:
-            pass  # 检查失败保守保留
+        if verdict is True:          # 单条就能答 → 不是真跨条文
+            _log_reject(clause_a, clause_b, "single_clause_sufficient",
+                        f"{clause['clause_id']} 单独可答")
+            return None
+        # verdict is None（判官不可用/无法解析）→ 保守保留，与过滤器①一致
 
     return {
         "sample_id": _sample_id(clause_a["clause_id"], clause_b["clause_id"]),

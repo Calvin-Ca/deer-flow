@@ -271,9 +271,17 @@ def build_group_b(
         pbar.close()
 
     # 统计
-    total_clauses = len(clauses) - len(already_done)
-    fail_rate = total_fail / total_clauses if total_clauses else 0
-    print(f"\n[group_b] 生成 {total_ok} 样本 | 失败 {total_fail}/{total_clauses} 条 ({fail_rate:.1%})")
+    #
+    # 分母用 len(pending)（真正发起过请求的条数），不用 len(clauses)-len(already_done)：
+    # 后者把 oversized 跳过的条款也算进分母，而那些条款根本没发过请求——
+    # 等于拿「没尝试」冲抵「尝试失败」，稀释失败率、让 5% 告警门线偏松。
+    # 且 oversized 是整条丢弃（比解析失败更严重），必须单独报出来而非混进分母消失。
+    attempted = len(pending)
+    fail_rate = total_fail / attempted if attempted else 0
+    print(f"\n[group_b] 生成 {total_ok} 样本 | 失败 {total_fail}/{attempted} 条 ({fail_rate:.1%})")
+    if oversized:
+        print(f"[group_b] 另有 {len(oversized)} 条超长条款整条未生成（不计入上面的失败率）→ "
+              f"{_FAILED_DIR / 'group_b_oversized.jsonl'}")
     print_cost_summary()
 
     if fail_rate > 0.05:

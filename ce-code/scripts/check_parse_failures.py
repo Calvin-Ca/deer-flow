@@ -42,23 +42,31 @@ def main() -> None:
     rows = [json.loads(l) for l in open(path, encoding="utf-8")]
     print(f"日志: {path.name}   失败 {len(rows)} 条\n")
 
-    recovered = truncated = other = 0
+    # ⚠️ 只有当日志存的是**完整** raw 时，「截断」这一类才可信。
+    # group_b 早先存 raw[:1000]，任何超长输出都会被误判为截断，
+    # 把排查引向「调大 max_tokens」这个错误方向——实测失败样本平均输出 590 token、
+    # 上限 3000，根本不存在截断。故此处先探测日志是否被裁剪，被裁剪时不下截断结论。
+    clipped = sum(1 for r in rows if r.get("raw_len") is None and len(r.get("raw", "")) >= 1000)
+    log_is_clipped = clipped > len(rows) * 0.2
+
+    recovered = unparseable = 0
     for r in rows:
         raw = r.get("raw", "")
         if jsonx.extract(raw, kind="array") is not None or \
            jsonx.extract(raw, kind="object") is not None:
             recovered += 1
-        elif not raw.rstrip().endswith(("]", "}", "```")):
-            truncated += 1          # 输出被 max_tokens 截断，修转义救不回
         else:
-            other += 1
+            unparseable += 1
 
     n = len(rows) or 1
     print(f"  ✅ 转义修复可捞回 : {recovered:>4}  ({recovered/n:.0%})")
-    print(f"  ✂️ 输出被截断     : {truncated:>4}  ({truncated/n:.0%})  ← 需调高 max_tokens")
-    print(f"  ❓ 其他           : {other:>4}  ({other/n:.0%})")
+    print(f"  ❌ 仍解析不了     : {unparseable:>4}  ({unparseable/n:.0%})")
     print()
-    if recovered:
+    if log_is_clipped:
+        print("  ⚠️ 本日志的 raw 被裁剪过（无 raw_len 字段且多数正好 1000 字符）。")
+        print("     裁剪后的片段本就不是完整 JSON，「仍解析不了」这一栏严重高估，")
+        print("     实际可捞回比例只能靠补跑实测。请先重跑一次以产出完整日志。")
+    elif recovered:
         print(f"→ 补跑这 {len(rows)} 条条文可回收约 {recovered * 4} 条样本（每条文 4 视角）")
 
 

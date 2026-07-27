@@ -155,7 +155,11 @@ def _log_parse_failure(clause_id: str, raw: str) -> None:
     with open(path, "a", encoding="utf-8") as f:
         f.write(
             json.dumps(
-                {"ts": datetime.now(timezone.utc).isoformat(), "clause_id": clause_id, "raw": raw[:1000]},
+                # 存全量而非截断：raw[:1000] 会让任何超长输出在事后诊断中被误判为
+                # 「被 max_tokens 截断」，从而把排查引向调大 max_tokens 这个错误方向。
+                # 实测失败样本平均输出仅 590 token、上限 3000，根本不存在截断。
+                {"ts": datetime.now(timezone.utc).isoformat(), "clause_id": clause_id,
+                 "raw": raw, "raw_len": len(raw)},
                 ensure_ascii=False,
             )
             + "\n"

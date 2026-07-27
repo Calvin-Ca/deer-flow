@@ -87,7 +87,12 @@ class _RateLimiter:
             self._last = time.monotonic()
 
 
-_rate_limiter = _RateLimiter(rpm=int(os.getenv("LLM_RPM", "60")))
+# 默认值按**本地 vLLM** 设定：本项目的合成与判官都打本地/内网 vLLM，没有 API 配额，
+# 限流器对它们是纯损耗。原默认 60（即 1 次/秒）在高并发下会成为硬瓶颈：
+#   合成 64 并发、单请求约 52s → 稳态需 1.23 次/秒，被 60 RPM 砍掉约 19%
+#   判官 max_tokens=10、单请求约 1s → 8 并发本可 8 次/秒，被砍到 1/8
+# 若改用计费 API（如 5.5 的 judge 走 qwen-max/GPT-4o），务必显式调低 LLM_RPM。
+_rate_limiter = _RateLimiter(rpm=int(os.getenv("LLM_RPM", "600")))
 
 
 # ── OpenAI 客户端（DashScope endpoint）────────────────────────────────────

@@ -28,6 +28,11 @@ _CLAUSES = _ROOT / "data/interim/clauses.jsonl"
 _OUT_DIR = _ROOT / "data/processed/group_d1"
 _FAILED_DIR = _ROOT / "data/interim/failed"
 
+# 合成模型：调用处、样本元数据、manifest 三处同源，避免各写一份字面量后漂移
+# （group_b 就因此把 Qwen3-32B-AWQ 记成了 qwen-max）。
+_SYNTH_MODEL = "/models/Qwen3-32B-AWQ"
+
+
 sys.path.insert(0, str(_ROOT))
 from src.utils.llm import call as llm_call, print_cost_summary
 from src.filter.answerable import judge_answerable
@@ -135,7 +140,7 @@ def _process_pair(
     )
     try:
         raw = llm_call(
-            prompt, system=_SYSTEM, model="/models/Qwen3-32B-AWQ",
+            prompt, system=_SYSTEM, model=_SYNTH_MODEL,
             max_tokens=1500, temperature=0.8, seed=seed,
             sample_id=f"{clause_a['clause_id']}+{clause_b['clause_id']}",
         )
@@ -183,7 +188,7 @@ def _process_pair(
         "meta": {
             "source_clauses": [clause_a["clause_id"], clause_b["clause_id"]],
             "sample_type": "cross_clause",
-            "synth_model": "/models/Qwen3-32B-AWQ",
+            "synth_model": _SYNTH_MODEL,
             "quality_score": None,
             "filters_passed": ["cross_clause_verified"],
         },
@@ -247,7 +252,7 @@ def build_group_d1(
         "version": "v1",
         "total": total_ok,
         "pairs_attempted": total,
-        "synth_model": "/models/Qwen3-32B-AWQ",
+        "synth_model": _SYNTH_MODEL,
         "built_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "seed": seed,
         "smoke": smoke,

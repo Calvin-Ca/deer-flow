@@ -31,6 +31,11 @@ _CLAUSES = _ROOT / "data/interim/clauses.jsonl"
 _OUT_DIR = _ROOT / "data/processed/group_d2"
 _FAILED_DIR = _ROOT / "data/interim/failed"
 
+# 合成模型：调用处、样本元数据、manifest 三处同源，避免各写一份字面量后漂移
+# （group_b 就因此把 Qwen3-32B-AWQ 记成了 qwen-max）。
+_SYNTH_MODEL = "/models/Qwen3-32B-AWQ"
+
+
 sys.path.insert(0, str(_ROOT))
 from src.utils.llm import call as llm_call, print_cost_summary
 from src.synth.group_a import convert_text_tables
@@ -118,7 +123,7 @@ def _process_one(
     )
     try:
         raw = llm_call(
-            prompt, system=_SYSTEM, model="/models/Qwen3-32B-AWQ",
+            prompt, system=_SYSTEM, model=_SYNTH_MODEL,
             max_tokens=1000, temperature=0.85, seed=seed + idx,
             sample_id=f"d2_{clause['clause_id']}_{type_key}",
         )
@@ -149,7 +154,7 @@ def _process_one(
             "source_clauses": [clause["clause_id"]],
             "sample_type": "refusal",
             "refusal_type": type_key,
-            "synth_model": "/models/Qwen3-32B-AWQ",
+            "synth_model": _SYNTH_MODEL,
             "quality_score": None,
             "filters_passed": [],
         },
@@ -228,7 +233,7 @@ def build_group_d2(
         "version": "v1",
         "total": total_ok,
         "type_counts": type_counts,
-        "synth_model": "/models/Qwen3-32B-AWQ",
+        "synth_model": _SYNTH_MODEL,
         "built_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "seed": seed,
         "smoke": smoke,

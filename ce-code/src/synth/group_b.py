@@ -28,6 +28,12 @@ _CLAUSES = _ROOT / "data/interim/clauses.jsonl"
 _OUT_DIR = _ROOT / "data/processed/group_b"
 _FAILED_DIR = _ROOT / "data/interim/failed"
 
+# 合成模型：调用处、样本元数据、manifest 三处必须同源。
+# 原先三处各写一份字面量，调用处是 /models/Qwen3-32B-AWQ 而元数据与 manifest
+# 却写着 "qwen-max"（早期方案的残留，换模型时漏改），9407 条样本与 manifest
+# 全部记错了合成模型——数据看着正常，溯源信息却是假的。用常量消除漂移可能。
+_SYNTH_MODEL = "/models/Qwen3-32B-AWQ"
+
 # 单条条文进 prompt 的字数上限。vLLM max_model_len=32768 token，
 # 中文约 1 字/token，留出 prompt 模板与输出的余量后取 2 万字。
 _MAX_CLAUSE_CHARS = 20000
@@ -104,7 +110,7 @@ def _process_clause(clause: dict, seed: int = 42) -> list[dict] | None:
         raw = llm_call(
             prompt,
             system=_SYSTEM,
-            model="/models/Qwen3-32B-AWQ",
+            model=_SYNTH_MODEL,
             max_tokens=3000,
             temperature=0.8,
             seed=seed,
@@ -137,7 +143,7 @@ def _process_clause(clause: dict, seed: int = 42) -> list[dict] | None:
                 "meta": {
                     "source_clauses": [clause["clause_id"]],
                     "sample_type": "single_clause",
-                    "synth_model": "qwen-max",
+                    "synth_model": _SYNTH_MODEL,
                     "perspective": perspective,
                     "quality_score": None,
                     "filters_passed": [],
@@ -295,7 +301,7 @@ def build_group_b(
         "total_clauses_attempted": total_clauses,
         "failed_clauses": total_fail,
         "fail_rate": round(fail_rate, 4),
-        "synth_model": "qwen-max",
+        "synth_model": _SYNTH_MODEL,
         "prompt_hash": _PROMPT_HASH,
         "seed": seed,
         "smoke": smoke,

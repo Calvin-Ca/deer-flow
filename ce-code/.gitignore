@@ -67,3 +67,6 @@ results/*/figs/
 
 # ===== [norm-ft] 模型 checkpoint =====
 checkpoints/
+
+# 修复脚本产生的备份（fix_synth_model_meta.py 等），不入 git
+*.bak

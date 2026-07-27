@@ -61,16 +61,28 @@ def _sid(prefix: str, *parts: str) -> str:
 
 
 def _parse_qa(raw: str) -> dict | None:
+    """从模型输出中提取题目 JSON。
+
+    注意字段名是 **gold_answer** 而非 answer——所有 prompt 的输出格式都写的
+    gold_answer。原实现校验 obj.get("answer")，恒为 None，导致本生成器
+    对任何输入都返回 None、产出零条题目且不报错；评测集因此改走了硬编码路线。
+
+    Args:
+        raw: 模型原始输出
+
+    Returns:
+        题目字典；缺 question 或 gold_answer、或 JSON 不可解析时返回 None
+    """
     m = re.search(r"\{[\s\S]*\}", raw)
     if not m:
         return None
     try:
         obj = json.loads(m.group(0))
-        if not obj.get("question") or not obj.get("answer"):
-            return None
-        return obj
     except json.JSONDecodeError:
         return None
+    if not obj.get("question") or not obj.get("gold_answer"):
+        return None
+    return obj
 
 
 def _extract_nums(text: str) -> list[str]:
@@ -78,6 +90,32 @@ def _extract_nums(text: str) -> list[str]:
     nums = re.findall(r"\b\d+(?:\.\d+)?\b", text)
     # 过滤掉条款号里的数字（如 8.2.1 → 8, 2, 1）
     return [n for n in nums if float(n) > 0.05][:8]
+
+
+def _verify_gold_values(values: list, clause_text: str) -> list[str]:
+    """只保留能在来源条文中找到的 gold_values（金标回锚）。
+
+    这是硬编码版评测集翻车的根源：金标由模型/人凭记忆写出、从不回查条文，
+    实测 463 个 gold_values 有 350 个（76%）在对应条文里根本不存在。
+    尺子本身错了，六个模型全被错误地扣分或加分，且指标看起来完全正常。
+
+    适用范围：查表类题型（single_clause / cross_clause / clause_verify）的
+    gold_values 应当是条文里的**原值**，可逐一回查。
+    **计算题除外**——其答案是推导出来的，本就不会出现在条文中，见 gen_calculation。
+
+    Args:
+        values:      模型给出的 gold_values
+        clause_text: 来源条文原文（多条时拼接）
+
+    Returns:
+        经回查确认存在于条文中的值；全部落空时返回空列表
+    """
+    out = []
+    for v in values or []:
+        s = str(v).strip()
+        if s and s in clause_text:
+            out.append(s)
+    return out
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -134,7 +172,10 @@ def gen_single_clause(
         "type": "single_clause",
         "question": qa["question"],
         "gold_clauses": [clause["clause_id"]],
-        "gold_values": qa.get("gold_values") or _extract_nums(clause["text"]),
+        # 只保留能在条文中回查到的值；模型未给或全部落空时不再用
+        # _extract_nums 兜底——那会抽出与问题无关的数值，制造假金标
+        "gold_values": _verify_gold_values(qa.get("gold_values"), clause["text"]),
+        "gold_verified": True,
         "gold_answer": qa.get("gold_answer", ""),
         "should_refuse": False,
         "source": f"AI生成/{clause['standard_code']}",
@@ -193,7 +234,9 @@ def gen_cross_clause(
         "type": "cross_clause",
         "question": qa["question"],
         "gold_clauses": [clause_a["clause_id"], clause_b["clause_id"]],
-        "gold_values": qa.get("gold_values", []),
+        "gold_values": _verify_gold_values(
+            qa.get("gold_values"), clause_a["text"] + "\n" + clause_b["text"]),
+        "gold_verified": True,
         "gold_answer": qa.get("gold_answer", ""),
         "should_refuse": False,
         "source": f"AI生成/{clause_a['standard_code']}×{clause_b['standard_code']}",
@@ -249,7 +292,11 @@ def gen_calculation(
         "type": "calculation",
         "question": qa["question"],
         "gold_clauses": [clause["clause_id"]],
+        # 计算题的答案由推导得出，本就不出现在条文中，无法像查表题那样回锚。
+        # 如实标记 gold_verified=False：5.4 数值判分对这批题的正确性
+        # 依赖出题模型的算术，属已知薄弱环节，须写进报告局限。
         "gold_values": qa["gold_values"],
+        "gold_verified": False,
         "gold_answer": qa.get("gold_answer", ""),
         "should_refuse": False,
         "source": f"AI生成/{clause['standard_code']}",
@@ -307,7 +354,8 @@ def gen_clause_verify(
         "type": "clause_verify",
         "question": qa["question"],
         "gold_clauses": [clause["clause_id"]],
-        "gold_values": qa.get("gold_values", []),
+        "gold_values": _verify_gold_values(qa.get("gold_values"), clause["text"]),
+        "gold_verified": True,
         "gold_answer": qa.get("gold_answer", ""),
         "should_refuse": False,
         "is_trap": is_trap,
@@ -375,6 +423,7 @@ def gen_refusal(
         "question": qa["question"],
         "gold_clauses": [],
         "gold_values": [],
+        "gold_verified": True,          # 拒答题无金标数值，无需回锚
         "gold_answer": qa.get("gold_answer", ""),
         "should_refuse": True,
         "refusal_type": cfg["type"],

@@ -28,7 +28,7 @@ from typing import Iterator
 _RE_HEADING = re.compile(
     r'^(#{1,3})\s+'           # ## / ###
     r'((?:\d+\.)*\d+)'        # 编号部分 1 / 1.2 / 1.2.3
-    r'(\s+\S.*?)$'            # 空格+名称（至少一个非空字符开头）
+    r'(\s*\S.*?)$'            # 名称（编号与名称间的空格可缺失：实测 `## 3基本规定`）
 )
 _RE_TOC_SUFFIX = re.compile(r'\s+\d{1,4}\s*$')   # 目录页码后缀
 
@@ -52,6 +52,10 @@ _RE_CLAUSE_NO_FRAG = re.compile(r'\d+\.\d+(?:\.\d+)*')
 
 # 标准号从目录名提取：GB50010-2010 / JGJ3-2010
 _RE_STD_CODE = re.compile(r'^((?:GB|JGJ|DBJ)\s*[\w/]*\d+-\d+)')
+
+# 「条文说明」附录起始行：独占一行的「条文说明」（可带 # 前缀）。
+# 目录里的「附：条文说明· 187」带页码与「附：」前缀，不会误匹配。
+_RE_COMMENTARY_START = re.compile(r'^#{0,3}\s*条文说明\s*$')
 
 
 # ── 数据结构 ─────────────────────────────────────────────────────────────
@@ -79,10 +83,61 @@ def _is_real_heading(line: str, m: re.Match) -> bool:
     return not _RE_TOC_SUFFIX.search(m.group(3))
 
 
-def _update_path(path: list[str], level: int, title: str) -> None:
-    """按标题层级更新 chapter_path（level=1→章，level=2→节，level=3→子节）。"""
-    depth = level - 1          # 深度索引：0=章，1=节，2=子节
-    del path[depth:]            # 截断当前深度及以下
+def _find_commentary_start(lines: list[str]) -> int:
+    """定位「条文说明」附录的起始行号。
+
+    Args:
+        lines: .md 全文按行切分的列表
+
+    Returns:
+        附录起始行的下标；未找到时返回 len(lines)（即不截断）
+    """
+    for i, line in enumerate(lines):
+        if _RE_COMMENTARY_START.match(line.strip()):
+            return i
+    return len(lines)
+
+
+def _is_structural_heading(no_str: str, cur_chapter: int) -> bool:
+    """判定该编号标题是「真章节标题」还是「条内分项小标题」。
+
+    正文里存在大量条文内部的分项标题（如第 6 章中的 `## 2 大偏心受拉构件`），
+    其编号是条内序号而非章号，误当章节会把 chapter_path 的章覆盖掉。
+    依据章号单调递增来区分。
+
+    Args:
+        no_str:      标题编号，如 "4" / "4.1" / "4.1.2"
+        cur_chapter: 当前所处章号（尚未进入任何章时为 0）
+
+    Returns:
+        True 表示应更新 chapter_path，False 表示忽略该标题
+    """
+    head = int(no_str.split('.')[0])
+    if '.' not in no_str:
+        return head == cur_chapter + 1   # 单段编号：只认下一章，杜绝条内分项标题夺章
+    return head == cur_chapter           # 多段编号：必须属于当前章
+    # 注：多段编号不允许「顺延进入下一章」。放宽会被正文里跨章引用式的
+    # 小标题提前顶掉章号（实测 GB50010 在第 3 章内即被顶到 4，
+    # 导致真正的 `## 4 材 料` 反被拒），代价是章标题真缺失时该章会挂在前一章下。
+
+
+def _update_path(path: list[str], no_str: str, title: str) -> None:
+    """按标题编号的段数更新 chapter_path。
+
+    不使用 markdown 的 # 级数：MinerU 对同层标题的 # 数并不一致
+    （GB50010 实测「## 1 总则」与「# 2 术语和符号」同为章却级数不同），
+    编号段数才是可靠的层级信号。
+
+    Args:
+        path:   待就地更新的层级路径（0=章，1=节，2=子节）
+        no_str: 标题编号，如 "4" / "4.1" / "4.1.2"
+        title:  完整标题文本，如 "4.1 混凝土"
+
+    Returns:
+        None（就地修改 path）
+    """
+    depth = min(no_str.count('.'), 2)   # 段数-1，最深到子节
+    del path[depth:]                     # 截断当前深度及以下
     path.append(title)
 
 
@@ -172,10 +227,16 @@ def split_clauses(md_path: Path, std_code: str, std_name: str) -> list[dict]:
     text = md_path.read_text(encoding='utf-8')
     lines = text.split('\n')
 
-    # 1. 从前言提取强制性条文
+    # 1. 从前言提取强制性条文（须在截断前做：公告段在文件最前面）
     # 取正文开始前约 2000 字作为前言区
     preamble_end = min(len(text), 8000)
     mandatory = _extract_mandatory(text[:preamble_end])
+
+    # 1.5 截断「条文说明」附录。
+    # 规范 PDF 的结构是「正文在前、条文说明在后」，两段使用**完全相同的条款号**。
+    # 不截断会让后出现的条文说明覆盖正文（见下方去重逻辑），
+    # 使整个条文库退化为解释性文字、丢失全部限值表格。
+    lines = lines[:_find_commentary_start(lines)]
 
     # 2. 定位正文开始（第一个真实章节标题行）
     content_start = 0
@@ -194,16 +255,22 @@ def split_clauses(md_path: Path, std_code: str, std_name: str) -> list[dict]:
     chapter_path: list[str] = []
     clauses: list[dict] = []
     current: _Clause | None = None
+    cur_chapter = 0
 
     for line in lines[content_start:]:
         # ── 章节标题 ──────────────────────────────────────────
         m_h = _RE_HEADING.match(line)
         if m_h and _is_real_heading(line, m_h):
-            level = len(m_h.group(1))          # ## → 2, ### → 3
             no_str = m_h.group(2)
+            if not _is_structural_heading(no_str, cur_chapter):
+                # 条内分项小标题：并入当前条款正文，不动 chapter_path
+                if current:
+                    current.lines.append(line)
+                continue
+            cur_chapter = int(no_str.split('.')[0])
             name_str = m_h.group(3).strip()
             title = f'{no_str} {name_str}'
-            _update_path(chapter_path, level, title)
+            _update_path(chapter_path, no_str, title)
             # 章节标题不追加进条款正文（只更新路径）
             continue
 

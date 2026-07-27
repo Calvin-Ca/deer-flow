@@ -83,6 +83,51 @@ def check_tables(clauses: list[dict]) -> dict:
     }
 
 
+# 条文说明的固有措辞。必须与正文的规范性引用区分开：
+#   正文  「应按本节规定调整地震作用效应」——祈使、指向他处
+#   说明  「本条规定了…的计算方法」「本条为…的基本表达式」——陈述、自我描述
+# 故 `本条/本节规定` 必须带「了」，不能裸匹配。
+_RE_COMMENTARY_TELL = re.compile(
+    r'本[条节](?:规定了|明确了|参照了|沿用了|为|系)|试验研究表明|'
+    r'(?:此|本)次修订|原规范|参考(?:了)?国外'
+)
+
+
+def check_commentary(clauses: list[dict]) -> int:
+    """统计疑似「条文说明」而非正文的条款数。
+
+    条文说明是解释条文来由的附录，与正文条款号完全重号，一旦混入即污染全库。
+    判据取其固有措辞（正文是规定性语句，不会自称"本条规定了…"）。
+
+    Args:
+        clauses: 单本规范的条款记录列表
+
+    Returns:
+        命中条文说明特征词的条款数（正文库应为 0）
+    """
+    return sum(1 for c in clauses if _RE_COMMENTARY_TELL.search(c["text"][:120]))
+
+
+def check_chapter_path(clauses: list[dict]) -> int:
+    """统计 chapter_path 首层章号与条款号章号不一致的条款数。
+
+    Args:
+        clauses: 单本规范的条款记录列表
+
+    Returns:
+        不一致的条款数（正常应为 0）
+    """
+    bad = 0
+    for c in clauses:
+        path = c.get("chapter_path") or []
+        if not path:
+            bad += 1
+            continue
+        if path[0].split()[0].split(".")[0] != c["clause_no"].split(".")[0]:
+            bad += 1
+    return bad
+
+
 def check_per_standard(all_clauses: list[dict]) -> list[dict]:
     by_std: dict[str, list[dict]] = defaultdict(list)
     for c in all_clauses:
@@ -99,12 +144,22 @@ def check_per_standard(all_clauses: list[dict]) -> list[dict]:
         ref_clauses = sum(1 for c in clauses if c["refs"])
         continuity_warns = check_continuity(clauses)
 
-        # 硬门限：强制性条文非零 + 表格 HTML 全部完整（无截断）
+        commentary_n = check_commentary(clauses)
+        path_bad_n = check_chapter_path(clauses)
+
+        # 硬门限：
+        #   1. 强制性条文非零
+        #   2. 表格 HTML 全部完整（无截断）
+        #   3. 条文说明混入率 = 0    —— 历史 bug：分块器「保留最后出现的」使
+        #      文末的条文说明附录整体覆盖正文，条文库退化为解释性文字、限值表全丢，
+        #      而当时的门限（1+2）全部通过。此断言专为拦截该类回归。
+        #   4. chapter_path 章号与条款号章号一致率 100%
         ok = (
             mandatory_n > 0
             and table_stat["complete_rate"] >= 1.0
+            and commentary_n == 0
+            and path_bad_n == 0
         )
-
 
         results.append({
             "std_code":           std_code,
@@ -118,6 +173,8 @@ def check_per_standard(all_clauses: list[dict]) -> list[dict]:
             "formula_clauses":    formula_clauses,
             "ref_clauses":        ref_clauses,
             "continuity_warns":   continuity_warns,
+            "commentary_count":   commentary_n,
+            "path_bad_count":     path_bad_n,
             "pass":               ok,
         })
     return results
@@ -128,8 +185,8 @@ def _fmt_rate(r: float) -> str:
 
 
 def print_summary(results: list[dict]) -> None:
-    print(f"{'规范':<18} {'条款':>5} {'强制':>4} {'极短':>4} {'表格/完整':>9} {'caption率':>9} {'公式':>5} {'引用':>5} {'结论':>5}")
-    print("-" * 75)
+    print(f"{'规范':<18} {'条款':>5} {'强制':>4} {'极短':>4} {'表格/完整':>9} {'caption率':>9} {'公式':>5} {'引用':>5} {'说明混入':>8} {'路径错':>6} {'结论':>5}")
+    print("-" * 96)
     all_pass = True
     for r in results:
         status = "OK" if r["pass"] else "FAIL"
@@ -139,9 +196,10 @@ def print_summary(results: list[dict]) -> None:
         print(
             f"{r['std_code']:<18} {r['clause_count']:>5} {r['mandatory_count']:>4} "
             f"{r['tiny_count']:>4} {tbl:>9} {_fmt_rate(r['table_caption_rate']):>9} "
-            f"{r['formula_clauses']:>5} {r['ref_clauses']:>5} {status:>5}"
+            f"{r['formula_clauses']:>5} {r['ref_clauses']:>5} "
+            f"{r['commentary_count']:>8} {r['path_bad_count']:>6} {status:>5}"
         )
-    print("-" * 75)
+    print("-" * 96)
     total = sum(r["clause_count"] for r in results)
     print(f"合计: {total} 条, {'全部通过' if all_pass else '有未通过项目'}")
 
@@ -150,8 +208,8 @@ def write_report(results: list[dict], out_path: Path) -> None:
     lines = [
         "# 条文库解析质检报告",
         "",
-        "| 规范 | 条款数 | 强制 | 极短(<30) | 表格总数 | caption率 | 公式条款 | 引用条款 | 通过 |",
-        "|---|---|---|---|---|---|---|---|---|",
+        "| 规范 | 条款数 | 强制 | 极短(<30) | 表格总数 | caption率 | 公式条款 | 引用条款 | 说明混入 | 路径错 | 通过 |",
+        "|---|---|---|---|---|---|---|---|---|---|---|",
     ]
     for r in results:
         pass_mark = "OK" if r["pass"] else "FAIL"
@@ -159,7 +217,8 @@ def write_report(results: list[dict], out_path: Path) -> None:
             f"| {r['std_code']} {r['std_name']} "
             f"| {r['clause_count']} | {r['mandatory_count']} | {r['tiny_count']} "
             f"| {r['table_complete']}/{r['table_total']} | {_fmt_rate(r['table_caption_rate'])} "
-            f"| {r['formula_clauses']} | {r['ref_clauses']} | {pass_mark} |"
+            f"| {r['formula_clauses']} | {r['ref_clauses']} "
+            f"| {r['commentary_count']} | {r['path_bad_count']} | {pass_mark} |"
         )
 
     lines += ["", "## 连续性警告"]
@@ -174,8 +233,13 @@ def write_report(results: list[dict], out_path: Path) -> None:
 
     lines += [
         "",
-        "> **门限说明**：强制性条文数 > 0 且表格 HTML 全部完整（complete = total）。",
+        "> **门限说明**：① 强制性条文数 > 0；② 表格 HTML 全部完整（complete = total）；",
+        "> ③ **说明混入 = 0**；④ **路径错 = 0**。",
         "> caption 率仅供参考——续表（续表 X.X.X）无独立 caption 属正常设计，不纳入门限。",
+        ">",
+        "> ③④ 为 2026-07-27 新增，拦截历史 bug 的回归：分块器原按「同条款号保留最后出现的」去重，",
+        "> 而规范 PDF 是「正文在前、条文说明在后」且两段完全重号，导致条文说明整体覆盖正文，",
+        "> 全库退化为解释性文字、限值表格大量丢失；当时仅有 ①② 两条门限，全部规范「通过」。",
         "",
         "## 结论",
     ]

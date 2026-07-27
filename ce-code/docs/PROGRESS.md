@@ -35,10 +35,10 @@
 | 2.4 | 过滤器 1：可答性 | ✅ | `src/filter/answerable.py` | LLM 判定；淘汰率 61.8%（4300/6960）；耗时 24h（设计缺陷：模型顺带生成完整答案，已留改进记录） |
 | 2.5 | 过滤器 2：条款准确性（核心） | ✅ | `src/filter/clause_check.py` | 淘汰率 3.0%（80/2660）；幻觉条款号+数值冲突双检 |
 | 2.6 | 过滤器 3：多样性去重 | ✅ | `src/filter/dedup.py` | 淘汰率 0.3%（7/2580）；改用远程 BGE API（vllm-bge-large:8097），绕过本地模型下载 |
-| 2.7 | C 组产出 + 淘汰率统计 | ✅ | `data/processed/group_c/train.jsonl`（2573 条） | 2026-07-27 完成；总淘汰率 63%（6760→2573），主要由可答性过滤主导 |
-| 2.8 | D1：跨条文样本（基于 refs） | 🔄 | `data/processed/group_d1/` | 服务器运行中；修复 refs 多余连字符 bug（`-_`→`_`）后识别出 319 对（原报 0 对）；--workers 8 |
-| 2.9 | D2：拒答样本 | ⬜ | `src/synth/group_d2.py` | 待 D1 完成后执行 |
-| 2.10 | D 组合并 | ⬜ | `src/synth/group_d_merge.py` | 待 D1+D2 完成后执行 |
+| 2.7 | C 组产出 + 淘汰率统计 | ✅ | `data/processed/group_c/train.jsonl`（2573 条） | 2026-07-27 完成；总淘汰率 63%（6760→2573），主要由可答性过滤主导。⚠️ 终值待核：`group_d/manifest.json` 合并时实读 **2567**（差 6）；`group_c/manifest.json` 未随服务器结果入 git，补交后可定案 |
+| 2.8 | D1：跨条文样本（基于 refs） | ✅ | `data/processed/group_d1/train.jsonl`（94 条） | 2026-07-26 完成，耗时 4h14m（--workers 8，732 次调用，零费用）。修复 refs 多余连字符 bug（`-_`→`_`）后识别出 319 对；生成 94 / 淘汰或失败 225（**70.5%**）。⚠️ 产量远低于 docstring 目标 ~3000：候选池（refs 一跳）本就只有 319 对；且淘汰样本未按 CLAUDE.md §6.6 留痕（JSON 解析失败与单条可答校验两类均 `return None`，无法归因） |
+| 2.9 | D2：拒答样本 | ✅ | `data/processed/group_d2/train.jsonl`（1457 条） | 2026-07-27 完成，耗时 9h41m（1495 次调用，零费用）；目标 1500，失败 43。三类配额 A_beyond_scope 732 / B_needs_field_data 434 / C_standard_conflict 291 = **5.0:3.0:2.0，达标** |
+| 2.10 | D 组合并 | ✅ | `data/processed/group_d/train.jsonl`（4118 条） | 2026-07-27 完成；构成 c 2567 + d1 94 + d2 1457。⚠️ 相对 C 的增量 1551 条中拒答占 94%、跨条文仅 6%，D 组实际接近「C + 拒答」 |
 
 ## 阶段 3：评测集建设（2 天）
 

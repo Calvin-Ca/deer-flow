@@ -34,6 +34,11 @@ _FAILED_DIR = _ROOT / "data/interim/failed"
 # （group_b 就因此把 Qwen3-32B-AWQ 记成了 qwen-max）。
 _SYNTH_MODEL = "/models/Qwen3-32B-AWQ"
 
+# 配对候选的最小条文长度：低于此值的是形如 'D.1 一般规定' 的纯章节标题壳（共 40 条），
+# 无实质内容，配对只会浪费 LLM 调用。20 字这个门槛实测只排除标题壳、不误伤真条文
+# （最短的真条文如「11.4.11 不应采用石板作为承重构件」为 21 字）。
+_MIN_CLAUSE_CHARS = 20
+
 
 sys.path.insert(0, str(_ROOT))
 from src.utils.llm import call as llm_call, print_cost_summary

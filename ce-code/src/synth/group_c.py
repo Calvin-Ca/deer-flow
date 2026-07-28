@@ -17,6 +17,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 _ROOT = Path(__file__).parents[2]
+import sys
+sys.path.insert(0, str(_ROOT))
+from src.utils.fingerprint import clauses_fingerprint
 _CLAUSES = _ROOT / "data/interim/clauses.jsonl"
 _GROUP_B = _ROOT / "data/processed/group_b/train.jsonl"
 _OUT_DIR = _ROOT / "data/processed/group_c"
@@ -121,6 +124,7 @@ def run(workers: int = 1, seed: int = 42) -> None:
     manifest = {
         "group": "c",
         "version": "v1",
+        "clauses_fingerprint": clauses_fingerprint(),
         "total": kept_3,
         "source": str(_GROUP_B),
         "built_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),

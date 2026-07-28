@@ -11,8 +11,12 @@ import argparse
 import json
 import re
 import hashlib
+import sys
 from html.parser import HTMLParser
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parents[2]))
+from src.utils.fingerprint import clauses_fingerprint
 
 
 # ─── HTML 表格 → Markdown ──────────────────────────────────────────────────
@@ -120,6 +124,7 @@ def convert_text_tables(text: str) -> str:
         return html_table_to_markdown(m.group(0))
 
     return re.sub(r"<table[\s\S]*?</table>", _replace, text, flags=re.IGNORECASE)
+
 
 
 # ─── 问题模板 ─────────────────────────────────────────────────────────────
@@ -292,6 +297,7 @@ def build_group_a(
         # 存相对路径：绝对路径在 Mac 与服务器上不同，会让两边的 manifest 无法比对
         "clauses_source": str(clauses_path.relative_to(clauses_path.parents[2])),
         "built_at": __import__("datetime").datetime.now().isoformat(timespec="seconds"),
+        "clauses_fingerprint": clauses_fingerprint(),
         "template_count": len(_TEMPLATES),
         "template_hash": _template_hash(),
         "oversized_skipped": [

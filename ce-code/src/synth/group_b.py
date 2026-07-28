@@ -42,6 +42,7 @@ from src.utils import jsonx
 # 超长条款上限从 group_a 引入而非各自定义：两组必须同口径，否则那 3 条巨表
 # 只进 A 不进 B，会制造出不属于设计变量的组间差异（详见 group_a.MAX_CLAUSE_CHARS）。
 from src.synth.group_a import convert_text_tables, MAX_CLAUSE_CHARS as _MAX_CLAUSE_CHARS
+from src.utils.fingerprint import clauses_fingerprint
 
 # ── Prompt 加载（冻结文件）────────────────────────────────────────────────
 
@@ -296,6 +297,7 @@ def build_group_b(
     manifest = {
         "group": "b",
         "version": "v1",
+        "clauses_fingerprint": clauses_fingerprint(),
         "total_samples": total_ok,
         "total_clauses_attempted": total_clauses,
         "failed_clauses": total_fail,

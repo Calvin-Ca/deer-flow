@@ -39,6 +39,7 @@ _SYNTH_MODEL = "/models/Qwen3-32B-AWQ"
 sys.path.insert(0, str(_ROOT))
 from src.utils.llm import call as llm_call, print_cost_summary
 from src.synth.group_a import convert_text_tables
+from src.utils.fingerprint import clauses_fingerprint
 
 # ── 拒答模板配置 ──────────────────────────────────────────────────────────
 
@@ -231,6 +232,7 @@ def build_group_d2(
     manifest = {
         "group": "d2",
         "version": "v1",
+        "clauses_fingerprint": clauses_fingerprint(),
         "total": total_ok,
         "type_counts": type_counts,
         "synth_model": _SYNTH_MODEL,

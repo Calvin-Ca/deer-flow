@@ -45,6 +45,7 @@ from src.utils.llm import call as llm_call, print_cost_summary
 from src.utils import jsonx
 from src.filter.answerable import judge_answerable
 from src.synth.group_a import convert_text_tables
+from src.utils.fingerprint import clauses_fingerprint
 
 # ── Prompt ────────────────────────────────────────────────────────────────
 
@@ -371,6 +372,7 @@ def build_group_d1(
     manifest = {
         "group": "d1",
         "version": "v1",
+        "clauses_fingerprint": clauses_fingerprint(),
         "total": file_total,
         "pool_size": pool_size,
         "synth_model": _SYNTH_MODEL,

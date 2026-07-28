@@ -13,6 +13,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 _ROOT = Path(__file__).parents[2]
+import sys
+sys.path.insert(0, str(_ROOT))
+from src.utils.fingerprint import clauses_fingerprint
 _SOURCES = {
     "c":  _ROOT / "data/processed/group_c/train.jsonl",
     "d1": _ROOT / "data/processed/group_d1/train.jsonl",
@@ -49,6 +52,7 @@ def merge() -> None:
     manifest = {
         "group": "d",
         "version": "v1",
+        "clauses_fingerprint": clauses_fingerprint(),
         "total": total,
         "source_counts": counts,
         "built_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),

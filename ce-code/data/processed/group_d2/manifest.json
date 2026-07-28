@@ -1,14 +1,15 @@
 {
   "group": "d2",
   "version": "v1",
-  "total": 1457,
+  "clauses_fingerprint": "87fc3a3f6cd5",
+  "total": 1499,
   "type_counts": {
-    "A_beyond_scope": 732,
-    "B_needs_field_data": 434,
-    "C_standard_conflict": 291
+    "A_beyond_scope": 750,
+    "B_needs_field_data": 449,
+    "C_standard_conflict": 300
   },
   "synth_model": "/models/Qwen3-32B-AWQ",
-  "built_at": "2026-07-27T06:36:35",
+  "built_at": "2026-07-28T04:32:59+00:00",
   "seed": 42,
   "smoke": false
 }

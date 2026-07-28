@@ -1,24 +1,29 @@
 {
   "group": "b",
   "version": "v1",
-  "total_samples": 200,
-  "total_clauses_attempted": 50,
-  "failed_clauses": 0,
-  "fail_rate": 0.0,
-  "synth_model": "qwen-max",
+  "total_samples": 632,
+  "total_clauses_attempted": 163,
+  "failed_clauses": 2,
+  "fail_rate": 0.0123,
+  "synth_model": "/models/Qwen3-32B-AWQ",
   "prompt_hash": "c842650a251e",
   "seed": 42,
-  "smoke": true,
-  "built_at": "2026-07-27T10:50:32",
+  "smoke": false,
+  "built_at": "2026-07-27T16:45:12+00:00",
   "cost": {
     "total_cny": 0.0,
-    "calls": 50,
+    "calls": 160,
     "tokens": {
-      "input": 34384,
-      "output": 40035
+      "input": 132383,
+      "output": 94387
     },
     "model_calls": {
-      "/models/Qwen3-32B-AWQ": 50
+      "/models/Qwen3-32B-AWQ": 160
     }
-  }
+  },
+  "meta_fixed_at": "2026-07-27T17:09:31+00:00",
+  "meta_fix_note": "synth_model 由 'qwen-max' 更正为实际调用的 '/models/Qwen3-32B-AWQ'",
+  "clauses_fingerprint": "87fc3a3f6cd5",
+  "fingerprint_backfilled": true,
+  "fingerprint_backfill_note": "构建于 clauses_fingerprint 字段引入之前。回填依据：① 覆盖条文数 > 任何历史版本总条数（1751），必定建自当前版本；② 该组只用条文 text、不依赖 refs，而两个 2357 条版本的 text 逐字相同。回填时间 2026-07-28T06:35:47+00:00"
 }

@@ -1,12 +1,12 @@
 {
   "version": "v1",
-  "total": 388,
+  "total": 386,
   "type_counts": {
-    "single_clause": 116,
-    "cross_clause": 93,
     "calculation": 79,
     "clause_verify": 60,
-    "refusal": 40
+    "cross_clause": 93,
+    "refusal": 39,
+    "single_clause": 115
   },
   "quota": {
     "single_clause": 120,
@@ -21,5 +21,38 @@
   "seed_supported": true,
   "built_at": "2026-07-27T12:56:22+00:00",
   "seed": 42,
-  "smoke": false
+  "smoke": false,
+  "gold_verified_count": 307,
+  "gold_clauses_count": 390,
+  "leakage_check": {
+    "checked": true,
+    "checked_at": "2026-07-28T07:09:13+00:00",
+    "threshold": 0.9,
+    "leaked": 0,
+    "against": 386
+  },
+  "leakage_checked_against": {
+    "a": "87fc3a3f6cd5",
+    "b": "87fc3a3f6cd5",
+    "c": "87fc3a3f6cd5",
+    "d": "87fc3a3f6cd5"
+  },
+  "replaced_questions": [
+    {
+      "id": "eval_sc_51fd949e",
+      "type": "single_clause",
+      "reason": "leakage_check cosine > 0.9"
+    },
+    {
+      "id": "eval_cc_6a1c2943",
+      "type": "cross_clause",
+      "reason": "leakage_check cosine > 0.9"
+    },
+    {
+      "id": "eval_cv_34d1dd75",
+      "type": "clause_verify",
+      "reason": "leakage_check cosine > 0.9"
+    }
+  ],
+  "manifest_refreshed_at": "2026-07-28T07:24:32+00:00"
 }

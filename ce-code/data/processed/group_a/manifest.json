@@ -3,7 +3,8 @@
   "version": "v1",
   "total": 11770,
   "clauses_source": "data/interim/clauses.jsonl",
-  "built_at": "2026-07-28T01:06:04",
+  "built_at": "2026-07-28T14:09:21",
+  "clauses_fingerprint": "87fc3a3f6cd5",
   "template_count": 5,
   "template_hash": "fceb6aec7ec9",
   "oversized_skipped": [

@@ -1,11 +1,18 @@
 {
   "group": "d",
   "version": "v1",
-  "total": 4118,
-  "source_counts": {
-    "c": 2567,
-    "d1": 94,
-    "d2": 1457
+  "clauses_fingerprint": "87fc3a3f6cd5",
+  "source_fingerprints": {
+    "c": "87fc3a3f6cd5",
+    "d1": "87fc3a3f6cd5",
+    "d2": "87fc3a3f6cd5"
   },
-  "built_at": "2026-07-27T06:36:35"
+  "provenance_warnings": [],
+  "total": 9187,
+  "source_counts": {
+    "c": 4727,
+    "d1": 2961,
+    "d2": 1499
+  },
+  "built_at": "2026-07-28T06:35:48+00:00"
 }

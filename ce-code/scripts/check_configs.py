@@ -156,19 +156,34 @@ def main() -> int:
               f"只存在于生成它的机器上；\n"
               f"    若这是训练机，说明数据确实没生成，训练会失败——请在训练机上复跑本检查确认。")
 
-    # 指纹一致性：四组必须派生自同一份条文库，否则消融的自变量不只是合成策略
+    # 指纹一致性：四组必须派生自同一份条文库，否则消融的自变量不只是合成策略。
+    #
+    # **缺指纹必须报问题，不能沉默放过**——原实现只在"已有指纹之间不一致"时告警，
+    # 于是三组缺指纹、一组有指纹时 set 长度为 1，照样打绿灯。那正是本项目一直在
+    # 修的同一类错误：把"没验证"当成"验证通过"。红线检查宁可说不知道。
     import json as _json
-    fps = {}
+    fps: dict[str, str] = {}
+    unverified: list[str] = []
     for g in _GROUPS:
         mf = _ROOT / f"data/processed/group_{g}/manifest.json"
-        if mf.exists():
-            v = _json.loads(mf.read_text(encoding="utf-8")).get("clauses_fingerprint")
-            if v:
-                fps[g] = v
+        if not mf.exists():
+            unverified.append(f"{g}（无 manifest）")
+            continue
+        v = _json.loads(mf.read_text(encoding="utf-8")).get("clauses_fingerprint")
+        if v:
+            fps[g] = v
+        else:
+            unverified.append(g)
+
     if len(set(fps.values())) > 1:
         problems.append(
-            "四组的 clauses_fingerprint 不一致 —— 存在旧库产物，消融的自变量"
-            f"不只是合成策略：{fps}"
+            f"四组的 clauses_fingerprint 不一致——存在旧库产物，"
+            f"消融的自变量不只是合成策略：{fps}"
+        )
+    if unverified:
+        problems.append(
+            f"{'、'.join(unverified)} 组未记录 clauses_fingerprint，无法确认是否派生自"
+            f"当前条文库。跑 scripts/backfill_fingerprint.py 验证并回填，或重建该组"
         )
 
     print("\n" + "─" * 60)

@@ -38,12 +38,18 @@ def main() -> None:
     """在当前进程内启动一次训练。
 
     Args:
-        无（从 sys.argv[1] 取配置文件路径，缺省 configs/group_a.yaml）
+        无（命令行：第一个位置参数为 yaml 路径，缺省 configs/group_a.yaml；
+            其余参数原样透传给 llamafactory，用于临时覆盖 yaml 里的设置）
 
     Returns:
         None
     """
-    cfg = sys.argv[1] if len(sys.argv) > 1 else "configs/group_a.yaml"
+    # 第一个位置参数是 yaml，其余原样透传给 llamafactory（其 CLI 参数优先于 yaml）。
+    # 这样 launch.json 里可以直接写 --max_steps 20 做冒烟，而 yaml 一个字不动
+    # ——临时改 yaml 再改回来违反铁律 1，且极易忘。
+    argv = sys.argv[1:]
+    cfg = argv[0] if argv and not argv[0].startswith("-") else "configs/group_a.yaml"
+    extra = argv[1:] if argv and not argv[0].startswith("-") else argv
     cfg_path = (_ROOT / cfg).resolve()
     if not cfg_path.exists():
         raise FileNotFoundError(f"找不到配置文件：{cfg_path}")
@@ -73,13 +79,17 @@ def main() -> None:
           f"（单卡，有效 batch = 2×8 = 16）")
     print(f"  NCCL P2P/IB   : {os.environ['NCCL_P2P_DISABLE']}/{os.environ['NCCL_IB_DISABLE']}")
     print(f"  RANK/WORLD    : {os.environ['RANK']}/{os.environ['WORLD_SIZE']}")
+    if extra:
+        print(f"  覆盖参数      : {' '.join(extra)}")
     print("  ⚠️ 仅供调试。本入口与 train.sh 的**启动路径不同**"
           "（in-process vs torchrun），")
     print("     四组训练必须统一走 train.sh，混用会引入未受控变量（铁律 1）。")
     print("=" * 58)
 
-    # llamafactory 通过 sys.argv 读取 yaml 路径
-    sys.argv = [sys.argv[0], str(cfg_path)]
+    # llamafactory 通过 sys.argv 读取 yaml 路径与覆盖参数。
+    # 原实现写死 [argv0, yaml]，会把 --max_steps 之类**静默丢弃**——
+    # 于是「以为在跑 20 步冒烟、实际跑满 1500 步」，且全程不报错。
+    sys.argv = [sys.argv[0], str(cfg_path), *extra]
 
     from llamafactory.train.tuner import run_exp
     run_exp()

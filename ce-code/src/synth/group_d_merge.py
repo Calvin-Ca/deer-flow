@@ -24,9 +24,47 @@ _SOURCES = {
 _OUT_DIR = _ROOT / "data/processed/group_d"
 
 
+def _check_sources() -> tuple[dict[str, str], list[str]]:
+    """核对三个来源的 clauses_fingerprint 是否与当前条文库一致。
+
+    **合并时直接盖当前指纹是假的保证**：D 由 C/D1/D2 拼成，若其中任一是旧库产物，
+    合并出来的 D 照样带一个绿色指纹——恰恰是引入指纹要防的那类事。指纹必须
+    反映来源的真实出处，而不是合并那一刻的条文库状态。
+
+    Args:
+        无
+
+    Returns:
+        (来源指纹表, 告警列表)
+    """
+    current = clauses_fingerprint()
+    fps: dict[str, str] = {}
+    warns: list[str] = []
+    for key, path in _SOURCES.items():
+        mf = path.parent / "manifest.json"
+        if not mf.exists():
+            warns.append(f"{key} 无 manifest，无法验证出处")
+            continue
+        fp = json.loads(mf.read_text(encoding="utf-8")).get("clauses_fingerprint")
+        fps[key] = fp or "未记录"
+        if not fp:
+            warns.append(f"{key} 未记录 clauses_fingerprint（构建于该字段引入前），无法验证出处")
+        elif fp != current:
+            warns.append(f"{key} 指纹 {fp} ≠ 当前条文库 {current}——是旧库产物，须重建")
+    return fps, warns
+
+
 def merge() -> None:
     _OUT_DIR.mkdir(parents=True, exist_ok=True)
     out_file = _OUT_DIR / "train.jsonl"
+
+    source_fps, warns = _check_sources()
+    if warns:
+        print("[group_d_merge] ⚠️ 来源出处校验：")
+        for w in warns:
+            print(f"    {w}")
+    else:
+        print("[group_d_merge] ✅ 三个来源均确认派生自当前条文库")
 
     counts: dict[str, int] = {}
     total = 0
@@ -52,7 +90,11 @@ def merge() -> None:
     manifest = {
         "group": "d",
         "version": "v1",
-        "clauses_fingerprint": clauses_fingerprint(),
+        # 只有三个来源全部确认同源，D 才配拥有指纹；否则如实置空——
+        # 盖一个来路不明的绿灯比没有指纹更糟。
+        "clauses_fingerprint": clauses_fingerprint() if not warns else None,
+        "source_fingerprints": source_fps,
+        "provenance_warnings": warns,
         "total": total,
         "source_counts": counts,
         "built_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),

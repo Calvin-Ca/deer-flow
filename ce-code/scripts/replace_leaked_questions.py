@@ -70,6 +70,66 @@ def _leaked_ids() -> list[str]:
     return ids
 
 
+def _last_failure() -> str:
+    """读出题失败日志的最后一条，供即时归因。
+
+    gen_evalset 的各生成函数按 §6.6 把失败原因写进
+    data/interim/failed/gen_evalset_failed.jsonl，但返回值只有 None。
+    调用方若只报"生成失败"，就把静默失败原样传下去了——15 次全失败时
+    分不清是模型偶发还是系统性问题（API key 未配、端点不通等）。
+
+    Args:
+        无
+
+    Returns:
+        形如 "reason: detail" 的单行摘要；无日志时说明情况
+    """
+    log = _ROOT / "data/interim/failed/gen_evalset_failed.jsonl"
+    if not log.exists():
+        return "（无失败日志，可能是异常在 gen_evalset 之外被吞掉）"
+    try:
+        last = None
+        with log.open(encoding="utf-8") as f:
+            for line in f:
+                if line.strip():
+                    last = line
+        if not last:
+            return "（失败日志为空）"
+        rec = json.loads(last)
+        return f"{rec.get('reason', '?')}: {str(rec.get('detail', ''))[:160]}"
+    except Exception as exc:
+        return f"（读失败日志出错：{exc}）"
+
+
+def _preflight() -> bool:
+    """开跑前用一次真实调用探测出题通道是否可用。
+
+    没有这一步，API key 未配一类的问题会表现成"每道题都生成失败"，
+    重试 5 次 × 3 题 = 15 次无谓调用后才暴露，且原因不明。
+    宁可先花一次调用把话说清楚。
+
+    Args:
+        无
+
+    Returns:
+        通道可用返回 True
+    """
+    from src.eval import gen_evalset as G
+    print(f"[replace] 探测出题通道：provider={G.PROVIDER} model={G._MODEL}")
+    try:
+        out = G._gen("回复 OK 两个字。", system="你是测试助手。",
+                     max_tokens=16, sample_id="preflight")
+    except Exception as exc:
+        print(f"  ❌ 出题通道不可用：{type(exc).__name__}: {exc}")
+        print("     若是鉴权错误，检查 DASHSCOPE_API_KEY 是否在环境里")
+        return False
+    if not out or not out.strip():
+        print("  ❌ 出题通道返回空内容")
+        return False
+    print(f"  ✅ 通道可用，返回：{out.strip()[:40]}")
+    return True
+
+
 def _train_embeddings(model):
     """编码四组全部训练问题，供新题即时查重。
 
@@ -135,6 +195,12 @@ def main() -> int:
         return 0
     print(f"[replace] 待替换 {len(ids)} 题：{ids}\n")
 
+    # 先探通道再干活：否则 API 不通会表现成"每道题都生成失败"，
+    # 白跑 15 次调用 + 一轮 35091 条的 embedding 编码才暴露，且原因不明。
+    if not _preflight():
+        print("\n出题通道不可用，未做任何替换。")
+        return 1
+
     items = [json.loads(l) for l in _EVAL.open(encoding="utf-8") if l.strip()]
     by_id = {it["id"]: it for it in items}
     clauses = G._load_clauses(_CLAUSES)
@@ -182,7 +248,10 @@ def main() -> int:
                 break
 
             if not new:
-                print(f"   第 {attempt} 次：生成失败，重试")
+                # 只报"生成失败"等于把静默失败原样传给使用者——15 次全失败时
+                # 分不清是模型偶发、还是 API key 没配之类的系统性问题。
+                # gen_evalset 已按 §6.6 把原因写进 failed 日志，这里把最新一条读出来。
+                print(f"   第 {attempt} 次：生成失败 —— {_last_failure()}")
                 continue
             sim, hit = _max_sim(new["question"], model, train_embs, train_qs)
             if sim > _THRESHOLD:

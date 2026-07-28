@@ -264,6 +264,7 @@ def build_group_d1(
     seed: int = 42,
     pool_size: int = 10000,
     limit: int = 0,
+    resume: bool = False,
 ) -> None:
     _OUT_DIR.mkdir(parents=True, exist_ok=True)
     _FAILED_DIR.mkdir(parents=True, exist_ok=True)
@@ -271,7 +272,7 @@ def build_group_d1(
     # 淘汰日志是追加写的，本次开跑前先归档上一轮：否则统计会把历史记录算进来。
     # B 组曾因此把三次跑的 336 条失败堆在一个文件里，整体百分比完全失真。
     rej_path = _FAILED_DIR / "group_d1_rejected.jsonl"
-    if rej_path.exists() and rej_path.stat().st_size:
+    if not resume and rej_path.exists() and rej_path.stat().st_size:
         stamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
         archived = rej_path.with_name(f"group_d1_rejected_{stamp}.jsonl")
         rej_path.rename(archived)
@@ -290,6 +291,26 @@ def build_group_d1(
         print(f"[group_d1] 小批模式：跨池抽 {len(pairs)} 对（seed={seed}）")
 
     out_file = _OUT_DIR / "train.jsonl"
+
+    # resume：跳过已生成的条文对。全量 5000 对约需 2 小时，中途挂掉若不能续跑
+    # 就得整轮重来（B 组正是靠 resume 把 174 条失败捞回来的）。
+    #
+    # 与 pool_size 的关系：_build_pairs 的抽样是**前缀嵌套**的——pool=5000 的结果
+    # 恰是 pool=10000 前 5000 项（同一 seed 洗牌后截断），故先跑 5000 再扩到 10000
+    # 时，已跑部分逐位不变、resume 能正确接上。
+    already: set[frozenset] = set()
+    if resume and out_file.exists():
+        with out_file.open(encoding="utf-8") as f:
+            for line in f:
+                if line.strip():
+                    src = (json.loads(line).get("meta") or {}).get("source_clauses", [])
+                    if len(src) == 2:
+                        already.add(frozenset(src))
+        before = len(pairs)
+        pairs = [p for p in pairs
+                 if frozenset((p[0]["clause_id"], p[1]["clause_id"])) not in already]
+        print(f"[group_d1] resume：已有 {len(already)} 对，跳过后待跑 {len(pairs)}/{before}")
+
     write_lock = threading.Lock()
     total_ok = 0
     total_fail = 0
@@ -303,7 +324,7 @@ def build_group_d1(
     def _handle(pair):
         return _process_pair(pair[0], pair[1], seed=seed)
 
-    with open(out_file, "w", encoding="utf-8") as fout:
+    with open(out_file, "a" if resume else "w", encoding="utf-8") as fout:
         with ThreadPoolExecutor(max_workers=workers) as pool:
             futures = [pool.submit(_handle, p) for p in pairs]
             for fut in as_completed(futures):
@@ -320,8 +341,13 @@ def build_group_d1(
     if pbar:
         pbar.close()
 
+    # total 可能为 0——resume 时若候选对已全部跑完就一对都不会执行，
+    # 而「跑完后再 resume 一次确认」恰是最常见的操作，除零会让它直接崩掉。
     total = total_ok + total_fail
-    print(f"[group_d1] 生成 {total_ok} / 淘汰或失败 {total_fail}（{total_fail/total:.1%}）")
+    if total:
+        print(f"[group_d1] 生成 {total_ok} / 淘汰或失败 {total_fail}（{total_fail/total:.1%}）")
+    else:
+        print("[group_d1] 本轮无待跑条文对（resume 已全部完成）")
 
     # 按原因拆分淘汰量：只报总数分不清是"格式坏了"还是"校验判严了"，
     # 而两者的处理方式完全不同（前者修解析、后者调闸或认账）。
@@ -337,29 +363,42 @@ def build_group_d1(
             print(f"           {r:<26}{n:>6} ({n/max(sum(reasons.values()),1):.0%})")
     print_cost_summary()
 
+    # total 必须以**文件实际条数**为准，不能用本轮的 total_ok：
+    # resume 时本轮只跑增量，用 total_ok 会让 manifest 低报最终数据集规模
+    # （实测续跑到 20 条时 manifest 仍写 10）。本轮统计另存 last_run。
+    file_total = sum(1 for line in out_file.open(encoding="utf-8") if line.strip())
+
     manifest = {
         "group": "d1",
         "version": "v1",
-        "total": total_ok,
-        "pairs_attempted": total,
+        "total": file_total,
+        "pool_size": pool_size,
         "synth_model": _SYNTH_MODEL,
         "built_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "seed": seed,
         "smoke": smoke,
+        "last_run": {
+            "generated": total_ok,
+            "pairs_attempted": total,
+            "yield_rate": round(total_ok / total, 4) if total else None,
+            "resume": resume,
+            "limit": limit,
+        },
     }
     with open(_OUT_DIR / "manifest.json", "w", encoding="utf-8") as f:
         json.dump(manifest, f, ensure_ascii=False, indent=2)
-    print(f"[group_d1] → {out_file}（{total_ok} 条）")
+    print(f"[group_d1] → {out_file}（累计 {file_total} 条，本轮新增 {total_ok}）")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--smoke", action="store_true", help="跨池抽 50 对试跑")
     parser.add_argument("--limit", type=int, default=0, help="跨池抽 N 对试跑（覆盖 --smoke）")
+    parser.add_argument("--resume", action="store_true", help="断点续跑，跳过已生成的条文对")
     parser.add_argument("--workers", type=int, default=1)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--pool-size", type=int, default=10000,
                         help="候选条文对上限（refs 全用，其余从同节组合按 seed 抽样补足）")
     args = parser.parse_args()
     build_group_d1(smoke=args.smoke, workers=args.workers, seed=args.seed,
-                   pool_size=args.pool_size, limit=args.limit)
+                   pool_size=args.pool_size, limit=args.limit, resume=args.resume)

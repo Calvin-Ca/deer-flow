@@ -15,7 +15,9 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import itertools
 import json
+import random
 import re
 import sys
 import threading
@@ -35,6 +37,7 @@ _SYNTH_MODEL = "/models/Qwen3-32B-AWQ"
 
 sys.path.insert(0, str(_ROOT))
 from src.utils.llm import call as llm_call, print_cost_summary
+from src.utils import jsonx
 from src.filter.answerable import judge_answerable
 from src.synth.group_a import convert_text_tables
 
@@ -77,19 +80,76 @@ def _load_clauses(path: Path) -> dict[str, dict]:
     return clauses
 
 
-def _build_pairs(clauses: dict[str, dict]) -> list[tuple[dict, dict]]:
-    """从 refs 字段构建（条文A, 条文B）对，去重。"""
+def _build_pairs(
+    clauses: dict[str, dict],
+    pool_size: int = 10000,
+    seed: int = 42,
+) -> list[tuple[dict, dict]]:
+    """构建候选条文对：refs 显式引用全用，不足部分从同节组合按种子抽样补足。
+
+    为什么不只用 refs——refs 只有 390 对，按老跑 29% 的产出率最多出 117 条，
+    离 3000 的目标差一个数量级；且**评测集的 93 道跨条文题金标对 100% 落在
+    refs 池里**（gen_evalset 用的是同一个 refs 字段），只用 refs 等于让训练数据
+    与考题同源，泄漏风险最高（铁律 3）。掺入同节抽样后 refs 占比降到 4%。
+
+    为什么扩池不损失严谨性——"必须综合两条才能回答"这个性质**不由配对方式保证，
+    而由质检闸保证**：两条分别单独喂判官，任一条单独能答就淘汰。refs 只是
+    "找出可能相关的两条"的启发式，同节组合是同类启发式，闸不变则产出性质不变。
+
+    候选条文先滤掉 <20 字的纯章节标题壳（形如 'D.1 一般规定'，共 40 条），
+    它们无实质内容，配对只会浪费 LLM 调用。
+
+    Args:
+        clauses:   clause_id → 条文
+        pool_size: 候选对总数上限
+        seed:      同节抽样种子（铁律 7）
+
+    Returns:
+        (条文A, 条文B) 列表，refs 对在前
+    """
+    # 纯标题壳无实质内容，不参与配对
+    usable = {cid: c for cid, c in clauses.items() if len(c["text"]) >= _MIN_CLAUSE_CHARS}
+
     seen: set[frozenset] = set()
     pairs: list[tuple[dict, dict]] = []
-    for cid, clause in clauses.items():
+
+    # ① refs 显式引用：语义关联最强，全部保留
+    for cid, clause in usable.items():
         for ref_id in clause.get("refs", []):
-            if ref_id not in clauses:
+            if ref_id not in usable or ref_id == cid:
                 continue
             key = frozenset([cid, ref_id])
             if key in seen:
                 continue
             seen.add(key)
-            pairs.append((clause, clauses[ref_id]))
+            pairs.append((clause, usable[ref_id]))
+    n_refs = len(pairs)
+
+    # ② 同节组合：按 (标准号, 一级章, 二级节) 分组，组内两两配对后按种子抽样
+    if len(pairs) < pool_size:
+        by_section: dict[tuple, list[str]] = {}
+        for cid, c in usable.items():
+            path = c.get("chapter_path") or []
+            key = (c["standard_code"], path[0] if path else "", path[1] if len(path) > 1 else "")
+            by_section.setdefault(key, []).append(cid)
+
+        candidates: list[frozenset] = []
+        for members in by_section.values():
+            if len(members) < 2:
+                continue
+            for a, b in itertools.combinations(sorted(members), 2):
+                key = frozenset([a, b])
+                if key not in seen:
+                    candidates.append(key)
+
+        random.Random(seed).shuffle(candidates)
+        for key in candidates[: pool_size - len(pairs)]:
+            a, b = tuple(key)
+            seen.add(key)
+            pairs.append((usable[a], usable[b]))
+
+    print(f"[group_d1] 候选对 {len(pairs)}（refs {n_refs} + 同节抽样 {len(pairs) - n_refs}，"
+          f"seed={seed}，可用条文 {len(usable)}/{len(clauses)}）")
     return pairs
 
 
@@ -148,15 +208,11 @@ def _process_pair(
         _log_reject(clause_a, clause_b, "synth_api_error", str(exc)[:200])
         return None
 
-    # 解析 JSON
-    m = re.search(r"\{[\s\S]*\}", raw)
-    if not m:
-        _log_reject(clause_a, clause_b, "no_json_in_output", raw[:200])
-        return None
-    try:
-        qa = json.loads(m.group(0))
-    except json.JSONDecodeError:
-        _log_reject(clause_a, clause_b, "json_decode_error", raw[:200])
+    # 解析 JSON——走 jsonx 而非裸 json.loads：条文含大量 LaTeX，模型照抄
+    # `\\leqslant`、`\\gamma` 等非法 JSON 转义，B 组曾因此丢掉 7.4% 的条文。
+    qa = jsonx.extract(raw, kind="object")
+    if not isinstance(qa, dict):
+        _log_reject(clause_a, clause_b, "json_parse_failed", raw)
         return None
 
     question = str(qa.get("question", "")).strip()
@@ -201,16 +257,32 @@ def build_group_d1(
     smoke: bool = False,
     workers: int = 1,
     seed: int = 42,
+    pool_size: int = 10000,
+    limit: int = 0,
 ) -> None:
     _OUT_DIR.mkdir(parents=True, exist_ok=True)
     _FAILED_DIR.mkdir(parents=True, exist_ok=True)
 
-    clauses = _load_clauses(_CLAUSES)
-    pairs = _build_pairs(clauses)
-    print(f"[group_d1] 共 {len(pairs)} 条文对（来自 refs 引用）")
+    # 淘汰日志是追加写的，本次开跑前先归档上一轮：否则统计会把历史记录算进来。
+    # B 组曾因此把三次跑的 336 条失败堆在一个文件里，整体百分比完全失真。
+    rej_path = _FAILED_DIR / "group_d1_rejected.jsonl"
+    if rej_path.exists() and rej_path.stat().st_size:
+        stamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+        archived = rej_path.with_name(f"group_d1_rejected_{stamp}.jsonl")
+        rej_path.rename(archived)
+        print(f"[group_d1] 上一轮淘汰日志已归档 → {archived.name}")
 
-    if smoke:
-        pairs = pairs[:30]
+    clauses = _load_clauses(_CLAUSES)
+    pairs = _build_pairs(clauses, pool_size=pool_size, seed=seed)
+
+    if smoke or limit:
+        # 必须**跨池抽样**而非取前 N：pairs 是 refs 在前，取前 N 只会覆盖
+        # refs 对，而同节抽样对占池子 96%——那样的小批测不出真实产出率，
+        # 失去"先小批验证再全量"（§6.5）的意义。
+        n = limit or 50
+        pairs = [pairs[i] for i in
+                 sorted(random.Random(seed).sample(range(len(pairs)), min(n, len(pairs))))]
+        print(f"[group_d1] 小批模式：跨池抽 {len(pairs)} 对（seed={seed}）")
 
     out_file = _OUT_DIR / "train.jsonl"
     write_lock = threading.Lock()
@@ -245,6 +317,19 @@ def build_group_d1(
 
     total = total_ok + total_fail
     print(f"[group_d1] 生成 {total_ok} / 淘汰或失败 {total_fail}（{total_fail/total:.1%}）")
+
+    # 按原因拆分淘汰量：只报总数分不清是"格式坏了"还是"校验判严了"，
+    # 而两者的处理方式完全不同（前者修解析、后者调闸或认账）。
+    rej_path = _FAILED_DIR / "group_d1_rejected.jsonl"
+    if rej_path.exists():
+        import collections
+        reasons = collections.Counter(
+            json.loads(line).get("reason", "?")
+            for line in rej_path.open(encoding="utf-8") if line.strip()
+        )
+        print("[group_d1] 淘汰原因构成：")
+        for r, n in reasons.most_common():
+            print(f"           {r:<26}{n:>6} ({n/max(sum(reasons.values()),1):.0%})")
     print_cost_summary()
 
     manifest = {
@@ -264,8 +349,12 @@ def build_group_d1(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--smoke", action="store_true")
+    parser.add_argument("--smoke", action="store_true", help="跨池抽 50 对试跑")
+    parser.add_argument("--limit", type=int, default=0, help="跨池抽 N 对试跑（覆盖 --smoke）")
     parser.add_argument("--workers", type=int, default=1)
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--pool-size", type=int, default=10000,
+                        help="候选条文对上限（refs 全用，其余从同节组合按 seed 抽样补足）")
     args = parser.parse_args()
-    build_group_d1(smoke=args.smoke, workers=args.workers, seed=args.seed)
+    build_group_d1(smoke=args.smoke, workers=args.workers, seed=args.seed,
+                   pool_size=args.pool_size, limit=args.limit)

@@ -22,12 +22,25 @@ _ROOT = Path(__file__).parents[2]
 _CLAUSES = _ROOT / "data/interim/clauses.jsonl"
 
 
+# 参与指纹的字段：凡是**下游会用来造数据**的字段都必须计入。
+#
+# text —— A/B/C 三组的样本内容直接来自它。
+# refs —— D1 的条文配对完全由它决定。实测教训：条文库在 8a6a0aec → 477572a9
+#         之间 text 一字未改、只有 282 条的 refs 变了（修 ClauseRef.clause_id
+#         多插连字符的 bug，refs 命中率 0% → 99%）。若指纹只含 text，
+#         这次改动指纹纹丝不动，D1 的陈旧就永远抓不出来——而 D1 恰恰是唯一
+#         依赖 refs 的组。
+#
+# 反之，构建时间戳一类的字段不计入：它们与"能否复现出同样的数据"无关，
+# 计入只会让指纹因无关因素频繁失配，失去语义。
+_FIELDS = ("text", "refs")
+
+
 def clauses_fingerprint(path: Path | None = None) -> str:
     """对条文库的内容取指纹。
 
-    只取 (clause_id, text) 两个字段并按 id 排序后哈希：其余字段（如构建时间戳）
-    变动不应改变指纹，而行序变动也不应——否则指纹会因无关因素频繁失配，
-    失去"内容是否相同"这个语义。
+    按 clause_id 排序后哈希 _FIELDS 里的字段：行序变动不应改变指纹
+    （否则会因无关因素频繁失配），字段取值变动则必须改变它。
 
     Args:
         path: 条文库路径，默认 data/interim/clauses.jsonl
@@ -43,12 +56,18 @@ def clauses_fingerprint(path: Path | None = None) -> str:
         for line in f:
             if line.strip():
                 c = json.loads(line)
-                items.append((c["clause_id"], c.get("text", "")))
+                # refs 是列表，排序后序列化——顺序变动不改变语义，不应改变指纹
+                payload = json.dumps(
+                    [sorted(c[f]) if isinstance(c.get(f), list) else c.get(f, "")
+                     for f in _FIELDS],
+                    ensure_ascii=False, sort_keys=True,
+                )
+                items.append((c["clause_id"], payload))
     items.sort()
     h = hashlib.md5()
-    for cid, text in items:
+    for cid, payload in items:
         h.update(cid.encode())
         h.update(b"\x00")
-        h.update(text.encode())
+        h.update(payload.encode())
         h.update(b"\x00")
     return h.hexdigest()[:12]

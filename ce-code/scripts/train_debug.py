@@ -34,6 +34,55 @@ from pathlib import Path
 _ROOT = Path(__file__).parents[1]
 
 
+def _parse_overrides(tokens: list[str]) -> dict:
+    """把命令行覆盖项解析成 dict，供合并进 yaml 配置。
+
+    支持两种写法（launch.json 里用哪种都行）：
+        --max_steps 20          argparse 风格
+        max_steps=20            OmegaConf 风格
+        --overwrite_output_dir  无值的开关，视为 True
+
+    值经 yaml.safe_load 转换类型："20"→20、"1.0e-4"→0.0001、"true"→True，
+    而 "none" 仍是字符串 none（report_to 需要的正是字符串）。不做转换的话
+    max_steps 会变成字符串 "20"，HfArgumentParser 不做二次转换，行为难以预料。
+
+    Args:
+        tokens: 命令行里 yaml 之后的全部参数
+
+    Returns:
+        覆盖项字典
+    """
+    import yaml
+
+    out: dict = {}
+    i = 0
+    while i < len(tokens):
+        tok = tokens[i]
+        if "=" in tok and not tok.startswith("-"):
+            key, _, raw = tok.partition("=")
+            out[key] = yaml.safe_load(raw)
+            i += 1
+            continue
+        if tok.startswith("--"):
+            key = tok[2:]
+            nxt = tokens[i + 1] if i + 1 < len(tokens) else None
+            # 下一个 token 是另一个覆盖项（--xxx 或 k=v）时，本项是无值开关。
+            # 只判断 startswith("--") 不够：混用两种语法时
+            # `--overwrite_output_dir logging_steps=1` 会把后者吞成前者的值。
+            is_next_an_option = nxt is None or nxt.startswith("--") or (
+                "=" in nxt and not nxt.startswith("-")
+            )
+            if is_next_an_option:
+                out[key] = True
+                i += 1
+            else:
+                out[key] = yaml.safe_load(nxt)
+                i += 2
+            continue
+        raise ValueError(f"无法解析的覆盖参数：{tok!r}（用 --key value 或 key=value）")
+    return out
+
+
 def main() -> None:
     """在当前进程内启动一次训练。
 
@@ -44,9 +93,12 @@ def main() -> None:
     Returns:
         None
     """
-    # 第一个位置参数是 yaml，其余原样透传给 llamafactory（其 CLI 参数优先于 yaml）。
-    # 这样 launch.json 里可以直接写 --max_steps 20 做冒烟，而 yaml 一个字不动
-    # ——临时改 yaml 再改回来违反铁律 1，且极易忘。
+    # 第一个位置参数是 yaml，其余为覆盖项。
+    # 覆盖项**不能靠透传 sys.argv 实现**：llamafactory 的 read_args 见到 yaml 后
+    # 走 OmegaConf.from_cli 解析剩余参数，那要求 `key=value` 语法；传 argparse
+    # 风格的 `--max_steps 20` 会让 "--max_steps" 与 "20" 各成一个 key，
+    # 最终报 `Some keys are not used by the HfArgumentParser`。
+    # 故改为自己读 yaml、在内存里合并，再把 dict 直接交给 run_exp(args=...)。
     argv = sys.argv[1:]
     cfg = argv[0] if argv and not argv[0].startswith("-") else "configs/group_a.yaml"
     extra = argv[1:] if argv and not argv[0].startswith("-") else argv
@@ -86,13 +138,21 @@ def main() -> None:
     print("     四组训练必须统一走 train.sh，混用会引入未受控变量（铁律 1）。")
     print("=" * 58)
 
-    # llamafactory 通过 sys.argv 读取 yaml 路径与覆盖参数。
-    # 原实现写死 [argv0, yaml]，会把 --max_steps 之类**静默丢弃**——
-    # 于是「以为在跑 20 步冒烟、实际跑满 1500 步」，且全程不报错。
-    sys.argv = [sys.argv[0], str(cfg_path), *extra]
+    import yaml
+
+    conf = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+    overrides = _parse_overrides(extra)
+    conf.update(overrides)
+
+    # yaml 里的相对路径（dataset_dir / deepspeed / output_dir）以 ce-code 为基准，
+    # 而调试器的 cwd 未必是它。转成绝对路径，避免"配置没问题却找不到文件"。
+    for key in ("dataset_dir", "deepspeed", "output_dir"):
+        val = conf.get(key)
+        if isinstance(val, str) and not Path(val).is_absolute():
+            conf[key] = str((_ROOT / val).resolve())
 
     from llamafactory.train.tuner import run_exp
-    run_exp()
+    run_exp(args=conf)
 
 
 if __name__ == "__main__":

@@ -55,7 +55,7 @@
 |---|---|---|---|---|
 | 2.1 | A 组：模板化切分 | ✅ | `group_a/train.jsonl`（**11770 条**） | 5 模板 × 2354 条。补超长条款闸（与 B 同口径，阈值单点导出）跳过 3 条纯查表巨表（E.5 11.5 万字等），11785→11770；这 15 条在 cutoff_len=2048 下只学得到前 5%、砍在表格中间。修 `template_hash`（原 hash 的是 lambda 内存地址，同一代码连跑三次三个值） |
 | 2.2 | 合成 prompt 设计 + 小批验证 | ✅ | `configs/prompts/synth_qa.txt` | prompt 已冻结，MD5 入 manifest |
-| 2.3 | B 组：全量反向生成 | ✅ | `group_b/train.jsonl`（**9407 条**） | 2352 条文 × 4 视角。失败率 7.4%→**1.3%**（`src/utils/jsonx.py` 修 LaTeX 转义）；`synth_model` 元数据修正（原记 qwen-max，实为 Qwen3-32B-AWQ） |
+| 2.3 | B 组：全量反向生成 | ✅ | `group_b/train.jsonl`（**9407 条**） | 2352 条文 × 4 视角。失败率 7.4%→**1.3%**（`src/utils/jsonx.py` 修 LaTeX 转义）；`synth_model` 元数据修正（原记 qwen-max，实为 Qwen3-32B-AWQ）；2026-07-29 修复 `--resume` 用本轮新增量覆盖累计 manifest（632→实测 9407）及未定义变量 `total_clauses` |
 | 2.4 | 过滤器 1：可答性 | ✅ | `src/filter/answerable.py` | 判官 qwen3-8b（≠ 合成模型），强制 YES/NO、max_tokens=10。淘汰 4203（44.7%），15m44s（原 24h） |
 | 2.5 | 过滤器 2：条款准确性 | ✅ | `src/filter/clause_check.py` | 淘汰 216（2.3%）。幻觉条款号 + 数值冲突双检，纯代码不调 LLM |
 | 2.6 | 过滤器 3：多样性去重 | ✅ | `src/filter/dedup.py` | 淘汰 261（2.8%）。**修系统性偏向**：`quality_score` 从未实装 → `0.0>=0.0` 恒真 → 永远保留组内靠前者 = 甲方/监理被结构性淘汰。改按固定种子洗牌后贪心，seed 入 manifest |

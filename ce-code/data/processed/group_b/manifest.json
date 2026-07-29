@@ -1,26 +1,32 @@
 {
   "group": "b",
   "version": "v1",
-  "total_samples": 632,
-  "total_clauses_attempted": 163,
-  "failed_clauses": 2,
-  "fail_rate": 0.0123,
+  "total_samples": 9407,
   "synth_model": "/models/Qwen3-32B-AWQ",
   "prompt_hash": "c842650a251e",
   "seed": 42,
   "smoke": false,
   "built_at": "2026-07-27T16:45:12+00:00",
-  "cost": {
-    "total_cny": 0.0,
-    "calls": 160,
-    "tokens": {
-      "input": 132383,
-      "output": 94387
-    },
-    "model_calls": {
-      "/models/Qwen3-32B-AWQ": 160
+  "last_run": {
+    "samples_added": 632,
+    "clauses_attempted": 163,
+    "failed_clauses": 2,
+    "fail_rate": 0.0123,
+    "resume": true,
+    "cost": {
+      "total_cny": 0.0,
+      "calls": 160,
+      "tokens": {
+        "input": 132383,
+        "output": 94387
+      },
+      "model_calls": {
+        "/models/Qwen3-32B-AWQ": 160
+      }
     }
   },
+  "manifest_fixed_at": "2026-07-29T08:28:52+08:00",
+  "manifest_fix_note": "total_samples 经服务器 train.jsonl 实测由本轮新增量 632 更正为累计总量 9407；本轮统计迁入 last_run",
   "meta_fixed_at": "2026-07-27T17:09:31+00:00",
   "meta_fix_note": "synth_model 由 'qwen-max' 更正为实际调用的 '/models/Qwen3-32B-AWQ'",
   "clauses_fingerprint": "87fc3a3f6cd5",

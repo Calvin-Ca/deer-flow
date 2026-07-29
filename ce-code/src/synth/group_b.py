@@ -42,6 +42,7 @@ from src.utils import jsonx
 # 超长条款上限从 group_a 引入而非各自定义：两组必须同口径，否则那 3 条巨表
 # 只进 A 不进 B，会制造出不属于设计变量的组间差异（详见 group_a.MAX_CLAUSE_CHARS）。
 from src.synth.group_a import convert_text_tables, MAX_CLAUSE_CHARS as _MAX_CLAUSE_CHARS
+from src.utils.dataset_stats import scan_training_jsonl
 from src.utils.fingerprint import clauses_fingerprint
 
 # ── Prompt 加载（冻结文件）────────────────────────────────────────────────
@@ -213,14 +214,7 @@ def build_group_b(
     # resume：跳过已有的 source_clauses
     already_done: set[str] = set()
     if resume and out_file.exists():
-        with open(out_file, encoding="utf-8") as f:
-            for line in f:
-                try:
-                    s = json.loads(line)
-                    for cid in s.get("meta", {}).get("source_clauses", []):
-                        already_done.add(cid)
-                except Exception:
-                    pass
+        _, already_done = scan_training_jsonl(out_file)
         print(f"[group_b] resume 模式：已跳过 {len(already_done)} 条条文（已生成）")
 
     pending = [c for c in clauses if c["clause_id"] not in already_done]
@@ -293,25 +287,36 @@ def build_group_b(
     if fail_rate > 0.05:
         print(f"[group_b] ⚠️  失败率 {fail_rate:.1%} > 5%，建议检查 data/interim/failed/ 后再全量跑")
 
-    # manifest
+    # manifest 的顶层字段描述**最终数据集**，不能写本轮增量。resume 会以追加模式
+    # 写 train.jsonl；若仍使用 total_ok，最后一次续跑新增 632 条时就会把已有的
+    # 9407 条数据错误记录成 632。本轮运行数据单独放在 last_run。
+    file_total, covered_clauses = scan_training_jsonl(out_file)
     manifest = {
         "group": "b",
         "version": "v1",
         "clauses_fingerprint": clauses_fingerprint(),
-        "total_samples": total_ok,
-        "total_clauses_attempted": total_clauses,
-        "failed_clauses": total_fail,
-        "fail_rate": round(fail_rate, 4),
+        "total_samples": file_total,
+        "total_source_clauses": len(covered_clauses),
         "synth_model": _SYNTH_MODEL,
         "prompt_hash": _PROMPT_HASH,
         "seed": seed,
         "smoke": smoke,
         "built_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        "cost": cost_tracker.summary(),
+        "last_run": {
+            "samples_added": total_ok,
+            "clauses_attempted": attempted,
+            "failed_clauses": total_fail,
+            "fail_rate": round(fail_rate, 4),
+            "oversized_skipped": len(oversized),
+            "resume": resume,
+            "sample": sample,
+            "cost": cost_tracker.summary(),
+        },
     }
     with open(_OUT_DIR / "manifest.json", "w", encoding="utf-8") as f:
         json.dump(manifest, f, ensure_ascii=False, indent=2)
-    print(f"[group_b] manifest → {_OUT_DIR / 'manifest.json'}")
+    print(f"[group_b] manifest → {_OUT_DIR / 'manifest.json'}"
+          f"（累计 {file_total} 条，本轮新增 {total_ok}）")
 
 
 if __name__ == "__main__":

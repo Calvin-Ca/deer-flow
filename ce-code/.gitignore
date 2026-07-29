@@ -64,6 +64,7 @@ data/interim/filtered_out/*
 # ===== [norm-ft] 推理结果（每次 run 产物，体量大）=====
 results/*/raw/
 results/*/figs/
+results/*/failed/
 
 # ===== [norm-ft] 模型 checkpoint =====
 checkpoints/

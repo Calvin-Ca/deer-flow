@@ -99,7 +99,7 @@
 
 | # | 任务 | 状态 | 产出 | 备注 |
 |---|---|---|---|---|
-| 5.1 | vLLM 多 adapter 批量推理（6 个模型 × 386 = 2316） | ⬜ | `results/{run_id}/raw/` | 参数见铁律 4；以评测文件实际 386 题为准，不再使用原始 400 配额作分母 |
+| 5.1 | vLLM 多 adapter 批量推理（6 个模型 × 386 = 2316） | 🔄 | `src/eval/run_inference.py`、`scripts/eval_inference.sh`、`scripts/serve_eval.sh`、`tests/test_eval_inference.py`、`results/{run_id}/raw/` | 推理模块已交付并通过 8 个纯本地用例：固定铁律 4 参数、20 题 smoke（各题型 4 题）、断点续跑、失败留痕、评测集/prompt/adapter SHA-256、逐模型完整性校验；以实际 386 题为准。`base_fewshot` 的 3-shot 正文尚未冻结，必须确认后才能跑六模型 smoke/全量 |
 | 5.2 | 条款号抽取 + 归一化 | ✅ | `src/eval/clause.py` | 支持带标准号/中文简称/纯条款号三种形式；含 clause_f1 和 is_hallucinated |
 | 5.3 | 条款引用 F1 + 硬幻觉率 | ⬜ | | 全自动 |
 | 5.4 | 数值精确匹配判分 | ⬜ | | |

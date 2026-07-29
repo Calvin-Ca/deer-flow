@@ -3,11 +3,12 @@
 > 由 Claude Code 维护。每完成一个子任务立即更新：状态、产出文件路径、遗留问题。
 > 状态取值：`⬜ 未开始` / `🔄 进行中` / `✅ 完成` / `⚠️ 阻塞`
 
-## 当前状态（2026-07-28）
+## 当前状态（2026-07-30）
 
-**阶段 1~3 已收口，数据可用于训练。**
+**阶段 1~4 已收口，四组 LoRA adapter 均完成 1500 步训练，可进入阶段 5 评测。**
 
-**阶段 4 正在解除训练 OOM**（开放项 O-8）——已实测定位到 logits+交叉熵占 8.13 GB，2026-07-29 已采纳 `batch 1 × 累积 16`（有效 batch 不变、梯度数学等价），**待重跑 20 步冒烟验证**。
+训练 OOM（O-8）已解决：四组统一采用 `batch 1 × 累积 16`，有效 batch 仍为 16；
+20 步冒烟和四组正式训练全部完成，无 OOM / NaN，最终权重及 checkpoint-1500 均已核验。
 
 | 组 | 样本数 | 构成 |
 |---|---|---|
@@ -81,15 +82,24 @@
 | 4.1 | LLaMA-Factory yaml × 4 + DeepSpeed | ✅ | `configs/group_{a,b,c,d}.yaml` `ds_zero2_offload.json` | 权重本地化（ModelScope 预下载）、`template: qwen` |
 | 4.2 | 配置一致性校验 | ✅ | `scripts/check_configs.py` | 铁律 1（27 键仅 4 个数据路径可不同）+ 铁律 2（max_steps=1500，禁与 epoch 并存）+ 技术栈约束 + 有效 batch + **四组指纹一致**。缺指纹即报错，不当作通过 |
 | 4.3 | F5 调试入口 | ✅ | `scripts/train_debug.py` + `.vscode/launch.json` | in-process 调 `run_exp()` 不 fork torchrun，断点可命中。修两处：①覆盖参数曾被静默丢弃（`--max_steps 20` 会跑成 1500 步）②改为内存合并 dict——llamafactory 见 yaml 后走 OmegaConf.from_cli，要求 `key=value`，透传 argparse 风格会报 `Some keys are not used`。launch.json 不入 git（根 .gitignore 忽略 .vscode/），需手工放到服务器 |
-| 4.4 | 冒烟验证（20 步） | ⚠️ | | **首次尝试 OOM**（详见开放项 O-8）。2026-07-29 已将四组同步改为 batch 1 × 累积 16，待服务器重跑 |
+| 4.4 | 冒烟验证（20 步） | ✅ | `checkpoints/_smoke_group_a/` | batch 1 × 累积 16 后 20/20 步通过；99.8s，train loss 1.0648，无 OOM / NaN |
 | 4.5 | 显存诊断 | ✅ | `scripts/probe_train_memory.py` | 实测而非估算。`--stage logits` 隔离测 lm_head+CE（不加载 7B 权重，几秒出结果）；`--stage full` 加载真实模型逐阶段打印。hidden/vocab 从模型 config 读，不写死 |
-| 4.6 | 四组正式训练 | ⬜ | `checkpoints/group_{a,b,c,d}/` | 串行单卡，预计每组 3~5h（改 batch 后 +10~20%）。记录时长/显存/loss 曲线 |
+| 4.6 | 四组正式训练 | ✅ | `checkpoints/group_{a,b,c,d}/` | 四组均完成 1500 步；最终 adapter + checkpoint-1500 全部核验。A/B/C/D 分别 1:52:03 / 1:41:59 / 1:40:03 / 1:41:11，总计 6:55:16 |
+
+训练实测（有效 batch=16，每组均处理约 24000 样本次；loss 受数据难度影响，不可横向当作模型优劣）：
+
+| 组 | 数据量 | 有效 epoch | train loss | runtime | samples/s |
+|---|---:|---:|---:|---:|---:|
+| A | 11770 | 2.0381 | 0.3770 | 6723s | 3.570 |
+| B | 9407 | 2.5511 | 0.9687 | 6119s | 3.922 |
+| C | 4727 | 5.0677 | 0.6643 | 6003s | 3.998 |
+| D | 9187 | 2.6096 | 0.8968 | 6071s | 3.953 |
 
 ## 阶段 5：评测（1 天）
 
 | # | 任务 | 状态 | 产出 | 备注 |
 |---|---|---|---|---|
-| 5.1 | vLLM 多 adapter 批量推理（6 个模型 × 400） | ⬜ | `results/{run_id}/raw/` | 参数见铁律 4 |
+| 5.1 | vLLM 多 adapter 批量推理（6 个模型 × 386 = 2316） | ⬜ | `results/{run_id}/raw/` | 参数见铁律 4；以评测文件实际 386 题为准，不再使用原始 400 配额作分母 |
 | 5.2 | 条款号抽取 + 归一化 | ✅ | `src/eval/clause.py` | 支持带标准号/中文简称/纯条款号三种形式；含 clause_f1 和 is_hallucinated |
 | 5.3 | 条款引用 F1 + 硬幻觉率 | ⬜ | | 全自动 |
 | 5.4 | 数值精确匹配判分 | ⬜ | | |
@@ -123,7 +133,7 @@
 > 2026-07-28：条文库修复引发的停线级问题**已全部解决**，四组重建完毕、铁律 1/2/3 全过。
 > 下面只留仍然开放的项；已解决项的教训沉淀在文末「贯穿性教训」。
 
-### ⚠️ 开放项（不阻塞训练，影响报告解读）
+### ⚠️ 开放项（影响评测实现或报告解读）
 
 | # | 问题 | 影响 | 处置 |
 |---|---|---|---|
@@ -134,10 +144,9 @@
 | O-5 | 出题模型与合成模型同厂不同代（qwen-max vs Qwen3-32B-AWQ） | 独立性弱于跨厂 | 泄漏检查实测 0/386，风险已量化。写入 EXPERIMENT.md 已知局限 |
 | O-6 | 服务器上存在两套 Python（conda 3.13 / 项目 venv 3.12） | 数据阶段无碍（纯 CPU），**训练阶段 torch+CUDA 版本不符会直接失败** | 开训前确认走 `ce-code/.venv`（CLAUDE.md §2 定 3.12 + uv） |
 | O-7 | `--workers` 提升有限 | 32B 单流 3.9 tok/s 是瓶颈，非并发问题 | 已探明，不再投入 |
-| O-8 | **训练 OOM**（24GB 卡装不下 7B+LoRA 的原配置） | 阻塞阶段 4 | 见下方「O-8 详情」。2026-07-29 已采纳 batch 1 × 累积 16，**待冒烟验证后关闭** |
 | O-9 | CLAUDE.md §2 与实现不符 | 宪法写「DeepSpeed ZeRO-2 **with CPU offload**」，而 `ds_zero2_offload.json` 已于 07-27 移除 offload（服务器无 nvcc，`cpu_adam` 编译不了）。日后照宪法复现会以为 offload 一直开着 | 待修正宪法措辞，或补一句环境限制说明 |
 
-#### O-8 详情：训练 OOM
+#### ✅ 已解决 O-8：训练 OOM
 
 **现象**：`train_debug.py` 跑 A 组 20 步冒烟，加载模型后前向即 OOM——
 `Tried to allocate 1.99 GiB. GPU has 23.65 GiB total, 1.26 GiB free, this process using 22.38 GiB`。
@@ -163,13 +172,16 @@ GPU 2 经 `nvidia-smi` 确认空闲（3MiB），非其他进程占用；GPU 1/3 
 只有显存峰值不同）；`max_steps=1500` 的语义不变（步=参数更新次数），铁律 2 不受影响。
 实测省 4.06 GB，反推余量 3.3 GB。代价：每优化步多一次前向反向，约慢 10~20%。
 
+**关闭依据（2026-07-30）**：A 组 20 步冒烟通过，随后 A/B/C/D 四组均完成 1500 步；
+GPU 0 实测训练显存 21394/24564 MiB（余量约 3.1 GiB），未再出现 OOM。
+
 **未采纳的两个方案**：
 - 去掉 DeepSpeed（省 ~1.6GB）：单卡切不了、offload 已移除，ZeRO-2 在此确为纯开销；
   但 batch 1 已够，且 CLAUDE.md §2 把它列为技术栈约束，为可有可无的 1.6GB 改宪法不划算
 - liger kernel 的 fused CE（logits 那 8GB 可压到 <1GB，且更快）：技术上最优，
   但需装新依赖、换 loss 实现、验证数值。**先跑通再优化**
 
-⚠️ 改超参须四组同步并记入 EXPERIMENT.md（铁律 1），故等用户确认后再动。
+该变更已同步四组并记入 `EXPERIMENT.md`；四组正式训练均从新配置起跑，未混用旧配置。
 
 ### 待确认的决策点
 

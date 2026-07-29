@@ -117,7 +117,7 @@ def main() -> None:
     # 与 train.sh 保持一致的三项（说明见该脚本顶部）。
     # 必须**无条件覆盖**，不能用 setdefault：若 shell 里已导出
     # CUDA_VISIBLE_DEVICES=0,1,2,3，setdefault 会原样继承那 4 张卡，
-    # 有效 batch 从 2×8=16 变成 64 且全程不报错——正是 train.sh 要防的那个失效模式。
+    # 有效 batch 从 1×16=16 变成 64 且全程不报错——正是 train.sh 要防的那个失效模式。
     os.environ["CUDA_VISIBLE_DEVICES"] = os.environ.get("CE_DEBUG_GPU", "0")
     os.environ["NCCL_P2P_DISABLE"] = "1"
     os.environ["NCCL_IB_DISABLE"] = "1"
@@ -128,7 +128,7 @@ def main() -> None:
     print("  训练调试入口（单进程，可断点）")
     print(f"  配置          : {cfg_path}")
     print(f"  可见 GPU      : {os.environ['CUDA_VISIBLE_DEVICES']}"
-          f"（单卡，有效 batch = 2×8 = 16）")
+          f"（单卡，有效 batch = 1×16 = 16）")
     print(f"  NCCL P2P/IB   : {os.environ['NCCL_P2P_DISABLE']}/{os.environ['NCCL_IB_DISABLE']}")
     print(f"  RANK/WORLD    : {os.environ['RANK']}/{os.environ['WORLD_SIZE']}")
     if extra:

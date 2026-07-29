@@ -7,7 +7,7 @@
 
 **阶段 1~3 已收口，数据可用于训练。**
 
-**阶段 4 受阻于训练 OOM**（开放项 O-8）——已实测定位到 logits+交叉熵占 8.13 GB，推荐改 `batch 1 × 累积 16`（有效 batch 不变、梯度数学等价），**待拍板**。
+**阶段 4 正在解除训练 OOM**（开放项 O-8）——已实测定位到 logits+交叉熵占 8.13 GB，2026-07-29 已采纳 `batch 1 × 累积 16`（有效 batch 不变、梯度数学等价），**待重跑 20 步冒烟验证**。
 
 | 组 | 样本数 | 构成 |
 |---|---|---|
@@ -81,7 +81,7 @@
 | 4.1 | LLaMA-Factory yaml × 4 + DeepSpeed | ✅ | `configs/group_{a,b,c,d}.yaml` `ds_zero2_offload.json` | 权重本地化（ModelScope 预下载）、`template: qwen` |
 | 4.2 | 配置一致性校验 | ✅ | `scripts/check_configs.py` | 铁律 1（27 键仅 4 个数据路径可不同）+ 铁律 2（max_steps=1500，禁与 epoch 并存）+ 技术栈约束 + 有效 batch + **四组指纹一致**。缺指纹即报错，不当作通过 |
 | 4.3 | F5 调试入口 | ✅ | `scripts/train_debug.py` + `.vscode/launch.json` | in-process 调 `run_exp()` 不 fork torchrun，断点可命中。修两处：①覆盖参数曾被静默丢弃（`--max_steps 20` 会跑成 1500 步）②改为内存合并 dict——llamafactory 见 yaml 后走 OmegaConf.from_cli，要求 `key=value`，透传 argparse 风格会报 `Some keys are not used`。launch.json 不入 git（根 .gitignore 忽略 .vscode/），需手工放到服务器 |
-| 4.4 | 冒烟验证（20 步） | ⚠️ | | **首次尝试 OOM**（详见开放项 O-8）。已实测定位到 logits+交叉熵，待定改法后重跑 |
+| 4.4 | 冒烟验证（20 步） | ⚠️ | | **首次尝试 OOM**（详见开放项 O-8）。2026-07-29 已将四组同步改为 batch 1 × 累积 16，待服务器重跑 |
 | 4.5 | 显存诊断 | ✅ | `scripts/probe_train_memory.py` | 实测而非估算。`--stage logits` 隔离测 lm_head+CE（不加载 7B 权重，几秒出结果）；`--stage full` 加载真实模型逐阶段打印。hidden/vocab 从模型 config 读，不写死 |
 | 4.6 | 四组正式训练 | ⬜ | `checkpoints/group_{a,b,c,d}/` | 串行单卡，预计每组 3~5h（改 batch 后 +10~20%）。记录时长/显存/loss 曲线 |
 
@@ -134,7 +134,7 @@
 | O-5 | 出题模型与合成模型同厂不同代（qwen-max vs Qwen3-32B-AWQ） | 独立性弱于跨厂 | 泄漏检查实测 0/386，风险已量化。写入 EXPERIMENT.md 已知局限 |
 | O-6 | 服务器上存在两套 Python（conda 3.13 / 项目 venv 3.12） | 数据阶段无碍（纯 CPU），**训练阶段 torch+CUDA 版本不符会直接失败** | 开训前确认走 `ce-code/.venv`（CLAUDE.md §2 定 3.12 + uv） |
 | O-7 | `--workers` 提升有限 | 32B 单流 3.9 tok/s 是瓶颈，非并发问题 | 已探明，不再投入 |
-| O-8 | **训练 OOM**（24GB 卡装不下 7B+LoRA 的当前配置） | 阻塞阶段 4 | 见下方「O-8 详情」。**待用户拍板改法** |
+| O-8 | **训练 OOM**（24GB 卡装不下 7B+LoRA 的原配置） | 阻塞阶段 4 | 见下方「O-8 详情」。2026-07-29 已采纳 batch 1 × 累积 16，**待冒烟验证后关闭** |
 | O-9 | CLAUDE.md §2 与实现不符 | 宪法写「DeepSpeed ZeRO-2 **with CPU offload**」，而 `ds_zero2_offload.json` 已于 07-27 移除 offload（服务器无 nvcc，`cpu_adam` 编译不了）。日后照宪法复现会以为 offload 一直开着 | 待修正宪法措辞，或补一句环境限制说明 |
 
 #### O-8 详情：训练 OOM
@@ -158,7 +158,7 @@ GPU 2 经 `nvidia-smi` 确认空闲（3MiB），非其他进程占用；GPU 1/3 
 显存账：权重 15.20 + logits/CE 8.13 = **23.33 GB**，已占满 23.65 GB 的卡，
 还没算 LoRA 状态(1.3)、激活(0.8)、DeepSpeed buffer(~1.6)。
 
-**推荐改法**：`per_device_train_batch_size 2→1` + `gradient_accumulation_steps 8→16`。
+**已采纳改法（2026-07-29）**：`per_device_train_batch_size 2→1` + `gradient_accumulation_steps 8→16`。
 有效 batch 仍为 16，**梯度数学等价**（已用 16 条样本的四种拆法验证：累积梯度逐位相同，
 只有显存峰值不同）；`max_steps=1500` 的语义不变（步=参数更新次数），铁律 2 不受影响。
 实测省 4.06 GB，反推余量 3.3 GB。代价：每优化步多一次前向反向，约慢 10~20%。

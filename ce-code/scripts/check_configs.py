@@ -30,6 +30,9 @@ _REQUIRED = {
     "lora_alpha": "64",
     "lora_dropout": "0.05",
     "bf16": "true",
+    # O-8：24GB GPU 上 batch=2 的 logits+CE 已实测 OOM；有效 batch 仍固定为 16。
+    "per_device_train_batch_size": "1",
+    "gradient_accumulation_steps": "16",
 }
 
 

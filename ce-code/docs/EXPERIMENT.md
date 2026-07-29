@@ -10,7 +10,7 @@
 | learning_rate | 1e-4 | ← 同 | ← 同 | ← 同 |
 | scheduler / warmup | cosine / 0.03 | ← 同 | ← 同 | ← 同 |
 | **max_steps** | **1500** | **1500** | **1500** | **1500** |
-| per_device_bs × grad_accum | 2 × 8 | ← 同 | ← 同 | ← 同 |
+| per_device_bs × grad_accum | 1 × 16 | ← 同 | ← 同 | ← 同 |
 | cutoff_len | 2048 | ← 同 | ← 同 | ← 同 |
 | 精度 | bf16 | ← 同 | ← 同 | ← 同 |
 | seed | 42 | ← 同 | ← 同 | ← 同 |
@@ -120,4 +120,4 @@
 
 | 日期 | 变更 | 原因 | 是否全组重跑 |
 |---|---|---|---|
-| | | | |
+| 2026-07-29 | `per_device_train_batch_size` 2→1；`gradient_accumulation_steps` 8→16 | 24GB GPU 上 batch=2 的 logits+交叉熵实测净占 8.13GB，首次前向 OOM；调整后有效 batch 仍为 16 | 是（正式训练尚未开始，四组从新配置起跑） |

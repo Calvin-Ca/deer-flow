@@ -1,0 +1,67 @@
+[
+  {
+    "sample_id": "b_28e5ef6a",
+    "source_dataset": "group_c",
+    "source_file": "data/processed/group_c/train.jsonl",
+    "source_file_sha256": "9fd2aa29d3caeeccceef101df741e666b5da6c8a2ebb12f7f7e5e7c9e8394eee",
+    "sample_type": "single_clause",
+    "source_clauses": [
+      "GB50011-2010_G.2.1"
+    ],
+    "selection_seed": 42,
+    "candidate_count": 3868,
+    "selection_rejections_file": "configs/prompts/eval_fewshot_rejections.json",
+    "selection_rejections_sha256": "242a97678eab80a381465b8021cd3301edde6e9b8579580435f92e76fb828eab",
+    "excluded_sample_ids": [],
+    "selection_clause_graph_file": "data/interim/clauses.jsonl",
+    "selection_clause_graph_sha256": "2bbed08c9ae93c20271caaa7eecdf61b400d57fb4868478bb64317a6e0135755",
+    "requires_direct_ref": false,
+    "user": "我设计了一栋8度抗震设防的建筑，采用钢框架-混凝土核心筒结构，其高度超过了规范第6.1.1条的钢筋混凝土框架-核心筒结构的适用高度，是否还能采用该结构形式？",
+    "assistant": "根据第G.2.1条，抗震设防烈度为6~8度且房屋高度超过第6.1.1条规定的混凝土框架-核心筒结构最大适用高度时，可以采用钢框架-混凝土核心筒结构。但适用高度不宜超过第6.1.1条和第8.1.1条规定的最大高度的平均值，超过后应进行专门研究和论证。"
+  },
+  {
+    "sample_id": "d1_2510effe",
+    "source_dataset": "group_d",
+    "source_file": "data/processed/group_d/train.jsonl",
+    "source_file_sha256": "f0567bf07b2796fbfa0c0d6c251592bb3943c53e56604bee479effe0c1ac127a",
+    "sample_type": "cross_clause",
+    "source_clauses": [
+      "GB50011-2010_B.0.1",
+      "GB50011-2010_3.9.3"
+    ],
+    "selection_seed": 42,
+    "candidate_count": 22,
+    "selection_rejections_file": "configs/prompts/eval_fewshot_rejections.json",
+    "selection_rejections_sha256": "242a97678eab80a381465b8021cd3301edde6e9b8579580435f92e76fb828eab",
+    "excluded_sample_ids": [
+      "d1_048f9832",
+      "d1_0bccf18f",
+      "d1_0be1e216"
+    ],
+    "selection_clause_graph_file": "data/interim/clauses.jsonl",
+    "selection_clause_graph_sha256": "2bbed08c9ae93c20271caaa7eecdf61b400d57fb4868478bb64317a6e0135755",
+    "requires_direct_ref": true,
+    "user": "在设计一栋采用高强混凝土的抗震建筑时，我需要同时参考哪些规范条文来确定混凝土强度等级和钢筋的选择？",
+    "assistant": "在设计高强混凝土抗震建筑时，应同时参考GB50011-2010第B.0.1条和第3.9.3条。第B.0.1条明确了高强混凝土结构的抗震设计要求，并指出混凝土强度等级应符合第3.9.3条的规定；而第3.9.3条则具体规定了混凝土强度等级的上限（如抗震墙不宜超过C60），并明确了钢筋的选用要求（如纵向受力钢筋宜选用HRB400级及以上）。因此，这两条条文需结合使用，才能满足高强混凝土结构的抗震设计与材料选用要求。"
+  },
+  {
+    "sample_id": "d2_d2fb7134",
+    "source_dataset": "group_d",
+    "source_file": "data/processed/group_d/train.jsonl",
+    "source_file_sha256": "f0567bf07b2796fbfa0c0d6c251592bb3943c53e56604bee479effe0c1ac127a",
+    "sample_type": "refusal",
+    "source_clauses": [
+      "JGJ3-2010_13.2.10"
+    ],
+    "selection_seed": 42,
+    "candidate_count": 1241,
+    "selection_rejections_file": "configs/prompts/eval_fewshot_rejections.json",
+    "selection_rejections_sha256": "242a97678eab80a381465b8021cd3301edde6e9b8579580435f92e76fb828eab",
+    "excluded_sample_ids": [],
+    "selection_clause_graph_file": "data/interim/clauses.jsonl",
+    "selection_clause_graph_sha256": "2bbed08c9ae93c20271caaa7eecdf61b400d57fb4868478bb64317a6e0135755",
+    "requires_direct_ref": false,
+    "user": "某高层建筑在施工过程中发现相邻建筑物沉降差异较大，是否需要立即停止施工并调整结构设计？",
+    "assistant": "JGJ3-2010第13.2.10条仅明确了高层建筑应进行沉降和变形观测，并参照相关规范执行，但并未提供具体应对差异沉降的处理方法或判断是否需要停止施工的标准。该条款适用于常规沉降监测的实施要求，但具体应对措施需结合现场地质条件、差异沉降数值、结构类型及使用功能等因素进行专业判断。建议由具有丰富经验的结构工程师对现场实际情况进行分析后，作出合理决策。"
+  }
+]

@@ -29,6 +29,7 @@ from src.eval.run_inference import (  # noqa: E402
     load_fewshot,
     parse_models,
     select_eval_rows,
+    validate_fewshot_against_eval,
 )
 
 
@@ -41,6 +42,50 @@ def _eval_rows(per_type: int = 5) -> list[dict]:
         }
         for index in range(per_type)
         for kind in EVAL_TYPES
+    ]
+
+
+def _frozen_demo(
+    index: int,
+    *,
+    source_dataset: str,
+    sample_type: str,
+    source_clauses: list[str] | None = None,
+) -> dict:
+    return {
+        "sample_id": f"sample_{index}",
+        "source_dataset": source_dataset,
+        "source_file": f"data/processed/{source_dataset}/train.jsonl",
+        "source_file_sha256": str(index) * 64,
+        "sample_type": sample_type,
+        "source_clauses": source_clauses or [],
+        "selection_seed": 42,
+        "candidate_count": 10,
+        "user": f"u{index}",
+        "assistant": f"a{index}",
+    }
+
+
+def _frozen_demos() -> list[dict]:
+    return [
+        _frozen_demo(
+            1,
+            source_dataset="group_c",
+            sample_type="single_clause",
+            source_clauses=["GB50010-2010_99.1.1"],
+        ),
+        _frozen_demo(
+            2,
+            source_dataset="group_d",
+            sample_type="cross_clause",
+            source_clauses=["GB50010-2010_99.2.1", "GB50010-2010_99.2.2"],
+        ),
+        _frozen_demo(
+            3,
+            source_dataset="group_d",
+            sample_type="refusal",
+            source_clauses=["GB50010-2010_99.3.1"],
+        ),
     ]
 
 
@@ -97,7 +142,7 @@ def test_fewshot_rejects_placeholder_or_wrong_count() -> None:
             {"user": f"u{index}", "assistant": f"a{index}"}
             for index in range(3)
         ]
-        placeholders[1]["assistant"] = "【待确认】答案"
+        placeholders[0]["assistant"] = "【待确认】答案"
         path.write_text(json.dumps(placeholders, ensure_ascii=False), encoding="utf-8")
         try:
             load_fewshot(path)
@@ -105,6 +150,30 @@ def test_fewshot_rejects_placeholder_or_wrong_count() -> None:
             assert "占位内容" in str(exc)
         else:
             raise AssertionError("待确认占位内容必须被拒绝")
+
+
+def test_fewshot_provenance_is_loaded_and_checked_against_eval() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "fewshot.json"
+        demos = _frozen_demos()
+        path.write_text(json.dumps(demos, ensure_ascii=False), encoding="utf-8")
+        loaded = load_fewshot(path)
+        validate_fewshot_against_eval(loaded, _eval_rows())
+        assert [item["sample_id"] for item in loaded] == [
+            "sample_1",
+            "sample_2",
+            "sample_3",
+        ]
+
+        loaded[0]["source_clauses"] = ["GB50010-2010_1.0.1"]
+        eval_rows = _eval_rows()
+        eval_rows[0]["gold_clauses"] = ["GB50010-2010_1.0.1"]
+        try:
+            validate_fewshot_against_eval(loaded, eval_rows)
+        except ValueError as exc:
+            assert "金标条文重合" in str(exc)
+        else:
+            raise AssertionError("few-shot 与评测金标条文重合时必须停止")
 
 
 def test_jsonl_and_resume_reject_duplicate_ids() -> None:

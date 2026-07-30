@@ -42,7 +42,7 @@ if [[ ! -x "$PYTHON_BIN" ]]; then
 fi
 if [[ "$MODELS" == *"base_fewshot"* && ! -f "$FEWSHOT_FILE" ]]; then
   echo "❌ 六模型评测需要冻结的 3-shot 文件：$FEWSHOT_FILE"
-  echo "   格式见 configs/prompts/eval_fewshot.example.json。"
+  echo "   请先运行：.venv/bin/python scripts/build_eval_fewshot.py"
   exit 1
 fi
 

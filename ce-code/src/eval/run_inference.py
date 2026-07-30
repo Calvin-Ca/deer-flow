@@ -20,6 +20,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import sys
 import threading
 import time
@@ -127,7 +128,7 @@ def select_eval_rows(rows: list[dict[str, Any]], smoke: bool) -> list[dict[str, 
     return [row for row in rows if row["id"] in selected_ids]
 
 
-def load_fewshot(path: Path) -> list[dict[str, str]]:
+def load_fewshot(path: Path) -> list[dict[str, Any]]:
     """加载恰好三条 user/assistant 示例；不允许从评测集临时取例子。"""
     if not path.is_file():
         raise FileNotFoundError(
@@ -144,7 +145,12 @@ def load_fewshot(path: Path) -> list[dict[str, str]]:
         raise ValueError(
             f"3-shot 文件必须是恰好 3 个元素的数组，实际为 {actual_type}"
         )
-    normalized: list[dict[str, str]] = []
+    expected = (
+        ("group_c", "single_clause"),
+        ("group_d", "cross_clause"),
+        ("group_d", "refusal"),
+    )
+    normalized: list[dict[str, Any]] = []
     for index, item in enumerate(value, 1):
         if not isinstance(item, dict):
             raise ValueError(f"3-shot 第 {index} 项必须是对象")
@@ -156,15 +162,65 @@ def load_fewshot(path: Path) -> list[dict[str, str]]:
             raise ValueError(f"3-shot 第 {index} 项 assistant 为空")
         if "【待确认】" in user or "【待确认】" in assistant:
             raise ValueError(f"3-shot 第 {index} 项仍是待确认占位内容")
-        normalized.append({"user": user.strip(), "assistant": assistant.strip()})
+        expected_dataset, expected_type = expected[index - 1]
+        if item.get("source_dataset") != expected_dataset:
+            raise ValueError(
+                f"3-shot 第 {index} 项 source_dataset 应为 {expected_dataset}"
+            )
+        if item.get("sample_type") != expected_type:
+            raise ValueError(f"3-shot 第 {index} 项 sample_type 应为 {expected_type}")
+        if not isinstance(item.get("sample_id"), str) or not item["sample_id"]:
+            raise ValueError(f"3-shot 第 {index} 项 sample_id 为空")
+        if item.get("selection_seed") != SEED:
+            raise ValueError(f"3-shot 第 {index} 项 selection_seed 必须为 {SEED}")
+        source_clauses = item.get("source_clauses")
+        if not isinstance(source_clauses, list):
+            raise ValueError(f"3-shot 第 {index} 项 source_clauses 不是数组")
+        source_hash = item.get("source_file_sha256")
+        if not isinstance(source_hash, str) or not re.fullmatch(
+            r"[0-9a-f]{64}", source_hash
+        ):
+            raise ValueError(f"3-shot 第 {index} 项 source_file_sha256 非法")
+        normalized.append(
+            {
+                **item,
+                "user": user.strip(),
+                "assistant": assistant.strip(),
+            }
+        )
     return normalized
+
+
+def validate_fewshot_against_eval(
+    fewshot: list[dict[str, Any]],
+    eval_rows: list[dict[str, Any]],
+) -> None:
+    """运行前再次确认示例不与评测问题或金标条文重合。"""
+    gold_clauses = {
+        clause
+        for row in eval_rows
+        for clause in (row.get("gold_clauses") or [])
+    }
+    eval_questions = {
+        re.sub(r"\s+", "", row["question"]).lower()
+        for row in eval_rows
+    }
+    for index, item in enumerate(fewshot, 1):
+        overlap = set(item["source_clauses"]) & gold_clauses
+        if overlap:
+            raise ValueError(
+                f"3-shot 第 {index} 项与评测金标条文重合：{sorted(overlap)}"
+            )
+        normalized_question = re.sub(r"\s+", "", item["user"]).lower()
+        if normalized_question in eval_questions:
+            raise ValueError(f"3-shot 第 {index} 项问题与评测题完全相同")
 
 
 def build_messages(
     question: str,
     *,
     model_id: str,
-    fewshot: list[dict[str, str]] | None,
+    fewshot: list[dict[str, Any]] | None,
 ) -> list[dict[str, str]]:
     """为六个模型构造消息；只有 base_fewshot 增加三条示例。"""
     messages = [{"role": "system", "content": SYSTEM_PROMPT}]
@@ -286,7 +342,7 @@ def _request_one(
     row: dict[str, Any],
     model_id: str,
     served_model: str,
-    fewshot: list[dict[str, str]] | None,
+    fewshot: list[dict[str, Any]] | None,
 ) -> dict[str, Any]:
     """执行一次确定性 chat completion，并返回可直接落盘的原始记录。"""
     started = time.monotonic()
@@ -439,7 +495,7 @@ def _run_model(
     rows: list[dict[str, Any]],
     model_id: str,
     served_model: str,
-    fewshot: list[dict[str, str]] | None,
+    fewshot: list[dict[str, Any]] | None,
     raw_path: Path,
     failed_path: Path,
     workers: int,
@@ -533,12 +589,13 @@ def main(argv: list[str] | None = None) -> int:
         _validate_evalset(rows)
         selected_rows = select_eval_rows(rows, args.smoke)
 
-        fewshot: list[dict[str, str]] | None = None
+        fewshot: list[dict[str, Any]] | None = None
         fewshot_file: Path | None = None
         fewshot_sha256: str | None = None
         if "base_fewshot" in models:
             fewshot_file = args.fewshot_file.resolve()
             fewshot = load_fewshot(fewshot_file)
+            validate_fewshot_against_eval(fewshot, rows)
             fewshot_sha256 = _sha256(fewshot_file)
 
         mapping = model_mapping(args.base_model)

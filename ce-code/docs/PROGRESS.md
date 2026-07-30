@@ -99,7 +99,7 @@
 
 | # | 任务 | 状态 | 产出 | 备注 |
 |---|---|---|---|---|
-| 5.1 | vLLM 多 adapter 批量推理（6 个模型 × 386 = 2316） | 🔄 | `src/eval/run_inference.py`、`scripts/eval_inference.sh`、`scripts/serve_eval.sh`、`tests/test_eval_inference.py`、`results/{run_id}/raw/` | 推理模块已交付并通过 8 个纯本地用例：固定铁律 4 参数、20 题 smoke（各题型 4 题）、断点续跑、失败留痕、评测集/prompt/adapter SHA-256、逐模型完整性校验；以实际 386 题为准。`base_fewshot` 的 3-shot 正文尚未冻结，必须确认后才能跑六模型 smoke/全量 |
+| 5.1 | vLLM 多 adapter 批量推理（6 个模型 × 386 = 2316） | 🔄 | `scripts/build_eval_fewshot.py`、`src/eval/run_inference.py`、`scripts/eval_inference.sh`、`scripts/serve_eval.sh`、`tests/test_{build_eval_fewshot,eval_inference}.py`、`results/{run_id}/raw/` | 推理与 3-shot 冻结模块已交付并通过 10 个纯本地用例：C 单条文 + D 跨条文/拒答、固定 seed=42、与评测金标条文零重合；固定铁律 4 参数、20 题 smoke、断点续跑、失败留痕、评测集/prompt/adapter SHA-256、逐模型完整性校验。待服务器生成并人工核对 3-shot 后跑 smoke |
 | 5.2 | 条款号抽取 + 归一化 | ✅ | `src/eval/clause.py` | 支持带标准号/中文简称/纯条款号三种形式；含 clause_f1 和 is_hallucinated |
 | 5.3 | 条款引用 F1 + 硬幻觉率 | ⬜ | | 全自动 |
 | 5.4 | 数值精确匹配判分 | ⬜ | | |

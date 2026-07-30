@@ -99,13 +99,13 @@
 
 | # | 任务 | 状态 | 产出 | 备注 |
 |---|---|---|---|---|
-| 5.1 | vLLM 多 adapter 批量推理（6 个模型 × 386 = 2316） | 🔄 | `scripts/build_eval_fewshot.py`、`configs/prompts/eval_fewshot_rejections.json`、`src/eval/run_inference.py`、`scripts/eval_inference.sh`、`scripts/serve_eval.sh`、`tests/test_{build_eval_fewshot,eval_inference}.py`、`results/{run_id}/raw/` | 推理与 3-shot 冻结模块已交付并通过 12 个纯本地用例：C 单条文 + D 跨条文/拒答、固定 seed=42、与评测金标条文零重合；人工否决项及理由留痕并参与 prompt 指纹，`d1_0bccf18f`、`d1_0be1e216` 已因过度推断/弱依赖被否决。跨条文候选现强制两条 source_clauses 在当前条文库 refs 中直接关联，并记录条文库 SHA-256。推理固定铁律 4 参数，支持20题 smoke、断点续跑、失败留痕和完整性校验 |
+| 5.1 | vLLM 多 adapter 批量推理（6 个模型 × 386 = 2316） | ✅ | `scripts/build_eval_fewshot.py`、`configs/prompts/eval_fewshot_rejections.json`、`src/eval/run_inference.py`、`scripts/eval_inference.sh`、`scripts/serve_eval.sh`、`tests/test_{build_eval_fewshot,eval_inference}.py`、`results/{run_id}/raw/` | 正式推理已完成 6×386；各模型无空答案，原始 JSONL 只读保留。截断数：base 10、base_fewshot 14、group_a 46、group_b 0、group_c 0、group_d 4，已由自动评分生成健康度指标 |
 | 5.2 | 条款号抽取 + 归一化 | ✅ | `src/eval/clause.py` | 支持带标准号/中文简称/纯条款号三种形式；含 clause_f1 和 is_hallucinated |
-| 5.3 | 条款引用 F1 + 硬幻觉率 | ⬜ | | 全自动 |
-| 5.4 | 数值精确匹配判分 | ⬜ | | |
+| 5.3 | 条款引用 F1 + 硬幻觉率 | ✅ | `src/eval/scoring.py`、`scripts/score_eval.py`、`results/{run_id}/metrics/` | 同时输出逐题指标、宏平均与微平均 F1，以及无效条文引用率 |
+| 5.4 | 数值精确匹配判分 | ✅ | `src/eval/scoring.py`、`scripts/score_eval.py` | Decimal 精确匹配；分别报告完整命中率和数值项命中率，无金标题不进入分母 |
 | 5.5 | LLM judge（盲评+乱序） | ⬜ | | judge 模型 ≠ 合成模型 |
-| 5.6 | 拒答二分类判定 | ⬜ | | 成对报告 |
-| 5.7 | 指标汇总，填 EXPERIMENT.md §3 | ⬜ | `results/{run_id}/summary.csv` | |
+| 5.6 | 拒答二分类判定 | ✅ | `src/eval/scoring.py`、`scripts/score_eval.py` | 启发式拒答分类；成对报告拒答准确率、应拒答召回率、非拒答误拒率 |
+| 5.7 | 指标汇总，填 EXPERIMENT.md §3 | 🔄 | `results/{run_id}/summary.csv`、`results/{run_id}/scoring_manifest.json` | 自动汇总入口已完成；待在服务器上对正式 run 运行并将结果填入实验记录 |
 
 ## 阶段 6：验证与报告（1.5 天）
 

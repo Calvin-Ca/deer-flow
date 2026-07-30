@@ -1,0 +1,139 @@
+{
+  "manifest_version": 1,
+  "eval_file": "/mnt/nvme/calvin/code/deer-flow/ce-code/data/eval/evalset_v1.jsonl",
+  "eval_sha256": "0ce0eafcde7b1415490264ec5eac5014b335c11c748b43e8b6f76885ed7c88cf",
+  "fewshot_file": "/mnt/nvme/calvin/code/deer-flow/ce-code/configs/prompts/eval_fewshot.json",
+  "fewshot_sha256": "1b29fd70b871fa7c9e95cc5013fb20db1f3b5e01c660654333b9b7d48c1d2f50",
+  "fewshot_rejections_file": "/mnt/nvme/calvin/code/deer-flow/ce-code/configs/prompts/eval_fewshot_rejections.json",
+  "fewshot_rejections_sha256": "242a97678eab80a381465b8021cd3301edde6e9b8579580435f92e76fb828eab",
+  "fewshot_clause_graph_file": "/mnt/nvme/calvin/code/deer-flow/ce-code/data/interim/clauses.jsonl",
+  "fewshot_clause_graph_sha256": "2bbed08c9ae93c20271caaa7eecdf61b400d57fb4868478bb64317a6e0135755",
+  "smoke": true,
+  "selected_count": 20,
+  "selected_ids": [
+    "eval_sc_6393312a",
+    "eval_sc_74e2472e",
+    "eval_sc_ff156194",
+    "eval_sc_79cb4c67",
+    "eval_cc_e553159a",
+    "eval_cc_9afed8ab",
+    "eval_cc_6482175f",
+    "eval_cc_6a1c2943",
+    "eval_ca_2add6b66",
+    "eval_ca_1539df6a",
+    "eval_ca_6326e493",
+    "eval_ca_5f544768",
+    "eval_cv_a8031b16",
+    "eval_cv_be7fa86a",
+    "eval_cv_01fe6fac",
+    "eval_cv_d15fa600",
+    "eval_rf_0e54d8a3",
+    "eval_rf_d8ea3a7e",
+    "eval_rf_52db9a0f",
+    "eval_rf_e0c77121"
+  ],
+  "models": [
+    "base",
+    "base_fewshot",
+    "group_a",
+    "group_b",
+    "group_c",
+    "group_d"
+  ],
+  "model_mapping": {
+    "base": "base",
+    "base_fewshot": "base",
+    "group_a": "group_a",
+    "group_b": "group_b",
+    "group_c": "group_c",
+    "group_d": "group_d"
+  },
+  "base_url": "http://127.0.0.1:8002/v1",
+  "artifact_fingerprints": {
+    "base": {
+      "path": "/mnt/nvme/calvin/models/Qwen2.5-7B-Instruct",
+      "files": {
+        "config.json": "7463bb0ea78315365e6c6b74de4e73bbcc8359dfb0c5a737584e077d42c0b03c",
+        "model.safetensors.index.json": "624bf7c47cd12468fdc16e38a47cf4f19e0415b859a223ba3c027eed2f0e1028"
+      }
+    },
+    "adapters": {
+      "group_a": {
+        "path": "/mnt/nvme/calvin/code/deer-flow/ce-code/checkpoints/group_a",
+        "files": {
+          "adapter_config.json": "707f74728077135d64d6d2ab934e7bcf46e081e6462073fd10e58ccb4bd83dc4",
+          "adapter_model.safetensors": "74e14a05a05b8c6478c375a7e654a1282994999e813805ce18d16fbb0e54aceb"
+        }
+      },
+      "group_b": {
+        "path": "/mnt/nvme/calvin/code/deer-flow/ce-code/checkpoints/group_b",
+        "files": {
+          "adapter_config.json": "98cd70312bf2323fa743ab727ca63e5f7390a9c551278a05001c6e31de28cfc7",
+          "adapter_model.safetensors": "f718afcb8186146e3c0f10629fa08d4891051aafee60d35ccfb26d3fca4fed5c"
+        }
+      },
+      "group_c": {
+        "path": "/mnt/nvme/calvin/code/deer-flow/ce-code/checkpoints/group_c",
+        "files": {
+          "adapter_config.json": "413bff6a315d25ff388761fa9a30443675ce906ba209e415767a5e13f70b13bd",
+          "adapter_model.safetensors": "4dccf4cf6ee04c9e5081398af191d72b9ccf9ebfa1efc4f379a387a2418f47a9"
+        }
+      },
+      "group_d": {
+        "path": "/mnt/nvme/calvin/code/deer-flow/ce-code/checkpoints/group_d",
+        "files": {
+          "adapter_config.json": "c6f582d21a6ca9824d81cd405199663b8f883ff2d7719a1ce6abae0f79146310",
+          "adapter_model.safetensors": "3aa416d48e362f8ce5210d7468a471a715092d9dc04fea3d986f33f24df52cd8"
+        }
+      }
+    }
+  },
+  "system_prompt": "You are Qwen, created by Alibaba Cloud. You are a helpful assistant.",
+  "generation": {
+    "temperature": 0.0,
+    "top_p": 1.0,
+    "seed": 42,
+    "max_tokens": 1024
+  },
+  "created_at": "2026-07-30T01:41:59.607180+00:00",
+  "status": "complete",
+  "counts": {
+    "base": {
+      "expected": 20,
+      "completed": 20,
+      "failed_this_run": 0,
+      "missing": 0
+    },
+    "base_fewshot": {
+      "expected": 20,
+      "completed": 20,
+      "failed_this_run": 0,
+      "missing": 0
+    },
+    "group_a": {
+      "expected": 20,
+      "completed": 20,
+      "failed_this_run": 0,
+      "missing": 0
+    },
+    "group_b": {
+      "expected": 20,
+      "completed": 20,
+      "failed_this_run": 0,
+      "missing": 0
+    },
+    "group_c": {
+      "expected": 20,
+      "completed": 20,
+      "failed_this_run": 0,
+      "missing": 0
+    },
+    "group_d": {
+      "expected": 20,
+      "completed": 20,
+      "failed_this_run": 0,
+      "missing": 0
+    }
+  },
+  "updated_at": "2026-07-30T01:49:33.151230+00:00"
+}

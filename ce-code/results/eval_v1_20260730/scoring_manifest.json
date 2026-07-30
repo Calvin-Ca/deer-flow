@@ -1,0 +1,17 @@
+{
+  "run_id": "eval_v1_20260730",
+  "eval_file": "/mnt/nvme/calvin/code/deer-flow/ce-code/data/eval/evalset_v1.jsonl",
+  "eval_sha256": "0ce0eafcde7b1415490264ec5eac5014b335c11c748b43e8b6f76885ed7c88cf",
+  "clauses_file": "/mnt/nvme/calvin/code/deer-flow/ce-code/data/interim/clauses.jsonl",
+  "clauses_sha256": "2bbed08c9ae93c20271caaa7eecdf61b400d57fb4868478bb64317a6e0135755",
+  "models": [
+    "base",
+    "base_fewshot",
+    "group_a",
+    "group_b",
+    "group_c",
+    "group_d"
+  ],
+  "result_count_per_model": 386,
+  "scoring_version": "stage5-auto-v1"
+}

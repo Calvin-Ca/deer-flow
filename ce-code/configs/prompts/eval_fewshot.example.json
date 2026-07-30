@@ -11,6 +11,9 @@
     "selection_rejections_file": "configs/prompts/eval_fewshot_rejections.json",
     "selection_rejections_sha256": "【脚本自动填写】",
     "excluded_sample_ids": [],
+    "selection_clause_graph_file": "data/interim/clauses.jsonl",
+    "selection_clause_graph_sha256": "【脚本自动填写】",
+    "requires_direct_ref": false,
     "user": "【待确认】示例问题 1",
     "assistant": "【待确认】示例答案 1"
   },
@@ -26,6 +29,9 @@
     "selection_rejections_file": "configs/prompts/eval_fewshot_rejections.json",
     "selection_rejections_sha256": "【脚本自动填写】",
     "excluded_sample_ids": [],
+    "selection_clause_graph_file": "data/interim/clauses.jsonl",
+    "selection_clause_graph_sha256": "【脚本自动填写】",
+    "requires_direct_ref": true,
     "user": "【待确认】示例问题 2",
     "assistant": "【待确认】示例答案 2"
   },
@@ -41,6 +47,9 @@
     "selection_rejections_file": "configs/prompts/eval_fewshot_rejections.json",
     "selection_rejections_sha256": "【脚本自动填写】",
     "excluded_sample_ids": [],
+    "selection_clause_graph_file": "data/interim/clauses.jsonl",
+    "selection_clause_graph_sha256": "【脚本自动填写】",
+    "requires_direct_ref": false,
     "user": "【待确认】示例问题 3",
     "assistant": "【待确认】示例答案 3"
   }

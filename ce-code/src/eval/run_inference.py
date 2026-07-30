@@ -33,6 +33,7 @@ _ROOT = Path(__file__).resolve().parents[2]
 _DEFAULT_EVAL_FILE = _ROOT / "data/eval/evalset_v1.jsonl"
 _DEFAULT_FEWSHOT_FILE = _ROOT / "configs/prompts/eval_fewshot.json"
 _DEFAULT_FEWSHOT_REJECTIONS = _ROOT / "configs/prompts/eval_fewshot_rejections.json"
+_DEFAULT_CLAUSES_FILE = _ROOT / "data/interim/clauses.jsonl"
 _DEFAULT_MODEL_PATH = Path("/mnt/nvme/calvin/models/Qwen2.5-7B-Instruct")
 _DEFAULT_CHECKPOINT_ROOT = _ROOT / "checkpoints"
 _RESULTS_ROOT = _ROOT / "results"
@@ -147,9 +148,9 @@ def load_fewshot(path: Path) -> list[dict[str, Any]]:
             f"3-shot 文件必须是恰好 3 个元素的数组，实际为 {actual_type}"
         )
     expected = (
-        ("group_c", "single_clause"),
-        ("group_d", "cross_clause"),
-        ("group_d", "refusal"),
+        ("group_c", "single_clause", False),
+        ("group_d", "cross_clause", True),
+        ("group_d", "refusal", False),
     )
     normalized: list[dict[str, Any]] = []
     for index, item in enumerate(value, 1):
@@ -163,7 +164,7 @@ def load_fewshot(path: Path) -> list[dict[str, Any]]:
             raise ValueError(f"3-shot 第 {index} 项 assistant 为空")
         if "【待确认】" in user or "【待确认】" in assistant:
             raise ValueError(f"3-shot 第 {index} 项仍是待确认占位内容")
-        expected_dataset, expected_type = expected[index - 1]
+        expected_dataset, expected_type, expected_direct_ref = expected[index - 1]
         if item.get("source_dataset") != expected_dataset:
             raise ValueError(
                 f"3-shot 第 {index} 项 source_dataset 应为 {expected_dataset}"
@@ -191,6 +192,18 @@ def load_fewshot(path: Path) -> list[dict[str, Any]]:
             )
         if not isinstance(item.get("excluded_sample_ids"), list):
             raise ValueError(f"3-shot 第 {index} 项 excluded_sample_ids 不是数组")
+        clause_graph_hash = item.get("selection_clause_graph_sha256")
+        if not isinstance(clause_graph_hash, str) or not re.fullmatch(
+            r"[0-9a-f]{64}", clause_graph_hash
+        ):
+            raise ValueError(
+                f"3-shot 第 {index} 项 selection_clause_graph_sha256 非法"
+            )
+        if item.get("requires_direct_ref") is not expected_direct_ref:
+            raise ValueError(
+                f"3-shot 第 {index} 项 requires_direct_ref "
+                f"应为 {expected_direct_ref}"
+            )
         normalized.append(
             {
                 **item,
@@ -265,6 +278,43 @@ def validate_fewshot_rejections(
         if item["sample_id"] in actual_ids:
             raise ValueError(f"3-shot 第 {index} 项本身已被人工否决")
     return rejections_hash
+
+
+def validate_fewshot_clause_graph(
+    fewshot: list[dict[str, Any]],
+    clauses_path: Path,
+) -> str:
+    """确认跨条文示例仍满足当前条文库中的 refs 直接引用关系。"""
+    if not clauses_path.is_file():
+        raise FileNotFoundError(f"条文库不存在：{clauses_path}")
+    clauses_hash = _sha256(clauses_path)
+    pairs: set[frozenset[str]] = set()
+    with clauses_path.open(encoding="utf-8") as file:
+        for line_no, line in enumerate(file, 1):
+            if not line.strip():
+                raise ValueError(f"{clauses_path}:{line_no} 是空行")
+            row = json.loads(line)
+            clause_id = row.get("clause_id")
+            refs = row.get("refs") or []
+            if not isinstance(clause_id, str) or not isinstance(refs, list):
+                raise ValueError(f"{clauses_path}:{line_no} clause_id/refs 格式错误")
+            for ref in refs:
+                if isinstance(ref, str) and ref and ref != clause_id:
+                    pairs.add(frozenset((clause_id, ref)))
+
+    for index, item in enumerate(fewshot, 1):
+        if item["selection_clause_graph_sha256"] != clauses_hash:
+            raise ValueError(
+                f"3-shot 第 {index} 项使用的条文库已变化，必须重新生成 prompt"
+            )
+        if item["requires_direct_ref"]:
+            source_clauses = item["source_clauses"]
+            if len(source_clauses) != 2 or frozenset(source_clauses) not in pairs:
+                raise ValueError(
+                    f"3-shot 第 {index} 项不满足 refs 直接引用关系："
+                    f"{source_clauses}"
+                )
+    return clauses_hash
 
 
 def build_messages(
@@ -448,6 +498,8 @@ def _manifest_contract(
     fewshot_sha256: str | None,
     fewshot_rejections_file: Path | None,
     fewshot_rejections_sha256: str | None,
+    fewshot_clause_graph_file: Path | None,
+    fewshot_clause_graph_sha256: str | None,
     selected_rows: list[dict[str, Any]],
     smoke: bool,
     models: tuple[str, ...],
@@ -467,6 +519,12 @@ def _manifest_contract(
             else None
         ),
         "fewshot_rejections_sha256": fewshot_rejections_sha256,
+        "fewshot_clause_graph_file": (
+            str(fewshot_clause_graph_file.resolve())
+            if fewshot_clause_graph_file
+            else None
+        ),
+        "fewshot_clause_graph_sha256": fewshot_clause_graph_sha256,
         "smoke": smoke,
         "selected_count": len(selected_rows),
         "selected_ids": [row["id"] for row in selected_rows],
@@ -628,6 +686,11 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         default=_DEFAULT_FEWSHOT_REJECTIONS,
     )
+    parser.add_argument(
+        "--clauses-file",
+        type=Path,
+        default=_DEFAULT_CLAUSES_FILE,
+    )
     parser.add_argument("--model-path", type=Path, default=_DEFAULT_MODEL_PATH)
     parser.add_argument("--checkpoint-root", type=Path, default=_DEFAULT_CHECKPOINT_ROOT)
     parser.add_argument("--workers", type=int, default=4)
@@ -658,6 +721,8 @@ def main(argv: list[str] | None = None) -> int:
         fewshot_sha256: str | None = None
         fewshot_rejections_file: Path | None = None
         fewshot_rejections_sha256: str | None = None
+        fewshot_clause_graph_file: Path | None = None
+        fewshot_clause_graph_sha256: str | None = None
         if "base_fewshot" in models:
             fewshot_file = args.fewshot_file.resolve()
             fewshot = load_fewshot(fewshot_file)
@@ -667,6 +732,11 @@ def main(argv: list[str] | None = None) -> int:
             fewshot_rejections_sha256 = validate_fewshot_rejections(
                 fewshot,
                 fewshot_rejections_file,
+            )
+            fewshot_clause_graph_file = args.clauses_file.resolve()
+            fewshot_clause_graph_sha256 = validate_fewshot_clause_graph(
+                fewshot,
+                fewshot_clause_graph_file,
             )
 
         mapping = model_mapping(args.base_model)
@@ -686,6 +756,8 @@ def main(argv: list[str] | None = None) -> int:
             fewshot_sha256=fewshot_sha256,
             fewshot_rejections_file=fewshot_rejections_file,
             fewshot_rejections_sha256=fewshot_rejections_sha256,
+            fewshot_clause_graph_file=fewshot_clause_graph_file,
+            fewshot_clause_graph_sha256=fewshot_clause_graph_sha256,
             selected_rows=selected_rows,
             smoke=args.smoke,
             models=models,

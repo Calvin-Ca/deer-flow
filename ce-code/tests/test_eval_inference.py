@@ -31,6 +31,7 @@ from src.eval.run_inference import (  # noqa: E402
     parse_models,
     select_eval_rows,
     validate_fewshot_against_eval,
+    validate_fewshot_clause_graph,
     validate_fewshot_rejections,
 )
 
@@ -66,6 +67,9 @@ def _frozen_demo(
         "selection_rejections_file": "configs/prompts/eval_fewshot_rejections.json",
         "selection_rejections_sha256": "a" * 64,
         "excluded_sample_ids": [],
+        "selection_clause_graph_file": "data/interim/clauses.jsonl",
+        "selection_clause_graph_sha256": "b" * 64,
+        "requires_direct_ref": sample_type == "cross_clause",
         "user": f"u{index}",
         "assistant": f"a{index}",
     }
@@ -223,6 +227,55 @@ def test_fewshot_rejections_must_match_current_config() -> None:
             assert "本身已被人工否决" in str(exc)
         else:
             raise AssertionError("已被人工否决的示例必须停止评测")
+
+
+def test_cross_fewshot_must_follow_current_clause_refs() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        prompt_path = root / "fewshot.json"
+        clauses_path = root / "clauses.jsonl"
+        clauses_path.write_text(
+            "\n".join(
+                [
+                    json.dumps(
+                        {
+                            "clause_id": "GB50010-2010_99.2.1",
+                            "refs": ["GB50010-2010_99.2.2"],
+                        }
+                    ),
+                    json.dumps(
+                        {
+                            "clause_id": "GB50010-2010_99.2.2",
+                            "refs": [],
+                        }
+                    ),
+                ]
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        graph_hash = hashlib.sha256(clauses_path.read_bytes()).hexdigest()
+        demos = _frozen_demos()
+        for demo in demos:
+            demo["selection_clause_graph_sha256"] = graph_hash
+        prompt_path.write_text(
+            json.dumps(demos, ensure_ascii=False),
+            encoding="utf-8",
+        )
+
+        loaded = load_fewshot(prompt_path)
+        assert validate_fewshot_clause_graph(loaded, clauses_path) == graph_hash
+
+        loaded[1]["source_clauses"] = [
+            "GB50010-2010_99.2.1",
+            "GB50010-2010_99.9.9",
+        ]
+        try:
+            validate_fewshot_clause_graph(loaded, clauses_path)
+        except ValueError as exc:
+            assert "不满足 refs 直接引用关系" in str(exc)
+        else:
+            raise AssertionError("跨条文示例没有直接 refs 关系时必须停止")
 
 
 def test_jsonl_and_resume_reject_duplicate_ids() -> None:

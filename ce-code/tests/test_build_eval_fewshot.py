@@ -52,6 +52,7 @@ def test_build_fewshot_is_deterministic_and_excludes_eval_clauses() -> None:
         eval_manifest = root / "data/eval/manifest.json"
         group_c = root / "data/processed/group_c/train.jsonl"
         group_d = root / "data/processed/group_d/train.jsonl"
+        clauses_file = root / "data/interim/clauses.jsonl"
         rejections = root / "configs/prompts/eval_fewshot_rejections.json"
 
         _write_jsonl(
@@ -144,6 +145,12 @@ def test_build_fewshot_is_deterministic_and_excludes_eval_clauses() -> None:
                     filters=["cross_clause_verified"],
                 ),
                 _sample(
+                    "d_cross_unlinked",
+                    "cross_clause",
+                    ["GB50010-2010_9.2.5", "GB50011-2010_9.2.6"],
+                    filters=["cross_clause_verified"],
+                ),
+                _sample(
                     "d_refusal_1",
                     "refusal",
                     ["GB50010-2010_9.3.1"],
@@ -157,12 +164,30 @@ def test_build_fewshot_is_deterministic_and_excludes_eval_clauses() -> None:
                 ),
             ],
         )
+        _write_jsonl(
+            clauses_file,
+            [
+                {
+                    "clause_id": "GB50010-2010_9.2.1",
+                    "refs": ["GB50011-2010_9.2.2"],
+                },
+                {"clause_id": "GB50011-2010_9.2.2", "refs": []},
+                {
+                    "clause_id": "GB50010-2010_9.2.3",
+                    "refs": ["GB50011-2010_9.2.4"],
+                },
+                {"clause_id": "GB50011-2010_9.2.4", "refs": []},
+                {"clause_id": "GB50010-2010_9.2.5", "refs": []},
+                {"clause_id": "GB50011-2010_9.2.6", "refs": []},
+            ],
+        )
 
         kwargs = {
             "eval_file": eval_file,
             "eval_manifest": eval_manifest,
             "group_c": group_c,
             "group_d": group_d,
+            "clauses_file": clauses_file,
             "rejections_path": rejections,
             "seed": 42,
         }
@@ -181,6 +206,7 @@ def test_build_fewshot_is_deterministic_and_excludes_eval_clauses() -> None:
         assert [row["candidate_count"] for row in first] == [2, 1, 2]
         assert first[1]["sample_id"] == "d_cross_2"
         assert first[1]["excluded_sample_ids"] == ["d_cross_1"]
+        assert first[1]["requires_direct_ref"] is True
 
 
 if __name__ == "__main__":

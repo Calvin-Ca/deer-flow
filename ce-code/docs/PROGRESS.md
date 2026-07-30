@@ -99,7 +99,7 @@
 
 | # | 任务 | 状态 | 产出 | 备注 |
 |---|---|---|---|---|
-| 5.1 | vLLM 多 adapter 批量推理（6 个模型 × 386 = 2316） | 🔄 | `scripts/build_eval_fewshot.py`、`configs/prompts/eval_fewshot_rejections.json`、`src/eval/run_inference.py`、`scripts/eval_inference.sh`、`scripts/serve_eval.sh`、`tests/test_{build_eval_fewshot,eval_inference}.py`、`results/{run_id}/raw/` | 推理与 3-shot 冻结模块已交付并通过 11 个纯本地用例：C 单条文 + D 跨条文/拒答、固定 seed=42、与评测金标条文零重合；人工否决项及理由单独留痕并参与 prompt 指纹，首个跨条文候选 `d1_0bccf18f` 因过度推断被否决，待服务器确定性重选并复核。推理固定铁律 4 参数，支持20题 smoke、断点续跑、失败留痕和完整性校验 |
+| 5.1 | vLLM 多 adapter 批量推理（6 个模型 × 386 = 2316） | 🔄 | `scripts/build_eval_fewshot.py`、`configs/prompts/eval_fewshot_rejections.json`、`src/eval/run_inference.py`、`scripts/eval_inference.sh`、`scripts/serve_eval.sh`、`tests/test_{build_eval_fewshot,eval_inference}.py`、`results/{run_id}/raw/` | 推理与 3-shot 冻结模块已交付并通过 12 个纯本地用例：C 单条文 + D 跨条文/拒答、固定 seed=42、与评测金标条文零重合；人工否决项及理由留痕并参与 prompt 指纹，`d1_0bccf18f`、`d1_0be1e216` 已因过度推断/弱依赖被否决。跨条文候选现强制两条 source_clauses 在当前条文库 refs 中直接关联，并记录条文库 SHA-256。推理固定铁律 4 参数，支持20题 smoke、断点续跑、失败留痕和完整性校验 |
 | 5.2 | 条款号抽取 + 归一化 | ✅ | `src/eval/clause.py` | 支持带标准号/中文简称/纯条款号三种形式；含 clause_f1 和 is_hallucinated |
 | 5.3 | 条款引用 F1 + 硬幻觉率 | ⬜ | | 全自动 |
 | 5.4 | 数值精确匹配判分 | ⬜ | | |

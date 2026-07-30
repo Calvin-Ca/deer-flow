@@ -5,7 +5,8 @@
   2. group_d：一条 cross_clause；
   3. group_d：一条 refusal；
   4. 三条样本的 source_clauses 均不得与评测集 gold_clauses 重合；
-  5. 固定 seed=42，候选按 sample_id 排序后独立确定性抽样。
+  5. cross_clause 的两条 source_clauses 必须在条文库 refs 中直接关联；
+  6. 固定 seed=42，候选按 sample_id 排序后独立确定性抽样。
 
 运行：
     .venv/bin/python scripts/build_eval_fewshot.py
@@ -30,6 +31,7 @@ _EVAL_FILE = _ROOT / "data/eval/evalset_v1.jsonl"
 _EVAL_MANIFEST = _ROOT / "data/eval/manifest.json"
 _GROUP_C = _ROOT / "data/processed/group_c/train.jsonl"
 _GROUP_D = _ROOT / "data/processed/group_d/train.jsonl"
+_CLAUSES = _ROOT / "data/interim/clauses.jsonl"
 _OUTPUT = _ROOT / "configs/prompts/eval_fewshot.json"
 _REJECTIONS = _ROOT / "configs/prompts/eval_fewshot_rejections.json"
 _SEED = 42
@@ -39,16 +41,19 @@ _SELECTIONS = (
         "source_dataset": "group_c",
         "sample_type": "single_clause",
         "required_filters": {"answerable", "clause_accurate", "diverse"},
+        "requires_direct_ref": False,
     },
     {
         "source_dataset": "group_d",
         "sample_type": "cross_clause",
         "required_filters": {"cross_clause_verified"},
+        "requires_direct_ref": True,
     },
     {
         "source_dataset": "group_d",
         "sample_type": "refusal",
         "required_filters": set(),
+        "requires_direct_ref": False,
     },
 )
 
@@ -185,6 +190,30 @@ def load_rejections(path: Path) -> list[dict[str, Any]]:
     return normalized
 
 
+def load_direct_ref_pairs(path: Path) -> set[frozenset[str]]:
+    """从 refs 构造无向直接引用对，用于筛选真正有关联的跨条文示例。"""
+    if not path.is_file():
+        raise FileNotFoundError(f"条文库不存在：{path}")
+    pairs: set[frozenset[str]] = set()
+    with path.open(encoding="utf-8") as file:
+        for line_no, line in enumerate(file, 1):
+            if not line.strip():
+                raise ValueError(f"{path}:{line_no} 是空行")
+            row = json.loads(line)
+            clause_id = row.get("clause_id")
+            if not isinstance(clause_id, str) or not clause_id:
+                raise ValueError(f"{path}:{line_no} clause_id 为空")
+            refs = row.get("refs") or []
+            if not isinstance(refs, list):
+                raise ValueError(f"{path}:{line_no} refs 不是数组")
+            for ref in refs:
+                if isinstance(ref, str) and ref and ref != clause_id:
+                    pairs.add(frozenset((clause_id, ref)))
+    if not pairs:
+        raise ValueError(f"条文库没有任何 refs 直接引用对：{path}")
+    return pairs
+
+
 def load_candidates(
     path: Path,
     *,
@@ -193,6 +222,7 @@ def load_candidates(
     eval_gold_clauses: set[str],
     eval_questions: set[str],
     rejected_sample_ids: set[str] | None = None,
+    allowed_clause_pairs: set[frozenset[str]] | None = None,
 ) -> list[dict[str, Any]]:
     """加载满足题型、过滤状态和零条文重合要求的候选样本。"""
     if not path.is_file():
@@ -228,6 +258,12 @@ def load_candidates(
                 raise ValueError(f"{path}:{line_no} source_clauses 不是数组")
             if set(source_clauses) & eval_gold_clauses:
                 continue
+            if allowed_clause_pairs is not None:
+                if (
+                    len(source_clauses) != 2
+                    or frozenset(source_clauses) not in allowed_clause_pairs
+                ):
+                    continue
             user, assistant = _conversation(sample)
             if _normalize_question(user) in eval_questions:
                 continue
@@ -263,6 +299,7 @@ def build_fewshot(
     eval_manifest: Path,
     group_c: Path,
     group_d: Path,
+    clauses_file: Path,
     rejections_path: Path,
     seed: int,
 ) -> list[dict[str, Any]]:
@@ -277,6 +314,8 @@ def build_fewshot(
         group_manifests,
     )
     source_hashes = {group: _sha256(path) for group, path in group_paths.items()}
+    clauses_sha256 = _sha256(clauses_file)
+    direct_ref_pairs = load_direct_ref_pairs(clauses_file)
     rejections = load_rejections(rejections_path)
     rejections_sha256 = _sha256(rejections_path)
 
@@ -302,6 +341,11 @@ def build_fewshot(
             eval_gold_clauses=eval_gold_clauses,
             eval_questions=eval_questions,
             rejected_sample_ids=rejected_sample_ids,
+            allowed_clause_pairs=(
+                direct_ref_pairs
+                if spec["requires_direct_ref"]
+                else None
+            ),
         )
         picked = select_candidate(
             candidates,
@@ -322,6 +366,9 @@ def build_fewshot(
                 "selection_rejections_file": _record_path(rejections_path),
                 "selection_rejections_sha256": rejections_sha256,
                 "excluded_sample_ids": sorted(rejected_sample_ids),
+                "selection_clause_graph_file": _record_path(clauses_file),
+                "selection_clause_graph_sha256": clauses_sha256,
+                "requires_direct_ref": spec["requires_direct_ref"],
                 "user": picked["user"],
                 "assistant": picked["assistant"],
             }
@@ -351,6 +398,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--eval-manifest", type=Path, default=_EVAL_MANIFEST)
     parser.add_argument("--group-c", type=Path, default=_GROUP_C)
     parser.add_argument("--group-d", type=Path, default=_GROUP_D)
+    parser.add_argument("--clauses-file", type=Path, default=_CLAUSES)
     parser.add_argument("--rejections", type=Path, default=_REJECTIONS)
     parser.add_argument("--output", type=Path, default=_OUTPUT)
     parser.add_argument("--seed", type=int, default=_SEED)
@@ -362,6 +410,7 @@ def main(argv: list[str] | None = None) -> int:
             eval_manifest=args.eval_manifest.resolve(),
             group_c=args.group_c.resolve(),
             group_d=args.group_d.resolve(),
+            clauses_file=args.clauses_file.resolve(),
             rejections_path=args.rejections.resolve(),
             seed=args.seed,
         )

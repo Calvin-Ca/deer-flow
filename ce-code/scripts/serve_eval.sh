@@ -4,6 +4,8 @@
 # 默认使用物理 GPU 0，服务地址 http://127.0.0.1:8002/v1。
 # 可覆盖示例：
 #   CUDA_VISIBLE_DEVICES=2 PORT=8002 bash scripts/serve_eval.sh
+# vLLM 0.6.x 尚不支持新版的 `--generation-config vllm` 特殊值：
+#   GENERATION_CONFIG=none VLLM_BIN=/path/to/vllm bash scripts/serve_eval.sh
 #
 # 本脚本占用当前终端持续运行；请另开一个终端执行 eval_inference.sh。
 
@@ -19,6 +21,12 @@ HOST="${HOST:-127.0.0.1}"
 VLLM_BIN="${VLLM_BIN:-.venv/bin/vllm}"
 GPU_MEMORY_UTILIZATION="${GPU_MEMORY_UTILIZATION:-0.90}"
 MAX_MODEL_LEN="${MAX_MODEL_LEN:-4096}"
+GENERATION_CONFIG="${GENERATION_CONFIG:-vllm}"
+
+generation_config_args=()
+if [[ "$GENERATION_CONFIG" != "none" ]]; then
+  generation_config_args=(--generation-config "$GENERATION_CONFIG")
+fi
 
 if [[ ! -x "$VLLM_BIN" ]]; then
   echo "❌ 找不到 vLLM 命令：$VLLM_BIN"
@@ -47,6 +55,7 @@ echo "  基座                : $MODEL_PATH"
 echo "  地址                : http://$HOST:$PORT/v1"
 echo "  max_model_len       : $MAX_MODEL_LEN"
 echo "  gpu_memory_util     : $GPU_MEMORY_UTILIZATION"
+echo "  generation_config   : $GENERATION_CONFIG"
 echo "  模型名              : base / group_a / group_b / group_c / group_d"
 echo "=========================================================="
 
@@ -56,7 +65,7 @@ exec "$VLLM_BIN" serve "$MODEL_PATH" \
   --served-model-name base \
   --dtype bfloat16 \
   --seed 42 \
-  --generation-config vllm \
+  "${generation_config_args[@]}" \
   --max-model-len "$MAX_MODEL_LEN" \
   --gpu-memory-utilization "$GPU_MEMORY_UTILIZATION" \
   --enable-lora \

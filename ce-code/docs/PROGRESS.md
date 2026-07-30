@@ -103,15 +103,15 @@
 | 5.2 | 条款号抽取 + 归一化 | ✅ | `src/eval/clause.py` | 支持带标准号/中文简称/纯条款号三种形式；含 clause_f1 和 is_hallucinated |
 | 5.3 | 条款引用 F1 + 硬幻觉率 | ✅ | `src/eval/scoring.py`、`scripts/score_eval.py`、`results/{run_id}/metrics/` | 同时输出逐题指标、宏平均与微平均 F1，以及无效条文引用率 |
 | 5.4 | 数值精确匹配判分 | ✅ | `src/eval/scoring.py`、`scripts/score_eval.py` | Decimal 精确匹配；分别报告完整命中率和数值项命中率，无金标题不进入分母 |
-| 5.5 | LLM judge（盲评+乱序） | ⬜ | | judge 模型 ≠ 合成模型 |
-| 5.6 | 拒答二分类判定 | ✅ | `src/eval/scoring.py`、`scripts/score_eval.py` | 启发式拒答分类；成对报告拒答准确率、应拒答召回率、非拒答误拒率 |
-| 5.7 | 指标汇总，填 EXPERIMENT.md §3 | 🔄 | `results/{run_id}/summary.csv`、`results/{run_id}/scoring_manifest.json` | 自动汇总入口已完成；待在服务器上对正式 run 运行并将结果填入实验记录 |
+| 5.5 | LLM judge（盲评+乱序） | ⬜ | | judge 模型 ≠ 合成模型；需先完成人工抽样并确定 judge 模型 |
+| 5.6 | 拒答二分类判定 | 🔄 | `src/eval/scoring.py`、`scripts/score_eval.py`、`scripts/audit_refusals.py` | 已生成启发式拒答指标；已增加按题型分层抽查脚本，待人工核验拒答标签质量 |
+| 5.7 | 指标汇总，填 EXPERIMENT.md §3 | ✅ | `results/{run_id}/summary.csv`、`results/{run_id}/scoring_manifest.json`、`scripts/export_review.py` | smoke 与正式 run 均已完成自动评分；已生成逐题合并评审文件 `review.md`，实验报告尚未填写 |
 
 ## 阶段 6：验证与报告（1.5 天）
 
 | # | 任务 | 状态 | 产出 | 备注 |
 |---|---|---|---|---|
-| 6.1 | 人工抽检 100 条 + Kappa | ⬜ | | 我来标，你出抽样和计算脚本 |
+| 6.1 | 人工抽检 100 条 + Kappa | 🔄 | `scripts/audit_refusals.py`、`scripts/export_review.py` | 已具备分层抽样和逐题评审文件导出；待人工标注并计算一致性 |
 | 6.2 | 结果可视化 | ⬜ | `results/{run_id}/figs/` | |
 | 6.3 | 实验报告 | ⬜ | `reports/report.md` | 按 EXPERIMENT.md §4 组织 |
 | 6.4 | 一键复现脚本 + README | ⬜ | | |

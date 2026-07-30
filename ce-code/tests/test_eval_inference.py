@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import sys
 import tempfile
 from pathlib import Path
@@ -30,6 +31,7 @@ from src.eval.run_inference import (  # noqa: E402
     parse_models,
     select_eval_rows,
     validate_fewshot_against_eval,
+    validate_fewshot_rejections,
 )
 
 
@@ -61,6 +63,9 @@ def _frozen_demo(
         "source_clauses": source_clauses or [],
         "selection_seed": 42,
         "candidate_count": 10,
+        "selection_rejections_file": "configs/prompts/eval_fewshot_rejections.json",
+        "selection_rejections_sha256": "a" * 64,
+        "excluded_sample_ids": [],
         "user": f"u{index}",
         "assistant": f"a{index}",
     }
@@ -174,6 +179,50 @@ def test_fewshot_provenance_is_loaded_and_checked_against_eval() -> None:
             assert "金标条文重合" in str(exc)
         else:
             raise AssertionError("few-shot 与评测金标条文重合时必须停止")
+
+
+def test_fewshot_rejections_must_match_current_config() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        prompt_path = root / "fewshot.json"
+        rejections_path = root / "rejections.json"
+        rejections_path.write_text(
+            json.dumps(
+                {
+                    "version": 1,
+                    "rejections": [
+                        {
+                            "sample_id": "rejected_cross",
+                            "source_dataset": "group_d",
+                            "sample_type": "cross_clause",
+                            "reason": "测试否决",
+                        }
+                    ],
+                },
+                ensure_ascii=False,
+            ),
+            encoding="utf-8",
+        )
+        rejection_hash = hashlib.sha256(rejections_path.read_bytes()).hexdigest()
+        demos = _frozen_demos()
+        for demo in demos:
+            demo["selection_rejections_sha256"] = rejection_hash
+        demos[1]["excluded_sample_ids"] = ["rejected_cross"]
+        prompt_path.write_text(
+            json.dumps(demos, ensure_ascii=False),
+            encoding="utf-8",
+        )
+
+        loaded = load_fewshot(prompt_path)
+        assert validate_fewshot_rejections(loaded, rejections_path) == rejection_hash
+
+        loaded[1]["sample_id"] = "rejected_cross"
+        try:
+            validate_fewshot_rejections(loaded, rejections_path)
+        except ValueError as exc:
+            assert "本身已被人工否决" in str(exc)
+        else:
+            raise AssertionError("已被人工否决的示例必须停止评测")
 
 
 def test_jsonl_and_resume_reject_duplicate_ids() -> None:

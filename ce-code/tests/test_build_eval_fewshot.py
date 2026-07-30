@@ -52,6 +52,7 @@ def test_build_fewshot_is_deterministic_and_excludes_eval_clauses() -> None:
         eval_manifest = root / "data/eval/manifest.json"
         group_c = root / "data/processed/group_c/train.jsonl"
         group_d = root / "data/processed/group_d/train.jsonl"
+        rejections = root / "configs/prompts/eval_fewshot_rejections.json"
 
         _write_jsonl(
             eval_file,
@@ -84,6 +85,24 @@ def test_build_fewshot_is_deterministic_and_excludes_eval_clauses() -> None:
                 json.dumps({"clauses_fingerprint": "fp-v1"}),
                 encoding="utf-8",
             )
+        rejections.parent.mkdir(parents=True, exist_ok=True)
+        rejections.write_text(
+            json.dumps(
+                {
+                    "version": 1,
+                    "rejections": [
+                        {
+                            "sample_id": "d_cross_1",
+                            "source_dataset": "group_d",
+                            "sample_type": "cross_clause",
+                            "reason": "测试人工否决",
+                        }
+                    ],
+                },
+                ensure_ascii=False,
+            ),
+            encoding="utf-8",
+        )
 
         full_filters = ["answerable", "clause_accurate", "diverse"]
         _write_jsonl(
@@ -144,6 +163,7 @@ def test_build_fewshot_is_deterministic_and_excludes_eval_clauses() -> None:
             "eval_manifest": eval_manifest,
             "group_c": group_c,
             "group_d": group_d,
+            "rejections_path": rejections,
             "seed": 42,
         }
         first = build_fewshot(**kwargs)
@@ -158,7 +178,9 @@ def test_build_fewshot_is_deterministic_and_excludes_eval_clauses() -> None:
         eval_clauses = {"GB50010-2010_1.1.1", "GB50011-2010_2.2.2"}
         assert all(not (set(row["source_clauses"]) & eval_clauses) for row in first)
         assert all(row["selection_seed"] == 42 for row in first)
-        assert [row["candidate_count"] for row in first] == [2, 2, 2]
+        assert [row["candidate_count"] for row in first] == [2, 1, 2]
+        assert first[1]["sample_id"] == "d_cross_2"
+        assert first[1]["excluded_sample_ids"] == ["d_cross_1"]
 
 
 if __name__ == "__main__":

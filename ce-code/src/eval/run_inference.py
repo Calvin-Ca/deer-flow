@@ -32,6 +32,7 @@ from typing import Any, Iterable
 _ROOT = Path(__file__).resolve().parents[2]
 _DEFAULT_EVAL_FILE = _ROOT / "data/eval/evalset_v1.jsonl"
 _DEFAULT_FEWSHOT_FILE = _ROOT / "configs/prompts/eval_fewshot.json"
+_DEFAULT_FEWSHOT_REJECTIONS = _ROOT / "configs/prompts/eval_fewshot_rejections.json"
 _DEFAULT_MODEL_PATH = Path("/mnt/nvme/calvin/models/Qwen2.5-7B-Instruct")
 _DEFAULT_CHECKPOINT_ROOT = _ROOT / "checkpoints"
 _RESULTS_ROOT = _ROOT / "results"
@@ -181,6 +182,15 @@ def load_fewshot(path: Path) -> list[dict[str, Any]]:
             r"[0-9a-f]{64}", source_hash
         ):
             raise ValueError(f"3-shot 第 {index} 项 source_file_sha256 非法")
+        rejections_hash = item.get("selection_rejections_sha256")
+        if not isinstance(rejections_hash, str) or not re.fullmatch(
+            r"[0-9a-f]{64}", rejections_hash
+        ):
+            raise ValueError(
+                f"3-shot 第 {index} 项 selection_rejections_sha256 非法"
+            )
+        if not isinstance(item.get("excluded_sample_ids"), list):
+            raise ValueError(f"3-shot 第 {index} 项 excluded_sample_ids 不是数组")
         normalized.append(
             {
                 **item,
@@ -214,6 +224,47 @@ def validate_fewshot_against_eval(
         normalized_question = re.sub(r"\s+", "", item["user"]).lower()
         if normalized_question in eval_questions:
             raise ValueError(f"3-shot 第 {index} 项问题与评测题完全相同")
+
+
+def validate_fewshot_rejections(
+    fewshot: list[dict[str, Any]],
+    rejections_path: Path,
+) -> str:
+    """确认 prompt 应用的人工否决清单就是当前仓库版本。"""
+    if not rejections_path.is_file():
+        raise FileNotFoundError(f"few-shot 人工否决清单不存在：{rejections_path}")
+    rejections_hash = _sha256(rejections_path)
+    value = json.loads(rejections_path.read_text(encoding="utf-8"))
+    rows = value.get("rejections") if isinstance(value, dict) else None
+    if not isinstance(rows, list):
+        raise ValueError(f"few-shot 人工否决清单格式错误：{rejections_path}")
+    expected: dict[tuple[str, str], set[str]] = {}
+    for row in rows:
+        if not isinstance(row, dict):
+            raise ValueError(f"few-shot 人工否决清单存在非对象项：{rejections_path}")
+        key = (row.get("source_dataset"), row.get("sample_type"))
+        sample_id = row.get("sample_id")
+        if not all(isinstance(item, str) and item for item in (*key, sample_id)):
+            raise ValueError(f"few-shot 人工否决清单字段不完整：{row!r}")
+        expected.setdefault(key, set()).add(sample_id)
+
+    for index, item in enumerate(fewshot, 1):
+        if item["selection_rejections_sha256"] != rejections_hash:
+            raise ValueError(
+                f"3-shot 第 {index} 项使用的人工否决清单已变化，"
+                "必须重新生成 prompt"
+            )
+        key = (item["source_dataset"], item["sample_type"])
+        actual_ids = set(item["excluded_sample_ids"])
+        expected_ids = expected.get(key, set())
+        if actual_ids != expected_ids:
+            raise ValueError(
+                f"3-shot 第 {index} 项 excluded_sample_ids={sorted(actual_ids)}，"
+                f"当前否决清单要求 {sorted(expected_ids)}"
+            )
+        if item["sample_id"] in actual_ids:
+            raise ValueError(f"3-shot 第 {index} 项本身已被人工否决")
+    return rejections_hash
 
 
 def build_messages(
@@ -395,6 +446,8 @@ def _manifest_contract(
     eval_sha256: str,
     fewshot_file: Path | None,
     fewshot_sha256: str | None,
+    fewshot_rejections_file: Path | None,
+    fewshot_rejections_sha256: str | None,
     selected_rows: list[dict[str, Any]],
     smoke: bool,
     models: tuple[str, ...],
@@ -408,6 +461,12 @@ def _manifest_contract(
         "eval_sha256": eval_sha256,
         "fewshot_file": str(fewshot_file.resolve()) if fewshot_file else None,
         "fewshot_sha256": fewshot_sha256,
+        "fewshot_rejections_file": (
+            str(fewshot_rejections_file.resolve())
+            if fewshot_rejections_file
+            else None
+        ),
+        "fewshot_rejections_sha256": fewshot_rejections_sha256,
         "smoke": smoke,
         "selected_count": len(selected_rows),
         "selected_ids": [row["id"] for row in selected_rows],
@@ -564,6 +623,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--eval-file", type=Path, default=_DEFAULT_EVAL_FILE)
     parser.add_argument("--fewshot-file", type=Path, default=_DEFAULT_FEWSHOT_FILE)
+    parser.add_argument(
+        "--fewshot-rejections",
+        type=Path,
+        default=_DEFAULT_FEWSHOT_REJECTIONS,
+    )
     parser.add_argument("--model-path", type=Path, default=_DEFAULT_MODEL_PATH)
     parser.add_argument("--checkpoint-root", type=Path, default=_DEFAULT_CHECKPOINT_ROOT)
     parser.add_argument("--workers", type=int, default=4)
@@ -592,11 +656,18 @@ def main(argv: list[str] | None = None) -> int:
         fewshot: list[dict[str, Any]] | None = None
         fewshot_file: Path | None = None
         fewshot_sha256: str | None = None
+        fewshot_rejections_file: Path | None = None
+        fewshot_rejections_sha256: str | None = None
         if "base_fewshot" in models:
             fewshot_file = args.fewshot_file.resolve()
             fewshot = load_fewshot(fewshot_file)
             validate_fewshot_against_eval(fewshot, rows)
             fewshot_sha256 = _sha256(fewshot_file)
+            fewshot_rejections_file = args.fewshot_rejections.resolve()
+            fewshot_rejections_sha256 = validate_fewshot_rejections(
+                fewshot,
+                fewshot_rejections_file,
+            )
 
         mapping = model_mapping(args.base_model)
         run_dir = _RESULTS_ROOT / args.run_id
@@ -613,6 +684,8 @@ def main(argv: list[str] | None = None) -> int:
             eval_sha256=_sha256(eval_file),
             fewshot_file=fewshot_file,
             fewshot_sha256=fewshot_sha256,
+            fewshot_rejections_file=fewshot_rejections_file,
+            fewshot_rejections_sha256=fewshot_rejections_sha256,
             selected_rows=selected_rows,
             smoke=args.smoke,
             models=models,

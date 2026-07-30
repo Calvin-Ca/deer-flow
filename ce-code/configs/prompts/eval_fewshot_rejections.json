@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "reviewed_at": "2026-07-30",
+  "rejections": [
+    {
+      "sample_id": "d1_0bccf18f",
+      "source_dataset": "group_d",
+      "sample_type": "cross_clause",
+      "source_clauses": [
+        "GB50011-2010_H.2.7",
+        "GB50011-2010_H.2.5"
+      ],
+      "reason": "答案末句将屋盖支撑表述为节点承载力不足时实现整体稳定的补偿手段；H.2.5 与 H.2.7 原文分别规定屋盖支撑和节点承载力例外，未明确建立这种补偿关系，不宜作为 few-shot 示范答案。"
+    }
+  ]
+}

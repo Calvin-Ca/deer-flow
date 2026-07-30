@@ -31,6 +31,7 @@ _EVAL_MANIFEST = _ROOT / "data/eval/manifest.json"
 _GROUP_C = _ROOT / "data/processed/group_c/train.jsonl"
 _GROUP_D = _ROOT / "data/processed/group_d/train.jsonl"
 _OUTPUT = _ROOT / "configs/prompts/eval_fewshot.json"
+_REJECTIONS = _ROOT / "configs/prompts/eval_fewshot_rejections.json"
 _SEED = 42
 
 _SELECTIONS = (
@@ -71,6 +72,14 @@ def _sha256(path: Path) -> str:
 
 def _normalize_question(value: str) -> str:
     return re.sub(r"\s+", "", value).lower()
+
+
+def _record_path(path: Path) -> str:
+    """仓库内记相对路径，测试或显式外部路径则如实记绝对路径。"""
+    try:
+        return str(path.relative_to(_ROOT))
+    except ValueError:
+        return str(path.resolve())
 
 
 def _load_eval_contract(
@@ -145,6 +154,37 @@ def _conversation(sample: dict[str, Any]) -> tuple[str, str]:
     return user.strip(), assistant.strip()
 
 
+def load_rejections(path: Path) -> list[dict[str, Any]]:
+    """加载人工审查否决项，并拒绝重复或字段不完整的记录。"""
+    value = _load_json(path)
+    rows = value.get("rejections")
+    if not isinstance(rows, list):
+        raise ValueError(f"rejections 不是数组：{path}")
+    seen: set[str] = set()
+    normalized: list[dict[str, Any]] = []
+    for index, row in enumerate(rows, 1):
+        if not isinstance(row, dict):
+            raise ValueError(f"{path}: rejection 第 {index} 项不是对象")
+        sample_id = row.get("sample_id")
+        if not isinstance(sample_id, str) or not sample_id:
+            raise ValueError(f"{path}: rejection 第 {index} 项 sample_id 为空")
+        if sample_id in seen:
+            raise ValueError(f"{path}: 重复 rejection sample_id={sample_id}")
+        seen.add(sample_id)
+        if row.get("source_dataset") not in {"group_c", "group_d"}:
+            raise ValueError(f"{path}: {sample_id} source_dataset 非法")
+        if row.get("sample_type") not in {
+            "single_clause",
+            "cross_clause",
+            "refusal",
+        }:
+            raise ValueError(f"{path}: {sample_id} sample_type 非法")
+        if not isinstance(row.get("reason"), str) or not row["reason"].strip():
+            raise ValueError(f"{path}: {sample_id} reason 为空")
+        normalized.append(row)
+    return normalized
+
+
 def load_candidates(
     path: Path,
     *,
@@ -152,6 +192,7 @@ def load_candidates(
     required_filters: set[str],
     eval_gold_clauses: set[str],
     eval_questions: set[str],
+    rejected_sample_ids: set[str] | None = None,
 ) -> list[dict[str, Any]]:
     """加载满足题型、过滤状态和零条文重合要求的候选样本。"""
     if not path.is_file():
@@ -159,6 +200,7 @@ def load_candidates(
             f"训练文件不存在：{path}\n"
             "train.jsonl 不进 Git，请在四组训练所在的服务器运行本脚本。"
         )
+    rejected_sample_ids = rejected_sample_ids or set()
     candidates: list[dict[str, Any]] = []
     seen_ids: set[str] = set()
     with path.open(encoding="utf-8") as file:
@@ -172,6 +214,8 @@ def load_candidates(
             if sample_id in seen_ids:
                 raise ValueError(f"{path}:{line_no} 重复 sample_id={sample_id}")
             seen_ids.add(sample_id)
+            if sample_id in rejected_sample_ids:
+                continue
 
             meta = sample.get("meta") or {}
             if meta.get("sample_type") != sample_type:
@@ -219,6 +263,7 @@ def build_fewshot(
     eval_manifest: Path,
     group_c: Path,
     group_d: Path,
+    rejections_path: Path,
     seed: int,
 ) -> list[dict[str, Any]]:
     group_paths = {"group_c": group_c, "group_d": group_d}
@@ -232,18 +277,31 @@ def build_fewshot(
         group_manifests,
     )
     source_hashes = {group: _sha256(path) for group, path in group_paths.items()}
+    rejections = load_rejections(rejections_path)
+    rejections_sha256 = _sha256(rejections_path)
 
     frozen: list[dict[str, Any]] = []
     for spec in _SELECTIONS:
         source_dataset = spec["source_dataset"]
         sample_type = spec["sample_type"]
         source_path = group_paths[source_dataset]
+        relevant_rejections = [
+            row
+            for row in rejections
+            if row["source_dataset"] == source_dataset
+            and row["sample_type"] == sample_type
+        ]
+        rejected_sample_ids = {
+            row["sample_id"]
+            for row in relevant_rejections
+        }
         candidates = load_candidates(
             source_path,
             sample_type=sample_type,
             required_filters=spec["required_filters"],
             eval_gold_clauses=eval_gold_clauses,
             eval_questions=eval_questions,
+            rejected_sample_ids=rejected_sample_ids,
         )
         picked = select_candidate(
             candidates,
@@ -261,6 +319,9 @@ def build_fewshot(
                 "source_clauses": picked["source_clauses"],
                 "selection_seed": seed,
                 "candidate_count": len(candidates),
+                "selection_rejections_file": _record_path(rejections_path),
+                "selection_rejections_sha256": rejections_sha256,
+                "excluded_sample_ids": sorted(rejected_sample_ids),
                 "user": picked["user"],
                 "assistant": picked["assistant"],
             }
@@ -290,6 +351,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--eval-manifest", type=Path, default=_EVAL_MANIFEST)
     parser.add_argument("--group-c", type=Path, default=_GROUP_C)
     parser.add_argument("--group-d", type=Path, default=_GROUP_D)
+    parser.add_argument("--rejections", type=Path, default=_REJECTIONS)
     parser.add_argument("--output", type=Path, default=_OUTPUT)
     parser.add_argument("--seed", type=int, default=_SEED)
     args = parser.parse_args(argv)
@@ -300,6 +362,7 @@ def main(argv: list[str] | None = None) -> int:
             eval_manifest=args.eval_manifest.resolve(),
             group_c=args.group_c.resolve(),
             group_d=args.group_d.resolve(),
+            rejections_path=args.rejections.resolve(),
             seed=args.seed,
         )
         _write_frozen(args.output.resolve(), frozen)

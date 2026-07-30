@@ -8,6 +8,9 @@
     "source_clauses": [],
     "selection_seed": 42,
     "candidate_count": 0,
+    "selection_rejections_file": "configs/prompts/eval_fewshot_rejections.json",
+    "selection_rejections_sha256": "【脚本自动填写】",
+    "excluded_sample_ids": [],
     "user": "【待确认】示例问题 1",
     "assistant": "【待确认】示例答案 1"
   },
@@ -20,6 +23,9 @@
     "source_clauses": [],
     "selection_seed": 42,
     "candidate_count": 0,
+    "selection_rejections_file": "configs/prompts/eval_fewshot_rejections.json",
+    "selection_rejections_sha256": "【脚本自动填写】",
+    "excluded_sample_ids": [],
     "user": "【待确认】示例问题 2",
     "assistant": "【待确认】示例答案 2"
   },
@@ -32,6 +38,9 @@
     "source_clauses": [],
     "selection_seed": 42,
     "candidate_count": 0,
+    "selection_rejections_file": "configs/prompts/eval_fewshot_rejections.json",
+    "selection_rejections_sha256": "【脚本自动填写】",
+    "excluded_sample_ids": [],
     "user": "【待确认】示例问题 3",
     "assistant": "【待确认】示例答案 3"
   }

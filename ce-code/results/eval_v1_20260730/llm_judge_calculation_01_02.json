@@ -1,0 +1,1868 @@
+[
+{
+"id": "eval_ca_2add6b66",
+"scores": {
+"Answer_1": {
+"correctness": 1,
+"completeness": 3,
+"grounding": 1,
+"relevance": 4,
+"overall": 1,
+"numerical_reasoning": 1,
+"reason": "计算公式和数值均错误，误将强度标准值代入弹模公式，导致结果严重偏离规范。"
+},
+"Answer_2": {
+"correctness": 1,
+"completeness": 3,
+"grounding": 1,
+"relevance": 4,
+"overall": 1,
+"numerical_reasoning": 1,
+"reason": "引入水胶比经验公式，规范依据错误，计算结果和单位均不符合题意。"
+},
+"Answer_3": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 2,
+"relevance": 3,
+"overall": 2,
+"numerical_reasoning": 2,
+"reason": "给出表格形式但C30数值错误，且条文表述存在问题。"
+},
+"Answer_4": {
+"correctness": 4,
+"completeness": 3,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"numerical_reasoning": 4,
+"reason": "弹性模量正确，剪切模量错误，缺少计算过程但核心部分正确。"
+},
+"Answer_5": {
+"correctness": 5,
+"completeness": 4,
+"grounding": 4,
+"relevance": 5,
+"overall": 5,
+"numerical_reasoning": 5,
+"reason": "数值基本符合规范，剪切模量略有取舍差异。"
+},
+"Answer_6": {
+"correctness": 3,
+"completeness": 3,
+"grounding": 4,
+"relevance": 5,
+"overall": 3,
+"numerical_reasoning": 3,
+"reason": "弹模正确，剪切模量偏低，与金标不符。"
+}
+}
+},
+{
+"id": "eval_ca_1539df6a",
+"scores": {
+"Answer_1": {
+"correctness": 1,
+"completeness": 3,
+"grounding": 1,
+"relevance": 5,
+"overall": 1,
+"numerical_reasoning": 1,
+"reason": "虚构保护层厚度计算公式，未按规范表格确定，结果错误。"
+},
+"Answer_2": {
+"correctness": 1,
+"completeness": 3,
+"grounding": 2,
+"relevance": 5,
+"overall": 1,
+"numerical_reasoning": 1,
+"reason": "保护层厚度规定理解错误，普通梁25mm不适用于该环境条件。"
+},
+"Answer_3": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 2,
+"relevance": 4,
+"overall": 2,
+"numerical_reasoning": 2,
+"reason": "列出表格但环境类别缺少五类，不能支持最终判断。"
+},
+"Answer_4": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 2,
+"relevance": 5,
+"overall": 2,
+"numerical_reasoning": 2,
+"reason": "基础数值错误，环境类别调整理解不足。"
+},
+"Answer_5": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 2,
+"relevance": 5,
+"overall": 2,
+"numerical_reasoning": 2,
+"reason": "将普通环境保护层表值直接用于五类环境，结论错误。"
+},
+"Answer_6": {
+"correctness": 1,
+"completeness": 2,
+"grounding": 3,
+"relevance": 3,
+"overall": 1,
+"numerical_reasoning": 1,
+"reason": "不应拒答，规范可直接确定保护层厚度，错误回避问题。"
+}
+}
+},
+{
+"id": "eval_ca_6326e493",
+"scores": {
+"Answer_1": {
+"correctness": 1,
+"completeness": 4,
+"grounding": 1,
+"relevance": 5,
+"overall": 1,
+"numerical_reasoning": 1,
+"reason": "公式不存在且结果错误，但计算过程完整。"
+},
+"Answer_2": {
+"correctness": 1,
+"completeness": 3,
+"grounding": 1,
+"relevance": 4,
+"overall": 1,
+"numerical_reasoning": 1,
+"reason": "引用了错误公式和不存在条件，计算无规范依据。"
+},
+"Answer_3": {
+"correctness": 1,
+"completeness": 2,
+"grounding": 1,
+"relevance": 3,
+"overall": 1,
+"numerical_reasoning": 1,
+"reason": "答非所问，回答锚筋锚固长度而非锚板厚度。"
+},
+"Answer_4": {
+"correctness": 1,
+"completeness": 3,
+"grounding": 1,
+"relevance": 4,
+"overall": 1,
+"numerical_reasoning": 1,
+"reason": "公式和单位均错误，无法作为规范计算依据。"
+},
+"Answer_5": {
+"correctness": 1,
+"completeness": 3,
+"grounding": 1,
+"relevance": 4,
+"overall": 1,
+"numerical_reasoning": 1,
+"reason": "虚构查表系数，计算过程无可靠规范依据。"
+},
+"Answer_6": {
+"correctness": 1,
+"completeness": 2,
+"grounding": 2,
+"relevance": 3,
+"overall": 1,
+"numerical_reasoning": 1,
+"reason": "错误拒答，题目已提供足够数据可按构造要求计算。"
+}
+}
+},
+{
+"id": "eval_ca_5f544768",
+"scores": {
+"Answer_1": {
+"correctness": 3,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"numerical_reasoning": 3,
+"reason": "直径正确，间距引用抗震构造要求导致偏严但非完全无关。"
+},
+"Answer_2": {
+"correctness": 1,
+"completeness": 4,
+"grounding": 1,
+"relevance": 5,
+"overall": 1,
+"numerical_reasoning": 1,
+"reason": "条文和限制条件明显错误，给出错误间距。"
+},
+"Answer_3": {
+"correctness": 5,
+"completeness": 4,
+"grounding": 4,
+"relevance": 5,
+"overall": 5,
+"numerical_reasoning": 5,
+"reason": "核心要求正确，给出6mm和600mm，符合题意。"
+},
+"Answer_4": {
+"correctness": 5,
+"completeness": 3,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"numerical_reasoning": 5,
+"reason": "结论正确，但解释部分较少。"
+},
+"Answer_5": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 2,
+"relevance": 5,
+"overall": 2,
+"numerical_reasoning": 2,
+"reason": "直径正确，间距200mm依据错误。"
+},
+"Answer_6": {
+"correctness": 3,
+"completeness": 3,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"numerical_reasoning": 3,
+"reason": "基本构造要求正确，但自行提高要求且未说明依据。"
+}
+}
+},
+{
+"id": "eval_ca_983c4c56",
+"scores": {
+"Answer_1": {
+"correctness": 4,
+"completeness": 4,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"numerical_reasoning": 4,
+"reason": "极限强度正确，屈服强度错误。"
+},
+"Answer_2": {
+"correctness": 3,
+"completeness": 4,
+"grounding": 4,
+"relevance": 5,
+"overall": 3,
+"numerical_reasoning": 3,
+"reason": "极限强度正确，屈服强度取值错误。"
+},
+"Answer_3": {
+"correctness": 1,
+"completeness": 3,
+"grounding": 1,
+"relevance": 3,
+"overall": 1,
+"numerical_reasoning": 1,
+"reason": "表格内容混乱，未正确回答HRB400指标。"
+},
+"Answer_4": {
+"correctness": 5,
+"completeness": 4,
+"grounding": 4,
+"relevance": 5,
+"overall": 5,
+"numerical_reasoning": 5,
+"reason": "两个数值均正确，满足查表要求。"
+},
+"Answer_5": {
+"correctness": 5,
+"completeness": 4,
+"grounding": 4,
+"relevance": 5,
+"overall": 5,
+"numerical_reasoning": 5,
+"reason": "结果正确，说明简洁。"
+},
+"Answer_6": {
+"correctness": 3,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"numerical_reasoning": 3,
+"reason": "屈服强度正确，极限强度错误。"
+}
+}
+},
+{
+"id": "eval_ca_a9452204",
+"scores": {
+"Answer_1": {
+"correctness": 3,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"numerical_reasoning": 3,
+"reason": "轴压比接近但表格依据和结果不符合金标。"
+},
+"Answer_2": {
+"correctness": 3,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"numerical_reasoning": 3,
+"reason": "给出0.70，规范依据描述不准确。"
+},
+"Answer_3": {
+"correctness": 5,
+"completeness": 4,
+"grounding": 4,
+"relevance": 5,
+"overall": 5,
+"numerical_reasoning": 5,
+"reason": "表格和二级框架柱限值0.75符合要求。"
+},
+"Answer_4": {
+"correctness": 1,
+"completeness": 3,
+"grounding": 1,
+"relevance": 4,
+"overall": 1,
+"numerical_reasoning": 1,
+"reason": "公式和限值错误。"
+},
+"Answer_5": {
+"correctness": 4,
+"completeness": 3,
+"grounding": 3,
+"relevance": 5,
+"overall": 4,
+"numerical_reasoning": 4,
+"reason": "最终取0.75正确，但条文引用不够准确。"
+},
+"Answer_6": {
+"correctness": 1,
+"completeness": 2,
+"grounding": 3,
+"relevance": 3,
+"overall": 1,
+"numerical_reasoning": 1,
+"reason": "错误拒答，规范可直接查取限值。"
+}
+}
+},
+{
+"id": "eval_ca_229ef811",
+"scores": {
+"Answer_1": {
+"correctness": 3,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"numerical_reasoning": 3,
+"reason": "引用了额外1/20条件，导致结果错误。"
+},
+"Answer_2": {
+"correctness": 4,
+"completeness": 4,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"numerical_reasoning": 4,
+"reason": "计算正确但将不小于表述为大于。"
+},
+"Answer_3": {
+"correctness": 1,
+"completeness": 2,
+"grounding": 1,
+"relevance": 2,
+"overall": 1,
+"numerical_reasoning": 1,
+"reason": "答非所问，内容为组合值系数。"
+},
+"Answer_4": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 2,
+"relevance": 5,
+"overall": 2,
+"numerical_reasoning": 2,
+"reason": "比例错误，规范要求为1/15。"
+},
+"Answer_5": {
+"correctness": 5,
+"completeness": 4,
+"grounding": 4,
+"relevance": 5,
+"overall": 5,
+"numerical_reasoning": 5,
+"reason": "计算和结论均正确。"
+},
+"Answer_6": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 2,
+"relevance": 4,
+"overall": 2,
+"numerical_reasoning": 2,
+"reason": "比例计算错误且错误表示无法判断。"
+}
+}
+},
+{
+"id": "eval_ca_79230086",
+"scores": {
+"Answer_1": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 2,
+"relevance": 4,
+"overall": 2,
+"numerical_reasoning": 2,
+"reason": "公式和计算方法错误，但意识到周期缺失需假设。"
+},
+"Answer_2": {
+"correctness": 1,
+"completeness": 3,
+"grounding": 1,
+"relevance": 4,
+"overall": 1,
+"numerical_reasoning": 1,
+"reason": "使用错误公式估算周期，结果无规范依据。"
+},
+"Answer_3": {
+"correctness": 1,
+"completeness": 3,
+"grounding": 1,
+"relevance": 3,
+"overall": 1,
+"numerical_reasoning": 1,
+"reason": "大量公式和条文引用错误，未完成计算。"
+},
+"Answer_4": {
+"correctness": 5,
+"completeness": 3,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"numerical_reasoning": 5,
+"reason": "按F/G得到0.25，但与金标设定计算过程不完全一致。"
+},
+"Answer_5": {
+"correctness": 3,
+"completeness": 3,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"numerical_reasoning": 3,
+"reason": "没有完整计算，结论依据不足。"
+},
+"Answer_6": {
+"correctness": 1,
+"completeness": 2,
+"grounding": 2,
+"relevance": 3,
+"overall": 1,
+"numerical_reasoning": 1,
+"reason": "错误拒答，题目已给定计算假设。"
+}
+}
+}
+]
+
+
+[
+{
+"id": "eval_ca_567746f0",
+"scores": {
+"Answer_1": {
+"correctness": 1,
+"completeness": 3,
+"grounding": 1,
+"relevance": 4,
+"overall": 1,
+"numerical_reasoning": 1,
+"reason": "虚构防震缝计算公式，规范依据错误，计算过程完整但结论严重偏离规范。"
+},
+"Answer_2": {
+"correctness": 1,
+"completeness": 3,
+"grounding": 1,
+"relevance": 4,
+"overall": 1,
+"numerical_reasoning": 1,
+"reason": "套用了不存在的计算方法，单位换算错误，最终结果错误。"
+},
+"Answer_3": {
+"correctness": 1,
+"completeness": 2,
+"grounding": 1,
+"relevance": 3,
+"overall": 1,
+"numerical_reasoning": 1,
+"reason": "引用公式和参数明显不适用于本题，存在大量条文及计算幻觉。"
+},
+"Answer_4": {
+"correctness": 1,
+"completeness": 2,
+"grounding": 1,
+"relevance": 3,
+"overall": 1,
+"numerical_reasoning": 1,
+"reason": "错误引用表值和计算公式，缝宽740mm无规范依据。"
+},
+"Answer_5": {
+"correctness": 5,
+"completeness": 4,
+"grounding": 4,
+"relevance": 5,
+"overall": 5,
+"numerical_reasoning": 5,
+"reason": "正确识别9.3.2与6.1.2关系，得到50mm，与金标一致，说明略少。"
+},
+"Answer_6": {
+"correctness": 3,
+"completeness": 3,
+"grounding": 3,
+"relevance": 4,
+"overall": 3,
+"numerical_reasoning": 3,
+"reason": "拒答理由不充分，本题已有规范给定条件可直接回答。"
+}
+}
+},
+{
+"id": "eval_ca_20f32341",
+"scores": {
+"Answer_1": {
+"correctness": 1,
+"completeness": 3,
+"grounding": 1,
+"relevance": 4,
+"overall": 1,
+"numerical_reasoning": 1,
+"reason": "虚构折算刚度公式，未采用规范规定的7、8、9度取值。"
+},
+"Answer_2": {
+"correctness": 1,
+"completeness": 3,
+"grounding": 1,
+"relevance": 4,
+"overall": 1,
+"numerical_reasoning": 1,
+"reason": "计算过程完整但公式错误，0.0625结论无规范依据。"
+},
+"Answer_3": {
+"correctness": 2,
+"completeness": 2,
+"grounding": 2,
+"relevance": 4,
+"overall": 2,
+"numerical_reasoning": 2,
+"reason": "引用条文内容与题目相关性不足，未回答折算系数计算。"
+},
+"Answer_4": {
+"correctness": 1,
+"completeness": 2,
+"grounding": 1,
+"relevance": 4,
+"overall": 1,
+"numerical_reasoning": 1,
+"reason": "公式和计算方法错误，0.84结果不可信。"
+},
+"Answer_5": {
+"correctness": 1,
+"completeness": 3,
+"grounding": 2,
+"relevance": 4,
+"overall": 1,
+"numerical_reasoning": 1,
+"reason": "误用查表逻辑，折算系数0.2与规范不符。"
+},
+"Answer_6": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 3,
+"relevance": 4,
+"overall": 2,
+"numerical_reasoning": 2,
+"reason": "不应拒答，规范已给出明确系数，但指出工程条件需结合有一定合理性。"
+}
+}
+},
+{
+"id": "eval_ca_ae94986a",
+"scores": {
+"Answer_1": {
+"correctness": 2,
+"completeness": 4,
+"grounding": 2,
+"relevance": 5,
+"overall": 2,
+"numerical_reasoning": 2,
+"reason": "计算方法和规范引用错误，但有完整计算框架。"
+},
+"Answer_2": {
+"correctness": 1,
+"completeness": 3,
+"grounding": 1,
+"relevance": 4,
+"overall": 1,
+"numerical_reasoning": 1,
+"reason": "采用错误公式，计算结果不具备结构设计意义。"
+},
+"Answer_3": {
+"correctness": 1,
+"completeness": 1,
+"grounding": 1,
+"relevance": 1,
+"overall": 1,
+"numerical_reasoning": 1,
+"reason": "大量罗列条文但未回答计算问题，属于无效回答。"
+},
+"Answer_4": {
+"correctness": 2,
+"completeness": 2,
+"grounding": 2,
+"relevance": 3,
+"overall": 2,
+"numerical_reasoning": 2,
+"reason": "指出需计算但未完成，假设参数不充分。"
+},
+"Answer_5": {
+"correctness": 2,
+"completeness": 2,
+"grounding": 2,
+"relevance": 3,
+"overall": 2,
+"numerical_reasoning": 2,
+"reason": "引用条款方向错误，没有给出有效计算。"
+},
+"Answer_6": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 3,
+"relevance": 4,
+"overall": 2,
+"numerical_reasoning": 2,
+"reason": "错误拒绝，题目给定条件足够进行简化计算。"
+}
+}
+}
+]
+[
+{
+"id": "eval_ca_9a1efa7f",
+"scores": {
+"Answer_1": {
+"correctness": 4,
+"completeness": 4,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"numerical_reasoning": 4,
+"reason": "正确识别10%控制要求，计算1500kN；但增加核心筒剪力和15%条款说明不够准确。"
+},
+"Answer_2": {
+"correctness": 2,
+"completeness": 4,
+"grounding": 2,
+"relevance": 4,
+"overall": 2,
+"numerical_reasoning": 2,
+"reason": "20%和5%要求错误，且将层剪力平均处理不符合规范要求。"
+},
+"Answer_3": {
+"correctness": 1,
+"completeness": 3,
+"grounding": 1,
+"relevance": 2,
+"overall": 1,
+"numerical_reasoning": 1,
+"reason": "大量引用无关公式，混淆6.7.1内容，未有效回答问题。"
+},
+"Answer_4": {
+"correctness": 2,
+"completeness": 2,
+"grounding": 2,
+"relevance": 3,
+"overall": 2,
+"numerical_reasoning": 2,
+"reason": "提出的系数和比例缺乏规范依据，未完成题目判断。"
+},
+"Answer_5": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 2,
+"relevance": 4,
+"overall": 2,
+"numerical_reasoning": 3,
+"reason": "15%要求与规范不符，但计算过程简单清晰。"
+},
+"Answer_6": {
+"correctness": 1,
+"completeness": 3,
+"grounding": 1,
+"relevance": 3,
+"overall": 1,
+"numerical_reasoning": 1,
+"reason": "公式引用错误，计算7083kN和238.89kN无规范依据。"
+}
+}
+},
+{
+"id": "eval_ca_def9eff0",
+"scores": {
+"Answer_1": {
+"correctness": 2,
+"completeness": 4,
+"grounding": 2,
+"relevance": 5,
+"overall": 2,
+"numerical_reasoning": 2,
+"reason": "荷载计算正确，但地震作用算法、螺栓承载力引用均存在问题。"
+},
+"Answer_2": {
+"correctness": 3,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"numerical_reasoning": 3,
+"reason": "考虑了连接件分配，但未给出实际数量，承载力判断依据不足。"
+},
+"Answer_3": {
+"correctness": 1,
+"completeness": 2,
+"grounding": 1,
+"relevance": 2,
+"overall": 1,
+"numerical_reasoning": 1,
+"reason": "引用钢筋混凝土托墙梁条文，与顶棚连接件无关。"
+},
+"Answer_4": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 2,
+"relevance": 4,
+"overall": 2,
+"numerical_reasoning": 2,
+"reason": "荷载单位计算错误，未考虑题目要求的地震附加作用。"
+},
+"Answer_5": {
+"correctness": 1,
+"completeness": 3,
+"grounding": 1,
+"relevance": 4,
+"overall": 1,
+"numerical_reasoning": 1,
+"reason": "条文引用错误，荷载值和螺栓参数存在明显错误。"
+},
+"Answer_6": {
+"correctness": 3,
+"completeness": 3,
+"grounding": 3,
+"relevance": 4,
+"overall": 3,
+"numerical_reasoning": 3,
+"reason": "拒答理由部分合理，但本题已有足够信息可做规范判断。"
+}
+}
+},
+{
+"id": "eval_ca_bad3544a",
+"scores": {
+"Answer_1": {
+"correctness": 3,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"numerical_reasoning": 3,
+"reason": "采用节点受剪计算思路，但公式和参数缺少关键条件，无法可靠判断。"
+},
+"Answer_2": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 2,
+"relevance": 4,
+"overall": 2,
+"numerical_reasoning": 2,
+"reason": "未提供有效节点受剪计算，结果依据不足。"
+},
+"Answer_3": {
+"correctness": 2,
+"completeness": 2,
+"grounding": 2,
+"relevance": 3,
+"overall": 2,
+"numerical_reasoning": 1,
+"reason": "引用大量条文但未完成节点核芯区验算。"
+},
+"Answer_4": {
+"correctness": 1,
+"completeness": 2,
+"grounding": 1,
+"relevance": 3,
+"overall": 1,
+"numerical_reasoning": 1,
+"reason": "公式明显错误，计算结果无规范依据。"
+},
+"Answer_5": {
+"correctness": 2,
+"completeness": 2,
+"grounding": 2,
+"relevance": 3,
+"overall": 2,
+"numerical_reasoning": 2,
+"reason": "未完成计算，只说明一般方法。"
+},
+"Answer_6": {
+"correctness": 3,
+"completeness": 3,
+"grounding": 3,
+"relevance": 4,
+"overall": 3,
+"numerical_reasoning": 3,
+"reason": "拒答理由较合理，但部分参数已给出，不应完全拒绝。"
+}
+}
+}
+]
+
+
+[
+  {
+    "id": "eval_ca_512a9e30",
+    "scores": {
+      "Answer_1": {
+        "correctness": 1,
+        "completeness": 3,
+        "grounding": 1,
+        "relevance": 4,
+        "overall": 1,
+        "numerical_reasoning": 1,
+        "reason": "错误理解卸载规则，将第一级卸载误认为加载20kN的一半，稳定条件也非规范要求。"
+      },
+      "Answer_2": {
+        "correctness": 1,
+        "completeness": 3,
+        "grounding": 1,
+        "relevance": 4,
+        "overall": 1,
+        "numerical_reasoning": 1,
+        "reason": "错误认为卸载按加载分级对应，未采用H.0.9规定的3倍规则。"
+      },
+      "Answer_3": {
+        "correctness": 2,
+        "completeness": 3,
+        "grounding": 2,
+        "relevance": 4,
+        "overall": 2,
+        "numerical_reasoning": 2,
+        "reason": "卸载计算方法错误，稳定条件表述与规范不符。"
+      },
+      "Answer_4": {
+        "correctness": 2,
+        "completeness": 3,
+        "grounding": 2,
+        "relevance": 4,
+        "overall": 2,
+        "numerical_reasoning": 2,
+        "reason": "部分理解卸载递减过程，但第一级卸载值错误，稳定标准错误。"
+      },
+      "Answer_5": {
+        "correctness": 2,
+        "completeness": 3,
+        "grounding": 2,
+        "relevance": 4,
+        "overall": 2,
+        "numerical_reasoning": 2,
+        "reason": "计算50kN错误，稳定条件与规范要求不一致。"
+      },
+      "Answer_6": {
+        "correctness": 2,
+        "completeness": 3,
+        "grounding": 2,
+        "relevance": 4,
+        "overall": 2,
+        "numerical_reasoning": 2,
+        "reason": "引用条文方向正确，但卸载规则和稳定条件均错误。"
+      }
+    }
+  },
+  {
+    "id": "eval_ca_1494706d",
+    "scores": {
+      "Answer_1": {
+        "correctness": 2,
+        "completeness": 4,
+        "grounding": 2,
+        "relevance": 5,
+        "overall": 2,
+        "numerical_reasoning": 2,
+        "reason": "轴压比限值调整过程为编造，规范无C30和截面增加调整。"
+      },
+      "Answer_2": {
+        "correctness": 1,
+        "completeness": 4,
+        "grounding": 1,
+        "relevance": 4,
+        "overall": 1,
+        "numerical_reasoning": 1,
+        "reason": "错误构造轴压比公式并引入假设荷载，偏离规范表格确定方法。"
+      },
+      "Answer_3": {
+        "correctness": 1,
+        "completeness": 2,
+        "grounding": 1,
+        "relevance": 3,
+        "overall": 1,
+        "numerical_reasoning": 1,
+        "reason": "引用6.3.9与轴压比计算无关，公式明显错误。"
+      },
+      "Answer_4": {
+        "correctness": 1,
+        "completeness": 3,
+        "grounding": 1,
+        "relevance": 4,
+        "overall": 1,
+        "numerical_reasoning": 1,
+        "reason": "轴压比限值0.60错误，引用条文错误。"
+      },
+      "Answer_5": {
+        "correctness": 2,
+        "completeness": 3,
+        "grounding": 2,
+        "relevance": 4,
+        "overall": 2,
+        "numerical_reasoning": 2,
+        "reason": "限值0.80接近但箍筋提高逻辑错误，未准确查表。"
+      },
+      "Answer_6": {
+        "correctness": 3,
+        "completeness": 3,
+        "grounding": 3,
+        "relevance": 4,
+        "overall": 3,
+        "numerical_reasoning": 3,
+        "reason": "错误拒答，题目条件足够确定轴压比限值。"
+      }
+    }
+  },
+  {
+    "id": "eval_ca_eea7f41d",
+    "scores": {
+      "Answer_1": {
+        "correctness": 2,
+        "completeness": 4,
+        "grounding": 2,
+        "relevance": 5,
+        "overall": 2,
+        "numerical_reasoning": 2,
+        "reason": "将水平系梁错误按框架梁处理，计算方法和条文适用错误。"
+      },
+      "Answer_2": {
+        "correctness": 3,
+        "completeness": 4,
+        "grounding": 3,
+        "relevance": 5,
+        "overall": 3,
+        "numerical_reasoning": 3,
+        "reason": "总体方向正确，但部分间距要求和构造描述不准确。"
+      },
+      "Answer_3": {
+        "correctness": 1,
+        "completeness": 2,
+        "grounding": 1,
+        "relevance": 2,
+        "overall": 1,
+        "numerical_reasoning": 1,
+        "reason": "回答受剪承载力调整系数，与水平系梁配筋要求无关。"
+      },
+      "Answer_4": {
+        "correctness": 5,
+        "completeness": 4,
+        "grounding": 5,
+        "relevance": 5,
+        "overall": 5,
+        "numerical_reasoning": 5,
+        "reason": "准确引用7.5.5并给出4φ12、φ6@200等关键要求。"
+      },
+      "Answer_5": {
+        "correctness": 4,
+        "completeness": 4,
+        "grounding": 4,
+        "relevance": 5,
+        "overall": 4,
+        "numerical_reasoning": 4,
+        "reason": "基本符合规范要求，但部分构造描述不够严谨。"
+      },
+      "Answer_6": {
+        "correctness": 2,
+        "completeness": 3,
+        "grounding": 2,
+        "relevance": 4,
+        "overall": 2,
+        "numerical_reasoning": 2,
+        "reason": "错误拒答，规范已明确给出最低构造要求。"
+      }
+    }
+  }
+]
+
+[
+  {
+    "id": "eval_ca_ff6aef0b",
+    "scores": {
+      "Answer_1": {
+        "correctness": 2,
+        "completeness": 4,
+        "grounding": 2,
+        "relevance": 5,
+        "overall": 2,
+        "numerical_reasoning": 2,
+        "reason": "计算轴压比过程有一定合理性，但未按规范计算柱剪力设计值，最终结论缺乏依据。"
+      },
+      "Answer_2": {
+        "correctness": 1,
+        "completeness": 4,
+        "grounding": 1,
+        "relevance": 4,
+        "overall": 1,
+        "numerical_reasoning": 1,
+        "reason": "构造了不存在的剪力计算公式，轴压比和剪力计算均错误。"
+      },
+      "Answer_3": {
+        "correctness": 1,
+        "completeness": 3,
+        "grounding": 1,
+        "relevance": 3,
+        "overall": 1,
+        "numerical_reasoning": 1,
+        "reason": "引用条文错误，计算公式和物理含义均不符合柱剪力设计。"
+      },
+      "Answer_4": {
+        "correctness": 3,
+        "completeness": 3,
+        "grounding": 3,
+        "relevance": 4,
+        "overall": 3,
+        "numerical_reasoning": 3,
+        "reason": "指出需按规范公式计算，但未给出具体计算结果。"
+      },
+      "Answer_5": {
+        "correctness": 2,
+        "completeness": 3,
+        "grounding": 2,
+        "relevance": 4,
+        "overall": 2,
+        "numerical_reasoning": 2,
+        "reason": "涉及柱抗剪验算，但公式和符号定义错误。"
+      },
+      "Answer_6": {
+        "correctness": 3,
+        "completeness": 3,
+        "grounding": 3,
+        "relevance": 4,
+        "overall": 3,
+        "numerical_reasoning": 3,
+        "reason": "拒答理由部分合理，但题目给出的条件可进行规范计算。"
+      }
+    }
+  },
+  {
+    "id": "eval_ca_f77d22a4",
+    "scores": {
+      "Answer_1": {
+        "correctness": 2,
+        "completeness": 4,
+        "grounding": 2,
+        "relevance": 5,
+        "overall": 2,
+        "numerical_reasoning": 2,
+        "reason": "自行假设梁长并计算弯矩，关键参数缺失但不应随意假设。"
+      },
+      "Answer_2": {
+        "correctness": 1,
+        "completeness": 4,
+        "grounding": 1,
+        "relevance": 4,
+        "overall": 1,
+        "numerical_reasoning": 1,
+        "reason": "使用截面高度计算弯矩，量纲错误，公式无规范依据。"
+      },
+      "Answer_3": {
+        "correctness": 1,
+        "completeness": 1,
+        "grounding": 1,
+        "relevance": 1,
+        "overall": 1,
+        "numerical_reasoning": 1,
+        "reason": "大量罗列无关条文，未回答转换梁弯矩问题。"
+      },
+      "Answer_4": {
+        "correctness": 1,
+        "completeness": 2,
+        "grounding": 1,
+        "relevance": 3,
+        "overall": 1,
+        "numerical_reasoning": 1,
+        "reason": "将荷载直接相加为力，未计算弯矩，单位错误。"
+      },
+      "Answer_5": {
+        "correctness": 3,
+        "completeness": 3,
+        "grounding": 3,
+        "relevance": 4,
+        "overall": 3,
+        "numerical_reasoning": 2,
+        "reason": "方向基本正确，但没有实际计算最大弯矩。"
+      },
+      "Answer_6": {
+        "correctness": 3,
+        "completeness": 3,
+        "grounding": 3,
+        "relevance": 4,
+        "overall": 3,
+        "numerical_reasoning": 3,
+        "reason": "拒答有一定合理性，但题目期望按给定简化条件计算。"
+      }
+    }
+  },
+  {
+    "id": "eval_ca_3b5b4bb7",
+    "scores": {
+      "Answer_1": {
+        "correctness": 5,
+        "completeness": 5,
+        "grounding": 5,
+        "relevance": 5,
+        "overall": 5,
+        "numerical_reasoning": 5,
+        "reason": "预应力面积、预加力和偏心距计算均正确，与金标一致。"
+      },
+      "Answer_2": {
+        "correctness": 1,
+        "completeness": 2,
+        "grounding": 1,
+        "relevance": 3,
+        "overall": 1,
+        "numerical_reasoning": 1,
+        "reason": "未按规范公式计算预加力和偏心距。"
+      },
+      "Answer_3": {
+        "correctness": 2,
+        "completeness": 2,
+        "grounding": 2,
+        "relevance": 3,
+        "overall": 2,
+        "numerical_reasoning": 2,
+        "reason": "引用公式方向接近，但没有完成有效计算。"
+      },
+      "Answer_4": {
+        "correctness": 1,
+        "completeness": 1,
+        "grounding": 1,
+        "relevance": 1,
+        "overall": 1,
+        "numerical_reasoning": 1,
+        "reason": "未回答预加力计算问题。"
+      },
+      "Answer_5": {
+        "correctness": 2,
+        "completeness": 2,
+        "grounding": 2,
+        "relevance": 3,
+        "overall": 2,
+        "numerical_reasoning": 2,
+        "reason": "没有给出正确的预应力计算过程和结果。"
+      },
+      "Answer_6": {
+        "correctness": 3,
+        "completeness": 3,
+        "grounding": 3,
+        "relevance": 4,
+        "overall": 3,
+        "numerical_reasoning": 3,
+        "reason": "若拒答则不合理，题目参数完整，可直接计算。"
+      }
+    }
+  }
+]
+[
+{
+"id": "eval_ca_bad3544a",
+"scores": {
+"Answer_1": {
+"correctness": 3,
+"completeness": 3,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"numerical_reasoning": 3,
+"reason": "采用节点核芯区受剪计算思路，方向相关，但未给出完整有效参数，公式适用性不足。"
+},
+"Answer_2": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 2,
+"relevance": 4,
+"overall": 2,
+"numerical_reasoning": 2,
+"reason": "未完成规范要求的节点受剪验算，部分参数处理错误。"
+},
+"Answer_3": {
+"correctness": 2,
+"completeness": 2,
+"grounding": 2,
+"relevance": 3,
+"overall": 2,
+"numerical_reasoning": 2,
+"reason": "引用大量条文但未针对本题计算节点核芯区承载力。"
+},
+"Answer_4": {
+"correctness": 1,
+"completeness": 2,
+"grounding": 1,
+"relevance": 3,
+"overall": 1,
+"numerical_reasoning": 1,
+"reason": "缺少有效计算过程，结果无规范依据。"
+},
+"Answer_5": {
+"correctness": 2,
+"completeness": 2,
+"grounding": 2,
+"relevance": 3,
+"overall": 2,
+"numerical_reasoning": 2,
+"reason": "仅描述验算流程，没有完成承载力计算和判断。"
+},
+"Answer_6": {
+"correctness": 3,
+"completeness": 3,
+"grounding": 3,
+"relevance": 4,
+"overall": 3,
+"numerical_reasoning": 3,
+"reason": "拒答理由部分合理，但题目给定条件可进行规范化计算。"
+}
+}
+}
+]
+
+[
+  {
+    "id": "eval_ca_bad3544a",
+    "scores": {
+      "Answer_1": {
+        "correctness": 1,
+        "completeness": 3,
+        "grounding": 1,
+        "relevance": 4,
+        "overall": 1,
+        "numerical_reasoning": 1,
+        "reason": "公式与附录D实际节点核芯区计算方法不符，假设配筋且计算结果量级错误。"
+      },
+      "Answer_2": {
+        "correctness": 1,
+        "completeness": 3,
+        "grounding": 1,
+        "relevance": 4,
+        "overall": 1,
+        "numerical_reasoning": 1,
+        "reason": "构造不存在的面积公式，导致承载力严重失真。"
+      },
+      "Answer_3": {
+        "correctness": 3,
+        "completeness": 4,
+        "grounding": 4,
+        "relevance": 5,
+        "overall": 3,
+        "numerical_reasoning": 3,
+        "reason": "引用了相关节点受剪公式，但参数缺失并自行假设，计算不完整。"
+      },
+      "Answer_4": {
+        "correctness": 2,
+        "completeness": 2,
+        "grounding": 3,
+        "relevance": 4,
+        "overall": 2,
+        "numerical_reasoning": 2,
+        "reason": "只描述计算流程，没有实际计算和判断。"
+      },
+      "Answer_5": {
+        "correctness": 2,
+        "completeness": 2,
+        "grounding": 3,
+        "relevance": 4,
+        "overall": 2,
+        "numerical_reasoning": 2,
+        "reason": "仅说明规范公式，没有完成验算。"
+      },
+      "Answer_6": {
+        "correctness": 3,
+        "completeness": 3,
+        "grounding": 3,
+        "relevance": 4,
+        "overall": 3,
+        "numerical_reasoning": 3,
+        "reason": "拒答理由部分合理，但题目已有部分计算条件。"
+      }
+    }
+  },
+  {
+    "id": "eval_ca_512a9e30",
+    "scores": {
+      "Answer_1": {
+        "correctness": 1,
+        "completeness": 3,
+        "grounding": 1,
+        "relevance": 4,
+        "overall": 1,
+        "numerical_reasoning": 1,
+        "reason": "将卸载规则错误理解为50%，第一级卸载值和稳定条件均错误。"
+      },
+      "Answer_2": {
+        "correctness": 1,
+        "completeness": 3,
+        "grounding": 2,
+        "relevance": 4,
+        "overall": 1,
+        "numerical_reasoning": 1,
+        "reason": "卸载值20kN错误，稳定条件泛化且无规范依据。"
+      },
+      "Answer_3": {
+        "correctness": 1,
+        "completeness": 2,
+        "grounding": 1,
+        "relevance": 3,
+        "overall": 1,
+        "numerical_reasoning": 1,
+        "reason": "引用错误循环加载规则，未按H.0.9规定计算。"
+      },
+      "Answer_4": {
+        "correctness": 1,
+        "completeness": 2,
+        "grounding": 1,
+        "relevance": 3,
+        "overall": 1,
+        "numerical_reasoning": 1,
+        "reason": "第一级卸载和稳定条件均错误。"
+      },
+      "Answer_5": {
+        "correctness": 2,
+        "completeness": 3,
+        "grounding": 2,
+        "relevance": 4,
+        "overall": 2,
+        "numerical_reasoning": 2,
+        "reason": "50%卸载逻辑错误，但稳定判断方向部分接近。"
+      },
+      "Answer_6": {
+        "correctness": 2,
+        "completeness": 3,
+        "grounding": 2,
+        "relevance": 4,
+        "overall": 2,
+        "numerical_reasoning": 2,
+        "reason": "卸载规则错误，稳定条件表述不符合规范。"
+      }
+    }
+  }
+]
+
+[
+  {
+    "id": "eval_ca_1494706d",
+    "scores": {
+      "Answer_1": {
+        "correctness": 2,
+        "completeness": 4,
+        "grounding": 2,
+        "relevance": 5,
+        "overall": 2,
+        "numerical_reasoning": 2,
+        "reason": "轴压比限值确定过程错误，引入C30和截面调整系数，规范无此规定。"
+      },
+      "Answer_2": {
+        "correctness": 1,
+        "completeness": 4,
+        "grounding": 1,
+        "relevance": 4,
+        "overall": 1,
+        "numerical_reasoning": 1,
+        "reason": "构造错误公式并自行假设荷载，未按表6.3.6确定限值。"
+      },
+      "Answer_3": {
+        "correctness": 1,
+        "completeness": 2,
+        "grounding": 1,
+        "relevance": 3,
+        "overall": 1,
+        "numerical_reasoning": 1,
+        "reason": "引用6.3.9与轴压比限值无关，公式含义错误。"
+      },
+      "Answer_4": {
+        "correctness": 1,
+        "completeness": 3,
+        "grounding": 1,
+        "relevance": 4,
+        "overall": 1,
+        "numerical_reasoning": 1,
+        "reason": "0.60限值错误，规范表值判断错误。"
+      },
+      "Answer_5": {
+        "correctness": 2,
+        "completeness": 3,
+        "grounding": 2,
+        "relevance": 4,
+        "overall": 2,
+        "numerical_reasoning": 2,
+        "reason": "0.80接近部分情况，但提出箍筋增加0.20无规范依据。"
+      },
+      "Answer_6": {
+        "correctness": 3,
+        "completeness": 3,
+        "grounding": 3,
+        "relevance": 4,
+        "overall": 3,
+        "numerical_reasoning": 3,
+        "reason": "不应完全拒答，题目信息足够查表确定轴压比限值。"
+      }
+    }
+  },
+  {
+    "id": "eval_ca_eea7f41d",
+    "scores": {
+      "Answer_1": {
+        "correctness": 2,
+        "completeness": 4,
+        "grounding": 2,
+        "relevance": 5,
+        "overall": 2,
+        "numerical_reasoning": 2,
+        "reason": "将水平系梁错误按框架梁要求处理，规范适用对象错误。"
+      },
+      "Answer_2": {
+        "correctness": 4,
+        "completeness": 4,
+        "grounding": 4,
+        "relevance": 5,
+        "overall": 4,
+        "numerical_reasoning": 4,
+        "reason": "基本符合7.5.5要求，但部分间距描述不够准确。"
+      },
+      "Answer_3": {
+        "correctness": 1,
+        "completeness": 2,
+        "grounding": 1,
+        "relevance": 2,
+        "overall": 1,
+        "numerical_reasoning": 1,
+        "reason": "回答约束砌体墙抗剪调整系数，与水平系梁配筋无关。"
+      },
+      "Answer_4": {
+        "correctness": 5,
+        "completeness": 4,
+        "grounding": 5,
+        "relevance": 5,
+        "overall": 5,
+        "numerical_reasoning": 5,
+        "reason": "准确给出4φ12、φ6及@200等构造要求。"
+      },
+      "Answer_5": {
+        "correctness": 4,
+        "completeness": 4,
+        "grounding": 4,
+        "relevance": 5,
+        "overall": 4,
+        "numerical_reasoning": 4,
+        "reason": "结论正确，但部分截面和构造表述略有偏差。"
+      },
+      "Answer_6": {
+        "correctness": 2,
+        "completeness": 3,
+        "grounding": 2,
+        "relevance": 4,
+        "overall": 2,
+        "numerical_reasoning": 2,
+        "reason": "错误拒答，规范已明确给出最低构造要求。"
+      }
+    }
+  }
+]
+
+[
+  {
+    "id": "eval_ca_ff6aef0b",
+    "scores": {
+      "Answer_1": {
+        "correctness": 3,
+        "completeness": 3,
+        "grounding": 3,
+        "relevance": 5,
+        "overall": 3,
+        "numerical_reasoning": 3,
+        "reason": "轴压比计算有一定合理性，但未给出规范要求的剪力设计值计算结果。"
+      },
+      "Answer_2": {
+        "correctness": 1,
+        "completeness": 4,
+        "grounding": 1,
+        "relevance": 4,
+        "overall": 1,
+        "numerical_reasoning": 1,
+        "reason": "自行构造剪力公式，轴压比和剪力计算均无规范依据。"
+      },
+      "Answer_3": {
+        "correctness": 1,
+        "completeness": 4,
+        "grounding": 1,
+        "relevance": 4,
+        "overall": 1,
+        "numerical_reasoning": 1,
+        "reason": "引用6.3.6错误，混淆剪切模量与柱剪力设计计算。"
+      },
+      "Answer_4": {
+        "correctness": 2,
+        "completeness": 2,
+        "grounding": 2,
+        "relevance": 4,
+        "overall": 2,
+        "numerical_reasoning": 2,
+        "reason": "只描述计算方向，没有具体计算和判断。"
+      },
+      "Answer_5": {
+        "correctness": 2,
+        "completeness": 2,
+        "grounding": 2,
+        "relevance": 4,
+        "overall": 2,
+        "numerical_reasoning": 2,
+        "reason": "涉及抗剪验算概念，但公式和符号定义错误。"
+      },
+      "Answer_6": {
+        "correctness": 3,
+        "completeness": 3,
+        "grounding": 3,
+        "relevance": 4,
+        "overall": 3,
+        "numerical_reasoning": 3,
+        "reason": "拒答理由部分合理，但题目要求的是规范计算，不应完全拒绝。"
+      }
+    }
+  },
+  {
+    "id": "eval_ca_f77d22a4",
+    "scores": {
+      "Answer_1": {
+        "correctness": 2,
+        "completeness": 4,
+        "grounding": 2,
+        "relevance": 5,
+        "overall": 2,
+        "numerical_reasoning": 2,
+        "reason": "自行假设梁长并计算弯矩，缺少跨度条件，结果不能作为规范计算。"
+      },
+      "Answer_2": {
+        "correctness": 1,
+        "completeness": 3,
+        "grounding": 1,
+        "relevance": 4,
+        "overall": 1,
+        "numerical_reasoning": 1,
+        "reason": "将截面高度作为力臂计算弯矩，单位和方法错误。"
+      },
+      "Answer_3": {
+        "correctness": 1,
+        "completeness": 1,
+        "grounding": 1,
+        "relevance": 1,
+        "overall": 1,
+        "numerical_reasoning": 1,
+        "reason": "大量无关条文堆砌，未回答转换梁弯矩问题。"
+      },
+      "Answer_4": {
+        "correctness": 1,
+        "completeness": 2,
+        "grounding": 1,
+        "relevance": 3,
+        "overall": 1,
+        "numerical_reasoning": 1,
+        "reason": "把荷载直接相加作为弯矩，量纲错误。"
+      },
+      "Answer_5": {
+        "correctness": 3,
+        "completeness": 3,
+        "grounding": 3,
+        "relevance": 4,
+        "overall": 3,
+        "numerical_reasoning": 3,
+        "reason": "知道需要考虑地震组合，但没有完成具体计算。"
+      },
+      "Answer_6": {
+        "correctness": 3,
+        "completeness": 3,
+        "grounding": 3,
+        "relevance": 4,
+        "overall": 3,
+        "numerical_reasoning": 3,
+        "reason": "拒答有一定合理性，题目缺少跨度等关键计算参数。"
+      }
+    }
+  },
+  {
+    "id": "eval_ca_3b5b4bb7",
+    "scores": {
+      "Answer_1": {
+        "correctness": 5,
+        "completeness": 5,
+        "grounding": 5,
+        "relevance": 5,
+        "overall": 5,
+        "numerical_reasoning": 5,
+        "reason": "预加力和偏心距计算完整正确，与金标结果一致。"
+      },
+      "Answer_2": {
+        "correctness": 1,
+        "completeness": 2,
+        "grounding": 1,
+        "relevance": 3,
+        "overall": 1,
+        "numerical_reasoning": 1,
+        "reason": "未采用预应力构件预加力公式，计算逻辑错误。"
+      },
+      "Answer_3": {
+        "correctness": 2,
+        "completeness": 2,
+        "grounding": 2,
+        "relevance": 3,
+        "overall": 2,
+        "numerical_reasoning": 2,
+        "reason": "仅涉及公式说明，没有完成正确计算。"
+      },
+      "Answer_4": {
+        "correctness": 1,
+        "completeness": 1,
+        "grounding": 1,
+        "relevance": 1,
+        "overall": 1,
+        "numerical_reasoning": 1,
+        "reason": "未回答预加力及偏心距计算。"
+      },
+      "Answer_5": {
+        "correctness": 2,
+        "completeness": 2,
+        "grounding": 2,
+        "relevance": 3,
+        "overall": 2,
+        "numerical_reasoning": 2,
+        "reason": "未给出正确公式推导和数值结果。"
+      },
+      "Answer_6": {
+        "correctness": 3,
+        "completeness": 3,
+        "grounding": 3,
+        "relevance": 4,
+        "overall": 3,
+        "numerical_reasoning": 3,
+        "reason": "不应拒答，题目参数完整可直接计算。"
+      }
+    }
+  }
+]
+[
+{
+"id": "eval_ca_96cc2e3e",
+"scores": {
+"Answer_1": {
+"correctness": 3,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"numerical_reasoning": 3,
+"reason": "考虑了支撑设计基本思路，但荷载分配和承载力验算过程不够严谨。"
+},
+"Answer_2": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 2,
+"relevance": 4,
+"overall": 2,
+"numerical_reasoning": 2,
+"reason": "计算方法与规范要求偏离，未正确完成支撑验算。"
+},
+"Answer_3": {
+"correctness": 1,
+"completeness": 2,
+"grounding": 1,
+"relevance": 2,
+"overall": 1,
+"numerical_reasoning": 1,
+"reason": "引用大量无关条文，未针对10.2.3条要求进行计算。"
+},
+"Answer_4": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 2,
+"relevance": 4,
+"overall": 2,
+"numerical_reasoning": 2,
+"reason": "只给出原则判断，没有完成关键承载力计算。"
+},
+"Answer_5": {
+"correctness": 3,
+"completeness": 3,
+"grounding": 3,
+"relevance": 4,
+"overall": 3,
+"numerical_reasoning": 3,
+"reason": "基本理解支撑作用，但计算参数和验算过程不足。"
+},
+"Answer_6": {
+"correctness": 3,
+"completeness": 3,
+"grounding": 3,
+"relevance": 4,
+"overall": 3,
+"numerical_reasoning": 3,
+"reason": "拒答理由不充分，题目给出了一定计算条件。"
+}
+}
+},
+{
+"id": "eval_ca_5d5ff107",
+"scores": {
+"Answer_1": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"numerical_reasoning": 5,
+"reason": "正确计算基础平均压力，并按规范判断地基承载力满足要求。"
+},
+"Answer_2": {
+"correctness": 4,
+"completeness": 4,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"numerical_reasoning": 4,
+"reason": "计算压力方法正确，但埋深修正和规范引用略有不足。"
+},
+"Answer_3": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 2,
+"relevance": 4,
+"overall": 2,
+"numerical_reasoning": 2,
+"reason": "部分概念正确，但未正确完成承载力判断。"
+},
+"Answer_4": {
+"correctness": 3,
+"completeness": 3,
+"grounding": 3,
+"relevance": 4,
+"overall": 3,
+"numerical_reasoning": 3,
+"reason": "给出压力计算，但对规范要求解释不足。"
+},
+"Answer_5": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 2,
+"relevance": 4,
+"overall": 2,
+"numerical_reasoning": 2,
+"reason": "计算过程存在，但承载力和埋深判断逻辑错误。"
+},
+"Answer_6": {
+"correctness": 3,
+"completeness": 3,
+"grounding": 3,
+"relevance": 4,
+"overall": 3,
+"numerical_reasoning": 3,
+"reason": "错误拒答，题目数据足够进行基础压力计算。"
+}
+}
+}
+]
+```json
+[
+  {
+    "id": "eval_ca_4604b8bb",
+    "scores": {
+      "Answer_1": {
+        "correctness": 3,
+        "completeness": 4,
+        "grounding": 3,
+        "relevance": 5,
+        "overall": 3,
+        "numerical_reasoning": 3,
+        "reason": "指出需要复杂分析有一定合理性，但采用自创公式计算5mm，未采用题设金标经验系数方法。"
+      },
+      "Answer_2": {
+        "correctness": 2,
+        "completeness": 4,
+        "grounding": 2,
+        "relevance": 4,
+        "overall": 2,
+        "numerical_reasoning": 2,
+        "reason": "引入抗弯刚度计算模型，但参数假设较多，结果0.51mm缺乏规范依据。"
+      },
+      "Answer_3": {
+        "correctness": 3,
+        "completeness": 3,
+        "grounding": 3,
+        "relevance": 4,
+        "overall": 3,
+        "numerical_reasoning": 2,
+        "reason": "给出变形计算思路，但未结合题目数据得到最终位移和判断。"
+      },
+      "Answer_4": {
+        "correctness": 2,
+        "completeness": 3,
+        "grounding": 2,
+        "relevance": 4,
+        "overall": 2,
+        "numerical_reasoning": 2,
+        "reason": "错误修改允许位移值，且没有完成实际计算。"
+      },
+      "Answer_5": {
+        "correctness": 2,
+        "completeness": 3,
+        "grounding": 2,
+        "relevance": 4,
+        "overall": 2,
+        "numerical_reasoning": 2,
+        "reason": "提出计算方向，但未给出结果，且角点法表述依据不足。"
+      },
+      "Answer_6": {
+        "correctness": 3,
+        "completeness": 3,
+        "grounding": 3,
+        "relevance": 4,
+        "overall": 3,
+        "numerical_reasoning": 3,
+        "refusal_appropriateness": 3,
+        "reason": "拒答有工程谨慎性，但题目提供了简化计算条件，不应完全无法回答。"
+      }
+    }
+  }
+]
+
+
+
+
+
+
+

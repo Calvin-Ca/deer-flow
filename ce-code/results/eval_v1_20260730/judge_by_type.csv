@@ -1,0 +1,6 @@
+type,base,base_fewshot,group_a,group_b,group_c,group_d
+single_clause,2.773,2.341,2.307,2.919,2.318,2.614
+cross_clause,1.820,1.660,2.680,2.240,2.160,2.620
+calculation,2.457,1.804,1.717,2.217,2.696,2.348
+clause_verify,4.028,4.139,3.042,3.917,3.778,4.306
+refusal,3.911,3.750,2.911,2.589,2.714,4.964

@@ -1,0 +1,2519 @@
+[
+{
+"id": "eval_cv_a8031b16",
+"scores": {
+"Answer_1": {
+"correctness": 5,
+"completeness": 4,
+"grounding": 4,
+"relevance": 5,
+"overall": 5,
+"reason": "结论正确，准确描述构造钢筋要求，但未明确引用9.1.6条文号，规范依据略弱。"
+},
+"Answer_2": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 3,
+"relevance": 5,
+"overall": 4,
+"reason": "结论和数值正确，但引用9.2.10条错误，存在条文号幻觉。"
+},
+"Answer_3": {
+"correctness": 4,
+"completeness": 4,
+"grounding": 5,
+"relevance": 4,
+"overall": 4,
+"reason": "引用9.1.6正确，但额外增加跨度、厚度等限制，部分表述不准确。"
+},
+"Answer_4": {
+"correctness": 5,
+"completeness": 4,
+"grounding": 2,
+"relevance": 5,
+"overall": 4,
+"reason": "结论正确，引用第9.1.8条错误，规范依据存在问题。"
+},
+"Answer_5": {
+"correctness": 5,
+"completeness": 4,
+"grounding": 2,
+"relevance": 5,
+"overall": 4,
+"reason": "结论正确，但引用9.1.7条错误，条文号张冠李戴。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 4,
+"grounding": 2,
+"relevance": 5,
+"overall": 4,
+"reason": "内容基本正确，但引用9.1.10条错误，规范定位不准确。"
+}
+}
+},
+{
+"id": "eval_cv_be7fa86a",
+"scores": {
+"Answer_1": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"reason": "正确说明公式及适用疲劳验算范围，条文和变量解释准确。"
+},
+"Answer_2": {
+"correctness": 4,
+"completeness": 5,
+"grounding": 5,
+"relevance": 4,
+"overall": 4,
+"reason": "主要内容正确，但补充的一般设计公式存在无关且可能错误内容。"
+},
+"Answer_3": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"reason": "完整引用6.7.8条及公式变量，规范依据充分。"
+},
+"Answer_4": {
+"correctness": 5,
+"completeness": 3,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"reason": "结论正确，但缺少关键变量解释，条文支撑较简略。"
+},
+"Answer_5": {
+"correctness": 5,
+"completeness": 3,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"reason": "结论正确，但回答过于简略，完整性不足。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 4,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"reason": "正确说明条文适用范围和变量含义，回答清晰。"
+}
+}
+},
+{
+"id": "eval_cv_01fe6fac",
+"scores": {
+"Answer_1": {
+"correctness": 5,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 4,
+"reason": "结论正确，解释合理，但未准确引用10.3.5条。"
+},
+"Answer_2": {
+"correctness": 5,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 4,
+"reason": "结论正确，但引用其他规范且未给准确条文，依据不足。"
+},
+"Answer_3": {
+"correctness": 3,
+"completeness": 4,
+"grounding": 2,
+"relevance": 3,
+"overall": 3,
+"reason": "结论正确，但引用10.1.6开裂计算，与题目条文无关。"
+},
+"Answer_4": {
+"correctness": 5,
+"completeness": 3,
+"grounding": 2,
+"relevance": 5,
+"overall": 4,
+"reason": "结论正确，但10.3.11条引用错误。"
+},
+"Answer_5": {
+"correctness": 5,
+"completeness": 4,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"reason": "正确引用10.3.5并说明要求，回答符合金标。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 3,
+"grounding": 2,
+"relevance": 5,
+"overall": 4,
+"reason": "结论正确，但引用10.3.1错误。"
+}
+}
+},
+{
+"id": "eval_cv_d15fa600",
+"scores": {
+"Answer_1": {
+"correctness": 5,
+"completeness": 4,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"reason": "结论正确，补充因素合理，但对D.2内容描述略泛。"
+},
+"Answer_2": {
+"correctness": 5,
+"completeness": 4,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"reason": "回答正确，但具体条款描述较笼统。"
+},
+"Answer_3": {
+"correctness": 4,
+"completeness": 2,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"reason": "结论正确但没有展开有效解释，完整性不足。"
+},
+"Answer_4": {
+"correctness": 5,
+"completeness": 3,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"reason": "结论正确，说明较简单。"
+},
+"Answer_5": {
+"correctness": 1,
+"completeness": 3,
+"grounding": 1,
+"relevance": 4,
+"overall": 1,
+"reason": "给出的受压承载力公式明显错误，存在严重条文和公式幻觉。"
+},
+"Answer_6": {
+"correctness": 4,
+"completeness": 3,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"reason": "结论正确，但未直接说明题干因素。"
+}
+}
+},
+{
+"id": "eval_cv_717645c7",
+"scores": {
+"Answer_1": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"reason": "完整复述数值要求，结论正确。"
+},
+"Answer_2": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"reason": "准确说明条文要求，仅做轻微解释。"
+},
+"Answer_3": {
+"correctness": 2,
+"completeness": 2,
+"grounding": 1,
+"relevance": 3,
+"overall": 2,
+"reason": "引用11.3.8但内容实际为梁截面尺寸，答非所问。"
+},
+"Answer_4": {
+"correctness": 5,
+"completeness": 3,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"reason": "结论正确，但缺少具体数值。"
+},
+"Answer_5": {
+"correctness": 5,
+"completeness": 3,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"reason": "结论正确，但解释简略。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"reason": "准确复述规范要求，内容完整。"
+}
+}
+}
+]
+[
+{
+"id": "eval_cv_3e2396f2",
+"scores": {
+"Answer_1": {
+"correctness": 5,
+"completeness": 4,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"reason": "结论正确，解释符合规范要求，但未准确引用9.6.4条。"
+},
+"Answer_2": {
+"correctness": 4,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 4,
+"reason": "结论正确，但引用9.3.1作为柱钢筋贯穿节点依据错误。"
+},
+"Answer_3": {
+"correctness": 3,
+"completeness": 3,
+"grounding": 4,
+"relevance": 4,
+"overall": 3,
+"reason": "大量引用梁端锚固内容，但未回答装配整体式结构要求，偏离题意。"
+},
+"Answer_4": {
+"correctness": 4,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 4,
+"reason": "指出规范归属问题，结论基本正确，但引用条款错误。"
+},
+"Answer_5": {
+"correctness": 5,
+"completeness": 4,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"reason": "准确引用9.6.4并说明要求，符合金标。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 4,
+"reason": "结论正确，但引用9.6.3而非9.6.4。"
+}
+}
+},
+{
+"id": "eval_cv_8699a9ab",
+"scores": {
+"Answer_1": {
+"correctness": 4,
+"completeness": 5,
+"grounding": 2,
+"relevance": 5,
+"overall": 4,
+"reason": "主要内容正确，但错误引入钢结构规范，依据不准确。"
+},
+"Answer_2": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"reason": "准确回答所有要求，内容完整。"
+},
+"Answer_3": {
+"correctness": 1,
+"completeness": 3,
+"grounding": 1,
+"relevance": 4,
+"overall": 1,
+"reason": "引用钢结构规范且数值与题干冲突，属于严重错误。"
+},
+"Answer_4": {
+"correctness": 5,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 4,
+"reason": "结论正确，但条文号引用不准确。"
+},
+"Answer_5": {
+"correctness": 3,
+"completeness": 2,
+"grounding": 2,
+"relevance": 4,
+"overall": 3,
+"reason": "没有明确判断，且引用条款错误。"
+},
+"Answer_6": {
+"correctness": 4,
+"completeness": 3,
+"grounding": 2,
+"relevance": 5,
+"overall": 4,
+"reason": "结论正确，但引用表格条款存在幻觉。"
+}
+}
+},
+{
+"id": "eval_cv_be185310",
+"scores": {
+"Answer_1": {
+"correctness": 1,
+"completeness": 3,
+"grounding": 3,
+"relevance": 5,
+"overall": 2,
+"reason": "否定正确公式，与金标冲突，主要结论错误。"
+},
+"Answer_2": {
+"correctness": 1,
+"completeness": 4,
+"grounding": 2,
+"relevance": 4,
+"overall": 2,
+"reason": "错误否定规范公式，并给出错误计算公式。"
+},
+"Answer_3": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"reason": "完整引用公式及变量定义，完全符合规范。"
+},
+"Answer_4": {
+"correctness": 5,
+"completeness": 3,
+"grounding": 2,
+"relevance": 5,
+"overall": 4,
+"reason": "结论正确，但引用6.2.23错误。"
+},
+"Answer_5": {
+"correctness": 4,
+"completeness": 3,
+"grounding": 2,
+"relevance": 5,
+"overall": 4,
+"reason": "公式判断正确，但引用6.2.20错误。"
+},
+"Answer_6": {
+"correctness": 3,
+"completeness": 4,
+"grounding": 2,
+"relevance": 5,
+"overall": 3,
+"reason": "指出部分问题但混淆Nu0计算依据，条文引用错误。"
+}
+}
+},
+{
+"id": "eval_cv_dd65e9f5",
+"scores": {
+"Answer_1": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"reason": "准确引用D.4.1内容，解释充分。"
+},
+"Answer_2": {
+"correctness": 4,
+"completeness": 4,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"reason": "最终判断正确，但对条文目的解释偏差。"
+},
+"Answer_3": {
+"correctness": 5,
+"completeness": 2,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"reason": "结论正确，但没有提供有效依据。"
+},
+"Answer_4": {
+"correctness": 4,
+"completeness": 3,
+"grounding": 3,
+"relevance": 5,
+"overall": 4,
+"reason": "结论正确，但附加描述不够准确。"
+},
+"Answer_5": {
+"correctness": 3,
+"completeness": 3,
+"grounding": 2,
+"relevance": 5,
+"overall": 3,
+"reason": "结论正确，但关于根据结构分析确定属于错误扩展。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 3,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"reason": "准确引用D.4.1并判断正确。"
+}
+}
+},
+{
+"id": "eval_cv_a1a72056",
+"scores": {
+"Answer_1": {
+"correctness": 5,
+"completeness": 4,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"reason": "结论正确，规范要求解释合理。"
+},
+"Answer_2": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"reason": "准确引用10.3.2相关内容，回答完整。"
+},
+"Answer_3": {
+"correctness": 1,
+"completeness": 4,
+"grounding": 1,
+"relevance": 4,
+"overall": 1,
+"reason": "引用10.3.2但内容为张拉控制应力，与题目不符。"
+},
+"Answer_4": {
+"correctness": 5,
+"completeness": 3,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"reason": "结论正确，但引用款号错误。"
+},
+"Answer_5": {
+"correctness": 5,
+"completeness": 3,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"reason": "结论正确，但第10.3.2条款解释不准确。"
+},
+"Answer_6": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 3,
+"relevance": 5,
+"overall": 2,
+"reason": "错误质疑题干要求，与金标结论冲突。"
+}
+}
+}
+]
+[
+{
+"id": "eval_cv_5283c56f",
+"scores": {
+"Answer_1": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"reason": "准确说明附录F计算和增大系数要求，结论与金标一致。"
+},
+"Answer_2": {
+"correctness": 4,
+"completeness": 4,
+"grounding": 4,
+"relevance": 4,
+"overall": 4,
+"reason": "主要结论正确，但将Fl_eq简化为Fl乘系数，计算表达不严谨。"
+},
+"Answer_3": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 1,
+"relevance": 2,
+"overall": 2,
+"reason": "引用9.1.13且内容无关，属于条文张冠李戴。"
+},
+"Answer_4": {
+"correctness": 5,
+"completeness": 3,
+"grounding": 3,
+"relevance": 5,
+"overall": 4,
+"reason": "结论正确，但引用8.2.5错误。"
+},
+"Answer_5": {
+"correctness": 4,
+"completeness": 3,
+"grounding": 2,
+"relevance": 5,
+"overall": 3,
+"reason": "结论基本正确，但引用8.2.4错误。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 3,
+"relevance": 5,
+"overall": 4,
+"reason": "内容准确，但引用建筑抗震规范附录F条款而非GB50010主体条文。"
+}
+}
+},
+{
+"id": "eval_cv_141c0d64",
+"scores": {
+"Answer_1": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 3,
+"relevance": 5,
+"overall": 4,
+"reason": "判断正确，要求描述完整，但引用规范范围不准确。"
+},
+"Answer_2": {
+"correctness": 1,
+"completeness": 5,
+"grounding": 2,
+"relevance": 5,
+"overall": 2,
+"reason": "错误将坍落度大改为小，核心结论错误。"
+},
+"Answer_3": {
+"correctness": 4,
+"completeness": 2,
+"grounding": 2,
+"relevance": 4,
+"overall": 3,
+"reason": "结论正确，但引用砌体规范条文与问题不匹配。"
+},
+"Answer_4": {
+"correctness": 5,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 4,
+"reason": "结论正确，但F.3.5条号可能不准确。"
+},
+"Answer_5": {
+"correctness": 1,
+"completeness": 3,
+"grounding": 2,
+"relevance": 5,
+"overall": 2,
+"reason": "将Cb20错误改为Cb25，核心数值错误。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 4,
+"reason": "结论正确，但引用F.3.3而非金标条文。"
+}
+}
+},
+{
+"id": "eval_cv_6fa137c7",
+"scores": {
+"Answer_1": {
+"correctness": 3,
+"completeness": 4,
+"grounding": 4,
+"relevance": 5,
+"overall": 3,
+"reason": "指出短暂设计状况差异，导致未完全认可题干，判断偏差。"
+},
+"Answer_2": {
+"correctness": 5,
+"completeness": 4,
+"grounding": 4,
+"relevance": 5,
+"overall": 5,
+"reason": "结论正确，但对条文细节解释较简单。"
+},
+"Answer_3": {
+"correctness": 2,
+"completeness": 4,
+"grounding": 1,
+"relevance": 3,
+"overall": 2,
+"reason": "引用第3.3.2条内容错误，与结构重要性系数无关。"
+},
+"Answer_4": {
+"correctness": 3,
+"completeness": 4,
+"grounding": 4,
+"relevance": 5,
+"overall": 3,
+"reason": "结论受到错误短暂设计状况判断影响。"
+},
+"Answer_5": {
+"correctness": 4,
+"completeness": 4,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"reason": "指出持久正确，但错误引入短暂设计状况。"
+},
+"Answer_6": {
+"correctness": 4,
+"completeness": 4,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"reason": "基本准确，但对题干整体判断略保守。"
+}
+}
+},
+{
+"id": "eval_cv_c42ef9d3",
+"scores": {
+"Answer_1": {
+"correctness": 5,
+"completeness": 4,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"reason": "正确判断并解释条文目的。"
+},
+"Answer_2": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"reason": "准确复述条文内容，回答完整。"
+},
+"Answer_3": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 1,
+"relevance": 3,
+"overall": 2,
+"reason": "引用9.1.1错误内容，实际为其他章节。"
+},
+"Answer_4": {
+"correctness": 5,
+"completeness": 3,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"reason": "结论正确，但条款细分引用未验证。"
+},
+"Answer_5": {
+"correctness": 5,
+"completeness": 3,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"reason": "结论正确，解释略简单。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 4,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"reason": "准确回答并补充适用性说明。"
+}
+}
+},
+{
+"id": "eval_cv_d5cbe006",
+"scores": {
+"Answer_1": {
+"correctness": 5,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 4,
+"reason": "数值判断正确，但引用混凝土规范条款错误。"
+},
+"Answer_2": {
+"correctness": 1,
+"completeness": 4,
+"grounding": 2,
+"relevance": 5,
+"overall": 2,
+"reason": "将0.8%错误判断为0.9%，核心结论错误。"
+},
+"Answer_3": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"reason": "完整说明公式及表格要求，准确支持结论。"
+},
+"Answer_4": {
+"correctness": 1,
+"completeness": 3,
+"grounding": 2,
+"relevance": 5,
+"overall": 2,
+"reason": "错误认为应为0.9%，与规范不符。"
+},
+"Answer_5": {
+"correctness": 1,
+"completeness": 3,
+"grounding": 2,
+"relevance": 5,
+"overall": 2,
+"reason": "错误给出0.85%，核心数值错误。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 3,
+"grounding": 2,
+"relevance": 5,
+"overall": 4,
+"reason": "结论正确，但引用11.4.10错误。"
+}
+}
+}
+]
+[
+{
+"id": "eval_cv_2facf7d0",
+"scores": {
+"Answer_1": {
+"correctness": 2,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 2,
+"reason": "错误给出180mm，否定题干200mm要求，核心判断错误。"
+},
+"Answer_2": {
+"correctness": 2,
+"completeness": 5,
+"grounding": 2,
+"relevance": 5,
+"overall": 2,
+"reason": "指出180mm但仍错误认为200mm说法合理，逻辑矛盾。"
+},
+"Answer_3": {
+"correctness": 2,
+"completeness": 2,
+"grounding": 1,
+"relevance": 3,
+"overall": 2,
+"reason": "结论正确但引用无关规程条文，未回答圈梁高度。"
+},
+"Answer_4": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 2,
+"relevance": 5,
+"overall": 2,
+"reason": "错误认为180mm，与金标结论冲突。"
+},
+"Answer_5": {
+"correctness": 5,
+"completeness": 3,
+"grounding": 3,
+"relevance": 5,
+"overall": 4,
+"reason": "结论正确，引用条款可能存在偏差。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 3,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"reason": "准确引用F.3.9并判断正确。"
+}
+}
+},
+{
+"id": "eval_cv_7c5d7039",
+"scores": {
+"Answer_1": {
+"correctness": 2,
+"completeness": 5,
+"grounding": 2,
+"relevance": 5,
+"overall": 2,
+"reason": "错误增加混凝土项，认为题干公式不完整。"
+},
+"Answer_2": {
+"correctness": 4,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 4,
+"reason": "公式和变量基本正确，但γRE取值说明错误。"
+},
+"Answer_3": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"reason": "完整引用11.7.6公式和变量定义。"
+},
+"Answer_4": {
+"correctness": 5,
+"completeness": 3,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"reason": "判断正确，但引用条款未说明。"
+},
+"Answer_5": {
+"correctness": 5,
+"completeness": 3,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"reason": "结论正确，解释较简略。"
+},
+"Answer_6": {
+"correctness": 4,
+"completeness": 4,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"reason": "基本正确，但错误表示规范未明确N取值。"
+}
+}
+},
+{
+"id": "eval_cv_f58de13c",
+"scores": {
+"Answer_1": {
+"correctness": 3,
+"completeness": 4,
+"grounding": 4,
+"relevance": 5,
+"overall": 3,
+"reason": "认为不属于禁止使用，但与金标结论不一致。"
+},
+"Answer_2": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 5,
+"reason": "正确认可条文限制，解释充分。"
+},
+"Answer_3": {
+"correctness": 3,
+"completeness": 3,
+"grounding": 3,
+"relevance": 4,
+"overall": 3,
+"reason": "结论正确但引用内容与题干限制无关。"
+},
+"Answer_4": {
+"correctness": 5,
+"completeness": 3,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"reason": "结论正确，但解释较少。"
+},
+"Answer_5": {
+"correctness": 5,
+"completeness": 3,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"reason": "结论正确，说明简单。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 3,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"reason": "结论正确，但缺少条文具体说明。"
+}
+}
+},
+{
+"id": "eval_cv_9f1af307",
+"scores": {
+"Answer_1": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 5,
+"reason": "正确解释各项要求，整体符合规范。"
+},
+"Answer_2": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"reason": "准确复述抗震墙分布钢筋要求。"
+},
+"Answer_3": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 1,
+"relevance": 2,
+"overall": 2,
+"reason": "引用高规梁箍筋内容，与抗震墙问题无关。"
+},
+"Answer_4": {
+"correctness": 4,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"reason": "主体正确，但将拉筋间距作为题干问题偏差处理。"
+},
+"Answer_5": {
+"correctness": 4,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"reason": "基本正确，但额外讨论拉筋间距。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 4,
+"grounding": 4,
+"relevance": 5,
+"overall": 5,
+"reason": "准确判断并说明规范要求。"
+}
+}
+},
+{
+"id": "eval_cv_54b52583",
+"scores": {
+"Answer_1": {
+"correctness": 5,
+"completeness": 4,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"reason": "结论正确，解释连接作用合理。"
+},
+"Answer_2": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"reason": "准确引用条文并解释目的。"
+},
+"Answer_3": {
+"correctness": 2,
+"completeness": 4,
+"grounding": 1,
+"relevance": 3,
+"overall": 2,
+"reason": "引用9.1.18但内容错误，未回答题目。"
+},
+"Answer_4": {
+"correctness": 5,
+"completeness": 3,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"reason": "判断正确，但缺少详细说明。"
+},
+"Answer_5": {
+"correctness": 5,
+"completeness": 4,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"reason": "结论正确，条文解释略有扩展。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 4,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"reason": "准确回答规范要求。"
+}
+}
+}
+]
+[
+{
+"id": "eval_cv_54b52583",
+"scores": {
+"Answer_1": {
+"correctness": 5,
+"completeness": 4,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"reason": "正确判断条文要求，解释连接方式作用合理。"
+},
+"Answer_2": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"reason": "准确引用9.1.18原文并说明目的。"
+},
+"Answer_3": {
+"correctness": 1,
+"completeness": 3,
+"grounding": 1,
+"relevance": 3,
+"overall": 1,
+"reason": "虽然引用9.1.18，但条文内容错误，未回答天窗架连接要求。"
+},
+"Answer_4": {
+"correctness": 5,
+"completeness": 3,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"reason": "结论正确，但缺少具体规范说明。"
+},
+"Answer_5": {
+"correctness": 5,
+"completeness": 4,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"reason": "判断正确，引用款项可能不准确但不影响主要结论。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 4,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"reason": "准确说明规范要求，回答符合金标。"
+}
+}
+}
+]
+
+
+[
+{
+"id": "eval_cv_34d1dd75",
+"scores": {
+"Answer_1": {
+"correctness": 2,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 2,
+"reason": "大部分条文内容复述正确，但错误认为预应力筋取f_pyk，核心判断错误。"
+},
+"Answer_2": {
+"correctness": 2,
+"completeness": 5,
+"grounding": 3,
+"relevance": 5,
+"overall": 2,
+"reason": "指出部分错误，但普通钢筋取值表述错误，且最终未准确匹配金标。"
+},
+"Answer_3": {
+"correctness": 1,
+"completeness": 3,
+"grounding": 1,
+"relevance": 4,
+"overall": 1,
+"reason": "将防连续倒塌条文错误解释为抗震设计内容，存在严重条文幻觉。"
+},
+"Answer_4": {
+"correctness": 2,
+"completeness": 4,
+"grounding": 4,
+"relevance": 5,
+"overall": 2,
+"reason": "复述题干但未识别错误，预应力筋取值错误。"
+},
+"Answer_5": {
+"correctness": 2,
+"completeness": 4,
+"grounding": 4,
+"relevance": 5,
+"overall": 2,
+"reason": "完整重复错误说法，未发现f_pyk与金标不符。"
+},
+"Answer_6": {
+"correctness": 4,
+"completeness": 4,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"reason": "指出需结合工程判断，但没有明确指出题干错误，回答偏保守。"
+}
+}
+},
+{
+"id": "eval_cv_6bc9582c",
+"scores": {
+"Answer_1": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"reason": "准确复述7.3.2要求，判断正确。"
+},
+"Answer_2": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 5,
+"reason": "内容完整正确，但后续结构类型讨论略有扩展。"
+},
+"Answer_3": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"reason": "完整引用条文并准确支持结论。"
+},
+"Answer_4": {
+"correctness": 5,
+"completeness": 4,
+"grounding": 4,
+"relevance": 5,
+"overall": 5,
+"reason": "准确判断，但未展开条文来源。"
+},
+"Answer_5": {
+"correctness": 5,
+"completeness": 4,
+"grounding": 4,
+"relevance": 5,
+"overall": 5,
+"reason": "结论正确，说明简洁有效。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 4,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"reason": "准确引用规范并回答问题。"
+}
+}
+},
+{
+"id": "eval_cv_7ea4c641",
+"scores": {
+"Answer_1": {
+"correctness": 2,
+"completeness": 4,
+"grounding": 2,
+"relevance": 5,
+"overall": 2,
+"reason": "错误否定η_b定义，且后续解释自相矛盾。"
+},
+"Answer_2": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"reason": "准确说明η_b含义，符合规范。"
+},
+"Answer_3": {
+"correctness": 5,
+"completeness": 4,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"reason": "正确引用条文定义。"
+},
+"Answer_4": {
+"correctness": 5,
+"completeness": 3,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"reason": "判断正确，但解释较简略。"
+},
+"Answer_5": {
+"correctness": 1,
+"completeness": 3,
+"grounding": 1,
+"relevance": 4,
+"overall": 1,
+"reason": "错误认为η_b表示承台周边土修正系数。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 3,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"reason": "结论正确，虽补充说明但不影响判断。"
+}
+}
+},
+{
+"id": "eval_cv_ad20df22",
+"scores": {
+"Answer_1": {
+"correctness": 1,
+"completeness": 4,
+"grounding": 2,
+"relevance": 5,
+"overall": 1,
+"reason": "错误修改规范公式，并错误解释变量含义。"
+},
+"Answer_2": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 5,
+"reason": "正确认可公式，与金标一致。"
+},
+"Answer_3": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 2,
+"relevance": 3,
+"overall": 2,
+"reason": "讨论H.0.8其他内容，未验证题目公式。"
+},
+"Answer_4": {
+"correctness": 4,
+"completeness": 3,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"reason": "基本正确，但加入题目未要求的限制条件。"
+},
+"Answer_5": {
+"correctness": 5,
+"completeness": 4,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"reason": "准确判断公式正确。"
+},
+"Answer_6": {
+"correctness": 3,
+"completeness": 4,
+"grounding": 4,
+"relevance": 5,
+"overall": 3,
+"reason": "提出适用条件，但以此否定题干，判断偏差。"
+}
+}
+},
+{
+"id": "eval_cv_821468ce",
+"scores": {
+"Answer_1": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 5,
+"reason": "正确判断并解释连接要求。"
+},
+"Answer_2": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 5,
+"reason": "主要内容正确，但引入其他规范略显多余。"
+},
+"Answer_3": {
+"correctness": 1,
+"completeness": 3,
+"grounding": 1,
+"relevance": 2,
+"overall": 1,
+"reason": "引用消能器连接条文，与消能梁段连接问题无关。"
+},
+"Answer_4": {
+"correctness": 5,
+"completeness": 4,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"reason": "准确引用8.5.4并判断正确。"
+},
+"Answer_5": {
+"correctness": 4,
+"completeness": 3,
+"grounding": 3,
+"relevance": 5,
+"overall": 4,
+"reason": "结论正确，但引用8.5.5而非金标条文。"
+},
+"Answer_6": {
+"correctness": 4,
+"completeness": 4,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"reason": "指出部分细节问题，但错误认为规范未明确承载力要求。"
+}
+}
+}
+]
+[
+{
+"id": "eval_cv_be92b3ca",
+"scores": {
+"Answer_1": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"reason": "准确说明第7.3.9条各项要求，结论正确。"
+},
+"Answer_2": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"reason": "完整列出条文要求，与金标一致。"
+},
+"Answer_3": {
+"correctness": 4,
+"completeness": 2,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"reason": "结论正确，但只回答了部分条文内容。"
+},
+"Answer_4": {
+"correctness": 5,
+"completeness": 4,
+"grounding": 4,
+"relevance": 5,
+"overall": 5,
+"reason": "正确判断并概括主要要求。"
+},
+"Answer_5": {
+"correctness": 5,
+"completeness": 3,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"reason": "结论正确，但缺少具体条文内容。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 4,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"reason": "准确回答并引用规范要求。"
+}
+}
+},
+{
+"id": "eval_cv_3d5aa6d8",
+"scores": {
+"Answer_1": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 5,
+"reason": "正确判断并完整解释填方勘察要求。"
+},
+"Answer_2": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 5,
+"reason": "内容完整，但增加施工建议不影响正确性。"
+},
+"Answer_3": {
+"correctness": 3,
+"completeness": 3,
+"grounding": 2,
+"relevance": 4,
+"overall": 3,
+"reason": "结论正确，但引用5.1.1与题目条文不匹配。"
+},
+"Answer_4": {
+"correctness": 5,
+"completeness": 3,
+"grounding": 3,
+"relevance": 5,
+"overall": 4,
+"reason": "结论正确，但引用6.3.1不准确。"
+},
+"Answer_5": {
+"correctness": 5,
+"completeness": 4,
+"grounding": 4,
+"relevance": 5,
+"overall": 5,
+"reason": "准确说明要求，条文引用基本可信。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 4,
+"grounding": 4,
+"relevance": 5,
+"overall": 5,
+"reason": "正确复述要求，满足题目。"
+}
+}
+},
+{
+"id": "eval_cv_c7725bb7",
+"scores": {
+"Answer_1": {
+"correctness": 5,
+"completeness": 4,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"reason": "准确解释支挡结构定义，扩展内容合理。"
+},
+"Answer_2": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"reason": "完整说明定义及作用。"
+},
+"Answer_3": {
+"correctness": 5,
+"completeness": 3,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"reason": "判断正确，但解释较少。"
+},
+"Answer_4": {
+"correctness": 4,
+"completeness": 3,
+"grounding": 2,
+"relevance": 5,
+"overall": 4,
+"reason": "结论正确，但条文号写为2.1.15存在错误。"
+},
+"Answer_5": {
+"correctness": 4,
+"completeness": 3,
+"grounding": 2,
+"relevance": 5,
+"overall": 4,
+"reason": "定义基本正确，但引用2.1.12错误。"
+},
+"Answer_6": {
+"correctness": 4,
+"completeness": 3,
+"grounding": 2,
+"relevance": 5,
+"overall": 4,
+"reason": "结论正确，但条文号错误。"
+}
+}
+},
+{
+"id": "eval_cv_f54715ff",
+"scores": {
+"Answer_1": {
+"correctness": 5,
+"completeness": 4,
+"grounding": 4,
+"relevance": 5,
+"overall": 5,
+"reason": "正确判断地区参数，但场地条件解释错误。"
+},
+"Answer_2": {
+"correctness": 5,
+"completeness": 4,
+"grounding": 4,
+"relevance": 5,
+"overall": 5,
+"reason": "结论正确，说明合理。"
+},
+"Answer_3": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"reason": "完整引用附录表格并准确验证。"
+},
+"Answer_4": {
+"correctness": 5,
+"completeness": 3,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"reason": "判断正确，说明简洁。"
+},
+"Answer_5": {
+"correctness": 5,
+"completeness": 3,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"reason": "结论正确，但无详细依据。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 4,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"reason": "准确说明附录条文内容。"
+}
+}
+},
+{
+"id": "eval_cv_fbfd5f7c",
+"scores": {
+"Answer_1": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 5,
+"reason": "准确解释公式和分配方法。"
+},
+"Answer_2": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 5,
+"reason": "结论正确，但条文引用不够精准。"
+},
+"Answer_3": {
+"correctness": 2,
+"completeness": 4,
+"grounding": 3,
+"relevance": 4,
+"overall": 2,
+"reason": "引用5.4.2内容，未回答5.3.1要求。"
+},
+"Answer_4": {
+"correctness": 5,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 4,
+"reason": "结论正确，但引用JGJ3而非金标规范。"
+},
+"Answer_5": {
+"correctness": 4,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 4,
+"reason": "结论正确，但公式简化为0.08Geq缺少适用说明。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 4,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"reason": "准确引用5.3.1并判断正确。"
+}
+}
+}
+]
+[
+{
+"id": "eval_cv_040b6266",
+"scores": {
+"Answer_1": {
+"correctness": 5,
+"completeness": 4,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"reason": "正确判断说法符合9.2.3条要求，解释完整。"
+},
+"Answer_2": {
+"correctness": 3,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"reason": "正确指出前半部分，但错误否定1.5倍缝宽要求。"
+},
+"Answer_3": {
+"correctness": 3,
+"completeness": 3,
+"grounding": 4,
+"relevance": 5,
+"overall": 3,
+"reason": "结论正确，但引用内容与题干描述不完整。"
+},
+"Answer_4": {
+"correctness": 5,
+"completeness": 4,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"reason": "准确判断并说明主要要求。"
+},
+"Answer_5": {
+"correctness": 5,
+"completeness": 3,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"reason": "结论正确，但缺少具体规范内容。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 4,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"reason": "准确复述9.2.3要求，符合金标。"
+}
+}
+},
+{
+"id": "eval_cv_后续题目",
+"scores": {}
+}
+]
+[
+{
+"id": "eval_cv_6ba56d44",
+"scores": {
+"Answer_1": {
+"correctness": 5,
+"completeness": 4,
+"grounding": 4,
+"relevance": 5,
+"overall": 5,
+"reason": "正确判断并解释排水措施要求，补充内容合理。"
+},
+"Answer_2": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 2,
+"relevance": 5,
+"overall": 4,
+"reason": "结论正确，但引用GB50202和5.2.1条文存在不准确。"
+},
+"Answer_3": {
+"correctness": 5,
+"completeness": 3,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"reason": "判断正确，说明较简略。"
+},
+"Answer_4": {
+"correctness": 5,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 4,
+"reason": "结论正确，但引用6.3.6而非金标条文。"
+},
+"Answer_5": {
+"correctness": 5,
+"completeness": 4,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"reason": "准确引用6.3.10并说明要求。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 3,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"reason": "准确回答，内容简洁。"
+}
+}
+},
+{
+"id": "eval_cv_8b8e3e26",
+"scores": {
+"Answer_1": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"reason": "正确解释复合地基定义，并合理扩展。"
+},
+"Answer_2": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 5,
+"reason": "定义正确，扩展内容较多但无明显错误。"
+},
+"Answer_3": {
+"correctness": 5,
+"completeness": 3,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"reason": "判断正确，但增强体举例部分不够严谨。"
+},
+"Answer_4": {
+"correctness": 5,
+"completeness": 3,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"reason": "正确引用2.1.10并判断。"
+},
+"Answer_5": {
+"correctness": 4,
+"completeness": 3,
+"grounding": 2,
+"relevance": 5,
+"overall": 4,
+"reason": "结论正确，但引用2.1.12错误。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 3,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"reason": "准确复述规范定义。"
+}
+}
+},
+{
+"id": "eval_cv_472138af",
+"scores": {
+"Answer_1": {
+"correctness": 2,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 2,
+"reason": "错误否定规范数值，且认为条文无此要求。"
+},
+"Answer_2": {
+"correctness": 1,
+"completeness": 4,
+"grounding": 2,
+"relevance": 5,
+"overall": 1,
+"reason": "错误认为1900kg/m³不准确，与金标冲突。"
+},
+"Answer_3": {
+"correctness": 1,
+"completeness": 2,
+"grounding": 1,
+"relevance": 3,
+"overall": 1,
+"reason": "引用L.0.3内容完全错误，条文幻觉严重。"
+},
+"Answer_4": {
+"correctness": 1,
+"completeness": 3,
+"grounding": 2,
+"relevance": 5,
+"overall": 1,
+"reason": "错误给出1800kg/m³，核心数值错误。"
+},
+"Answer_5": {
+"correctness": 5,
+"completeness": 3,
+"grounding": 3,
+"relevance": 5,
+"overall": 4,
+"reason": "结论正确，但引用L.0.2而非L.0.3。"
+},
+"Answer_6": {
+"correctness": 1,
+"completeness": 3,
+"grounding": 2,
+"relevance": 5,
+"overall": 1,
+"reason": "错误给出1800kg/m³。"
+}
+}
+},
+{
+"id": "eval_cv_02b92ee4",
+"scores": {
+"Answer_1": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 5,
+"reason": "正确解释方法和适用条件。"
+},
+"Answer_2": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 5,
+"reason": "结论正确，但引用JGJ94相关内容略偏离。"
+},
+"Answer_3": {
+"correctness": 3,
+"completeness": 3,
+"grounding": 2,
+"relevance": 4,
+"overall": 3,
+"reason": "结论正确，但引用JGJ106内容与题目规范不符。"
+},
+"Answer_4": {
+"correctness": 5,
+"completeness": 3,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"reason": "准确引用T.0.10并判断。"
+},
+"Answer_5": {
+"correctness": 5,
+"completeness": 4,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"reason": "完整说明确定方法。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 3,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"reason": "准确回答规范要求。"
+}
+}
+},
+{
+"id": "eval_cv_f8e484bb",
+"scores": {
+"Answer_1": {
+"correctness": 3,
+"completeness": 4,
+"grounding": 4,
+"relevance": 5,
+"overall": 3,
+"reason": "总体判断正确，但混淆自由段和锚固段长度要求。"
+},
+"Answer_2": {
+"correctness": 5,
+"completeness": 4,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"reason": "准确解释9.6.8要求。"
+},
+"Answer_3": {
+"correctness": 3,
+"completeness": 4,
+"grounding": 4,
+"relevance": 5,
+"overall": 3,
+"reason": "条文描述错误，将长度单位改为锚杆直径。"
+},
+"Answer_4": {
+"correctness": 5,
+"completeness": 4,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"reason": "正确解释自由段和锚固段要求。"
+},
+"Answer_5": {
+"correctness": 4,
+"completeness": 3,
+"grounding": 5,
+"relevance": 5,
+"overall": 4,
+"reason": "结论正确，但自由段表述略不严谨。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 4,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"reason": "准确复述规范要求。"
+}
+}
+}
+]
+[
+{
+"id": "eval_cv_040b6266",
+"scores": {
+"Answer_1": {
+"correctness": 5,
+"completeness": 4,
+"grounding": 4,
+"relevance": 5,
+"overall": 5,
+"reason": "正确判断并说明9.2.3要求，仅条文依据展开不足。"
+},
+"Answer_2": {
+"correctness": 2,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 2,
+"reason": "错误否定1.5倍防震缝宽度要求。"
+},
+"Answer_3": {
+"correctness": 3,
+"completeness": 3,
+"grounding": 3,
+"relevance": 4,
+"overall": 3,
+"reason": "结论正确，但引用条文内容与题目不完全对应。"
+},
+"Answer_4": {
+"correctness": 5,
+"completeness": 4,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"reason": "准确回答规范要求。"
+},
+"Answer_5": {
+"correctness": 5,
+"completeness": 3,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"reason": "结论正确，但说明较简略。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 4,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"reason": "正确引用9.2.3并支持判断。"
+}
+}
+},
+{
+"id": "eval_cv_6ba56d44",
+"scores": {
+"Answer_1": {
+"correctness": 5,
+"completeness": 4,
+"grounding": 4,
+"relevance": 5,
+"overall": 5,
+"reason": "正确回答排水措施要求，扩展合理。"
+},
+"Answer_2": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 2,
+"relevance": 5,
+"overall": 4,
+"reason": "结论正确，但引用其他规范条文存在错误。"
+},
+"Answer_3": {
+"correctness": 5,
+"completeness": 3,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"reason": "正确但缺少规范依据。"
+},
+"Answer_4": {
+"correctness": 5,
+"completeness": 3,
+"grounding": 3,
+"relevance": 5,
+"overall": 4,
+"reason": "结论正确，但引用6.3.6不准确。"
+},
+"Answer_5": {
+"correctness": 5,
+"completeness": 3,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"reason": "准确引用6.3.10并判断。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 3,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"reason": "简洁准确回答。"
+}
+}
+},
+{
+"id": "eval_cv_8b8e3e26",
+"scores": {
+"Answer_1": {
+"correctness": 5,
+"completeness": 4,
+"grounding": 4,
+"relevance": 5,
+"overall": 5,
+"reason": "正确解释复合地基定义。"
+},
+"Answer_2": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 5,
+"reason": "完整解释定义，扩展内容合理。"
+},
+"Answer_3": {
+"correctness": 5,
+"completeness": 3,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"reason": "准确回答，但部分举例不够严谨。"
+},
+"Answer_4": {
+"correctness": 5,
+"completeness": 3,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"reason": "正确引用2.1.10。"
+},
+"Answer_5": {
+"correctness": 4,
+"completeness": 3,
+"grounding": 2,
+"relevance": 5,
+"overall": 4,
+"reason": "结论正确，但引用2.1.12错误。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 3,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"reason": "准确复述规范定义。"
+}
+}
+},
+{
+"id": "eval_cv_472138af",
+"scores": {
+"Answer_1": {
+"correctness": 1,
+"completeness": 4,
+"grounding": 2,
+"relevance": 5,
+"overall": 1,
+"reason": "错误否定规范数值，核心判断错误。"
+},
+"Answer_2": {
+"correctness": 1,
+"completeness": 4,
+"grounding": 2,
+"relevance": 5,
+"overall": 1,
+"reason": "错误认为1900kg/m³说法不准确。"
+},
+"Answer_3": {
+"correctness": 1,
+"completeness": 2,
+"grounding": 1,
+"relevance": 3,
+"overall": 1,
+"reason": "条文内容完全错误，存在明显幻觉。"
+},
+"Answer_4": {
+"correctness": 1,
+"completeness": 3,
+"grounding": 2,
+"relevance": 5,
+"overall": 1,
+"reason": "错误给出1800kg/m³。"
+},
+"Answer_5": {
+"correctness": 5,
+"completeness": 3,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"reason": "结论正确，但条款号错误。"
+},
+"Answer_6": {
+"correctness": 1,
+"completeness": 3,
+"grounding": 2,
+"relevance": 5,
+"overall": 1,
+"reason": "错误给出1800kg/m³。"
+}
+}
+},
+{
+"id": "eval_cv_02b92ee4",
+"scores": {
+"Answer_1": {
+"correctness": 5,
+"completeness": 4,
+"grounding": 4,
+"relevance": 5,
+"overall": 5,
+"reason": "正确解释缓变形曲线判断方法。"
+},
+"Answer_2": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 3,
+"relevance": 5,
+"overall": 5,
+"reason": "内容完整，但引用JGJ规范偏离金标。"
+},
+"Answer_3": {
+"correctness": 3,
+"completeness": 3,
+"grounding": 2,
+"relevance": 4,
+"overall": 3,
+"reason": "结论正确，但引用检测规范内容错误。"
+},
+"Answer_4": {
+"correctness": 5,
+"completeness": 3,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"reason": "正确引用T.0.10方法。"
+},
+"Answer_5": {
+"correctness": 5,
+"completeness": 4,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"reason": "准确说明规范方法。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 3,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"reason": "结论正确，表达简洁。"
+}
+}
+}
+]
+[
+{
+"id": "eval_cv_040b6266",
+"scores": {
+"Answer_1": {
+"correctness": 5,
+"completeness": 4,
+"grounding": 4,
+"relevance": 5,
+"overall": 5,
+"reason": "正确判断并解释9.2.3要求，仅条文引用展开不足。"
+},
+"Answer_2": {
+"correctness": 2,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 2,
+"reason": "错误否定1.5倍防震缝宽度要求。"
+},
+"Answer_3": {
+"correctness": 3,
+"completeness": 3,
+"grounding": 3,
+"relevance": 4,
+"overall": 3,
+"reason": "结论正确，但引用条文内容与问题不完全匹配。"
+},
+"Answer_4": {
+"correctness": 5,
+"completeness": 4,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"reason": "准确说明规范要求。"
+},
+"Answer_5": {
+"correctness": 5,
+"completeness": 3,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"reason": "结论正确，解释较简略。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 4,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"reason": "正确引用并支持判断。"
+}
+}
+},
+{
+"id": "eval_cv_6ba56d44",
+"scores": {
+"Answer_1": {
+"correctness": 5,
+"completeness": 4,
+"grounding": 4,
+"relevance": 5,
+"overall": 5,
+"reason": "正确回答排水措施要求，扩展合理。"
+},
+"Answer_2": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 2,
+"relevance": 5,
+"overall": 4,
+"reason": "结论正确，但引用其他规范条文错误。"
+},
+"Answer_3": {
+"correctness": 5,
+"completeness": 3,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"reason": "判断正确，但说明较少。"
+},
+"Answer_4": {
+"correctness": 5,
+"completeness": 3,
+"grounding": 3,
+"relevance": 5,
+"overall": 4,
+"reason": "结论正确，但条文引用偏差。"
+},
+"Answer_5": {
+"correctness": 5,
+"completeness": 3,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"reason": "准确引用6.3.10。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 3,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"reason": "简洁准确。"
+}
+}
+},
+{
+"id": "eval_cv_8b8e3e26",
+"scores": {
+"Answer_1": {
+"correctness": 5,
+"completeness": 4,
+"grounding": 4,
+"relevance": 5,
+"overall": 5,
+"reason": "正确解释复合地基定义。"
+},
+"Answer_2": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 5,
+"reason": "完整回答，扩展内容合理。"
+},
+"Answer_3": {
+"correctness": 5,
+"completeness": 3,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"reason": "结论正确，但增强体举例不严谨。"
+},
+"Answer_4": {
+"correctness": 5,
+"completeness": 3,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"reason": "正确引用2.1.10。"
+},
+"Answer_5": {
+"correctness": 4,
+"completeness": 3,
+"grounding": 2,
+"relevance": 5,
+"overall": 4,
+"reason": "结论正确，但条文号错误。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 3,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"reason": "准确回答定义。"
+}
+}
+},
+{
+"id": "eval_cv_472138af",
+"scores": {
+"Answer_1": {
+"correctness": 1,
+"completeness": 4,
+"grounding": 2,
+"relevance": 5,
+"overall": 1,
+"reason": "错误否定规范数值，核心判断错误。"
+},
+"Answer_2": {
+"correctness": 1,
+"completeness": 4,
+"grounding": 2,
+"relevance": 5,
+"overall": 1,
+"reason": "错误认为1900kg/m³不准确。"
+},
+"Answer_3": {
+"correctness": 1,
+"completeness": 2,
+"grounding": 1,
+"relevance": 3,
+"overall": 1,
+"reason": "引用L.0.3内容完全错误。"
+},
+"Answer_4": {
+"correctness": 1,
+"completeness": 3,
+"grounding": 2,
+"relevance": 5,
+"overall": 1,
+"reason": "错误给出1800kg/m³。"
+},
+"Answer_5": {
+"correctness": 5,
+"completeness": 3,
+"grounding": 3,
+"relevance": 5,
+"overall": 4,
+"reason": "结论正确，但条款引用错误。"
+},
+"Answer_6": {
+"correctness": 1,
+"completeness": 3,
+"grounding": 2,
+"relevance": 5,
+"overall": 1,
+"reason": "错误给出1800kg/m³。"
+}
+}
+},
+{
+"id": "eval_cv_02b92ee4",
+"scores": {
+"Answer_1": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 5,
+"reason": "正确解释缓变形曲线判断方法。"
+},
+"Answer_2": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 3,
+"relevance": 5,
+"overall": 5,
+"reason": "内容完整，但引用JGJ规范偏离金标。"
+},
+"Answer_3": {
+"correctness": 3,
+"completeness": 3,
+"grounding": 2,
+"relevance": 4,
+"overall": 3,
+"reason": "结论正确，但引用条文无关。"
+},
+"Answer_4": {
+"correctness": 5,
+"completeness": 3,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"reason": "正确引用T.0.10。"
+},
+"Answer_5": {
+"correctness": 5,
+"completeness": 4,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"reason": "准确说明规范方法。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 3,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"reason": "正确回答。"
+}
+}
+}
+]

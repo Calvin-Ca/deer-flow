@@ -103,19 +103,50 @@
 | 5.2 | 条款号抽取 + 归一化 | ✅ | `src/eval/clause.py` | 支持带标准号/中文简称/纯条款号三种形式；含 clause_f1 和 is_hallucinated |
 | 5.3 | 条款引用 F1 + 硬幻觉率 | ✅ | `src/eval/scoring.py`、`scripts/score_eval.py`、`results/{run_id}/metrics/` | 同时输出逐题指标、宏平均与微平均 F1，以及无效条文引用率 |
 | 5.4 | 数值精确匹配判分 | ✅ | `src/eval/scoring.py`、`scripts/score_eval.py` | Decimal 精确匹配；分别报告完整命中率和数值项命中率，无金标题不进入分母 |
-| 5.5 | LLM judge（盲评+乱序） | ⬜ | | judge 模型 ≠ 合成模型；需先完成人工抽样并确定 judge 模型 |
+| 5.5 | LLM judge（盲评+乱序） | 🔄 | `results/eval_v1_20260730/llm_judge_*.json`、`results/eval_v1_20260730/review_batches/` | 已完成一轮部分盲评及结果清洗；当前只能支持方向性结论，不能作为最终显著性结论。judge 文件存在拼接数组、自然语言混入、重复评分和覆盖不全问题；且 `model_map.json` 对所有题固定 Answer 顺序，尚不能证明实现了逐题随机乱序 |
 | 5.6 | 拒答二分类判定 | 🔄 | `src/eval/scoring.py`、`scripts/score_eval.py`、`scripts/audit_refusals.py` | 已生成启发式拒答指标；已增加按题型分层抽查脚本，待人工核验拒答标签质量 |
-| 5.7 | 指标汇总，填 EXPERIMENT.md §3 | ✅ | `results/{run_id}/summary.csv`、`results/{run_id}/scoring_manifest.json`、`scripts/export_review.py` | smoke 与正式 run 均已完成自动评分；已生成逐题合并评审文件 `review.md`，实验报告尚未填写 |
+| 5.7 | 指标汇总，填 EXPERIMENT.md §3 | ✅ | `results/{run_id}/summary.csv`、`results/{run_id}/scoring_manifest.json`、`scripts/export_review.py` | smoke 与正式 run 均已完成自动评分；已生成逐题合并评审文件 `review.md` 和分题型 judge 表 `judge_by_type.csv` |
+
+### 5.5 LLM judge 清洗结果（2026-07-31）
+
+对 `results/eval_v1_20260730/llm_judge_*.json` 做了保守清洗：
+
+- 去掉格式损坏、缺少 `scores` 或必要字段的记录；
+- 同一题、同一模型的重复评分按题目 ID 聚合，重复 overall 取中位数，不直接取最后一条；
+- 仅剔除 judge 自身理由明确指出“与金标不一致/核心结论错误/无依据”，却给出 overall=5 的自相矛盾评分。已发现的明确异常为 `eval_sc_ff156194 / group_b`：答案给出 `1.50×10⁴`，金标为 `1.60×10⁴`，理由承认不一致但评分为5；
+- “核心结论正确但规范条文号错误”的记录保留为部分正确，不作一刀切删除。
+
+清洗后共有 156 道题有有效 judge（各模型按相同题目比较）；按题型聚合的 overall 均值如下：
+
+| 题型 | base | base_fewshot | group_a | group_b | group_c | group_d |
+|---|---:|---:|---:|---:|---:|---:|
+| single_clause | 2.773 | 2.341 | 2.307 | **2.919** | 2.318 | 2.614 |
+| cross_clause | 1.820 | 1.660 | **2.680** | 2.240 | 2.160 | 2.620 |
+| calculation | 2.457 | 1.804 | 1.717 | 2.217 | **2.696** | 2.348 |
+| clause_verify | 4.028 | 4.139 | 3.042 | 3.917 | 3.778 | **4.306** |
+| refusal | 3.911 | 3.750 | 2.911 | 2.589 | 2.714 | **4.964** |
+
+按正式评测集题型配额（115/93/79/60/39）加权后：`group_d=3.061`、`base=2.789`、`group_b=2.733`、`group_c=2.624`、`base_fewshot=2.489`、`group_a=2.451`。但只看正常回答任务（single/cross/calculation）时，`group_d=2.543` 与 `group_b=2.506` 基本持平。因此当前可如实记录为：`group_d` 的综合领先主要来自拒答和条文判断；`group_b` 是单条文正常问答最佳；`group_c` 在已评计算题上最佳；few-shot 未显示收益；`group_a` 不宜作为整体候选。
+
+上述结果不是完整评测结论：judge 有效覆盖约 40%，各题型样本量约 23～44，重复评分稳定性有限，且答案顺序尚未逐题随机化。需完成随机分层抽样、全覆盖 judge、双轮独立评分及人工 Kappa 后，才能用于正式报告的最终模型排名。
 
 ## 阶段 6：验证与报告（1.5 天）
 
 | # | 任务 | 状态 | 产出 | 备注 |
 |---|---|---|---|---|
-| 6.1 | 人工抽检 100 条 + Kappa | 🔄 | `scripts/audit_refusals.py`、`scripts/export_review.py` | 已具备分层抽样和逐题评审文件导出；待人工标注并计算一致性 |
+| 6.1 | 人工抽检 100 条 + Kappa | ⏸️ | `scripts/audit_refusals.py`、`scripts/export_review.py` | 流程和标注格式已说明；本阶段暂缓人工标注与 Kappa 计算，不能把自动拒答标签当作人工验证结果 |
 | 6.2 | 结果可视化 | ⬜ | `results/{run_id}/figs/` | |
-| 6.3 | 实验报告 | ⬜ | `reports/report.md` | 按 EXPERIMENT.md §4 组织 |
+| 6.3 | 实验报告 | ✅ | `reports/report.md` | 已按 PRD 实验设计、全量自动指标、清洗后的 judge 结果、关键发现和局限性完成；人工 Kappa 仍暂缓 |
 | 6.4 | 一键复现脚本 + README | ⬜ | | |
 | 6.5 | 评测集脱敏开源 | ⬜ | | 只开评测集，不开条文库 |
+
+### 6.1 人工抽检与 Kappa 的实施说明（暂缓）
+
+Kappa 用来衡量两名人工标注人对同一批回答的判断是否一致，并扣除“碰巧一致”的部分；它不是模型准确率。建议把一个 `(题目 ID, 模型)` 作为一个标注单元，两名标注人独立标注同一批样本，拒答专项使用 `refusal / answer` 二分类，回答质量使用 `correct / partial / wrong / refusal` 四分类。先计算人工 A 与人工 B 的 Cohen's Kappa，再用仲裁后的人工标签与自动规则或 LLM judge 比较一致性。
+
+例如10条二分类样本中人工实际一致8条（80%），按双方标签分布计算的偶然一致率为58%，则：`Kappa=(0.80-0.58)/(1-0.58)=0.524`。这表示表面一致率虽为80%，扣除偶然一致后只有中等一致性。项目当前目标是 Kappa≥0.75；低于该值时，应先检查评分规则和分歧样本，不能直接采信 judge 排名。
+
+当前 `scripts/export_review.py` 只导出评审材料，`scripts/audit_refusals.py` 只打印疑似误拒答，尚不会保存双人标签或计算 Kappa。因此该步骤暂缓期间，相关数值均不填入正式结果表。
 
 ---
 

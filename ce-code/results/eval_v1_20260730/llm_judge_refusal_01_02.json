@@ -1,0 +1,4547 @@
+[
+{
+"id": "eval_rf_0e54d8a3",
+"scores": {
+"Answer_1": {
+"correctness": 3,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "分析较全面但最终偏向推荐桩基础，超出规范可确定范围；应保留综合比选。题型金标要求拒答。"
+},
+"Answer_2": {
+"correctness": 2,
+"completeness": 5,
+"grounding": 3,
+"relevance": 5,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "内容完整但明确推荐桩基础，并夸大筏板抗震劣势，缺少工程条件约束。"
+},
+"Answer_3": {
+"correctness": 2,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "认为桩基础更优依据不足，隔震等内容无关，未遵循应拒答边界。"
+},
+"Answer_4": {
+"correctness": 1,
+"completeness": 3,
+"grounding": 1,
+"relevance": 4,
+"overall": 1,
+"refusal_appropriateness": 1,
+"reason": "错误推荐筏板基础，并引用无法验证条文支持结论。"
+},
+"Answer_5": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 1,
+"relevance": 4,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "错误声称规范要求优先桩基础，存在条文幻觉。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "正确识别问题无法仅凭条件决策，拒答并给出需要补充的工程因素。"
+}
+}
+},
+{
+"id": "eval_rf_d8ea3a7e",
+"scores": {
+"Answer_1": {
+"correctness": 3,
+"completeness": 5,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "分析较合理但倾向深层搅拌桩，未保持方案选择需综合判断。"
+},
+"Answer_2": {
+"correctness": 4,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 4,
+"reason": "较好说明两方案适用条件，最后保留综合决策，基本符合拒答要求。"
+},
+"Answer_3": {
+"correctness": 3,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "专业信息丰富，但给出条件化推荐，仍超出题目可确定范围。"
+},
+"Answer_4": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 1,
+"relevance": 4,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "引用第7.2.1条支持具体方案选择，依据不足。"
+},
+"Answer_5": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 1,
+"relevance": 4,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "直接推荐预应力管桩，错误使用规范条文。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "准确说明规范边界，建议依据勘察和综合因素决策。"
+}
+}
+},
+{
+"id": "eval_rf_52db9a0f",
+"scores": {
+"Answer_1": {
+"correctness": 3,
+"completeness": 5,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "分析全面但最终推荐深层搅拌桩，超出信息支持范围。"
+},
+"Answer_2": {
+"correctness": 3,
+"completeness": 5,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "比较充分，但仍给出明确方案推荐。"
+},
+"Answer_3": {
+"correctness": 2,
+"completeness": 5,
+"grounding": 3,
+"relevance": 5,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "增加大量具体参数假设，部分内容无题目依据。"
+},
+"Answer_4": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 1,
+"relevance": 4,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "引用条文并直接推荐管桩，规范依据不足。"
+},
+"Answer_5": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 1,
+"relevance": 4,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "直接推荐搅拌桩，错误声称规范优先。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "符合金标，明确规范不能替代工程比选。"
+}
+}
+},
+{
+"id": "eval_rf_e0c77121",
+"scores": {
+"Answer_1": {
+"correctness": 4,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 4,
+"reason": "处理方法列举合理，但开头直接判断不能天然地基略绝对。"
+},
+"Answer_2": {
+"correctness": 3,
+"completeness": 5,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "方法丰富，但部分措施和条文对应不准确。"
+},
+"Answer_3": {
+"correctness": 3,
+"completeness": 4,
+"grounding": 4,
+"relevance": 4,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "引用软弱下卧层条文有一定相关性，但未完整回答处理建议。"
+},
+"Answer_4": {
+"correctness": 4,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 4,
+"reason": "正确说明不能简单判断，给出处理方向。"
+},
+"Answer_5": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 1,
+"relevance": 4,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "规范引用错误，前半句结论与地基处理原则不符。"
+},
+"Answer_6": {
+"correctness": 4,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 4,
+"reason": "正确指出需结合承载力和变形要求，但部分条文引用需核实。"
+}
+}
+},
+{
+"id": "eval_rf_abbc9f03",
+"scores": {
+"Answer_1": {
+"correctness": 4,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 4,
+"reason": "方案比较较完整，最后建议综合判断，基本符合拒答要求。"
+},
+"Answer_2": {
+"correctness": 4,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 4,
+"reason": "能够说明两方案优缺点，但篇幅较长且部分表述泛化。"
+},
+"Answer_3": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 2,
+"relevance": 4,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "直接推荐深层搅拌桩，缺少项目条件支撑。"
+},
+"Answer_4": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 1,
+"relevance": 4,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "错误引用第7.2.1条并确定优选方案。"
+},
+"Answer_5": {
+"correctness": 4,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 4,
+"reason": "保留多方案选择，符合规范边界，条文引用略有问题。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "准确拒答具体选择，说明需要勘察、荷载和经济性分析。"
+}
+}
+}
+]
+[
+{
+"id": "eval_rf_129b3a20",
+"scores": {
+"Answer_1": {
+"correctness": 4,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 4,
+"reason": "未直接拍板选择，能够比较两方案并强调需结合条件综合判断，符合拒答边界。"
+},
+"Answer_2": {
+"correctness": 4,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 4,
+"reason": "分析较全面，正确指出需结合地质、成本、环境等因素，但部分基础优缺点表述偏绝对。"
+},
+"Answer_3": {
+"correctness": 2,
+"completeness": 5,
+"grounding": 3,
+"relevance": 5,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "分析详细但最终直接推荐桩基础，超出题目条件可确定范围。"
+},
+"Answer_4": {
+"correctness": 4,
+"completeness": 3,
+"grounding": 3,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 4,
+"reason": "正确说明需综合比较，没有强行选择方案。"
+},
+"Answer_5": {
+"correctness": 2,
+"completeness": 4,
+"grounding": 2,
+"relevance": 4,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "错误倾向推荐筏板基础，且引用条文支持不足。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "准确说明规范边界，拒绝替代工程决策，并给出合理建议。"
+}
+}
+},
+{
+"id": "eval_rf_e0795bcf",
+"scores": {
+"Answer_1": {
+"correctness": 3,
+"completeness": 5,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "比较较完整，但最终推荐CFG桩，缺少项目条件依据。"
+},
+"Answer_2": {
+"correctness": 3,
+"completeness": 5,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "比较全面但最终推荐桩基础，不应在信息不足时确定方案。"
+},
+"Answer_3": {
+"correctness": 4,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 4,
+"reason": "能够比较多种方案并保留条件判断，基本符合要求。"
+},
+"Answer_4": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 2,
+"relevance": 4,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "直接推荐CFG桩，规范条文依据不足。"
+},
+"Answer_5": {
+"correctness": 4,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 4,
+"reason": "未绝对选择方案，能够根据荷载和地质条件进行区分。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "符合拒答要求，准确说明需要综合判断。"
+}
+}
+},
+{
+"id": "eval_rf_320713cc",
+"scores": {
+"Answer_1": {
+"correctness": 3,
+"completeness": 5,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "分析完整但给出条件性推荐，超出规范可直接确定范围。"
+},
+"Answer_2": {
+"correctness": 3,
+"completeness": 5,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "比较充分，但倾向桩基础，缺少具体工程条件。"
+},
+"Answer_3": {
+"correctness": 4,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 4,
+"reason": "较好说明需要结合勘察和荷载条件，没有简单替代设计。"
+},
+"Answer_4": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 2,
+"relevance": 4,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "直接偏向CFG桩方案，规范依据不足。"
+},
+"Answer_5": {
+"correctness": 3,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "部分保留综合判断，但仍给出方案倾向。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "准确拒答具体优选，符合金标要求。"
+}
+}
+},
+{
+"id": "eval_rf_3c0a88b9",
+"scores": {
+"Answer_1": {
+"correctness": 4,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 4,
+"reason": "能够说明需综合条件选择，虽分析略偏向某方案但未绝对化。"
+},
+"Answer_2": {
+"correctness": 4,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 4,
+"reason": "比较完整，最终建议结合实际条件确定。"
+},
+"Answer_3": {
+"correctness": 2,
+"completeness": 4,
+"grounding": 2,
+"relevance": 5,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "直接推荐方案，未遵守应拒答要求。"
+},
+"Answer_4": {
+"correctness": 5,
+"completeness": 4,
+"grounding": 4,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "准确指出规范不能替代具体工程选择。"
+},
+"Answer_5": {
+"correctness": 3,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "分析较合理，但仍对某方案存在倾向。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "正确说明规范适用边界并建议综合判断。"
+}
+}
+},
+{
+"id": "eval_rf_eee0f1df",
+"scores": {
+"Answer_1": {
+"correctness": 4,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 4,
+"reason": "比较两方案较全面，但最终选择倾向稍强。"
+},
+"Answer_2": {
+"correctness": 4,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 4,
+"reason": "能够结合不同条件提出建议，基本符合拒答边界。"
+},
+"Answer_3": {
+"correctness": 3,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "比较充分但仍进行了方案选择。"
+},
+"Answer_4": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 1,
+"relevance": 4,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "引用条文支持具体方案选择，依据不足。"
+},
+"Answer_5": {
+"correctness": 4,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 4,
+"reason": "能够说明不同条件下方案差异，未简单下结论。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "准确识别需要工程综合判断，拒答理由合理。"
+}
+}
+}
+]
+[
+{
+"id": "eval_rf_37934457",
+"scores": {
+"Answer_1": {
+"correctness": 3,
+"completeness": 5,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "比较较完整，但最终直接推荐预制桩，超过题目信息可支持范围。"
+},
+"Answer_2": {
+"correctness": 3,
+"completeness": 5,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "分析全面但明确选择预制桩，未充分遵守拒答要求。"
+},
+"Answer_3": {
+"correctness": 2,
+"completeness": 5,
+"grounding": 2,
+"relevance": 5,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "方案比较存在明显错误，最终推荐深层搅拌桩依据不足。"
+},
+"Answer_4": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 1,
+"relevance": 4,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "引用条文支持具体方案选择，存在条文依据不足问题。"
+},
+"Answer_5": {
+"correctness": 4,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 4,
+"reason": "能说明不同方案适用条件，没有简单绝对化选择。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "准确识别需要综合判断，符合拒答边界。"
+}
+}
+},
+{
+"id": "eval_rf_320713cc",
+"scores": {
+"Answer_1": {
+"correctness": 4,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 4,
+"reason": "比较合理，说明需结合条件选择，虽略倾向深基础。"
+},
+"Answer_2": {
+"correctness": 3,
+"completeness": 5,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "分析完整但直接建议桩基础，且8度抗震推荐缺少依据。"
+},
+"Answer_3": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "正确说明无法仅凭条件确定方案，并给出比选因素。"
+},
+"Answer_4": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 2,
+"relevance": 4,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "直接推荐CFG桩，条文引用和结论依据不足。"
+},
+"Answer_5": {
+"correctness": 1,
+"completeness": 3,
+"grounding": 1,
+"relevance": 4,
+"overall": 1,
+"refusal_appropriateness": 1,
+"reason": "抗震规范表述错误，推荐依据存在明显幻觉。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "规范边界判断准确，拒答并提出综合分析要求。"
+}
+}
+},
+{
+"id": "eval_rf_3c0a88b9",
+"scores": {
+"Answer_1": {
+"correctness": 3,
+"completeness": 5,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "比较充分，但最终推荐深层搅拌桩，超出信息范围。"
+},
+"Answer_2": {
+"correctness": 3,
+"completeness": 5,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "有条件分析，但仍给出初步方案倾向。"
+},
+"Answer_3": {
+"correctness": 2,
+"completeness": 2,
+"grounding": 2,
+"relevance": 4,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "直接确定深层搅拌桩，缺少工程条件支撑。"
+},
+"Answer_4": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 1,
+"relevance": 4,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "引用第7.2.1条支持具体方案，存在条文幻觉。"
+},
+"Answer_5": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 1,
+"relevance": 4,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "错误声称规范优先推荐深层搅拌桩。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "正确说明规范不能替代工程方案比选。"
+}
+}
+},
+{
+"id": "eval_rf_eee0f1df",
+"scores": {
+"Answer_1": {
+"correctness": 4,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 4,
+"reason": "比较合理并保留综合判断，但给出CFG倾向。"
+},
+"Answer_2": {
+"correctness": 4,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 4,
+"reason": "能够根据不同条件选择，没有完全替代设计判断。"
+},
+"Answer_3": {
+"correctness": 3,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "直接推荐CFG桩，缺少具体荷载和试验依据。"
+},
+"Answer_4": {
+"correctness": 3,
+"completeness": 4,
+"grounding": 2,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "方向正确，但条文引用准确性不足。"
+},
+"Answer_5": {
+"correctness": 4,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 4,
+"reason": "正确说明两种方法均可能适用，需要综合选择。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "准确拒绝具体选择，说明需依据勘察和比选。"
+}
+}
+},
+{
+"id": "eval_rf_37934457",
+"scores": {
+"Answer_1": {
+"correctness": 3,
+"completeness": 5,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "比较详细，但最终推荐预制桩，超出信息支持。"
+},
+"Answer_2": {
+"correctness": 3,
+"completeness": 5,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "分析较完整，但直接选择预制桩。"
+},
+"Answer_3": {
+"correctness": 2,
+"completeness": 5,
+"grounding": 2,
+"relevance": 5,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "方案优缺点存在错误，最终推荐依据不足。"
+},
+"Answer_4": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 1,
+"relevance": 4,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "引用液化条文支持桩基选择，存在条文幻觉。"
+},
+"Answer_5": {
+"correctness": 4,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 4,
+"reason": "能比较方案并保留条件判断，较符合要求。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "准确说明规范无法直接确定方案，拒答合理。"
+}
+}
+}
+]
+[
+{
+"id": "eval_rf_fa2bf3a4",
+"scores": {
+"Answer_1": {
+"correctness": 4,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 4,
+"reason": "能够比较不同方案并说明需结合工程条件，但仍有一定方案倾向，未完全保持拒答边界。"
+},
+"Answer_2": {
+"correctness": 3,
+"completeness": 5,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "分析较全面，但直接推荐某方案，超出了规范可确定范围。"
+},
+"Answer_3": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "正确说明需要结合勘察、荷载和施工条件综合判断，没有强行选择。"
+},
+"Answer_4": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 2,
+"relevance": 4,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "直接依据条文确定方案，存在规范依据不足问题。"
+},
+"Answer_5": {
+"correctness": 3,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "有综合分析，但仍给出偏向性建议。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "准确识别问题需要工程判断，拒答合理并给出后续建议。"
+}
+}
+},
+{
+"id": "eval_rf_1da1db39",
+"scores": {
+"Answer_1": {
+"correctness": 3,
+"completeness": 5,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "内容完整但倾向某一处理方案，缺少具体条件支撑。"
+},
+"Answer_2": {
+"correctness": 4,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 4,
+"reason": "能够比较方案并强调进一步资料分析，基本符合拒答要求。"
+},
+"Answer_3": {
+"correctness": 2,
+"completeness": 4,
+"grounding": 2,
+"relevance": 4,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "给出明确推荐，且部分技术判断缺少题目依据。"
+},
+"Answer_4": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 1,
+"relevance": 4,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "引用条文直接判断方案，存在条文适用性问题。"
+},
+"Answer_5": {
+"correctness": 4,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 4,
+"reason": "保持条件化分析，没有简单替代设计决策。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "准确说明规范边界，建议结合工程资料综合判断。"
+}
+}
+},
+{
+"id": "eval_rf_a8020e64",
+"scores": {
+"Answer_1": {
+"correctness": 4,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 4,
+"reason": "分析全面，能够说明不同条件下方案差异，但略有倾向。"
+},
+"Answer_2": {
+"correctness": 3,
+"completeness": 5,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "比较充分但最终给出方案建议，超出信息范围。"
+},
+"Answer_3": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "正确拒绝直接选型，说明需要具体工程条件。"
+},
+"Answer_4": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 2,
+"relevance": 4,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "错误将规范作为方案选择依据，结论过于确定。"
+},
+"Answer_5": {
+"correctness": 3,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "有综合因素分析，但仍存在推荐倾向。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "拒答边界判断正确，给出合理工程建议。"
+}
+}
+},
+{
+"id": "eval_rf_ccabff5b",
+"scores": {
+"Answer_1": {
+"correctness": 4,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 4,
+"reason": "分析较全面，指出需要多因素比较，但存在轻微方案倾向。"
+},
+"Answer_2": {
+"correctness": 4,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 4,
+"reason": "能够比较不同处理方式，没有简单给出唯一答案。"
+},
+"Answer_3": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "正确说明需依据工程资料和设计要求综合决策。"
+},
+"Answer_4": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 1,
+"relevance": 4,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "条文引用支持具体选择不足，存在依据问题。"
+},
+"Answer_5": {
+"correctness": 3,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "分析方向正确，但仍试图给出方案判断。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "符合拒答题要求，明确规范不能替代工程决策。"
+}
+}
+},
+{
+"id": "eval_rf_d7d3d0b9",
+"scores": {
+"Answer_1": {
+"correctness": 4,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 4,
+"reason": "能够说明方案比较需要结合条件，但部分内容存在泛化。"
+},
+"Answer_2": {
+"correctness": 3,
+"completeness": 5,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "分析详细，但最终仍有明确方案倾向。"
+},
+"Answer_3": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "正确识别无法仅凭题目条件确定方案，符合金标。"
+},
+"Answer_4": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 2,
+"relevance": 4,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "直接推荐方案，且条文支撑不足。"
+},
+"Answer_5": {
+"correctness": 3,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "有条件分析，但没有完全保持拒答边界。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "规范边界判断准确，拒答并提出综合评估要求。"
+}
+}
+}
+]
+继续。按文件中的盲评规则，对每道题的各 Answer 独立评分，并保留题目 id 与 Answer 名称。
+
+```json
+[
+  {
+    "id": "eval_rf_fa2bf3a4",
+    "Answer_1": {
+      "correctness": 3,
+      "completeness": 4,
+      "grounding": 3,
+      "relevance": 4,
+      "overall": 3,
+      "refusal_appropriateness": 4
+    },
+    "Answer_2": {
+      "correctness": 3,
+      "completeness": 4,
+      "grounding": 3,
+      "relevance": 4,
+      "overall": 3,
+      "refusal_appropriateness": 4
+    },
+    "Answer_3": {
+      "correctness": 4,
+      "completeness": 4,
+      "grounding": 4,
+      "relevance": 4,
+      "overall": 4,
+      "refusal_appropriateness": 5
+    },
+    "Answer_4": {
+      "correctness": 2,
+      "completeness": 2,
+      "grounding": 2,
+      "relevance": 3,
+      "overall": 2,
+      "refusal_appropriateness": 2
+    },
+    "Answer_5": {
+      "correctness": 3,
+      "completeness": 3,
+      "grounding": 3,
+      "relevance": 3,
+      "overall": 3,
+      "refusal_appropriateness": 3
+    },
+    "Answer_6": {
+      "correctness": 5,
+      "completeness": 4,
+      "grounding": 5,
+      "relevance": 5,
+      "overall": 5,
+      "refusal_appropriateness": 5
+    }
+  },
+  {
+    "id": "eval_rf_1da1db39",
+    "Answer_1": {
+      "correctness": 3,
+      "completeness": 4,
+      "grounding": 3,
+      "relevance": 4,
+      "overall": 3,
+      "refusal_appropriateness": 4
+    },
+    "Answer_2": {
+      "correctness": 3,
+      "completeness": 4,
+      "grounding": 3,
+      "relevance": 4,
+      "overall": 3,
+      "refusal_appropriateness": 4
+    },
+    "Answer_3": {
+      "correctness": 4,
+      "completeness": 4,
+      "grounding": 4,
+      "relevance": 4,
+      "overall": 4,
+      "refusal_appropriateness": 5
+    },
+    "Answer_4": {
+      "correctness": 2,
+      "completeness": 3,
+      "grounding": 2,
+      "relevance": 3,
+      "overall": 2,
+      "refusal_appropriateness": 3
+    },
+    "Answer_5": {
+      "correctness": 3,
+      "completeness": 3,
+      "grounding": 3,
+      "relevance": 3,
+      "overall": 3,
+      "refusal_appropriateness": 3
+    },
+    "Answer_6": {
+      "correctness": 5,
+      "completeness": 4,
+      "grounding": 5,
+      "relevance": 5,
+      "overall": 5,
+      "refusal_appropriateness": 5
+    }
+  },
+  {
+    "id": "eval_rf_a8020e64",
+    "Answer_1": {
+      "correctness": 3,
+      "completeness": 4,
+      "grounding": 3,
+      "relevance": 4,
+      "overall": 3,
+      "refusal_appropriateness": 4
+    },
+    "Answer_2": {
+      "correctness": 4,
+      "completeness": 4,
+      "grounding": 4,
+      "relevance": 4,
+      "overall": 4,
+      "refusal_appropriateness": 5
+    },
+    "Answer_3": {
+      "correctness": 3,
+      "completeness": 3,
+      "grounding": 3,
+      "relevance": 3,
+      "overall": 3,
+      "refusal_appropriateness": 4
+    },
+    "Answer_4": {
+      "correctness": 2,
+      "completeness": 2,
+      "grounding": 2,
+      "relevance": 3,
+      "overall": 2,
+      "refusal_appropriateness": 2
+    },
+    "Answer_5": {
+      "correctness": 3,
+      "completeness": 3,
+      "grounding": 3,
+      "relevance": 3,
+      "overall": 3,
+      "refusal_appropriateness": 3
+    },
+    "Answer_6": {
+      "correctness": 5,
+      "completeness": 4,
+      "grounding": 5,
+      "relevance": 5,
+      "overall": 5,
+      "refusal_appropriateness": 5
+    }
+  },
+  {
+    "id": "eval_rf_ccabff5b",
+    "Answer_1": {
+      "correctness": 3,
+      "completeness": 4,
+      "grounding": 3,
+      "relevance": 4,
+      "overall": 3,
+      "refusal_appropriateness": 4
+    },
+    "Answer_2": {
+      "correctness": 4,
+      "completeness": 4,
+      "grounding": 4,
+      "relevance": 4,
+      "overall": 4,
+      "refusal_appropriateness": 5
+    },
+    "Answer_3": {
+      "correctness": 4,
+      "completeness": 4,
+      "grounding": 4,
+      "relevance": 4,
+      "overall": 4,
+      "refusal_appropriateness": 5
+    },
+    "Answer_4": {
+      "correctness": 2,
+      "completeness": 2,
+      "grounding": 2,
+      "relevance": 3,
+      "overall": 2,
+      "refusal_appropriateness": 2
+    },
+    "Answer_5": {
+      "correctness": 3,
+      "completeness": 3,
+      "grounding": 3,
+      "relevance": 3,
+      "overall": 3,
+      "refusal_appropriateness": 3
+    },
+    "Answer_6": {
+      "correctness": 5,
+      "completeness": 4,
+      "grounding": 5,
+      "relevance": 5,
+      "overall": 5,
+      "refusal_appropriateness": 5
+    }
+  },
+  {
+    "id": "eval_rf_d7d3d0b9",
+    "Answer_1": {
+      "correctness": 3,
+      "completeness": 4,
+      "grounding": 3,
+      "relevance": 4,
+      "overall": 3,
+      "refusal_appropriateness": 4
+    },
+    "Answer_2": {
+      "correctness": 4,
+      "completeness": 4,
+      "grounding": 4,
+      "relevance": 4,
+      "overall": 4,
+      "refusal_appropriateness": 5
+    },
+    "Answer_3": {
+      "correctness": 3,
+      "completeness": 3,
+      "grounding": 3,
+      "relevance": 3,
+      "overall": 3,
+      "refusal_appropriateness": 4
+    },
+    "Answer_4": {
+      "correctness": 2,
+      "completeness": 2,
+      "grounding": 2,
+      "relevance": 3,
+      "overall": 2,
+      "refusal_appropriateness": 2
+    },
+    "Answer_5": {
+      "correctness": 3,
+      "completeness": 3,
+      "grounding": 3,
+      "relevance": 3,
+      "overall": 3,
+      "refusal_appropriateness": 3
+    },
+    "Answer_6": {
+      "correctness": 5,
+      "completeness": 4,
+      "grounding": 5,
+      "relevance": 5,
+      "overall": 5,
+      "refusal_appropriateness": 5
+    }
+  }
+]
+[
+{
+"id": "eval_rf_bd18d92d",
+"scores": {
+"Answer_1": {
+"correctness": 3,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 4,
+"reason": "认识到需结合构件类型和环境判断，但尝试依据宽度规则分析，未完全保持拒答边界。"
+},
+"Answer_2": {
+"correctness": 3,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "提供检测思路较完整，但对裂缝是否超标存在直接判断倾向。"
+},
+"Answer_3": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 2,
+"relevance": 4,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "尝试给出规范限值判断，但缺少必要检测条件，结论依据不足。"
+},
+"Answer_4": {
+"correctness": 4,
+"completeness": 4,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 5,
+"reason": "正确指出仅凭裂缝尺寸无法判断，需要检测评估。"
+},
+"Answer_5": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 2,
+"relevance": 4,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "直接依据裂缝宽度评价安全性，忽略结构状态差异。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "准确拒绝单凭裂缝数据判断，提出现场检测需求。"
+}
+}
+},
+{
+"id": "eval_rf_b1e4b427",
+"scores": {
+"Answer_1": {
+"correctness": 4,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 5,
+"reason": "充分说明影响因素并强调需要检测，符合拒答要求。"
+},
+"Answer_2": {
+"correctness": 3,
+"completeness": 5,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 4,
+"reason": "检测建议较完整，但部分裂缝判断依据可能过于泛化。"
+},
+"Answer_3": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 2,
+"relevance": 4,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "引用规范并尝试判断超标，但缺少实际检测数据。"
+},
+"Answer_4": {
+"correctness": 4,
+"completeness": 4,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 5,
+"reason": "正确说明需检测裂缝、材料和配筋等信息后评价。"
+},
+"Answer_5": {
+"correctness": 3,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "分析方向正确，但存在基于经验直接判断倾向。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "符合金标，明确需要现场检测和专业鉴定。"
+}
+}
+},
+{
+"id": "eval_rf_b99fa447",
+"scores": {
+"Answer_1": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "正确指出裂缝宽度不能单独判断安全性，并建议全面评估。"
+},
+"Answer_2": {
+"correctness": 3,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 4,
+"reason": "有检测建议，但部分安全判断仍依赖经验推断。"
+},
+"Answer_3": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 2,
+"relevance": 4,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "试图用单一指标评价建筑安全，结论风险较高。"
+},
+"Answer_4": {
+"correctness": 4,
+"completeness": 4,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 5,
+"reason": "能够说明需结合裂缝发展和结构状态综合判断。"
+},
+"Answer_5": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 2,
+"relevance": 4,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "给出加固倾向但缺少检测依据。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "准确说明需检测报告和专业鉴定后判断。"
+}
+}
+},
+{
+"id": "eval_rf_c6d027dc",
+"scores": {
+"Answer_1": {
+"correctness": 4,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 5,
+"reason": "完整描述调查检测流程，没有简单判断安全状态。"
+},
+"Answer_2": {
+"correctness": 3,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 4,
+"reason": "提供评估方法较多，但部分裂缝限值表述需结合条件。"
+},
+"Answer_3": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 2,
+"relevance": 4,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "尝试依据规范直接判断裂缝问题，缺少检测数据。"
+},
+"Answer_4": {
+"correctness": 4,
+"completeness": 4,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 5,
+"reason": "正确指出需要裂缝、材料、配筋和荷载等信息。"
+},
+"Answer_5": {
+"correctness": 3,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 4,
+"reason": "方向基本正确，但部分判断超出了已有信息。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "符合金标，拒绝直接判定并要求专业安全鉴定。"
+}
+}
+}
+]
+[
+{
+"id": "eval_rf_ccabff5b",
+"scores": {
+"Answer_1": {
+"correctness": 4,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 5,
+"reason": "能够说明裂缝问题需检测评估，流程完整，未简单下结论。"
+},
+"Answer_2": {
+"correctness": 3,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 4,
+"reason": "分析较全面，但部分判断依赖经验，缺少具体检测依据。"
+},
+"Answer_3": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 2,
+"relevance": 4,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "尝试直接判断结构状态，超出已有信息范围。"
+},
+"Answer_4": {
+"correctness": 4,
+"completeness": 4,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 5,
+"reason": "正确指出需结合裂缝发展、荷载和结构检测结果。"
+},
+"Answer_5": {
+"correctness": 3,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "方向基本正确，但存在提前给处理建议的问题。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "准确拒绝仅凭表面现象判断，并建议专业鉴定。"
+}
+}
+},
+{
+"id": "eval_rf_d7d3d0b9",
+"scores": {
+"Answer_1": {
+"correctness": 4,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 5,
+"reason": "能够说明结构安全需综合检测分析，回答完整。"
+},
+"Answer_2": {
+"correctness": 3,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 4,
+"reason": "提供分析方法，但部分结论依赖缺失参数。"
+},
+"Answer_3": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 2,
+"relevance": 4,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "依据有限信息作出判断，未充分考虑检测要求。"
+},
+"Answer_4": {
+"correctness": 4,
+"completeness": 4,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 5,
+"reason": "正确强调需要专业检测和综合评价。"
+},
+"Answer_5": {
+"correctness": 3,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "分析有一定依据，但仍存在直接建议倾向。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "符合拒答要求，明确需要结合现场资料判断。"
+}
+}
+},
+{
+"id": "eval_rf_bd18d92d",
+"scores": {
+"Answer_1": {
+"correctness": 3,
+"completeness": 5,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 4,
+"reason": "考虑因素较多，但对裂缝安全状态判断仍偏直接。"
+},
+"Answer_2": {
+"correctness": 3,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 4,
+"reason": "检测建议较合理，但部分标准判断缺少条件。"
+},
+"Answer_3": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 2,
+"relevance": 4,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "根据单一裂缝指标判断安全性，依据不足。"
+},
+"Answer_4": {
+"correctness": 5,
+"completeness": 4,
+"grounding": 4,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "正确识别需要专业评估，未越过信息边界。"
+},
+"Answer_5": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 2,
+"relevance": 4,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "直接判断并提出处理措施，缺少检测依据。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "符合规范问答边界，建议鉴定后处理。"
+}
+}
+},
+{
+"id": "eval_rf_b1e4b427",
+"scores": {
+"Answer_1": {
+"correctness": 4,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 5,
+"reason": "综合考虑检测和结构因素，未直接判定安全状态。"
+},
+"Answer_2": {
+"correctness": 3,
+"completeness": 5,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 4,
+"reason": "内容较丰富，但部分裂缝评价依据不够明确。"
+},
+"Answer_3": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 2,
+"relevance": 4,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "存在直接引用规范判断的倾向，缺少工程资料。"
+},
+"Answer_4": {
+"correctness": 4,
+"completeness": 4,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 5,
+"reason": "能够说明需检测裂缝性质和结构状态。"
+},
+"Answer_5": {
+"correctness": 3,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "基本合理，但有一定提前判断风险。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "准确说明需要专业检测鉴定，符合金标。"
+}
+}
+},
+{
+"id": "eval_rf_b99fa447",
+"scores": {
+"Answer_1": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "准确指出裂缝不能单独作为安全判断依据。"
+},
+"Answer_2": {
+"correctness": 3,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 4,
+"reason": "分析较充分，但部分判断仍依赖假设条件。"
+},
+"Answer_3": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 2,
+"relevance": 4,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "使用单项指标判断结构安全，结论过强。"
+},
+"Answer_4": {
+"correctness": 4,
+"completeness": 4,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 5,
+"reason": "能够说明需结合裂缝发展和结构检测结果。"
+},
+"Answer_5": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 2,
+"relevance": 4,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "直接建议加固，未先确认结构实际状态。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "拒答合理，符合专业评估边界。"
+}
+}
+}
+]
+[
+{
+"id": "eval_rf_e0795bcf",
+"scores": {
+"Answer_1": {
+"correctness": 3,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "方案比较较完整，但最终明确推荐CFG桩，超出题目信息可支持范围。"
+},
+"Answer_2": {
+"correctness": 3,
+"completeness": 5,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "分析全面，但直接推荐桩基础，未完全遵守拒答边界。"
+},
+"Answer_3": {
+"correctness": 4,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 4,
+"reason": "能进行多方案比较并保留条件判断，但仍给出倾向性建议。"
+},
+"Answer_4": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 2,
+"relevance": 4,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "引用具体条文并确定方案，条文依据不足。"
+},
+"Answer_5": {
+"correctness": 4,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 4,
+"reason": "基本符合综合判断要求，但仍包含方案倾向。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "准确说明规范不能直接决定方案，应结合工程条件比选。"
+}
+}
+},
+{
+"id": "eval_rf_320713cc",
+"scores": {
+"Answer_1": {
+"correctness": 4,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 4,
+"reason": "比较充分，说明需结合条件选择，但部分倾向深基础。"
+},
+"Answer_2": {
+"correctness": 3,
+"completeness": 5,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "分析较完整，但最终给出方案建议。"
+},
+"Answer_3": {
+"correctness": 3,
+"completeness": 4,
+"grounding": 3,
+"relevance": 4,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "有综合因素分析，但仍试图选择具体方案。"
+},
+"Answer_4": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 2,
+"relevance": 4,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "直接依据条文选择方案，依据不足。"
+},
+"Answer_5": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 1,
+"relevance": 4,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "存在规范条文表述和方案判断问题。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "准确说明规范边界，符合拒答要求。"
+}
+}
+},
+{
+"id": "eval_rf_eee0f1df",
+"scores": {
+"Answer_1": {
+"correctness": 4,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 4,
+"reason": "比较合理，说明两方案适用差异，但略有选择倾向。"
+},
+"Answer_2": {
+"correctness": 4,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 4,
+"reason": "分析全面，保留综合判断，较符合要求。"
+},
+"Answer_3": {
+"correctness": 3,
+"completeness": 3,
+"grounding": 3,
+"relevance": 4,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "直接推荐CFG桩，缺少项目具体依据。"
+},
+"Answer_4": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 2,
+"relevance": 4,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "引用条文确定方法，存在依据不足。"
+},
+"Answer_5": {
+"correctness": 4,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 4,
+"reason": "方向正确，强调综合因素，但仍有轻微推荐。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "准确拒绝直接选择方案并说明判断依据。"
+}
+}
+},
+{
+"id": "eval_rf_37934457",
+"scores": {
+"Answer_1": {
+"correctness": 3,
+"completeness": 5,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "比较较完整，但直接推荐预制桩。"
+},
+"Answer_2": {
+"correctness": 4,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 4,
+"reason": "能够比较两方案并提出综合分析，仍略有倾向。"
+},
+"Answer_3": {
+"correctness": 3,
+"completeness": 4,
+"grounding": 3,
+"relevance": 4,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "方案比较有内容，但最终选择依据不足。"
+},
+"Answer_4": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 2,
+"relevance": 4,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "直接推荐某方案，缺少工程条件支持。"
+},
+"Answer_5": {
+"correctness": 4,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 4,
+"reason": "能够保持条件化分析，没有绝对选择。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "准确说明需要技术经济分析后确定。"
+}
+}
+},
+{
+"id": "eval_rf_fa2bf3a4",
+"scores": {
+"Answer_1": {
+"correctness": 4,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 4,
+"reason": "能比较方案并强调条件分析，但略带方案倾向。"
+},
+"Answer_2": {
+"correctness": 4,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 4,
+"reason": "分析全面，没有简单给出唯一答案。"
+},
+"Answer_3": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "正确说明需结合实际条件综合判断。"
+},
+"Answer_4": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 2,
+"relevance": 4,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "依据不足却直接选择方案。"
+},
+"Answer_5": {
+"correctness": 3,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "分析方向正确，但仍存在推荐倾向。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "符合拒答题要求，明确工程判断边界。"
+}
+}
+}
+]
+[
+{
+"id": "eval_rf_1da1db39",
+"scores": {
+"Answer_1": {
+"correctness": 3,
+"completeness": 5,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "分析因素较全面，但仍倾向推荐具体方案，超出规范可直接判断范围。"
+},
+"Answer_2": {
+"correctness": 4,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 4,
+"reason": "能够比较方案并说明需结合工程条件，基本符合拒答要求。"
+},
+"Answer_3": {
+"correctness": 3,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "技术分析较多，但最终仍给出明确选择。"
+},
+"Answer_4": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 2,
+"relevance": 4,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "引用条文直接确定方案，条文支持不足。"
+},
+"Answer_5": {
+"correctness": 3,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "有综合考虑，但仍存在方案推荐倾向。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "准确说明规范边界，建议根据勘察和工程条件比选。"
+}
+}
+},
+{
+"id": "eval_rf_a8020e64",
+"scores": {
+"Answer_1": {
+"correctness": 3,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "比较较充分，但没有保持完全拒答。"
+},
+"Answer_2": {
+"correctness": 4,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 4,
+"reason": "能说明多因素影响，未简单给唯一答案。"
+},
+"Answer_3": {
+"correctness": 3,
+"completeness": 4,
+"grounding": 3,
+"relevance": 4,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "分析存在合理内容，但最终推荐方案依据不足。"
+},
+"Answer_4": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 2,
+"relevance": 4,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "依据条文进行具体选择，存在条文适用问题。"
+},
+"Answer_5": {
+"correctness": 3,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "考虑因素较多，但仍偏向给出结论。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "准确说明需要工程综合判断。"
+}
+}
+},
+{
+"id": "eval_rf_ccabff5b",
+"scores": {
+"Answer_1": {
+"correctness": 3,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "分析完整，但仍试图选择方案。"
+},
+"Answer_2": {
+"correctness": 4,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 4,
+"reason": "能够比较方案并强调综合评估。"
+},
+"Answer_3": {
+"correctness": 3,
+"completeness": 5,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "内容丰富，但最终明确推荐某方案。"
+},
+"Answer_4": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 2,
+"relevance": 4,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "条文引用无法支持具体方案选择。"
+},
+"Answer_5": {
+"correctness": 3,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "部分符合要求，但存在直接判断。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "正确拒绝替代设计决策，符合金标。"
+}
+}
+},
+{
+"id": "eval_rf_d7d3d0b9",
+"scores": {
+"Answer_1": {
+"correctness": 4,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 4,
+"reason": "分析较全面，但仍有轻微方案倾向。"
+},
+"Answer_2": {
+"correctness": 4,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 4,
+"reason": "能够说明需要结合条件选择。"
+},
+"Answer_3": {
+"correctness": 3,
+"completeness": 4,
+"grounding": 3,
+"relevance": 4,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "分析有内容，但最终仍给出明确方案。"
+},
+"Answer_4": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 2,
+"relevance": 4,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "规范依据不足却直接推荐方案。"
+},
+"Answer_5": {
+"correctness": 3,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "考虑因素较多，但没有完全拒答。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "符合拒答标准，明确工程判断边界。"
+}
+}
+},
+{
+"id": "eval_rf_bd18d92d",
+"scores": {
+"Answer_1": {
+"correctness": 3,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "考虑因素较多，但对具体方案有判断倾向。"
+},
+"Answer_2": {
+"correctness": 4,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 4,
+"reason": "比较方案较合理，但未完全保持拒答。"
+},
+"Answer_3": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 2,
+"relevance": 4,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "根据有限条件直接选择方案，依据不足。"
+},
+"Answer_4": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 2,
+"relevance": 4,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "将规范原则错误扩展为具体选择依据。"
+},
+"Answer_5": {
+"correctness": 3,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "分析方向正确，但仍存在推荐。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "准确指出需要结合工程资料综合判断。"
+}
+}
+}
+]
+[
+{
+"id": "eval_rf_d7d3d0b9",
+"scores": {
+"Answer_1": {
+"correctness": 4,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 4,
+"reason": "能够说明需结合地质、荷载和施工条件，但仍存在一定方案倾向。"
+},
+"Answer_2": {
+"correctness": 4,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 4,
+"reason": "比较分析较完整，基本遵守综合判断原则。"
+},
+"Answer_3": {
+"correctness": 3,
+"completeness": 4,
+"grounding": 3,
+"relevance": 4,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "技术分析较多，但最终直接推荐桩基础依据不足。"
+},
+"Answer_4": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 2,
+"relevance": 4,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "引用条文直接选择方案，存在条文依据不足问题。"
+},
+"Answer_5": {
+"correctness": 3,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "能够考虑多因素，但没有完全保持拒答边界。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "准确说明规范无法替代具体工程决策。"
+}
+}
+},
+{
+"id": "eval_rf_bd18d92d",
+"scores": {
+"Answer_1": {
+"correctness": 3,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "分析因素较多，但仍对方案选择给出倾向。"
+},
+"Answer_2": {
+"correctness": 4,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 4,
+"reason": "方案比较合理，但未完全拒答。"
+},
+"Answer_3": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 2,
+"relevance": 4,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "根据有限信息直接判断方案，依据不足。"
+},
+"Answer_4": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 2,
+"relevance": 4,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "规范条文不能支持具体方案选择。"
+},
+"Answer_5": {
+"correctness": 3,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "分析方向正确，但仍存在推荐倾向。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "符合金标，明确需要综合判断。"
+}
+}
+},
+{
+"id": "eval_rf_b1e4b427",
+"scores": {
+"Answer_1": {
+"correctness": 4,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 4,
+"reason": "综合考虑因素较全面，但略带判断倾向。"
+},
+"Answer_2": {
+"correctness": 4,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 4,
+"reason": "能够说明需要工程资料支持最终决定。"
+},
+"Answer_3": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 2,
+"relevance": 4,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "引用规范并直接确定方案，存在幻觉风险。"
+},
+"Answer_4": {
+"correctness": 4,
+"completeness": 4,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 5,
+"reason": "正确指出需要结合工程条件分析。"
+},
+"Answer_5": {
+"correctness": 3,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "内容合理，但有直接建议处理方式。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "准确说明规范边界和专业决策要求。"
+}
+}
+},
+{
+"id": "eval_rf_b99fa447",
+"scores": {
+"Answer_1": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "正确拒绝直接选择方案，并说明需综合评估。"
+},
+"Answer_2": {
+"correctness": 4,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 4,
+"reason": "分析全面，但部分内容偏向方案比较。"
+},
+"Answer_3": {
+"correctness": 3,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "存在明确推荐，但理由部分有参考价值。"
+},
+"Answer_4": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 2,
+"relevance": 4,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "条文无法支持给出唯一方案。"
+},
+"Answer_5": {
+"correctness": 3,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "考虑因素较多，但没有完全拒答。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "符合拒答要求，避免替代设计决策。"
+}
+}
+},
+{
+"id": "eval_rf_c6d027dc",
+"scores": {
+"Answer_1": {
+"correctness": 4,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 5,
+"reason": "强调检测评估流程，符合不能直接判断原则。"
+},
+"Answer_2": {
+"correctness": 3,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 4,
+"reason": "方法描述较多，但部分判断缺少条件。"
+},
+"Answer_3": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 2,
+"relevance": 4,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "尝试依据有限信息直接评价问题。"
+},
+"Answer_4": {
+"correctness": 4,
+"completeness": 4,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 5,
+"reason": "正确说明需结合检测和工程资料。"
+},
+"Answer_5": {
+"correctness": 3,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 4,
+"reason": "方向基本正确，但部分处理建议超出信息范围。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "准确说明需要专业检测鉴定后判断。"
+}
+}
+}
+]
+[
+{
+"id": "eval_rf_e0795bcf",
+"scores": {
+"Answer_1": {
+"correctness": 3,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "比较三种方案较完整，但直接推荐CFG桩，超出了已有条件可确定的范围。"
+},
+"Answer_2": {
+"correctness": 3,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "分析较全面，但最终明确推荐桩基础，未完全遵守拒答要求。"
+},
+"Answer_3": {
+"correctness": 4,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 4,
+"reason": "考虑了多种工程因素，给出条件化分析，但仍存在选择倾向。"
+},
+"Answer_4": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 2,
+"relevance": 4,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "直接根据所谓规范条文选择方案，条文依据不足。"
+},
+"Answer_5": {
+"correctness": 3,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "有综合判断意识，但仍给出了具体方案倾向。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "准确说明规范不能替代工程方案决策，符合金标。"
+}
+}
+},
+{
+"id": "eval_rf_129b3a20",
+"scores": {
+"Answer_1": {
+"correctness": 4,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 5,
+"reason": "充分比较两方案并保留最终需综合判断，没有强行给唯一答案。"
+},
+"Answer_2": {
+"correctness": 4,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 5,
+"reason": "分析全面，明确不同条件对应不同选择。"
+},
+"Answer_3": {
+"correctness": 3,
+"completeness": 5,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "内容丰富，但最后直接推荐桩基础，依据不足。"
+},
+"Answer_4": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 2,
+"relevance": 4,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "引用条文判断具体方案，存在规范依据问题。"
+},
+"Answer_5": {
+"correctness": 3,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "有条件分析，但存在直接推荐倾向。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "准确说明需要结合勘察、荷载、施工和经济因素综合判断。"
+}
+}
+},
+{
+"id": "eval_rf_52db9a0f",
+"scores": {
+"Answer_1": {
+"correctness": 3,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "方案比较充分，但最终推荐深层搅拌桩，超出信息支持。"
+},
+"Answer_2": {
+"correctness": 3,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "分析较全面，但给出确定方案，不符合拒答边界。"
+},
+"Answer_3": {
+"correctness": 3,
+"completeness": 5,
+"grounding": 3,
+"relevance": 4,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "包含较多专业内容，但部分条件和结论缺少依据。"
+},
+"Answer_4": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 2,
+"relevance": 4,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "引用第7.2.1条直接确定方案，存在条文幻觉风险。"
+},
+"Answer_5": {
+"correctness": 3,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "考虑因素较多，但仍偏向推荐深层搅拌桩。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "正确指出规范不能替代具体工程方案选择。"
+}
+}
+},
+{
+"id": "eval_rf_e0c77121",
+"scores": {
+"Answer_1": {
+"correctness": 4,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 4,
+"reason": "处理方法较全面，但对天然地基不可用的判断略绝对。"
+},
+"Answer_2": {
+"correctness": 4,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 4,
+"reason": "内容完整，能够说明需根据软弱夹层情况处理。"
+},
+"Answer_3": {
+"correctness": 3,
+"completeness": 3,
+"grounding": 3,
+"relevance": 4,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "引用条文分析，但未充分回答天然地基和处理选择问题。"
+},
+"Answer_4": {
+"correctness": 4,
+"completeness": 4,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 5,
+"reason": "正确指出需结合条件采取加固或置换等措施。"
+},
+"Answer_5": {
+"correctness": 3,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 4,
+"reason": "基本合理，但对规范条文引用和天然地基判断有问题。"
+},
+"Answer_6": {
+"correctness": 4,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 5,
+"reason": "能说明需结合承载力和变形验算判断，没有简单下结论。"
+}
+}
+},
+{
+"id": "eval_rf_abbc9f03",
+"scores": {
+"Answer_1": {
+"correctness": 4,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 5,
+"reason": "比较两方案较完整，并最终保留综合决策要求。"
+},
+"Answer_2": {
+"correctness": 4,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 5,
+"reason": "分析全面，强调需结合勘察和工程条件。"
+},
+"Answer_3": {
+"correctness": 2,
+"completeness": 2,
+"grounding": 2,
+"relevance": 4,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "直接推荐方案，且缺少实际条件分析。"
+},
+"Answer_4": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 2,
+"relevance": 4,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "引用第7.2.1条直接选择方案，依据不足。"
+},
+"Answer_5": {
+"correctness": 4,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 4,
+"reason": "基本符合综合判断要求，但条文引用需谨慎。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "准确说明规范边界和工程决策流程。"
+}
+}
+}
+]
+[
+{
+"id": "eval_rf_320713cc",
+"scores": {
+"Answer_1": {
+"correctness": 4,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 5,
+"reason": "比较两种方案并强调需结合工程条件，没有给出绝对方案，符合拒答要求。"
+},
+"Answer_2": {
+"correctness": 3,
+"completeness": 5,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "分析较全面，但给出8度抗震优先桩基础等倾向性建议，依据不足。"
+},
+"Answer_3": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "准确识别信息不足，提出勘察、比选和专业判断流程。"
+},
+"Answer_4": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 2,
+"relevance": 4,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "引用具体条文并推荐CFG桩，规范依据和结论均不足。"
+},
+"Answer_5": {
+"correctness": 1,
+"completeness": 2,
+"grounding": 1,
+"relevance": 3,
+"overall": 1,
+"refusal_appropriateness": 1,
+"reason": "存在明显错误表述，认为地基加固可减少整体地震响应依据不足。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "正确说明条文不能替代具体工程决策。"
+}
+}
+},
+{
+"id": "eval_rf_3c0a88b9",
+"scores": {
+"Answer_1": {
+"correctness": 3,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "有比较分析，但最终推荐深层搅拌桩，超出已有条件。"
+},
+"Answer_2": {
+"correctness": 4,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 4,
+"reason": "分析较全面，保留进一步勘察要求，但仍有方案倾向。"
+},
+"Answer_3": {
+"correctness": 2,
+"completeness": 2,
+"grounding": 2,
+"relevance": 4,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "仅凭有限信息直接推荐方案，缺少依据。"
+},
+"Answer_4": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 1,
+"relevance": 4,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "引用第7.2.1条支持具体选择，存在条文幻觉风险。"
+},
+"Answer_5": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 2,
+"relevance": 4,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "直接指定深层搅拌桩，未考虑荷载和勘察条件。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "准确说明规范边界，符合拒答标准。"
+}
+}
+},
+{
+"id": "eval_rf_eee0f1df",
+"scores": {
+"Answer_1": {
+"correctness": 4,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 4,
+"reason": "分析两方案适用性较好，但后续仍给出CFG倾向。"
+},
+"Answer_2": {
+"correctness": 4,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 4,
+"reason": "比较全面，能够保留条件化选择。"
+},
+"Answer_3": {
+"correctness": 3,
+"completeness": 3,
+"grounding": 3,
+"relevance": 4,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "直接推荐CFG桩，且部分技术描述存在错误。"
+},
+"Answer_4": {
+"correctness": 3,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "提出条件判断，但引用条文和方案建议不够严谨。"
+},
+"Answer_5": {
+"correctness": 4,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 5,
+"reason": "符合综合判断原则，没有强行选择单一方案。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "准确说明需要依据勘察和技术经济比较确定。"
+}
+}
+},
+{
+"id": "eval_rf_37934457",
+"scores": {
+"Answer_1": {
+"correctness": 4,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 4,
+"reason": "比较两方案较完整，最终保留综合判断要求。"
+},
+"Answer_2": {
+"correctness": 4,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 4,
+"reason": "分析全面，但仍存在一定方案倾向。"
+},
+"Answer_3": {
+"correctness": 3,
+"completeness": 3,
+"grounding": 3,
+"relevance": 4,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "直接推荐深层搅拌桩，缺少项目实际条件。"
+},
+"Answer_4": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 2,
+"relevance": 4,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "引用第7.2.1条直接确定方案，依据不足。"
+},
+"Answer_5": {
+"correctness": 3,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "有一定条件分析，但仍倾向深层搅拌方案。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "准确说明需结合实际工程资料综合判断。"
+}
+}
+}
+]
+[
+{
+"id": "eval_rf_fa2bf3a4",
+"scores": {
+"Answer_1": {
+"correctness": 4,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 4,
+"reason": "能够比较方案并说明影响因素，但仍有一定推荐倾向。"
+},
+"Answer_2": {
+"correctness": 4,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 4,
+"reason": "分析较全面，考虑安全和经济因素，但未完全保持拒答。"
+},
+"Answer_3": {
+"correctness": 3,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "技术分析较多，但最终选择方案依据不足。"
+},
+"Answer_4": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 2,
+"relevance": 4,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "引用具体条文支持方案选择，存在依据不足。"
+},
+"Answer_5": {
+"correctness": 3,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "考虑因素较多，但仍给出方案倾向。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "准确说明规范无法替代工程方案决策。"
+}
+}
+},
+{
+"id": "eval_rf_1da1db39",
+"scores": {
+"Answer_1": {
+"correctness": 3,
+"completeness": 5,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "分析因素较完整，但直接推荐方案。"
+},
+"Answer_2": {
+"correctness": 4,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 4,
+"reason": "能够说明需结合条件判断，基本符合要求。"
+},
+"Answer_3": {
+"correctness": 3,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "内容较丰富，但最终明确选择方案。"
+},
+"Answer_4": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 2,
+"relevance": 4,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "依据条文直接确定方案，规范支撑不足。"
+},
+"Answer_5": {
+"correctness": 3,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "考虑多因素，但仍存在推荐倾向。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "正确说明需要结合勘察和工程条件综合判断。"
+}
+}
+},
+{
+"id": "eval_rf_a8020e64",
+"scores": {
+"Answer_1": {
+"correctness": 3,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "分析较完整，但未完全拒绝选择具体方案。"
+},
+"Answer_2": {
+"correctness": 4,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 4,
+"reason": "比较全面，能够体现综合评估原则。"
+},
+"Answer_3": {
+"correctness": 3,
+"completeness": 4,
+"grounding": 3,
+"relevance": 4,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "有合理分析，但最终推荐方案依据不足。"
+},
+"Answer_4": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 2,
+"relevance": 4,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "引用条文判断具体选择，存在条文适用问题。"
+},
+"Answer_5": {
+"correctness": 3,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "分析方向正确，但有直接建议。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "准确说明规范边界和工程决策要求。"
+}
+}
+},
+{
+"id": "eval_rf_ccabff5b",
+"scores": {
+"Answer_1": {
+"correctness": 3,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "比较较完整，但仍尝试确定方案。"
+},
+"Answer_2": {
+"correctness": 4,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 4,
+"reason": "综合分析较好，但存在轻微选择倾向。"
+},
+"Answer_3": {
+"correctness": 3,
+"completeness": 5,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "内容丰富，但直接推荐方案。"
+},
+"Answer_4": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 2,
+"relevance": 4,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "条文不能支持唯一方案选择。"
+},
+"Answer_5": {
+"correctness": 3,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "有条件分析，但拒答边界不足。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "符合拒答要求，避免替代工程决策。"
+}
+}
+},
+{
+"id": "eval_rf_d7d3d0b9",
+"scores": {
+"Answer_1": {
+"correctness": 4,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 4,
+"reason": "能够综合分析条件，但仍带有一定倾向。"
+},
+"Answer_2": {
+"correctness": 4,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 4,
+"reason": "分析全面，基本符合拒答原则。"
+},
+"Answer_3": {
+"correctness": 3,
+"completeness": 4,
+"grounding": 3,
+"relevance": 4,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "技术分析存在，但最终选择依据不足。"
+},
+"Answer_4": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 2,
+"relevance": 4,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "依据条文直接推荐方案，支撑不足。"
+},
+"Answer_5": {
+"correctness": 3,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 3,
+"reason": "考虑因素较多，但仍有直接判断。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "准确说明规范不能替代具体工程判断。"
+}
+}
+}
+]
+[
+{
+"id": "eval_rf_ccabff5b",
+"scores": {
+"Answer_1": {
+"correctness": 4,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 5,
+"reason": "正确指出需检测评估，并给出合理流程，没有直接判断安全性。"
+},
+"Answer_2": {
+"correctness": 4,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 5,
+"reason": "检测、验算和处理流程完整，符合拒答边界。"
+},
+"Answer_3": {
+"correctness": 2,
+"completeness": 4,
+"grounding": 1,
+"relevance": 3,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "大量条文引用与题意不符，存在明显条文错配。"
+},
+"Answer_4": {
+"correctness": 3,
+"completeness": 3,
+"grounding": 3,
+"relevance": 4,
+"overall": 3,
+"refusal_appropriateness": 4,
+"reason": "指出需验算，但规范引用和判断过程较笼统。"
+},
+"Answer_5": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 2,
+"relevance": 4,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "直接给出裂缝限值判断，且条文依据不足。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "准确说明需现场数据和专业鉴定。"
+}
+}
+},
+{
+"id": "eval_rf_d7d3d0b9",
+"scores": {
+"Answer_1": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "完整说明检测、评估和加固流程，未武断判断。"
+},
+"Answer_2": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "符合既有结构评估流程，建议专业鉴定。"
+},
+"Answer_3": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "评估流程完整，强调需依据检测结果。"
+},
+"Answer_4": {
+"correctness": 3,
+"completeness": 3,
+"grounding": 3,
+"relevance": 4,
+"overall": 3,
+"refusal_appropriateness": 4,
+"reason": "提出验算要求，但条文适用性不足。"
+},
+"Answer_5": {
+"correctness": 1,
+"completeness": 2,
+"grounding": 1,
+"relevance": 3,
+"overall": 1,
+"refusal_appropriateness": 1,
+"reason": "给出具体折减系数，存在明显编造风险。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "准确说明需要现场数据和第三方评估。"
+}
+}
+},
+{
+"id": "eval_rf_bd18d92d",
+"scores": {
+"Answer_1": {
+"correctness": 4,
+"completeness": 5,
+"grounding": 3,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 5,
+"reason": "强调不能仅凭裂缝宽度判断，评估流程合理。"
+},
+"Answer_2": {
+"correctness": 3,
+"completeness": 5,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 5,
+"reason": "流程完整，但部分规范条号和限值引用不严谨。"
+},
+"Answer_3": {
+"correctness": 1,
+"completeness": 3,
+"grounding": 1,
+"relevance": 2,
+"overall": 1,
+"refusal_appropriateness": 1,
+"reason": "大量错误条文堆砌，未有效回答拒答边界。"
+},
+"Answer_4": {
+"correctness": 3,
+"completeness": 3,
+"grounding": 3,
+"relevance": 4,
+"overall": 3,
+"refusal_appropriateness": 4,
+"reason": "指出需结合检测，但判断过于简化。"
+},
+"Answer_5": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 2,
+"relevance": 4,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "直接判定不安全，缺少现场条件依据。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "符合金标，需要检测数据后判断。"
+}
+}
+},
+{
+"id": "eval_rf_b1e4b427",
+"scores": {
+"Answer_1": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "综合考虑裂缝、材料和荷载因素，未直接下结论。"
+},
+"Answer_2": {
+"correctness": 4,
+"completeness": 5,
+"grounding": 3,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 5,
+"reason": "评估流程完整，但部分规范引用可能不准确。"
+},
+"Answer_3": {
+"correctness": 1,
+"completeness": 2,
+"grounding": 1,
+"relevance": 2,
+"overall": 1,
+"refusal_appropriateness": 1,
+"reason": "大量无关条文编号，存在严重幻觉。"
+},
+"Answer_4": {
+"correctness": 3,
+"completeness": 3,
+"grounding": 3,
+"relevance": 4,
+"overall": 3,
+"refusal_appropriateness": 4,
+"reason": "说明裂缝验算原则，但缺少检测边界。"
+},
+"Answer_5": {
+"correctness": 2,
+"completeness": 2,
+"grounding": 2,
+"relevance": 3,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "直接评级和判断安全性，依据不足。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "正确说明需要现场数据和专业评估。"
+}
+}
+},
+{
+"id": "eval_rf_b99fa447",
+"scores": {
+"Answer_1": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "准确说明不能仅凭裂缝宽度判断安全性。"
+},
+"Answer_2": {
+"correctness": 3,
+"completeness": 5,
+"grounding": 2,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 4,
+"reason": "总体合理，但规范引用和限值表述存在问题。"
+},
+"Answer_3": {
+"correctness": 1,
+"completeness": 2,
+"grounding": 1,
+"relevance": 3,
+"overall": 1,
+"refusal_appropriateness": 1,
+"reason": "直接判断安全，且引用依据明显错误。"
+},
+"Answer_4": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 2,
+"relevance": 4,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "将裂缝宽度直接等同安全结论，缺少检测。"
+},
+"Answer_5": {
+"correctness": 1,
+"completeness": 2,
+"grounding": 1,
+"relevance": 3,
+"overall": 1,
+"refusal_appropriateness": 1,
+"reason": "错误直接判定不安全并要求立即加固。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "准确指出需要检测数据和安全评估。"
+}
+}
+}
+]
+[
+{
+"id": "eval_rf_c6d027dc",
+"scores": {
+"Answer_1": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "准确说明裂缝安全判断需结合检测、鉴定和结构实际状态，未越过规范边界。"
+},
+"Answer_2": {
+"correctness": 3,
+"completeness": 5,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 4,
+"reason": "提供了较完整评估流程，但部分裂缝限值和规范依据表述不够严谨。"
+},
+"Answer_3": {
+"correctness": 1,
+"completeness": 2,
+"grounding": 1,
+"relevance": 2,
+"overall": 1,
+"refusal_appropriateness": 1,
+"reason": "通过编造条文和固定标准直接判断，存在严重依据错误。"
+},
+"Answer_4": {
+"correctness": 4,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 5,
+"reason": "正确指出需结合荷载、裂缝发展和检测结果综合评价。"
+},
+"Answer_5": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 2,
+"relevance": 4,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "直接依据裂缝宽度判断结构安全，缺少必要检测条件。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "符合拒答题要求，明确需要专业检测和安全鉴定后判断。"
+}
+}
+}
+]
+我已收到 `refusal_002(1).md`，并读取到第 21～25 题完整内容。
+
+我会继续按之前规则输出 **5题一批纯 JSON**。以下为第 21～25 题评审结果：
+
+```json
+[
+  {
+    "id": "eval_rf_e6253456",
+    "scores": {
+      "Answer_1": {
+        "correctness": 5,
+        "completeness": 5,
+        "grounding": 5,
+        "relevance": 5,
+        "overall": 5,
+        "refusal_appropriateness": 5,
+        "reason": "准确指出不能仅凭裂缝信息判断安全性，并提出完整检测评估流程。"
+      },
+      "Answer_2": {
+        "correctness": 5,
+        "completeness": 5,
+        "grounding": 5,
+        "relevance": 5,
+        "overall": 5,
+        "refusal_appropriateness": 5,
+        "reason": "覆盖裂缝检测、材料检测、荷载评估等必要信息，符合拒答要求。"
+      },
+      "Answer_3": {
+        "correctness": 1,
+        "completeness": 2,
+        "grounding": 1,
+        "relevance": 3,
+        "overall": 1,
+        "refusal_appropriateness": 1,
+        "reason": "直接判定危险房屋，且引用规范名称和条文存在明显错误。"
+      },
+      "Answer_4": {
+        "correctness": 4,
+        "completeness": 4,
+        "grounding": 3,
+        "relevance": 5,
+        "overall": 4,
+        "refusal_appropriateness": 5,
+        "reason": "正确建议专业检测评估，但条文依据不足。"
+      },
+      "Answer_5": {
+        "correctness": 2,
+        "completeness": 3,
+        "grounding": 2,
+        "relevance": 4,
+        "overall": 2,
+        "refusal_appropriateness": 2,
+        "reason": "依据裂缝限值直接判断严重超标，忽略结构实际条件。"
+      },
+      "Answer_6": {
+        "correctness": 5,
+        "completeness": 5,
+        "grounding": 4,
+        "relevance": 5,
+        "overall": 5,
+        "refusal_appropriateness": 5,
+        "reason": "准确说明规范不能替代现场检测和安全鉴定。"
+      }
+    }
+  },
+  {
+    "id": "eval_rf_e5f05fa4",
+    "scores": {
+      "Answer_1": {
+        "correctness": 4,
+        "completeness": 5,
+        "grounding": 4,
+        "relevance": 5,
+        "overall": 4,
+        "refusal_appropriateness": 5,
+        "reason": "指出需结合裂缝宽度、位置、荷载等因素，未直接下结论。"
+      },
+      "Answer_2": {
+        "correctness": 4,
+        "completeness": 5,
+        "grounding": 3,
+        "relevance": 5,
+        "overall": 4,
+        "refusal_appropriateness": 5,
+        "reason": "评估流程完整，但部分裂缝限值引用不够严谨。"
+      },
+      "Answer_3": {
+        "correctness": 1,
+        "completeness": 3,
+        "grounding": 1,
+        "relevance": 2,
+        "overall": 1,
+        "refusal_appropriateness": 1,
+        "reason": "回答内容偏离问题，引用锚固长度条文无关。"
+      },
+      "Answer_4": {
+        "correctness": 2,
+        "completeness": 3,
+        "grounding": 2,
+        "relevance": 4,
+        "overall": 2,
+        "refusal_appropriateness": 2,
+        "reason": "直接根据假设裂缝值判断承载力，不适用于当前信息。"
+      },
+      "Answer_5": {
+        "correctness": 2,
+        "completeness": 3,
+        "grounding": 2,
+        "relevance": 4,
+        "overall": 2,
+        "refusal_appropriateness": 2,
+        "reason": "将裂缝限值和疲劳验算混用，依据不足。"
+      },
+      "Answer_6": {
+        "correctness": 5,
+        "completeness": 5,
+        "grounding": 4,
+        "relevance": 5,
+        "overall": 5,
+        "refusal_appropriateness": 5,
+        "reason": "正确说明需要检测数据后进行承载力评估。"
+      }
+    }
+  },
+  {
+    "id": "eval_rf_15893378",
+    "scores": {
+      "Answer_1": {
+        "correctness": 5,
+        "completeness": 5,
+        "grounding": 5,
+        "relevance": 5,
+        "overall": 5,
+        "refusal_appropriateness": 5,
+        "reason": "完整说明需要检测和专业评估，没有越权判断。"
+      },
+      "Answer_2": {
+        "correctness": 5,
+        "completeness": 5,
+        "grounding": 5,
+        "relevance": 5,
+        "overall": 5,
+        "refusal_appropriateness": 5,
+        "reason": "覆盖裂缝检测、承载力验算和加固流程。"
+      },
+      "Answer_3": {
+        "correctness": 4,
+        "completeness": 5,
+        "grounding": 4,
+        "relevance": 5,
+        "overall": 4,
+        "refusal_appropriateness": 5,
+        "reason": "分析合理，但部分处理建议超出拒答边界。"
+      },
+      "Answer_4": {
+        "correctness": 3,
+        "completeness": 3,
+        "grounding": 3,
+        "relevance": 4,
+        "overall": 3,
+        "refusal_appropriateness": 4,
+        "reason": "有评估意识，但引用条文无法直接解决问题。"
+      },
+      "Answer_5": {
+        "correctness": 2,
+        "completeness": 3,
+        "grounding": 2,
+        "relevance": 4,
+        "overall": 2,
+        "refusal_appropriateness": 2,
+        "reason": "给出具体计算判断公式，缺少必要检测条件。"
+      },
+      "Answer_6": {
+        "correctness": 5,
+        "completeness": 5,
+        "grounding": 5,
+        "relevance": 5,
+        "overall": 5,
+        "refusal_appropriateness": 5,
+        "reason": "符合金标，强调检测数据和专业鉴定。"
+      }
+    }
+  },
+  {
+    "id": "eval_rf_3dcbc6bb",
+    "scores": {
+      "Answer_1": {
+        "correctness": 5,
+        "completeness": 5,
+        "grounding": 5,
+        "relevance": 5,
+        "overall": 5,
+        "refusal_appropriateness": 5,
+        "reason": "明确无法直接判断，并给出完整评估步骤。"
+      },
+      "Answer_2": {
+        "correctness": 5,
+        "completeness": 5,
+        "grounding": 5,
+        "relevance": 5,
+        "overall": 5,
+        "refusal_appropriateness": 5,
+        "reason": "检测、评估和处理建议完整，符合拒答要求。"
+      },
+      "Answer_3": {
+        "correctness": 5,
+        "completeness": 5,
+        "grounding": 5,
+        "relevance": 5,
+        "overall": 5,
+        "refusal_appropriateness": 5,
+        "reason": "准确列出需要调查的结构信息和损伤因素。"
+      },
+      "Answer_4": {
+        "correctness": 4,
+        "completeness": 4,
+        "grounding": 3,
+        "relevance": 5,
+        "overall": 4,
+        "refusal_appropriateness": 5,
+        "reason": "正确要求可靠性评定，但条文适用性一般。"
+      },
+      "Answer_5": {
+        "correctness": 3,
+        "completeness": 4,
+        "grounding": 3,
+        "relevance": 5,
+        "overall": 3,
+        "refusal_appropriateness": 4,
+        "reason": "评估方向正确，但直接引用附录判断略显武断。"
+      },
+      "Answer_6": {
+        "correctness": 5,
+        "completeness": 5,
+        "grounding": 5,
+        "relevance": 5,
+        "overall": 5,
+        "refusal_appropriateness": 5,
+        "reason": "准确说明需要现场数据和专业评估。"
+      }
+    }
+  },
+  {
+    "id": "eval_rf_895dae5b",
+    "scores": {
+      "Answer_1": {
+        "correctness": 4,
+        "completeness": 5,
+        "grounding": 4,
+        "relevance": 5,
+        "overall": 4,
+        "refusal_appropriateness": 5,
+        "reason": "评估因素全面，但部分裂缝限值引用不严谨。"
+      },
+      "Answer_2": {
+        "correctness": 5,
+        "completeness": 5,
+        "grounding": 5,
+        "relevance": 5,
+        "overall": 5,
+        "refusal_appropriateness": 5,
+        "reason": "完整覆盖检测、验算和专业评估流程。"
+      },
+      "Answer_3": {
+        "correctness": 5,
+        "completeness": 5,
+        "grounding": 5,
+        "relevance": 5,
+        "overall": 5,
+        "refusal_appropriateness": 5,
+        "reason": "系统说明裂缝评估、承载力验算和后续处理。"
+      },
+      "Answer_4": {
+        "correctness": 3,
+        "completeness": 3,
+        "grounding": 3,
+        "relevance": 4,
+        "overall": 3,
+        "refusal_appropriateness": 4,
+        "reason": "提出验算要求，但条文引用存在不确定性。"
+      },
+      "Answer_5": {
+        "correctness": 3,
+        "completeness": 3,
+        "grounding": 3,
+        "relevance": 4,
+        "overall": 3,
+        "refusal_appropriateness": 4,
+        "reason": "说明需验算，但规范引用和结论过于简化。"
+      },
+      "Answer_6": {
+        "correctness": 5,
+        "completeness": 5,
+        "grounding": 5,
+        "relevance": 5,
+        "overall": 5,
+        "refusal_appropriateness": 5,
+        "reason": "符合金标，需要检测报告后综合判断。"
+      }
+    }
+  }
+]
+[
+{
+"id": "eval_rf_f0d3d2c3",
+"scores": {
+"Answer_1": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "正确指出单一裂缝宽度不能判断安全性，并列出位置、原因、发展趋势等评估因素。"
+},
+"Answer_2": {
+"correctness": 3,
+"completeness": 4,
+"grounding": 3,
+"relevance": 5,
+"overall": 3,
+"refusal_appropriateness": 4,
+"reason": "总体方向正确，但0.3mm处理标准表述过于绝对，规范引用不严谨。"
+},
+"Answer_3": {
+"correctness": 1,
+"completeness": 2,
+"grounding": 1,
+"relevance": 3,
+"overall": 1,
+"refusal_appropriateness": 1,
+"reason": "直接判定不安全，且危险房屋标准引用存在明显错误。"
+},
+"Answer_4": {
+"correctness": 3,
+"completeness": 3,
+"grounding": 3,
+"relevance": 4,
+"overall": 3,
+"refusal_appropriateness": 4,
+"reason": "意识到需要评估，但将裂缝限值直接关联安全结论不够准确。"
+},
+"Answer_5": {
+"correctness": 3,
+"completeness": 3,
+"grounding": 3,
+"relevance": 4,
+"overall": 3,
+"refusal_appropriateness": 4,
+"reason": "提出需要评估修复，但裂缝限值和条文适用性不足。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "准确说明需结合现场检测数据和专业评估，符合拒答要求。"
+}
+}
+},
+{
+"id": "eval_rf_bf5ad28c",
+"scores": {
+"Answer_1": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "正确识别裂缝和晃动需要专业检测，并提出安全措施建议。"
+},
+"Answer_2": {
+"correctness": 4,
+"completeness": 5,
+"grounding": 3,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 5,
+"reason": "评估流程完整，但引用GB50011裂缝条文不准确。"
+},
+"Answer_3": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 5,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "符合金标，明确无法直接判断并给出检测路径。"
+},
+"Answer_4": {
+"correctness": 3,
+"completeness": 3,
+"grounding": 3,
+"relevance": 4,
+"overall": 3,
+"refusal_appropriateness": 4,
+"reason": "建议评估方向正确，但引用条文支持不足。"
+},
+"Answer_5": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 2,
+"relevance": 4,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "将环境裂缝限值直接用于安全判断，依据不足。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "正确说明需要检测数据和结构分析后判断安全性。"
+}
+}
+},
+{
+"id": "eval_rf_0aad7eea",
+"scores": {
+"Answer_1": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "完整说明裂缝评估需要考虑位置、原因、荷载和材料状态。"
+},
+"Answer_2": {
+"correctness": 4,
+"completeness": 5,
+"grounding": 3,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 5,
+"reason": "分析较全面，但给出假设性安全结论略超出拒答边界。"
+},
+"Answer_3": {
+"correctness": 4,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 4,
+"refusal_appropriateness": 5,
+"reason": "强调检测和验算流程，没有直接武断判断。"
+},
+"Answer_4": {
+"correctness": 2,
+"completeness": 3,
+"grounding": 2,
+"relevance": 4,
+"overall": 2,
+"refusal_appropriateness": 2,
+"reason": "引用条文直接推导承载力结论，依据不足。"
+},
+"Answer_5": {
+"correctness": 3,
+"completeness": 3,
+"grounding": 3,
+"relevance": 4,
+"overall": 3,
+"refusal_appropriateness": 4,
+"reason": "提出检测评估要求，但规范引用和裂缝判断不够准确。"
+},
+"Answer_6": {
+"correctness": 5,
+"completeness": 5,
+"grounding": 4,
+"relevance": 5,
+"overall": 5,
+"refusal_appropriateness": 5,
+"reason": "准确说明规范不能直接给出承载力结论，需要现场数据。"
+}
+}
+}
+]
+
+

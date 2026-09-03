@@ -1,0 +1,20 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.env
+.env.local
+
+# 真实招投标材料、解析产物和报告可能含商业秘密或个人信息，不进入代码仓库。
+data/raw/*
+!data/raw/.gitkeep
+!data/raw/README.md
+data/parsed/*
+!data/parsed/.gitkeep
+data/structured/*
+!data/structured/.gitkeep
+data/review_results/*
+!data/review_results/.gitkeep
